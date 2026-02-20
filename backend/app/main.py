@@ -38,6 +38,7 @@ _spectrum_cache = {
 _noise_floor = {}
 _last_frame_ts = None
 _last_send_ts = None
+_logs = []
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
@@ -90,6 +91,13 @@ def _cpu_percent():
     return psutil.cpu_percent(interval=None)
 
 
+def _log(message):
+    timestamp = datetime.now(timezone.utc).isoformat()
+    _logs.append(f"{timestamp} {message}")
+    if len(_logs) > 500:
+        _logs.pop(0)
+
+
 @app.get("/api/health")
 def health(request: Request):
     _enforce_auth(request)
@@ -140,6 +148,7 @@ async def scan_start(payload: dict, request: Request):
     _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
     _scan_state["scan"] = scan
     _scan_state["scan_id"] = _db.start_scan(scan, _scan_state["started_at"])
+    _log("scan_start")
     return _scan_state
 
 
@@ -149,6 +158,7 @@ async def scan_stop(request: Request):
     await _scan_engine.stop_async()
     _scan_state["state"] = "stopped"
     _db.end_scan(_scan_state.get("scan_id"), datetime.now(timezone.utc).isoformat())
+    _log("scan_stop")
     return _scan_state
 
 
@@ -214,6 +224,13 @@ def scans(limit: int = 100, request: Request = None):
     if request:
         _enforce_auth(request)
     return _db.get_scans(limit=limit)
+
+
+@app.get("/api/logs")
+def logs(limit: int = 200, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    return _logs[-limit:]
 
 
 @app.get("/api/scan/status")

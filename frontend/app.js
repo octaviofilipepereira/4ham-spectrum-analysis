@@ -39,6 +39,9 @@ const favoriteFilter = document.getElementById("favoriteFilter");
 const loginUserInput = document.getElementById("loginUser");
 const loginPassInput = document.getElementById("loginPass");
 const loginSaveBtn = document.getElementById("loginSave");
+const loginStatus = document.getElementById("loginStatus");
+const onboarding = document.getElementById("onboarding");
+const onboardingClose = document.getElementById("onboardingClose");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -200,6 +203,11 @@ function getAuthHeader() {
   return { Authorization: `Basic ${token}` };
 }
 
+function updateLoginStatus() {
+  const user = localStorage.getItem("authUser");
+  loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
+}
+
 function wsUrl(path) {
   const user = localStorage.getItem("authUser");
   const pass = localStorage.getItem("authPass");
@@ -271,6 +279,19 @@ async function fetchEvents() {
     }));
   } catch (err) {
     addEvent("Failed to load events");
+  }
+}
+
+async function fetchLogs() {
+  try {
+    const resp = await fetch("/api/logs?limit=50", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    logsEl.textContent = data.join("\n");
+  } catch (err) {
+    return;
   }
 }
 
@@ -481,6 +502,12 @@ loginSaveBtn.addEventListener("click", () => {
   localStorage.setItem("authUser", loginUserInput.value);
   localStorage.setItem("authPass", loginPassInput.value);
   showToast("Credentials saved");
+  updateLoginStatus();
+});
+
+onboardingClose.addEventListener("click", () => {
+  onboarding.classList.remove("show");
+  localStorage.setItem("onboardingDone", "1");
 });
 
 function loadFilters() {
@@ -534,6 +561,13 @@ saveBandBtn.addEventListener("click", async () => {
 });
 
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters);
+updateLoginStatus();
+fetchLogs();
+setInterval(fetchLogs, 4000);
+
+if (!localStorage.getItem("onboardingDone")) {
+  onboarding.classList.add("show");
+}
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

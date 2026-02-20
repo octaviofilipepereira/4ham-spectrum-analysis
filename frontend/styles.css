@@ -56,6 +56,12 @@ h1 {
   flex-wrap: wrap;
 }
 
+.login-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  align-self: center;
+}
+
 .control {
   display: flex;
   flex-direction: column;
@@ -117,6 +123,31 @@ h1 {
   display: grid;
   gap: 8px;
   color: var(--muted);
+}
+
+.onboarding {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 24, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.onboarding.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.onboarding__card {
+  background: #0f182f;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 360px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .filters {

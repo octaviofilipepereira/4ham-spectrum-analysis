@@ -28,6 +28,7 @@
             <input type="text" id="recordPath" value="data/iq_recording.c64" />
           </label>
           <button class="btn primary" id="startScan">Start scan</button>
+          <span class="login-status" id="loginStatus">Auth: guest</span>
           <button class="btn ghost" id="stopScan">Stop</button>
         </div>
       </header>
@@ -46,6 +47,14 @@
         </div>
       </section>
 
+
+    <div class="onboarding" id="onboarding">
+      <div class="onboarding__card">
+        <h2>Welcome</h2>
+        <p>Configure device, band, and credentials. Use the Start button or press <strong>s</strong>.</p>
+        <button class="btn primary" id="onboardingClose">Got it</button>
+      </div>
+    </div>
       <section class="panel status">
         <h2>Status</h2>
         <pre id="status">Disconnected</pre>
