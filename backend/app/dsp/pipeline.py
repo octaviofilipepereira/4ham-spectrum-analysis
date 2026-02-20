@@ -122,7 +122,23 @@ def estimate_occupancy(
             }
         )
 
-    return results
+    if results:
+        return results
+
+    if adapt:
+        threshold_dbm = max(threshold_dbm, power_db - 10.0)
+    occupied = power_db > threshold_dbm
+    return [
+        {
+            "frequency_hz": None,
+            "bandwidth_hz": int(sample_rate),
+            "power_dbm": float(power_db),
+            "threshold_dbm": float(threshold_dbm),
+            "noise_floor_db": float(noise_floor_db),
+            "snr_db": float(power_db - threshold_dbm),
+            "occupied": bool(occupied)
+        }
+    ]
 
 
 def compute_fft_db(iq_samples, sample_rate, smooth_bins=4):

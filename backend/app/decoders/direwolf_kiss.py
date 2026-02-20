@@ -61,12 +61,10 @@ def _decode_callsign(addr):
 def parse_ax25_source(frame):
     if not frame:
         return None
-    if frame[0] & 0x0F != 0:
+    if len(frame) < 14:
         return None
-    if len(frame) < 15:
-        return None
-    dest = frame[1:8]
-    src = frame[8:15]
+    dest = frame[0:7]
+    src = frame[7:14]
     src_call = _decode_callsign(src)
     return src_call
 

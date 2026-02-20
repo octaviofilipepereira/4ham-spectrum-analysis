@@ -50,9 +50,9 @@ def test_wsjtx_udp_decode_with_dial():
 def test_direwolf_kiss_parser():
     dest = bytes([0x80] * 6) + bytes([0x60])
     src = _encode_callsign("CT1ABC") + bytes([0x60])
-    ax25 = dest + src
+    control_pid = bytes([0x03, 0xF0])
+    ax25 = dest + src + control_pid
     frame = bytes([0x00]) + ax25
     event = parse_kiss_frame(frame)
     assert event is not None
     assert event["callsign"] == "CT1ABC"
-*** End Patch
