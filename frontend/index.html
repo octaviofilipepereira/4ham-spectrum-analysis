@@ -52,6 +52,34 @@
       </section>
 
       <section class="panel">
+        <h2>Filters</h2>
+        <div class="filters">
+          <label class="control">
+            Band
+            <select id="bandFilter">
+              <option value="">All</option>
+              <option value="20m">20m</option>
+              <option value="40m">40m</option>
+              <option value="2m">2m</option>
+              <option value="70cm">70cm</option>
+            </select>
+          </label>
+          <label class="control">
+            Mode
+            <select id="modeFilter">
+              <option value="">All</option>
+              <option value="FT8">FT8</option>
+              <option value="FT4">FT4</option>
+              <option value="APRS">APRS</option>
+              <option value="CW">CW</option>
+              <option value="SSB">SSB</option>
+            </select>
+          </label>
+          <button class="btn ghost" id="exportCsv">Export CSV</button>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Logs</h2>
         <pre id="logs">No logs yet.</pre>
       </section>

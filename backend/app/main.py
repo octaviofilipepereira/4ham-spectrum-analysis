@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 from fastapi import FastAPI, WebSocket
+from fastapi.responses import PlainTextResponse
 
 from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy
 from app.scan.engine import ScanEngine
@@ -97,8 +98,22 @@ async def scan_stop():
 
 
 @app.get("/api/events")
-def events(limit: int = 1000, band: str | None = None, mode: str | None = None):
-    return _db.get_events(limit=limit, band=band, mode=mode)
+def events(limit: int = 1000, band: str | None = None, mode: str | None = None, format: str | None = None):
+    data = _db.get_events(limit=limit, band=band, mode=mode)
+    if format == "csv":
+        lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence"]
+        for item in data:
+            lines.append(",".join([
+                str(item.get("type", "")),
+                str(item.get("timestamp", "")),
+                str(item.get("band", "")),
+                str(item.get("frequency_hz", "")),
+                str(item.get("mode", "")),
+                str(item.get("callsign", "")),
+                str(item.get("confidence", ""))
+            ]))
+        return PlainTextResponse("\n".join(lines), media_type="text/csv")
+    return data
 
 
 @app.get("/api/scans")

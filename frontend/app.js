@@ -8,6 +8,9 @@ const gainInput = document.getElementById("gain");
 const sampleRateInput = document.getElementById("sampleRate");
 const recordPathInput = document.getElementById("recordPath");
 const logsEl = document.getElementById("logs");
+const bandFilter = document.getElementById("bandFilter");
+const modeFilter = document.getElementById("modeFilter");
+const exportCsvBtn = document.getElementById("exportCsv");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -44,7 +47,14 @@ function renderEvents(items) {
 
 async function fetchEvents() {
   try {
-    const resp = await fetch("/api/events?limit=25&band=20m");
+    const params = new URLSearchParams({ limit: "25" });
+    if (bandFilter.value) {
+      params.append("band", bandFilter.value);
+    }
+    if (modeFilter.value) {
+      params.append("mode", modeFilter.value);
+    }
+    const resp = await fetch(`/api/events?${params.toString()}`);
     const data = await resp.json();
     renderEvents(data);
   } catch (err) {
@@ -103,6 +113,29 @@ function connectEvents() {
 connectEvents();
 fetchEvents();
 setInterval(fetchEvents, 5000);
+
+bandFilter.addEventListener("change", fetchEvents);
+modeFilter.addEventListener("change", fetchEvents);
+
+exportCsvBtn.addEventListener("click", () => {
+  const params = new URLSearchParams({ limit: "1000", format: "csv" });
+  if (bandFilter.value) {
+    params.append("band", bandFilter.value);
+  }
+  if (modeFilter.value) {
+    params.append("mode", modeFilter.value);
+  }
+  window.location.href = `/api/events?${params.toString()}`;
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "s") {
+    startBtn.click();
+  }
+  if (event.key === "x") {
+    stopBtn.click();
+  }
+});
 
 function connectSpectrum() {
   try {

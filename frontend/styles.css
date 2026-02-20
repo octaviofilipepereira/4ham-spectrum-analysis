@@ -77,6 +77,22 @@ h1 {
   width: 220px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.control select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  width: 140px;
+}
+
 pre {
   white-space: pre-wrap;
   word-break: break-word;
