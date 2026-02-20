@@ -56,6 +56,9 @@ const qualityLabel = document.getElementById("qualityLabel");
 const bandSummary = document.getElementById("bandSummary");
 const modeSummary = document.getElementById("modeSummary");
 const pageNumberLabel = document.getElementById("pageNumber");
+const showBandSummary = document.getElementById("showBandSummary");
+const showModeSummary = document.getElementById("showModeSummary");
+const eventsTotal = document.getElementById("eventsTotal");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -268,6 +271,7 @@ function renderEvents(items) {
   eventsEl.innerHTML = "";
   const counts = {};
   const modeCounts = {};
+  eventsTotal.textContent = String(items.length);
   items.forEach((eventItem) => {
     const label = `${eventItem.type} | ${eventItem.band || "?"} | ${eventItem.frequency_hz} Hz`;
     addEvent(label);
@@ -279,17 +283,21 @@ function renderEvents(items) {
     }
   });
   bandSummary.innerHTML = "";
-  Object.entries(counts).forEach(([band, count]) => {
-    const li = document.createElement("li");
-    li.textContent = `${band}: ${count}`;
-    bandSummary.appendChild(li);
-  });
+  if (showBandSummary.value === "on") {
+    Object.entries(counts).forEach(([band, count]) => {
+      const li = document.createElement("li");
+      li.textContent = `${band}: ${count}`;
+      bandSummary.appendChild(li);
+    });
+  }
   modeSummary.innerHTML = "";
-  Object.entries(modeCounts).forEach(([mode, count]) => {
-    const li = document.createElement("li");
-    li.textContent = `${mode}: ${count}`;
-    modeSummary.appendChild(li);
-  });
+  if (showModeSummary.value === "on") {
+    Object.entries(modeCounts).forEach(([mode, count]) => {
+      const li = document.createElement("li");
+      li.textContent = `${mode}: ${count}`;
+      modeSummary.appendChild(li);
+    });
+  }
 }
 
 async function fetchEvents() {
@@ -329,8 +337,8 @@ async function fetchEvents() {
       end: endFilter.value
     }));
     localStorage.setItem("summary", JSON.stringify({
-      showBand: true,
-      showMode: true
+      showBand: showBandSummary.value === "on",
+      showMode: showModeSummary.value === "on"
     }));
   } catch (err) {
     addEvent("Failed to load events");
@@ -588,6 +596,10 @@ async function loadSettings() {
       cwToggle.value = data.modes.cw ? "on" : "off";
       ssbToggle.value = data.modes.ssb ? "on" : "off";
     }
+    if (data.summary) {
+      showBandSummary.value = data.summary.showBand ? "on" : "off";
+      showModeSummary.value = data.summary.showMode ? "on" : "off";
+    }
   } catch (err) {
     logLine("Failed to load settings");
   }
@@ -609,6 +621,29 @@ saveModesBtn.addEventListener("click", async () => {
   });
   showToast("Modes saved");
 });
+
+showBandSummary.addEventListener("change", () => {
+  persistSummary();
+  fetchEvents();
+});
+
+showModeSummary.addEventListener("change", () => {
+  persistSummary();
+  fetchEvents();
+});
+
+function persistSummary() {
+  const summary = {
+    showBand: showBandSummary.value === "on",
+    showMode: showModeSummary.value === "on"
+  };
+  localStorage.setItem("summary", JSON.stringify(summary));
+  fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ summary })
+  });
+}
 
 prevPageBtn.addEventListener("click", () => {
   eventOffset = Math.max(0, eventOffset - 25);

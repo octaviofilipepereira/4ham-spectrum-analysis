@@ -263,12 +263,35 @@
 
       <section class="panel">
         <h2>Band Summary</h2>
+        <div class="filters">
+          <label class="control">
+            Show
+            <select id="showBandSummary">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+        </div>
         <ul class="summary" id="bandSummary"></ul>
       </section>
 
       <section class="panel">
         <h2>Mode Summary</h2>
+        <div class="filters">
+          <label class="control">
+            Show
+            <select id="showModeSummary">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+        </div>
         <ul class="summary" id="modeSummary"></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Total Events</h2>
+        <p id="eventsTotal">0</p>
       </section>
     </main>
 
