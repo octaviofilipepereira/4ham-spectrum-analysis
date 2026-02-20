@@ -1,5 +1,6 @@
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
+const waterfallEl = document.getElementById("waterfall");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 
@@ -41,3 +42,24 @@ function connectEvents() {
 }
 
 connectEvents();
+
+function connectSpectrum() {
+  try {
+    const ws = new WebSocket("ws://localhost:8000/ws/spectrum");
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        const frame = data.spectrum_frame;
+        if (frame && frame.fft_db) {
+          waterfallEl.textContent = `FFT bins: ${frame.fft_db.length} | center ${frame.center_hz}`;
+        }
+      } catch (err) {
+        waterfallEl.textContent = "Spectrum decode error";
+      }
+    };
+  } catch (err) {
+    waterfallEl.textContent = "Spectrum stream unavailable";
+  }
+}
+
+connectSpectrum();

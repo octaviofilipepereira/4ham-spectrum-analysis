@@ -1,7 +1,10 @@
+import asyncio
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+import numpy as np
+from fastapi import FastAPI, WebSocket
 
+from app.dsp.pipeline import compute_fft_db
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
 
@@ -57,3 +60,47 @@ def scan_stop():
 @app.get("/api/events")
 def events():
     return []
+
+
+@app.websocket("/ws/events")
+async def ws_events(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        payload = {
+            "event": {
+                "type": "occupancy",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "band": "20m",
+                "frequency_hz": 14074000,
+                "bandwidth_hz": 2700,
+                "power_dbm": -90.0,
+                "snr_db": 6.0,
+                "threshold_dbm": -98.0,
+                "occupied": True,
+                "mode": "SSB",
+                "confidence": 0.6,
+                "device": _scan_state.get("device")
+            }
+        }
+        await websocket.send_json(payload)
+        await asyncio.sleep(2.0)
+
+
+@app.websocket("/ws/spectrum")
+async def ws_spectrum(websocket: WebSocket):
+    await websocket.accept()
+    sample_rate = 48000
+    while True:
+        iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+        fft_db, bin_hz = compute_fft_db(iq, sample_rate)
+        payload = {
+            "spectrum_frame": {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "center_hz": 14074000,
+                "span_hz": sample_rate,
+                "bin_hz": bin_hz,
+                "fft_db": fft_db
+            }
+        }
+        await websocket.send_json(payload)
+        await asyncio.sleep(0.2)
