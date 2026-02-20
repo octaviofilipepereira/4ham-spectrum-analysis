@@ -177,6 +177,16 @@ def events(
 ):
     if request:
         _enforce_auth(request)
+    settings = _db.get_settings()
+    modes = settings.get("modes") or {}
+    if mode is None and modes:
+        enabled_modes = [
+            name.upper()
+            for name, enabled in modes.items()
+            if enabled
+        ]
+        if enabled_modes:
+            mode = enabled_modes[0]
     data = _db.get_events(limit=limit, offset=offset, band=band, mode=mode, callsign=callsign, start=start, end=end)
     if format == "csv":
         lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence,snr_db,power_dbm,scan_id"]
@@ -200,6 +210,7 @@ def events(
 @app.get("/api/export")
 def export_events(
     limit: int = 1000,
+    offset: int = 0,
     band: str | None = None,
     mode: str | None = None,
     callsign: str | None = None,
@@ -212,6 +223,7 @@ def export_events(
         _enforce_auth(request)
     return events(
         limit=limit,
+        offset=offset,
         band=band,
         mode=mode,
         callsign=callsign,

@@ -48,6 +48,10 @@ const onboardingPrev = document.getElementById("onboardingPrev");
 const onboardingNext = document.getElementById("onboardingNext");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
+const prevPageBtn = document.getElementById("prevPage");
+const nextPageBtn = document.getElementById("nextPage");
+const qualityBar = document.getElementById("qualityBar");
+const qualityLabel = document.getElementById("qualityLabel");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -217,6 +221,16 @@ function getAuthHeader() {
 function updateLoginStatus() {
   const user = localStorage.getItem("authUser");
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
+}
+
+function updateQuality(minDb, maxDb) {
+  if (minDb === "?" || maxDb === "?") {
+    return;
+  }
+  const snr = Math.max(0, Number(maxDb) - Number(minDb));
+  const pct = Math.min(100, Math.round((snr / 30) * 100));
+  qualityBar.style.setProperty("--quality", `${pct}%`);
+  qualityLabel.textContent = `SNR: ${snr.toFixed(1)} dB`;
 }
 
 function wsUrl(path) {
@@ -429,6 +443,7 @@ function connectSpectrum() {
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
           const maxDb = frame.max_db !== undefined ? frame.max_db.toFixed(1) : "?";
           waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb}`;
+          updateQuality(minDb, maxDb);
         }
       } catch (err) {
         waterfallStatus.textContent = "Spectrum decode error";
@@ -557,6 +572,16 @@ saveModesBtn.addEventListener("click", async () => {
     body: JSON.stringify(payload)
   });
   showToast("Modes saved");
+});
+
+prevPageBtn.addEventListener("click", () => {
+  eventOffset = Math.max(0, eventOffset - 25);
+  fetchEvents();
+});
+
+nextPageBtn.addEventListener("click", () => {
+  eventOffset += 25;
+  fetchEvents();
 });
 
 loginSaveBtn.addEventListener("click", () => {
