@@ -291,6 +291,8 @@ def save_settings(payload: dict, request: Request):
         existing["favorites"] = payload.get("favorites")
     if payload.get("modes"):
         existing["modes"] = payload.get("modes")
+    if payload.get("summary"):
+        existing["summary"] = payload.get("summary")
     _db.save_settings(existing)
     return {"status": "ok"}
 

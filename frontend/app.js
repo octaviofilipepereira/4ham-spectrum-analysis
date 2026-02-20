@@ -54,6 +54,8 @@ const nextPageBtn = document.getElementById("nextPage");
 const qualityBar = document.getElementById("qualityBar");
 const qualityLabel = document.getElementById("qualityLabel");
 const bandSummary = document.getElementById("bandSummary");
+const modeSummary = document.getElementById("modeSummary");
+const pageNumberLabel = document.getElementById("pageNumber");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -265,11 +267,15 @@ function addEvent(text) {
 function renderEvents(items) {
   eventsEl.innerHTML = "";
   const counts = {};
+  const modeCounts = {};
   items.forEach((eventItem) => {
     const label = `${eventItem.type} | ${eventItem.band || "?"} | ${eventItem.frequency_hz} Hz`;
     addEvent(label);
     if (eventItem.band) {
       counts[eventItem.band] = (counts[eventItem.band] || 0) + 1;
+    }
+    if (eventItem.mode) {
+      modeCounts[eventItem.mode] = (modeCounts[eventItem.mode] || 0) + 1;
     }
   });
   bandSummary.innerHTML = "";
@@ -277,6 +283,12 @@ function renderEvents(items) {
     const li = document.createElement("li");
     li.textContent = `${band}: ${count}`;
     bandSummary.appendChild(li);
+  });
+  modeSummary.innerHTML = "";
+  Object.entries(modeCounts).forEach(([mode, count]) => {
+    const li = document.createElement("li");
+    li.textContent = `${mode}: ${count}`;
+    modeSummary.appendChild(li);
   });
 }
 
@@ -308,12 +320,17 @@ async function fetchEvents() {
     const data = await resp.json();
     renderEvents(data);
     pageOffsetLabel.textContent = `Offset: ${eventOffset}`;
+    pageNumberLabel.textContent = `Page: ${Math.floor(eventOffset / 25) + 1}`;
     localStorage.setItem("filters", JSON.stringify({
       band: bandFilter.value,
       mode: modeFilter.value,
       callsign: callsignFilter.value,
       start: startFilter.value,
       end: endFilter.value
+    }));
+    localStorage.setItem("summary", JSON.stringify({
+      showBand: true,
+      showMode: true
     }));
   } catch (err) {
     addEvent("Failed to load events");
