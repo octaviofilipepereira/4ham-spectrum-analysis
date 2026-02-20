@@ -176,13 +176,18 @@ class Database:
         )
         self.conn.commit()
 
-    def get_events(self, limit=1000, band=None, mode=None):
+    def get_events(self, limit=1000, band=None, mode=None, callsign=None, start=None, end=None):
         events = []
         params = [limit]
         band_filter = ""
+        time_filter = ""
         if band:
             band_filter = "AND band = ?"
             params.insert(0, band)
+        if start and end:
+            time_filter = "AND timestamp BETWEEN ? AND ?"
+            params.insert(0, end)
+            params.insert(0, start)
 
         for row in self.conn.execute(
             """
@@ -190,10 +195,10 @@ class Database:
                    mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
                    device
             FROM occupancy_events
-            WHERE 1=1 {band_filter}
+            WHERE 1=1 {band_filter} {time_filter}
             ORDER BY timestamp DESC
             LIMIT ?
-            """.format(band_filter=band_filter),
+            """.format(band_filter=band_filter, time_filter=time_filter),
             tuple(params)
         ):
             events.append(dict(row))
@@ -201,22 +206,36 @@ class Database:
         params = [limit]
         band_filter = ""
         mode_filter = ""
+        callsign_filter = ""
+        time_filter = ""
         if band:
             band_filter = "AND band = ?"
             params.insert(0, band)
         if mode:
             mode_filter = "AND mode = ?"
             params.insert(0, mode)
+        if callsign:
+            callsign_filter = "AND callsign = ?"
+            params.insert(0, callsign)
+        if start and end:
+            time_filter = "AND timestamp BETWEEN ? AND ?"
+            params.insert(0, end)
+            params.insert(0, start)
 
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                  mode, callsign, snr_db, df_hz, confidence, raw, source, device
             FROM callsign_events
-            WHERE 1=1 {band_filter} {mode_filter}
+            WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {time_filter}
             ORDER BY timestamp DESC
             LIMIT ?
-            """.format(band_filter=band_filter, mode_filter=mode_filter),
+            """.format(
+                band_filter=band_filter,
+                mode_filter=mode_filter,
+                callsign_filter=callsign_filter,
+                time_filter=time_filter
+            ),
             tuple(params)
         ):
             events.append(dict(row))

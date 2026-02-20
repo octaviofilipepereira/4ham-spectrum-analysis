@@ -77,6 +77,10 @@ h1 {
   width: 220px;
 }
 
+.control input[type="datetime-local"] {
+  width: 200px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;

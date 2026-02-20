@@ -10,6 +10,9 @@ const recordPathInput = document.getElementById("recordPath");
 const logsEl = document.getElementById("logs");
 const bandFilter = document.getElementById("bandFilter");
 const modeFilter = document.getElementById("modeFilter");
+const callsignFilter = document.getElementById("callsignFilter");
+const startFilter = document.getElementById("startFilter");
+const endFilter = document.getElementById("endFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
@@ -53,6 +56,15 @@ async function fetchEvents() {
     }
     if (modeFilter.value) {
       params.append("mode", modeFilter.value);
+    }
+    if (callsignFilter.value) {
+      params.append("callsign", callsignFilter.value.trim());
+    }
+    if (startFilter.value) {
+      params.append("start", new Date(startFilter.value).toISOString());
+    }
+    if (endFilter.value) {
+      params.append("end", new Date(endFilter.value).toISOString());
     }
     const resp = await fetch(`/api/events?${params.toString()}`);
     const data = await resp.json();
@@ -116,6 +128,9 @@ setInterval(fetchEvents, 5000);
 
 bandFilter.addEventListener("change", fetchEvents);
 modeFilter.addEventListener("change", fetchEvents);
+callsignFilter.addEventListener("change", fetchEvents);
+startFilter.addEventListener("change", fetchEvents);
+endFilter.addEventListener("change", fetchEvents);
 
 exportCsvBtn.addEventListener("click", () => {
   const params = new URLSearchParams({ limit: "1000", format: "csv" });
@@ -125,7 +140,16 @@ exportCsvBtn.addEventListener("click", () => {
   if (modeFilter.value) {
     params.append("mode", modeFilter.value);
   }
-  window.location.href = `/api/events?${params.toString()}`;
+  if (callsignFilter.value) {
+    params.append("callsign", callsignFilter.value.trim());
+  }
+  if (startFilter.value) {
+    params.append("start", new Date(startFilter.value).toISOString());
+  }
+  if (endFilter.value) {
+    params.append("end", new Date(endFilter.value).toISOString());
+  }
+  window.location.href = `/api/export?${params.toString()}`;
 });
 
 document.addEventListener("keydown", (event) => {

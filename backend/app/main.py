@@ -98,10 +98,18 @@ async def scan_stop():
 
 
 @app.get("/api/events")
-def events(limit: int = 1000, band: str | None = None, mode: str | None = None, format: str | None = None):
-    data = _db.get_events(limit=limit, band=band, mode=mode)
+def events(
+    limit: int = 1000,
+    band: str | None = None,
+    mode: str | None = None,
+    callsign: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    format: str | None = None
+):
+    data = _db.get_events(limit=limit, band=band, mode=mode, callsign=callsign, start=start, end=end)
     if format == "csv":
-        lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence"]
+        lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence,snr_db,power_dbm,scan_id"]
         for item in data:
             lines.append(",".join([
                 str(item.get("type", "")),
@@ -110,10 +118,34 @@ def events(limit: int = 1000, band: str | None = None, mode: str | None = None, 
                 str(item.get("frequency_hz", "")),
                 str(item.get("mode", "")),
                 str(item.get("callsign", "")),
-                str(item.get("confidence", ""))
+                str(item.get("confidence", "")),
+                str(item.get("snr_db", "")),
+                str(item.get("power_dbm", "")),
+                str(item.get("scan_id", ""))
             ]))
         return PlainTextResponse("\n".join(lines), media_type="text/csv")
     return data
+
+
+@app.get("/api/export")
+def export_events(
+    limit: int = 1000,
+    band: str | None = None,
+    mode: str | None = None,
+    callsign: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    format: str = "csv"
+):
+    return events(
+        limit=limit,
+        band=band,
+        mode=mode,
+        callsign=callsign,
+        start=start,
+        end=end,
+        format=format
+    )
 
 
 @app.get("/api/scans")
