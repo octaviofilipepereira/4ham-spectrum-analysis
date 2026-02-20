@@ -13,7 +13,7 @@ Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-
 - UI web moderna, limpa e responsiva.
 - Idiomas: Portugues, Ingles, Espanhol (selecionado na instalacao).
 
-Nota: instrucoes de instalacao em [docs/install.md](docs/install.md).
+Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo SoapySDR via `apt` no Linux.
 
 ## Bandas alvo
 - 2 m
