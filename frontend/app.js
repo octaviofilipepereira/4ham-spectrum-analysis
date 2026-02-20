@@ -550,6 +550,9 @@ function connectSpectrum() {
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
           const maxDb = frame.max_db !== undefined ? frame.max_db.toFixed(1) : "?";
           const noiseFloor = frame.noise_floor_db !== undefined ? frame.noise_floor_db.toFixed(1) : "?";
+          const agcGain = frame.agc_gain_db !== undefined && frame.agc_gain_db !== null
+            ? frame.agc_gain_db.toFixed(1)
+            : null;
           let peaksInfo = "";
           if (Array.isArray(frame.peaks) && frame.peaks.length) {
             const topPeaks = frame.peaks.slice(0, 3).map((peak) => {
@@ -559,7 +562,8 @@ function connectSpectrum() {
             });
             peaksInfo = ` | peaks ${frame.peaks.length}: ${topPeaks.join(", ")}`;
           }
-          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}`;
+          const agcInfo = agcGain ? ` | agc ${agcGain}dB` : "";
+          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo}`;
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
@@ -588,7 +592,11 @@ function connectStatus() {
         const status = data.status;
         if (status) {
           const nf = status.noise_floor_db !== undefined ? status.noise_floor_db.toFixed(1) : "?";
-          statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
+          const threshold = status.threshold_db !== undefined ? status.threshold_db.toFixed(1) : "?";
+          const agc = status.agc_gain_db !== undefined && status.agc_gain_db !== null
+            ? status.agc_gain_db.toFixed(1)
+            : "?";
+          statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB thr=${threshold}dB agc=${agc}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
         }
       } catch (err) {
         setStatus("Status decode error");

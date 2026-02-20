@@ -56,6 +56,7 @@ _wsjtx_transport = None
 _kiss_task = None
 _threshold_state = {}
 _agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
+_last_agc_gain_db = None
 _decoder_status = {
     "sources": {},
     "wsjtx_udp": {
@@ -571,7 +572,9 @@ async def ws_events(websocket: WebSocket):
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
         if _agc_enabled:
             from app.dsp.pipeline import apply_agc
-            iq, _ = apply_agc(iq)
+            iq, gain_db = apply_agc(iq)
+            global _last_agc_gain_db
+            _last_agc_gain_db = gain_db
         band = _scan_engine.config.get("band") if _scan_engine.config else None
         power_db = compute_power_db(iq)
         noise_floor = _update_noise_floor(band, power_db)
@@ -656,6 +659,8 @@ async def ws_spectrum(websocket: WebSocket):
         if _agc_enabled:
             from app.dsp.pipeline import apply_agc
             iq, agc_gain_db = apply_agc(iq)
+            global _last_agc_gain_db
+            _last_agc_gain_db = agc_gain_db
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
         peaks = detect_peaks(fft_db, bin_hz)
         noise_floor_db = estimate_noise_floor(fft_db)
@@ -709,6 +714,8 @@ async def ws_status(websocket: WebSocket):
                 "cpu_pct": _cpu_percent(),
                 "frame_age_ms": frame_age_ms,
                 "noise_floor_db": _noise_floor.get(band),
+                "threshold_db": _threshold_state.get(band),
+                "agc_gain_db": _last_agc_gain_db,
                 "scan": _scan_engine.status()
             }
         }

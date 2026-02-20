@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS callsign_events (
   df_hz INTEGER,
   confidence REAL,
   raw TEXT,
+    grid TEXT,
+    report TEXT,
+    time_s INTEGER,
+    dt_s REAL,
+    is_new INTEGER,
     path TEXT,
     payload TEXT,
     lat REAL,
@@ -91,6 +96,11 @@ class Database:
     def _ensure_columns(self):
         self._add_column("occupancy_events", "scan_id INTEGER")
         self._add_column("callsign_events", "scan_id INTEGER")
+        self._add_column("callsign_events", "grid TEXT")
+        self._add_column("callsign_events", "report TEXT")
+        self._add_column("callsign_events", "time_s INTEGER")
+        self._add_column("callsign_events", "dt_s REAL")
+        self._add_column("callsign_events", "is_new INTEGER")
         self._add_column("callsign_events", "path TEXT")
         self._add_column("callsign_events", "payload TEXT")
         self._add_column("callsign_events", "lat REAL")
@@ -211,8 +221,9 @@ class Database:
             """
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
-                df_hz, confidence, raw, path, payload, lat, lon, msg, source, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
+                payload, lat, lon, msg, source, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -225,6 +236,11 @@ class Database:
                 event.get("df_hz"),
                 event.get("confidence"),
                 event.get("raw"),
+                event.get("grid"),
+                event.get("report"),
+                event.get("time_s"),
+                event.get("dt_s"),
+                1 if event.get("is_new") else 0 if event.get("is_new") is not None else None,
                 event.get("path"),
                 event.get("payload"),
                 event.get("lat"),
@@ -285,8 +301,8 @@ class Database:
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
-                 mode, callsign, snr_db, df_hz, confidence, raw, path, payload,
-                 lat, lon, msg, source, device
+                 mode, callsign, snr_db, df_hz, confidence, raw, grid, report,
+                 time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device
             FROM callsign_events
             WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {time_filter}
             ORDER BY timestamp DESC

@@ -49,6 +49,7 @@ def test_wsjtx_udp_decode_with_dial():
     assert event is not None
     assert event["callsign"] == "CT1ABC"
     assert event["frequency_hz"] == dial + df_hz
+    assert event["grid"] == "IN51"
 
 
 def test_direwolf_kiss_parser():

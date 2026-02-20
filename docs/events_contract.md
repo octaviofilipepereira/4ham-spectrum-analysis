@@ -14,7 +14,7 @@ All events must also satisfy the base schema in [events.schema.json](../events.s
 - mode: FT8 or FT4
 - df_hz: integer
 - raw: decoded line from WSJT-X
-- optional: grid, report
+- optional: grid, report, time_s, dt_s, is_new
 
 Example
 ```json

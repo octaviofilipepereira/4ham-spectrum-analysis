@@ -1,11 +1,14 @@
 import asyncio
 import os
+import re
 import struct
 
 from app.decoders.parsers import extract_callsign
 
 
 _MAGIC = b"WSJT-X"
+_GRID_RE = re.compile(r"^[A-R]{2}\d{2}[A-X]{0,2}$", re.IGNORECASE)
+_REPORT_RE = re.compile(r"^(R)?[+-]?\d{1,2}$", re.IGNORECASE)
 
 
 class WsjtxState:
@@ -100,10 +103,10 @@ def parse_wsjtx_datagram(data, state):
     if message_type != 2:
         return None
 
-    _, offset = _read_u8(data, offset)
-    _, offset = _read_i32(data, offset)
+    is_new, offset = _read_u8(data, offset)
+    time_s, offset = _read_i32(data, offset)
     snr_db, offset = _read_i32(data, offset)
-    _, offset = _read_f64(data, offset)
+    dt_s, offset = _read_f64(data, offset)
     df_hz, offset = _read_u32(data, offset)
     mode, offset = _read_qstring(data, offset)
     message, offset = _read_qstring(data, offset)
@@ -112,6 +115,15 @@ def parse_wsjtx_datagram(data, state):
     callsign = extract_callsign(message)
     if not callsign:
         return None
+
+    grid = None
+    report = None
+    for token in str(message).split():
+        if grid is None and _GRID_RE.match(token):
+            grid = token.upper()
+            continue
+        if report is None and _REPORT_RE.match(token):
+            report = token.upper()
 
     frequency_hz = None
     if state.dial_hz is not None and df_hz is not None:
@@ -123,6 +135,11 @@ def parse_wsjtx_datagram(data, state):
         "snr_db": float(snr_db) if snr_db is not None else None,
         "df_hz": int(df_hz) if df_hz is not None else None,
         "frequency_hz": frequency_hz,
+        "grid": grid,
+        "report": report,
+        "time_s": int(time_s) if time_s is not None else None,
+        "dt_s": float(dt_s) if dt_s is not None else None,
+        "is_new": bool(is_new) if is_new is not None else None,
         "raw": message
     }
 
