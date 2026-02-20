@@ -109,7 +109,7 @@ def describe_kiss():
     return f"{host}:{port}"
 
 
-async def kiss_loop(on_event, stop_event, logger=None, reconnect_delay=3.0):
+async def kiss_loop(on_event, stop_event, logger=None, reconnect_delay=3.0, status_cb=None):
     config = get_kiss_config()
     if not config:
         return
@@ -121,6 +121,8 @@ async def kiss_loop(on_event, stop_event, logger=None, reconnect_delay=3.0):
             reader, writer = await asyncio.open_connection(host, port)
             if logger:
                 logger(f"direwolf_kiss_connected {host}:{port}")
+            if status_cb:
+                status_cb("connected", f"{host}:{port}")
             while not stop_event.is_set():
                 data = await reader.read(1024)
                 if not data:
@@ -135,9 +137,13 @@ async def kiss_loop(on_event, stop_event, logger=None, reconnect_delay=3.0):
             writer.close()
             if hasattr(writer, "wait_closed"):
                 await writer.wait_closed()
+            if status_cb:
+                status_cb("disconnected", f"{host}:{port}")
         except Exception as exc:
             if logger:
                 logger(f"direwolf_kiss_error {exc}")
+            if status_cb:
+                status_cb("error", str(exc))
             await asyncio.sleep(reconnect_delay)
         if not stop_event.is_set():
             await asyncio.sleep(reconnect_delay)

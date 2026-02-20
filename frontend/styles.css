@@ -140,6 +140,11 @@ h1 {
   color: var(--muted);
 }
 
+.summary span {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .onboarding {
   position: fixed;
   inset: 0;

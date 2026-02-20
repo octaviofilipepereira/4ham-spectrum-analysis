@@ -62,6 +62,11 @@ const eventsTotal = document.getElementById("eventsTotal");
 const totalGlobal = document.getElementById("totalGlobal");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
+const decoderStatusEl = document.getElementById("decoderStatus");
+const wsjtxUdpStatusEl = document.getElementById("wsjtxUdpStatus");
+const kissStatusEl = document.getElementById("kissStatus");
+const decoderLastEventEl = document.getElementById("decoderLastEvent");
+const agcStatusEl = document.getElementById("agcStatus");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -596,6 +601,34 @@ function connectStatus() {
 
 connectStatus();
 
+async function fetchDecoderStatus() {
+  if (!decoderStatusEl) {
+    return;
+  }
+  try {
+    const resp = await fetch("/api/decoders/status", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      throw new Error("decoder status failed");
+    }
+    const data = await resp.json();
+    const status = data.status || {};
+    const wsjtx = status.wsjtx_udp || {};
+    const kiss = status.direwolf_kiss || {};
+    const sources = status.sources || {};
+    const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
+    wsjtxUdpStatusEl.textContent = wsjtx.enabled ? `Listening ${wsjtx.listen || "?"}` : "Disabled";
+    const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
+    kissStatusEl.textContent = kissState;
+    decoderLastEventEl.textContent = lastEvent;
+    agcStatusEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
+  } catch (err) {
+    wsjtxUdpStatusEl.textContent = "Unavailable";
+    kissStatusEl.textContent = "Unavailable";
+    decoderLastEventEl.textContent = "-";
+    agcStatusEl.textContent = "-";
+  }
+}
+
 async function loadDevices() {
   try {
     const resp = await fetch("/api/devices", { headers: { ...getAuthHeader() } });
@@ -829,6 +862,8 @@ saveBandBtn.addEventListener("click", async () => {
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
 fetchModeStats();
 setInterval(fetchModeStats, 10000);
+fetchDecoderStatus();
+setInterval(fetchDecoderStatus, 10000);
 updateLoginStatus();
 connectLogs();
 fetchLogs();

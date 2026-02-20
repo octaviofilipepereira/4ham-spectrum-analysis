@@ -297,6 +297,19 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  ingest:
+                    type: object
+                  supported_modes:
+                    type: array
+                    items:
+                      type: string
+                  sources:
+                    type: array
+                    items:
+                      type: string
+                  status:
+                    type: object
   /api/decoders/events:
     post:
       summary: Ingest decoder events

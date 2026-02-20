@@ -56,6 +56,29 @@ _wsjtx_transport = None
 _kiss_task = None
 _threshold_state = {}
 _agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
+_decoder_status = {
+    "sources": {},
+    "wsjtx_udp": {
+        "enabled": False,
+        "listen": None,
+        "last_packet_at": None
+    },
+    "direwolf_kiss": {
+        "enabled": False,
+        "address": None,
+        "connected": False,
+        "last_packet_at": None,
+        "last_error": None
+    },
+    "files": {
+        "wsjtx": None,
+        "aprs": None,
+        "cw": None
+    },
+    "dsp": {
+        "agc_enabled": _agc_enabled
+    }
+}
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
@@ -127,9 +150,16 @@ def _log(message):
         _logs.pop(0)
 
 
+def _touch_decoder_source(source):
+    if not source:
+        return
+    _decoder_status["sources"][source] = datetime.now(timezone.utc).isoformat()
+
+
 def _start_decoder_watch(kind, path, parser, default_mode):
     if not path:
         return
+    _decoder_status["files"][kind] = path
     from_end = tail_from_end_default()
 
     async def handle_line(line):
@@ -138,6 +168,7 @@ def _start_decoder_watch(kind, path, parser, default_mode):
         event = build_callsign_event(payload, _scan_state)
         if not event:
             return
+        _touch_decoder_source(event.get("source"))
         _db.insert_callsign(event)
 
     task = asyncio.create_task(
@@ -153,18 +184,22 @@ async def on_startup():
     _start_decoder_watch("wsjtx", os.getenv("WSJTX_ALLTXT_PATH"), parse_wsjtx_line, "FT8")
     _start_decoder_watch("aprs", os.getenv("DIREWOLF_LOG_PATH"), parse_aprs_line, "APRS")
     _start_decoder_watch("cw", os.getenv("CW_DECODE_PATH"), parse_cw_text, "CW")
-    listener = create_wsjtx_udp_listener(_wsjtx_state, lambda payload: _ingest_callsign_payloads([payload], {}), logger=_log)
+    listener = create_wsjtx_udp_listener(_wsjtx_state, _handle_wsjtx_udp, logger=_log)
     if listener:
         transport, _ = await listener
         global _wsjtx_transport
         _wsjtx_transport = transport
-        _log(f"wsjtx_udp_listen {describe_wsjtx_udp()}")
+        listen_addr = describe_wsjtx_udp()
+        _decoder_status["wsjtx_udp"].update({"enabled": True, "listen": listen_addr})
+        _log(f"wsjtx_udp_listen {listen_addr}")
     global _kiss_task
     _kiss_task = asyncio.create_task(
-        kiss_loop(lambda payload: _ingest_callsign_payloads([payload], {}), _decoder_stop, logger=_log)
+        kiss_loop(_handle_kiss_event, _decoder_stop, logger=_log, status_cb=_handle_kiss_status)
     )
-    if describe_kiss():
-        _log(f"direwolf_kiss_listen {describe_kiss()}")
+    kiss_addr = describe_kiss()
+    if kiss_addr:
+        _decoder_status["direwolf_kiss"].update({"enabled": True, "address": kiss_addr})
+        _log(f"direwolf_kiss_listen {kiss_addr}")
 
 
 @app.on_event("shutdown")
@@ -324,7 +359,8 @@ def decoder_status(request: Request = None):
             "batch": True
         },
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
-        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp"]
+        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp"],
+        "status": _decoder_status
     }
 
 
@@ -402,9 +438,30 @@ def _ingest_callsign_payloads(items, defaults):
         if not event:
             errors.append({"index": idx, "error": "invalid_event"})
             continue
+        _touch_decoder_source(event.get("source"))
         _db.insert_callsign(event)
         saved += 1
     return {"status": "ok", "saved": saved, "errors": errors}
+
+
+def _handle_wsjtx_udp(payload):
+    _decoder_status["wsjtx_udp"]["last_packet_at"] = datetime.now(timezone.utc).isoformat()
+    return _ingest_callsign_payloads([payload], {})
+
+
+def _handle_kiss_event(payload):
+    _decoder_status["direwolf_kiss"]["last_packet_at"] = datetime.now(timezone.utc).isoformat()
+    return _ingest_callsign_payloads([payload], {})
+
+
+def _handle_kiss_status(event, detail):
+    if event == "connected":
+        _decoder_status["direwolf_kiss"]["connected"] = True
+        _decoder_status["direwolf_kiss"]["last_error"] = None
+    elif event == "disconnected":
+        _decoder_status["direwolf_kiss"]["connected"] = False
+    elif event == "error":
+        _decoder_status["direwolf_kiss"]["last_error"] = detail
 
 
 @app.get("/api/export")
