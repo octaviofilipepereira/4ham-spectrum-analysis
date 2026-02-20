@@ -93,6 +93,8 @@ Frontend skeleton: ver [frontend/index.html](frontend/index.html).
 - CW: detecao de tom, binarizacao adaptativa, decoder Morse, correcao de timing.
 - SSB (voz): VAD + ASR para sugerir callsigns (pipeline complexo, baixa confianca).
 
+Nota: o backend suporta ingestao automatica por ficheiros (ALL.TXT/ logs) via variaveis de ambiente; ver o manual completo.
+
 ## Pipelines tecnicos por decoder
 ### FT8 / FT4 (WSJT-X)
 1. Captura IQ e sintonizacao no segmento FT8/FT4 da banda.

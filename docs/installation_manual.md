@@ -105,6 +105,14 @@ python -m pip install -r backend/requirements.txt
 
 ## Decoder Integrations
 
+### File watchers (automatic ingest)
+The backend can tail decoder output files and ingest callsigns automatically. Configure paths via environment variables before starting the backend:
+
+- `WSJTX_ALLTXT_PATH`: path to WSJT-X `ALL.TXT`
+- `DIREWOLF_LOG_PATH`: path to Direwolf log/decoded output
+- `CW_DECODE_PATH`: path to a text file with decoded CW lines
+- `DECODER_TAIL_FROM_START`: set to `1` to start from beginning; default starts at end
+
 ### WSJT-X (FT8/FT4)
 - Configure WSJT-X to write decoded messages to ALL.TXT.
 - Use the decoder ingest endpoint:

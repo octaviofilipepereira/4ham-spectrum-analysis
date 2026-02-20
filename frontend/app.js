@@ -544,7 +544,17 @@ function connectSpectrum() {
           const endHz = Math.round(frame.center_hz + frame.span_hz / 2);
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
           const maxDb = frame.max_db !== undefined ? frame.max_db.toFixed(1) : "?";
-          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb}`;
+          const noiseFloor = frame.noise_floor_db !== undefined ? frame.noise_floor_db.toFixed(1) : "?";
+          let peaksInfo = "";
+          if (Array.isArray(frame.peaks) && frame.peaks.length) {
+            const topPeaks = frame.peaks.slice(0, 3).map((peak) => {
+              const hz = Math.round(peak.offset_hz ?? 0);
+              const snr = peak.snr_db !== undefined ? peak.snr_db.toFixed(1) : "?";
+              return `${hz}Hz/${snr}dB`;
+            });
+            peaksInfo = ` | peaks ${frame.peaks.length}: ${topPeaks.join(", ")}`;
+          }
+          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}`;
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
