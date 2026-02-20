@@ -539,7 +539,7 @@ function connectSpectrum() {
         const data = JSON.parse(msg.data);
         const frame = data.spectrum_frame;
         if (frame && frame.fft_db) {
-          drawWaterfall(frame.fft_db);
+          drawWaterfall(frame);
           const startHz = Math.round(frame.center_hz - frame.span_hz / 2);
           const endHz = Math.round(frame.center_hz + frame.span_hz / 2);
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
@@ -839,7 +839,8 @@ if (!localStorage.getItem("onboardingDone")) {
   renderOnboarding();
 }
 
-function drawWaterfall(fftDb) {
+function drawWaterfall(frame) {
+  const fftDb = frame.fft_db || [];
   const width = canvas.width / window.devicePixelRatio;
   const height = canvas.height / window.devicePixelRatio;
   if (!fftDb.length) {
@@ -872,6 +873,17 @@ function drawWaterfall(fftDb) {
   }
 
   ctx.putImageData(rowData, 0, row);
+  if (Array.isArray(frame.peaks) && frame.peaks.length && frame.span_hz) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    const span = frame.span_hz;
+    frame.peaks.forEach((peak) => {
+      const offset = peak.offset_hz ?? 0;
+      const x = Math.round(((offset + span / 2) / span) * width);
+      ctx.fillRect(x, row, 2, 1);
+    });
+    ctx.restore();
+  }
   row = (row + 1) % height;
   if (row === 0) {
     ctx.clearRect(0, 0, width, height);

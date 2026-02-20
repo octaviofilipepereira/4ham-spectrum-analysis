@@ -12,6 +12,7 @@ from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
 from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
+from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
 from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy, detect_peaks, estimate_noise_floor
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -52,6 +53,9 @@ _decoder_tasks = []
 _decoder_stop = asyncio.Event()
 _wsjtx_state = WsjtxState()
 _wsjtx_transport = None
+_kiss_task = None
+_threshold_state = {}
+_agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
@@ -95,6 +99,17 @@ def _update_noise_floor(band, power_db, alpha=0.05):
     else:
         _noise_floor[band] = (1 - alpha) * current + alpha * power_db
     return _noise_floor[band]
+
+
+def _update_threshold(band, threshold_db, alpha=0.1):
+    if band is None or threshold_db is None:
+        return threshold_db
+    current = _threshold_state.get(band)
+    if current is None:
+        _threshold_state[band] = threshold_db
+    else:
+        _threshold_state[band] = (1 - alpha) * current + alpha * threshold_db
+    return _threshold_state[band]
 
 
 def _cpu_percent():
@@ -144,6 +159,12 @@ async def on_startup():
         global _wsjtx_transport
         _wsjtx_transport = transport
         _log(f"wsjtx_udp_listen {describe_wsjtx_udp()}")
+    global _kiss_task
+    _kiss_task = asyncio.create_task(
+        kiss_loop(lambda payload: _ingest_callsign_payloads([payload], {}), _decoder_stop, logger=_log)
+    )
+    if describe_kiss():
+        _log(f"direwolf_kiss_listen {describe_kiss()}")
 
 
 @app.on_event("shutdown")
@@ -154,6 +175,8 @@ async def on_shutdown():
     _decoder_tasks.clear()
     if _wsjtx_transport:
         _wsjtx_transport.close()
+    if _kiss_task:
+        _kiss_task.cancel()
 
 
 @app.get("/api/health")
@@ -489,6 +512,9 @@ async def ws_events(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+        if _agc_enabled:
+            from app.dsp.pipeline import apply_agc
+            iq, _ = apply_agc(iq)
         band = _scan_engine.config.get("band") if _scan_engine.config else None
         power_db = compute_power_db(iq)
         noise_floor = _update_noise_floor(band, power_db)
@@ -501,10 +527,14 @@ async def ws_events(websocket: WebSocket):
         )
         if occupancy:
             best = max(occupancy, key=lambda item: item.get("snr_db", 0.0))
+            nf_db = best.get("noise_floor_db")
+            if nf_db is not None:
+                _update_noise_floor(band, nf_db)
             offset_hz = best.get("offset_hz")
             frequency_hz = _scan_engine.center_hz
             if offset_hz is not None:
                 frequency_hz = int(_scan_engine.center_hz + offset_hz)
+            adaptive_threshold = _update_threshold(band, best.get("threshold_dbm"))
             event = {
                 "type": "occupancy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -514,7 +544,7 @@ async def ws_events(websocket: WebSocket):
                 "bandwidth_hz": best["bandwidth_hz"],
                 "power_dbm": power_db,
                 "snr_db": best.get("snr_db"),
-                "threshold_dbm": best.get("threshold_dbm", threshold_dbm),
+                "threshold_dbm": adaptive_threshold or best.get("threshold_dbm", threshold_dbm),
                 "occupied": best["occupied"],
                 "mode": "Unknown",
                 "confidence": 0.4,
@@ -565,6 +595,10 @@ async def ws_spectrum(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+        agc_gain_db = None
+        if _agc_enabled:
+            from app.dsp.pipeline import apply_agc
+            iq, agc_gain_db = apply_agc(iq)
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
         peaks = detect_peaks(fft_db, bin_hz)
         noise_floor_db = estimate_noise_floor(fft_db)
@@ -589,7 +623,8 @@ async def ws_spectrum(websocket: WebSocket):
                 "min_db": min_db,
                 "max_db": max_db,
                 "noise_floor_db": noise_floor_db,
-                "peaks": peaks
+                "peaks": peaks,
+                "agc_gain_db": agc_gain_db
             }
         }
         await websocket.send_json(payload)

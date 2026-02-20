@@ -32,6 +32,7 @@ For a complete, step-by-step manual, see [docs/installation_manual.md](installat
 - For APRS, run Direwolf with KISS TCP enabled.
 - Optional: set decoder file paths (e.g., `WSJTX_ALLTXT_PATH`) for automatic ingest.
 - Optional: enable native WSJT-X UDP ingest with `WSJTX_UDP_ENABLE=1`.
+- Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
 
 ## Troubleshooting
 - If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.

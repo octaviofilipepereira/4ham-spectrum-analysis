@@ -120,6 +120,13 @@ The backend can listen to WSJT-X UDP broadcast packets (native protocol). Config
 - `WSJTX_UDP_HOST`: bind address (default `0.0.0.0`)
 - `WSJTX_UDP_PORT`: UDP port (default `2237`)
 
+### Direwolf KISS TCP
+The backend can connect to Direwolf KISS TCP and ingest APRS frames automatically. Configure:
+
+- `DIREWOLF_KISS_ENABLE`: set to `1` to enable
+- `DIREWOLF_KISS_HOST`: host (default `127.0.0.1`)
+- `DIREWOLF_KISS_PORT`: TCP port (default `8001`)
+
 ### WSJT-X (FT8/FT4)
 - Configure WSJT-X to write decoded messages to ALL.TXT.
 - Use the decoder ingest endpoint:

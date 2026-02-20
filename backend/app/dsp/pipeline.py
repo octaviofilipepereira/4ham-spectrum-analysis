@@ -45,6 +45,19 @@ def detect_peaks(fft_db, bin_hz, min_snr_db=6.0, max_peaks=6):
     ]
 
 
+def apply_agc(iq_samples, target_rms=0.25, max_gain_db=30.0):
+    if iq_samples is None or len(iq_samples) == 0:
+        return iq_samples, 0.0
+    rms = np.sqrt(np.mean(np.abs(iq_samples) ** 2))
+    if rms <= 0:
+        return iq_samples, 0.0
+    gain = target_rms / rms
+    gain_db = 20.0 * np.log10(gain + 1e-12)
+    gain_db = float(np.clip(gain_db, -max_gain_db, max_gain_db))
+    gain = 10 ** (gain_db / 20.0)
+    return iq_samples * gain, gain_db
+
+
 def estimate_occupancy(
     iq_samples,
     sample_rate,
@@ -79,6 +92,7 @@ def estimate_occupancy(
                 "bandwidth_hz": int(sample_rate),
                 "power_dbm": float(power_db),
                 "threshold_dbm": float(threshold_dbm),
+                "noise_floor_db": float(noise_floor_db),
                 "snr_db": float(power_db - threshold_dbm),
                 "occupied": bool(occupied)
             }
@@ -102,6 +116,7 @@ def estimate_occupancy(
                 "bandwidth_hz": bw_hz,
                 "power_dbm": float(power_db),
                 "threshold_dbm": float(threshold_db),
+                "noise_floor_db": float(noise_floor_db),
                 "snr_db": snr_db,
                 "occupied": True
             }

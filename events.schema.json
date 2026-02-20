@@ -42,6 +42,7 @@
             "bandwidth_hz": { "type": "integer", "minimum": 0 },
             "power_dbm": { "type": "number" },
             "threshold_dbm": { "type": "number" },
+            "noise_floor_db": { "type": "number" },
             "occupied": { "type": "boolean" }
           },
           "required": ["bandwidth_hz", "power_dbm", "threshold_dbm", "occupied"]

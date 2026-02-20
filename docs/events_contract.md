@@ -103,7 +103,7 @@ Example
 ## Occupancy
 - type: occupancy
 - bandwidth_hz, power_dbm, threshold_dbm, occupied
-- optional: offset_hz, snr_db
+- optional: offset_hz, snr_db, noise_floor_db
 
 Example
 ```json
