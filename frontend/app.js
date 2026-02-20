@@ -50,6 +50,14 @@ function logLine(text) {
 
 function showToast(message) {
   toast.textContent = message;
+  toast.classList.remove("error");
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2500);
+}
+
+function showToastError(message) {
+  toast.textContent = message;
+  toast.classList.add("error");
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 2500);
 }
@@ -248,8 +256,19 @@ async function fetchEvents() {
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() }
     });
+    if (resp.status === 401) {
+      showToastError("Authentication failed");
+      return;
+    }
     const data = await resp.json();
     renderEvents(data);
+    localStorage.setItem("filters", JSON.stringify({
+      band: bandFilter.value,
+      mode: modeFilter.value,
+      callsign: callsignFilter.value,
+      start: startFilter.value,
+      end: endFilter.value
+    }));
   } catch (err) {
     addEvent("Failed to load events");
   }
@@ -464,6 +483,15 @@ loginSaveBtn.addEventListener("click", () => {
   showToast("Credentials saved");
 });
 
+function loadFilters() {
+  const data = JSON.parse(localStorage.getItem("filters") || "{}")
+  if (data.band) bandFilter.value = data.band;
+  if (data.mode) modeFilter.value = data.mode;
+  if (data.callsign) callsignFilter.value = data.callsign;
+  if (data.start) startFilter.value = data.start;
+  if (data.end) endFilter.value = data.end;
+}
+
 saveSettingsBtn.addEventListener("click", async () => {
   localStorage.setItem("authUser", authUserInput.value);
   localStorage.setItem("authPass", authPassInput.value);
@@ -505,7 +533,7 @@ saveBandBtn.addEventListener("click", async () => {
   loadBands();
 });
 
-loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites);
+loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters);
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

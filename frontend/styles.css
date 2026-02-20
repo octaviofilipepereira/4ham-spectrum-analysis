@@ -81,6 +81,10 @@ h1 {
   width: 200px;
 }
 
+.control input[type="password"] {
+  width: 180px;
+}
+
 .toast {
   position: fixed;
   bottom: 24px;
@@ -99,6 +103,20 @@ h1 {
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+.toast.error {
+  border-color: rgba(255, 99, 99, 0.6);
+  color: #ffd6d6;
+}
+
+.help {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
 }
 
 .filters {
