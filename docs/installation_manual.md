@@ -127,6 +127,16 @@ The backend can connect to Direwolf KISS TCP and ingest APRS frames automaticall
 - `DIREWOLF_KISS_HOST`: host (default `127.0.0.1`)
 - `DIREWOLF_KISS_PORT`: TCP port (default `8001`)
 
+## DSP Tuning
+Optional environment variables to refine DSP behavior:
+
+- `DSP_AGC_ENABLE`: set to `1` to enable AGC
+- `DSP_AGC_TARGET_RMS`: target RMS level (default `0.25`)
+- `DSP_AGC_MAX_GAIN_DB`: max AGC gain in dB (default `30`)
+- `DSP_AGC_ALPHA`: smoothing factor for gain (default `0.2`)
+- `DSP_SNR_THRESHOLD_DB`: SNR threshold for occupancy (default `6`)
+- `DSP_MIN_BW_HZ`: minimum occupancy bandwidth (default `500`)
+
 ### WSJT-X (FT8/FT4)
 - Configure WSJT-X to write decoded messages to ALL.TXT.
 - Use the decoder ingest endpoint:

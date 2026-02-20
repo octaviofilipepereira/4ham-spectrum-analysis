@@ -13,7 +13,14 @@ from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_tex
 from app.decoders.watchers import tail_lines, tail_from_end_default
 from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
 from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
-from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy, detect_peaks, estimate_noise_floor
+from app.dsp.pipeline import (
+    compute_fft_db,
+    compute_power_db,
+    estimate_occupancy,
+    detect_peaks,
+    estimate_noise_floor,
+    apply_agc_smoothed
+)
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
 from app.storage.db import Database
@@ -55,7 +62,29 @@ _wsjtx_state = WsjtxState()
 _wsjtx_transport = None
 _kiss_task = None
 _threshold_state = {}
+
+
+def _env_float(name, default):
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return int(default)
+
+
 _agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
+_agc_target_rms = _env_float("DSP_AGC_TARGET_RMS", 0.25)
+_agc_max_gain_db = _env_float("DSP_AGC_MAX_GAIN_DB", 30.0)
+_agc_alpha = _env_float("DSP_AGC_ALPHA", 0.2)
+_snr_threshold_db = _env_float("DSP_SNR_THRESHOLD_DB", 6.0)
+_min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
+_agc_state = {}
 _last_agc_gain_db = None
 _decoder_status = {
     "sources": {},
@@ -77,7 +106,12 @@ _decoder_status = {
         "cw": None
     },
     "dsp": {
-        "agc_enabled": _agc_enabled
+        "agc_enabled": _agc_enabled,
+        "agc_target_rms": _agc_target_rms,
+        "agc_max_gain_db": _agc_max_gain_db,
+        "agc_alpha": _agc_alpha,
+        "snr_threshold_db": _snr_threshold_db,
+        "min_bw_hz": _min_bw_hz
     }
 }
 
@@ -571,8 +605,13 @@ async def ws_events(websocket: WebSocket):
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
         if _agc_enabled:
-            from app.dsp.pipeline import apply_agc
-            iq, gain_db = apply_agc(iq)
+            iq, gain_db = apply_agc_smoothed(
+                iq,
+                _agc_state,
+                target_rms=_agc_target_rms,
+                max_gain_db=_agc_max_gain_db,
+                alpha=_agc_alpha
+            )
             global _last_agc_gain_db
             _last_agc_gain_db = gain_db
         band = _scan_engine.config.get("band") if _scan_engine.config else None
@@ -583,7 +622,9 @@ async def ws_events(websocket: WebSocket):
             iq,
             _scan_engine.sample_rate,
             threshold_dbm=threshold_dbm,
-            adapt=False
+            adapt=False,
+            snr_threshold_db=_snr_threshold_db,
+            min_bw_hz=_min_bw_hz
         )
         if occupancy:
             best = max(occupancy, key=lambda item: item.get("snr_db", 0.0))
@@ -657,8 +698,13 @@ async def ws_spectrum(websocket: WebSocket):
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
         agc_gain_db = None
         if _agc_enabled:
-            from app.dsp.pipeline import apply_agc
-            iq, agc_gain_db = apply_agc(iq)
+            iq, agc_gain_db = apply_agc_smoothed(
+                iq,
+                _agc_state,
+                target_rms=_agc_target_rms,
+                max_gain_db=_agc_max_gain_db,
+                alpha=_agc_alpha
+            )
             global _last_agc_gain_db
             _last_agc_gain_db = agc_gain_db
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)

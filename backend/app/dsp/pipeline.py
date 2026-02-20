@@ -58,6 +58,28 @@ def apply_agc(iq_samples, target_rms=0.25, max_gain_db=30.0):
     return iq_samples * gain, gain_db
 
 
+def apply_agc_smoothed(iq_samples, state, target_rms=0.25, max_gain_db=30.0, alpha=0.2):
+    if iq_samples is None or len(iq_samples) == 0:
+        return iq_samples, 0.0
+    rms = np.sqrt(np.mean(np.abs(iq_samples) ** 2))
+    if rms <= 0:
+        return iq_samples, 0.0
+    gain = target_rms / rms
+    gain_db = 20.0 * np.log10(gain + 1e-12)
+    gain_db = float(np.clip(gain_db, -max_gain_db, max_gain_db))
+    prev = None
+    if isinstance(state, dict):
+        prev = state.get("gain_db")
+    if prev is None:
+        smoothed = gain_db
+    else:
+        smoothed = (1 - alpha) * prev + alpha * gain_db
+    if isinstance(state, dict):
+        state["gain_db"] = smoothed
+    gain = 10 ** (smoothed / 20.0)
+    return iq_samples * gain, float(smoothed)
+
+
 def estimate_occupancy(
     iq_samples,
     sample_rate,
