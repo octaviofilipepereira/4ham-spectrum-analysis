@@ -6,8 +6,7 @@ def estimate_occupancy(iq_samples, sample_rate, threshold_dbm=-95.0, adapt=True)
     if iq_samples is None or len(iq_samples) == 0:
         return []
 
-    power_linear = np.mean(np.abs(iq_samples) ** 2)
-    power_db = 10.0 * np.log10(power_linear + 1e-12)
+    power_db = compute_power_db(iq_samples)
     if adapt:
         threshold_dbm = max(threshold_dbm, power_db - 10.0)
     occupied = power_db > threshold_dbm
@@ -38,3 +37,10 @@ def compute_fft_db(iq_samples, sample_rate, smooth_bins=4):
         fft_db = np.convolve(fft_db, kernel, mode="same")
     bin_hz = float(sample_rate) / float(len(iq_samples))
     return fft_db.tolist(), bin_hz, float(np.min(fft_db)), float(np.max(fft_db))
+
+
+def compute_power_db(iq_samples):
+    if iq_samples is None or len(iq_samples) == 0:
+        return -120.0
+    power_linear = np.mean(np.abs(iq_samples) ** 2)
+    return float(10.0 * np.log10(power_linear + 1e-12))

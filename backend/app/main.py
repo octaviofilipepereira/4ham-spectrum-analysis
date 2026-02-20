@@ -1,11 +1,12 @@
 import asyncio
 import os
+import time
 from datetime import datetime, timezone
 
 import numpy as np
 from fastapi import FastAPI, WebSocket
 
-from app.dsp.pipeline import compute_fft_db, estimate_occupancy
+from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
 from app.storage.db import Database
@@ -32,6 +33,28 @@ _spectrum_cache = {
     "center_hz": 0,
     "span_hz": 0
 }
+_noise_floor = {}
+_last_frame_ts = None
+_last_send_ts = None
+
+
+def _update_noise_floor(band, power_db, alpha=0.05):
+    if not band:
+        return power_db
+    current = _noise_floor.get(band)
+    if current is None:
+        _noise_floor[band] = power_db
+    else:
+        _noise_floor[band] = (1 - alpha) * current + alpha * power_db
+    return _noise_floor[band]
+
+
+def _cpu_percent():
+    try:
+        import psutil
+    except Exception:
+        return None
+    return psutil.cpu_percent(interval=None)
 
 
 @app.get("/api/health")
@@ -95,17 +118,26 @@ async def ws_events(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
-        occupancy = estimate_occupancy(iq, _scan_engine.sample_rate, adapt=True)
+        band = _scan_engine.config.get("band") if _scan_engine.config else None
+        power_db = compute_power_db(iq)
+        noise_floor = _update_noise_floor(band, power_db)
+        threshold_dbm = noise_floor + 6.0
+        occupancy = estimate_occupancy(
+            iq,
+            _scan_engine.sample_rate,
+            threshold_dbm=threshold_dbm,
+            adapt=False
+        )
         if occupancy:
             event = {
                 "type": "occupancy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "band": _scan_engine.config.get("band") if _scan_engine.config else None,
+                "band": band,
                 "frequency_hz": _scan_engine.center_hz,
                 "bandwidth_hz": occupancy[0]["bandwidth_hz"],
-                "power_dbm": occupancy[0]["power_dbm"],
+                "power_dbm": power_db,
                 "snr_db": None,
-                "threshold_dbm": occupancy[0]["threshold_dbm"],
+                "threshold_dbm": threshold_dbm,
                 "occupied": occupancy[0]["occupied"],
                 "mode": "Unknown",
                 "confidence": 0.4,
@@ -141,10 +173,13 @@ async def ws_events(websocket: WebSocket):
 async def ws_spectrum(websocket: WebSocket):
     await websocket.accept()
     while True:
+        frame_start = time.time()
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
+        global _last_frame_ts
+        _last_frame_ts = time.time()
         _spectrum_cache.update({
             "fft_db": fft_db,
             "bin_hz": bin_hz,
@@ -166,4 +201,26 @@ async def ws_spectrum(websocket: WebSocket):
             }
         }
         await websocket.send_json(payload)
+        global _last_send_ts
+        _last_send_ts = time.time()
         await asyncio.sleep(0.2)
+
+
+@app.websocket("/ws/status")
+async def ws_status(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        now = time.time()
+        frame_age_ms = None
+        if _last_frame_ts:
+            frame_age_ms = int((now - _last_frame_ts) * 1000)
+        payload = {
+            "status": {
+                "state": _scan_state.get("state"),
+                "device": _scan_state.get("device"),
+                "cpu_pct": _cpu_percent(),
+                "frame_age_ms": frame_age_ms
+            }
+        }
+        await websocket.send_json(payload)
+        await asyncio.sleep(1.0)

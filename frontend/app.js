@@ -25,6 +25,24 @@ function addEvent(text) {
   eventsEl.prepend(li);
 }
 
+function renderEvents(items) {
+  eventsEl.innerHTML = "";
+  items.forEach((eventItem) => {
+    const label = `${eventItem.type} | ${eventItem.band || "?"} | ${eventItem.frequency_hz} Hz`;
+    addEvent(label);
+  });
+}
+
+async function fetchEvents() {
+  try {
+    const resp = await fetch("/api/events?limit=25");
+    const data = await resp.json();
+    renderEvents(data);
+  } catch (err) {
+    addEvent("Failed to load events");
+  }
+}
+
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -57,6 +75,8 @@ function connectEvents() {
 }
 
 connectEvents();
+fetchEvents();
+setInterval(fetchEvents, 5000);
 
 function connectSpectrum() {
   try {
