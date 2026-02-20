@@ -221,9 +221,9 @@ class Database:
         )
         self.conn.commit()
 
-    def get_events(self, limit=1000, band=None, mode=None, callsign=None, start=None, end=None):
+    def get_events(self, limit=1000, offset=0, band=None, mode=None, callsign=None, start=None, end=None):
         events = []
-        params = [limit]
+        params = [limit, offset]
         band_filter = ""
         time_filter = ""
         if band:
@@ -242,13 +242,13 @@ class Database:
             FROM occupancy_events
             WHERE 1=1 {band_filter} {time_filter}
             ORDER BY timestamp DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """.format(band_filter=band_filter, time_filter=time_filter),
             tuple(params)
         ):
             events.append(dict(row))
 
-        params = [limit]
+        params = [limit, offset]
         band_filter = ""
         mode_filter = ""
         callsign_filter = ""
@@ -274,7 +274,7 @@ class Database:
             FROM callsign_events
             WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {time_filter}
             ORDER BY timestamp DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """.format(
                 band_filter=band_filter,
                 mode_filter=mode_filter,

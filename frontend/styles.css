@@ -62,6 +62,12 @@ h1 {
   align-self: center;
 }
 
+.ws-status {
+  font-size: 0.75rem;
+  color: var(--accent-2);
+  align-self: center;
+}
+
 .control {
   display: flex;
   flex-direction: column;

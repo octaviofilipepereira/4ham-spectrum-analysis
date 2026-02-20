@@ -40,6 +40,7 @@ const loginUserInput = document.getElementById("loginUser");
 const loginPassInput = document.getElementById("loginPass");
 const loginSaveBtn = document.getElementById("loginSave");
 const loginStatus = document.getElementById("loginStatus");
+const wsStatus = document.getElementById("wsStatus");
 const onboarding = document.getElementById("onboarding");
 const onboardingTitle = document.getElementById("onboardingTitle");
 const onboardingText = document.getElementById("onboardingText");
@@ -47,6 +48,12 @@ const onboardingPrev = document.getElementById("onboardingPrev");
 const onboardingNext = document.getElementById("onboardingNext");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
+const ft8Toggle = document.getElementById("ft8Toggle");
+const aprsToggle = document.getElementById("aprsToggle");
+const cwToggle = document.getElementById("cwToggle");
+const ssbToggle = document.getElementById("ssbToggle");
+const saveModesBtn = document.getElementById("saveModes");
+let eventOffset = 0;
 let row = 0;
 
 function logLine(text) {
@@ -249,7 +256,7 @@ function renderEvents(items) {
 
 async function fetchEvents() {
   try {
-    const params = new URLSearchParams({ limit: "25" });
+    const params = new URLSearchParams({ limit: "25", offset: String(eventOffset) });
     if (bandFilter.value) {
       params.append("band", bandFilter.value);
     }
@@ -361,6 +368,9 @@ function connectEvents() {
     ws.onopen = () => addEvent("Connected to events stream");
     ws.onmessage = (msg) => addEvent(msg.data);
     ws.onerror = () => addEvent("Events stream error");
+    ws.onclose = () => {
+      wsStatus.textContent = "WS: disconnected";
+    };
   } catch (err) {
     addEvent("WebSocket not available");
   }
@@ -423,6 +433,12 @@ function connectSpectrum() {
       } catch (err) {
         waterfallStatus.textContent = "Spectrum decode error";
       }
+    };
+    ws.onopen = () => {
+      wsStatus.textContent = "WS: connected";
+    };
+    ws.onclose = () => {
+      wsStatus.textContent = "WS: disconnected";
     };
   } catch (err) {
     waterfallStatus.textContent = "Spectrum stream unavailable";
@@ -515,10 +531,33 @@ async function loadSettings() {
       localStorage.setItem("favoriteBands", JSON.stringify(data.favorites));
       loadFavorites();
     }
+    if (data.modes) {
+      ft8Toggle.value = data.modes.ft8 ? "on" : "off";
+      aprsToggle.value = data.modes.aprs ? "on" : "off";
+      cwToggle.value = data.modes.cw ? "on" : "off";
+      ssbToggle.value = data.modes.ssb ? "on" : "off";
+    }
   } catch (err) {
     logLine("Failed to load settings");
   }
 }
+
+saveModesBtn.addEventListener("click", async () => {
+  const payload = {
+    modes: {
+      ft8: ft8Toggle.value === "on",
+      aprs: aprsToggle.value === "on",
+      cw: cwToggle.value === "on",
+      ssb: ssbToggle.value === "on"
+    }
+  };
+  await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload)
+  });
+  showToast("Modes saved");
+});
 
 loginSaveBtn.addEventListener("click", () => {
   localStorage.setItem("authUser", loginUserInput.value);

@@ -30,6 +30,7 @@
           <button class="btn primary" id="startScan">Start scan</button>
           <span class="login-status" id="loginStatus">Auth: guest</span>
           <button class="btn ghost" id="stopScan">Stop</button>
+          <span class="ws-status" id="wsStatus">WS: disconnected</span>
         </div>
       </header>
 
@@ -104,6 +105,41 @@
             <input type="password" id="authPass" />
           </label>
           <button class="btn ghost" id="saveSettings">Save</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Modes</h2>
+        <div class="filters">
+          <label class="control">
+            FT8/FT4
+            <select id="ft8Toggle">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="control">
+            APRS
+            <select id="aprsToggle">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="control">
+            CW
+            <select id="cwToggle">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="control">
+            SSB
+            <select id="ssbToggle">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <button class="btn ghost" id="saveModes">Save modes</button>
         </div>
       </section>
 

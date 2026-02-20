@@ -166,6 +166,7 @@ async def scan_stop(request: Request):
 @app.get("/api/events")
 def events(
     limit: int = 1000,
+    offset: int = 0,
     band: str | None = None,
     mode: str | None = None,
     callsign: str | None = None,
@@ -176,7 +177,7 @@ def events(
 ):
     if request:
         _enforce_auth(request)
-    data = _db.get_events(limit=limit, band=band, mode=mode, callsign=callsign, start=start, end=end)
+    data = _db.get_events(limit=limit, offset=offset, band=band, mode=mode, callsign=callsign, start=start, end=end)
     if format == "csv":
         lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence,snr_db,power_dbm,scan_id"]
         for item in data:
@@ -276,6 +277,8 @@ def save_settings(payload: dict, request: Request):
         existing["bands"] = payload.get("bands")
     if payload.get("favorites"):
         existing["favorites"] = payload.get("favorites")
+    if payload.get("modes"):
+        existing["modes"] = payload.get("modes")
     _db.save_settings(existing)
     return {"status": "ok"}
 
