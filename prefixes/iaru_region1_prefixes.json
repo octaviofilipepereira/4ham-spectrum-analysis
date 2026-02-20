@@ -88,6 +88,86 @@
     {
       "country": "Russian Federation",
       "prefixes": ["RA", "RB", "RC", "RD", "RE", "RF", "RG", "RH", "RI", "RJ", "RK", "RL", "RM", "RN", "RO", "RP", "RQ", "RR", "RS", "RT", "RU", "RV", "RW", "RX", "RY", "RZ", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "UI"]
+    },
+    {
+      "country": "Ireland",
+      "prefixes": ["EI", "EJ"]
+    },
+    {
+      "country": "Iceland",
+      "prefixes": ["TF"]
+    },
+    {
+      "country": "Croatia",
+      "prefixes": ["9A"]
+    },
+    {
+      "country": "Slovenia",
+      "prefixes": ["S5"]
+    },
+    {
+      "country": "Romania",
+      "prefixes": ["YO"]
+    },
+    {
+      "country": "Bulgaria",
+      "prefixes": ["LZ"]
+    },
+    {
+      "country": "Estonia",
+      "prefixes": ["ES"]
+    },
+    {
+      "country": "Latvia",
+      "prefixes": ["YL"]
+    },
+    {
+      "country": "Lithuania",
+      "prefixes": ["LY"]
+    },
+    {
+      "country": "Luxembourg",
+      "prefixes": ["LX"]
+    },
+    {
+      "country": "Malta",
+      "prefixes": ["9H"]
+    },
+    {
+      "country": "Cyprus",
+      "prefixes": ["5B"]
+    },
+    {
+      "country": "Andorra",
+      "prefixes": ["C3"]
+    },
+    {
+      "country": "Monaco",
+      "prefixes": ["3A"]
+    },
+    {
+      "country": "San Marino",
+      "prefixes": ["T7"]
+    },
+    {
+      "country": "Liechtenstein",
+      "prefixes": ["HB0"]
+    },
+    {
+      "country": "Bosnia and Herzegovina",
+      "prefixes": ["E7"]
+    },
+    {
+      "country": "North Macedonia",
+      "prefixes": ["Z3"]
+    },
+    {
+      "country": "Albania",
+      "prefixes": ["ZA"]
+    },
+    {
+      "country": "Montenegro",
+      "prefixes": ["4O"]
     }
   ]
 }
