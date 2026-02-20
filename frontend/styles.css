@@ -179,6 +179,14 @@ h1 {
   align-items: flex-end;
 }
 
+.filters.compact .control {
+  display: none;
+}
+
+.filters.compact .control--always {
+  display: flex;
+}
+
 .quality {
   display: flex;
   align-items: center;

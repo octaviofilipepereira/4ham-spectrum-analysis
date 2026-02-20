@@ -59,6 +59,8 @@ const pageNumberLabel = document.getElementById("pageNumber");
 const showBandSummary = document.getElementById("showBandSummary");
 const showModeSummary = document.getElementById("showModeSummary");
 const eventsTotal = document.getElementById("eventsTotal");
+const totalGlobal = document.getElementById("totalGlobal");
+const compactToggle = document.getElementById("compactToggle");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -345,6 +347,37 @@ async function fetchEvents() {
   }
 }
 
+async function fetchTotal() {
+  try {
+    const params = new URLSearchParams({});
+    if (bandFilter.value) {
+      params.append("band", bandFilter.value);
+    }
+    if (modeFilter.value) {
+      params.append("mode", modeFilter.value);
+    }
+    if (callsignFilter.value) {
+      params.append("callsign", callsignFilter.value.trim());
+    }
+    if (startFilter.value) {
+      params.append("start", new Date(startFilter.value).toISOString());
+    }
+    if (endFilter.value) {
+      params.append("end", new Date(endFilter.value).toISOString());
+    }
+    const resp = await fetch(`/api/events/count?${params.toString()}`, {
+      headers: { ...getAuthHeader() }
+    });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    totalGlobal.textContent = `Total: ${data.total}`;
+  } catch (err) {
+    return;
+  }
+}
+
 async function fetchLogs() {
   try {
     const resp = await fetch("/api/logs?limit=50", { headers: { ...getAuthHeader() } });
@@ -437,6 +470,11 @@ modeFilter.addEventListener("change", fetchEvents);
 callsignFilter.addEventListener("change", fetchEvents);
 startFilter.addEventListener("change", fetchEvents);
 endFilter.addEventListener("change", fetchEvents);
+bandFilter.addEventListener("change", fetchTotal);
+modeFilter.addEventListener("change", fetchTotal);
+callsignFilter.addEventListener("change", fetchTotal);
+startFilter.addEventListener("change", fetchTotal);
+endFilter.addEventListener("change", fetchTotal);
 
 exportCsvBtn.addEventListener("click", () => {
   exportCsvBtn.disabled = true;
@@ -655,6 +693,11 @@ nextPageBtn.addEventListener("click", () => {
   fetchEvents();
 });
 
+compactToggle.addEventListener("click", () => {
+  const panel = compactToggle.closest(".filters");
+  panel.classList.toggle("compact");
+});
+
 loginSaveBtn.addEventListener("click", () => {
   localStorage.setItem("authUser", loginUserInput.value);
   localStorage.setItem("authPass", loginPassInput.value);
@@ -753,7 +796,7 @@ saveBandBtn.addEventListener("click", async () => {
   loadBands();
 });
 
-loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters);
+loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
 updateLoginStatus();
 connectLogs();
 fetchLogs();

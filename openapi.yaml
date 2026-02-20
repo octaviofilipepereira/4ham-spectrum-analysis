@@ -234,6 +234,47 @@ paths:
               schema:
                 type: string
   /api/settings:
+      /api/events/count:
+        get:
+          summary: Count events
+          parameters:
+            - name: band
+              in: query
+              required: false
+              schema:
+                type: string
+            - name: mode
+              in: query
+              required: false
+              schema:
+                type: string
+            - name: callsign
+              in: query
+              required: false
+              schema:
+                type: string
+            - name: start
+              in: query
+              required: false
+              schema:
+                type: string
+                format: date-time
+            - name: end
+              in: query
+              required: false
+              schema:
+                type: string
+                format: date-time
+          responses:
+            "200":
+              description: Total events
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
     get:
       summary: Get settings
       responses:

@@ -207,6 +207,21 @@ def events(
     return data
 
 
+@app.get("/api/events/count")
+def events_count(
+    band: str | None = None,
+    mode: str | None = None,
+    callsign: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    request: Request = None
+):
+    if request:
+        _enforce_auth(request)
+    data = _db.get_events(limit=100000, offset=0, band=band, mode=mode, callsign=callsign, start=start, end=end)
+    return {"total": len(data)}
+
+
 @app.get("/api/export")
 def export_events(
     limit: int = 1000,
@@ -272,7 +287,10 @@ def scan_status(request: Request = None):
 @app.get("/api/settings")
 def get_settings(request: Request):
     _enforce_auth(request)
-    return _db.get_settings()
+    settings = _db.get_settings()
+    if "summary" not in settings:
+        settings["summary"] = {"showBand": True, "showMode": True}
+    return settings
 
 
 @app.post("/api/settings")
