@@ -287,3 +287,35 @@ class Database:
 
         events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
         return events[:limit]
+
+    def count_events(self, band=None, mode=None, callsign=None, start=None, end=None):
+        params = []
+        filters = []
+        if band:
+            filters.append("band = ?")
+            params.append(band)
+        if mode:
+            filters.append("mode = ?")
+            params.append(mode)
+        if callsign:
+            filters.append("callsign = ?")
+            params.append(callsign)
+        if start and end:
+            filters.append("timestamp BETWEEN ? AND ?")
+            params.extend([start, end])
+
+        where_clause = " AND ".join(filters)
+        if where_clause:
+            where_clause = "WHERE " + where_clause
+
+        occ = self.conn.execute(
+            f"SELECT COUNT(*) FROM occupancy_events {where_clause}",
+            tuple(params)
+        ).fetchone()[0]
+
+        calls = self.conn.execute(
+            f"SELECT COUNT(*) FROM callsign_events {where_clause}",
+            tuple(params)
+        ).fetchone()[0]
+
+        return int(occ) + int(calls)

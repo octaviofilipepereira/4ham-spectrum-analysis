@@ -39,6 +39,11 @@ _noise_floor = {}
 _last_frame_ts = None
 _last_send_ts = None
 _logs = []
+_count_cache = {
+    "timestamp": 0.0,
+    "value": 0,
+    "key": None
+}
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
@@ -218,8 +223,25 @@ def events_count(
 ):
     if request:
         _enforce_auth(request)
-    data = _db.get_events(limit=100000, offset=0, band=band, mode=mode, callsign=callsign, start=start, end=end)
-    return {"total": len(data)}
+    cache_key = (band, mode, callsign, start, end)
+    now = time.time()
+    if _count_cache["key"] == cache_key and (now - _count_cache["timestamp"]) < 5:
+        return {"total": _count_cache["value"]}
+    total = _db.count_events(band=band, mode=mode, callsign=callsign, start=start, end=end)
+    _count_cache.update({"timestamp": now, "value": total, "key": cache_key})
+    return {"total": total}
+
+
+@app.get("/api/events/stats")
+def events_stats(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    data = _db.get_events(limit=5000, offset=0)
+    stats = {}
+    for item in data:
+        mode_name = item.get("mode") or "Unknown"
+        stats[mode_name] = stats.get(mode_name, 0) + 1
+    return {"modes": stats}
 
 
 @app.get("/api/export")

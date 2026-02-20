@@ -234,6 +234,19 @@ paths:
               schema:
                 type: string
   /api/settings:
+        /api/events/stats:
+          get:
+            summary: Event stats by mode
+            responses:
+              "200":
+                description: Stats
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        modes:
+                          type: object
       /api/events/count:
         get:
           summary: Count events

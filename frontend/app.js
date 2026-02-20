@@ -61,6 +61,7 @@ const showModeSummary = document.getElementById("showModeSummary");
 const eventsTotal = document.getElementById("eventsTotal");
 const totalGlobal = document.getElementById("totalGlobal");
 const compactToggle = document.getElementById("compactToggle");
+let modeStatsCache = {};
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -373,6 +374,25 @@ async function fetchTotal() {
     }
     const data = await resp.json();
     totalGlobal.textContent = `Total: ${data.total}`;
+  } catch (err) {
+    return;
+  }
+}
+
+async function fetchModeStats() {
+  try {
+    const resp = await fetch("/api/events/stats", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    modeStatsCache = data.modes || {};
+    modeSummary.innerHTML = "";
+    Object.entries(modeStatsCache).forEach(([mode, count]) => {
+      const li = document.createElement("li");
+      li.textContent = `${mode}: ${count}`;
+      modeSummary.appendChild(li);
+    });
   } catch (err) {
     return;
   }
@@ -797,6 +817,8 @@ saveBandBtn.addEventListener("click", async () => {
 });
 
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
+fetchModeStats();
+setInterval(fetchModeStats, 10000);
 updateLoginStatus();
 connectLogs();
 fetchLogs();
