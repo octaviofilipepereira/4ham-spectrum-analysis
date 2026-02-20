@@ -2,6 +2,5 @@ fastapi
 uvicorn
 numpy
 scipy
-SoapySDR
 pytest
 psutil

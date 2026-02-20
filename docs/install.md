@@ -2,8 +2,13 @@
 
 ## Linux (Ubuntu/Debian)
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
-2. Install SoapySDR and RTL-SDR tools.
-3. Create a virtualenv and install Python deps.
+2. Install SoapySDR and RTL-SDR tools plus Python bindings:
+	- `sudo apt update`
+	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr`
+3. Create a virtualenv and install Python deps:
+	- `python3 -m venv .venv`
+	- `source .venv/bin/activate`
+	- `python -m pip install -r backend/requirements.txt`
 4. Run backend with uvicorn.
 
 ## Windows
