@@ -31,6 +31,7 @@ For a complete, step-by-step manual, see [docs/installation_manual.md](installat
 - Use a virtual audio cable for WSJT-X integration.
 - For APRS, run Direwolf with KISS TCP enabled.
 - Optional: set decoder file paths (e.g., `WSJTX_ALLTXT_PATH`) for automatic ingest.
+- Optional: enable native WSJT-X UDP ingest with `WSJTX_UDP_ENABLE=1`.
 
 ## Troubleshooting
 - If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.

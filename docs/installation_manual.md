@@ -113,6 +113,13 @@ The backend can tail decoder output files and ingest callsigns automatically. Co
 - `CW_DECODE_PATH`: path to a text file with decoded CW lines
 - `DECODER_TAIL_FROM_START`: set to `1` to start from beginning; default starts at end
 
+### WSJT-X UDP (native protocol)
+The backend can listen to WSJT-X UDP broadcast packets (native protocol). Configure:
+
+- `WSJTX_UDP_ENABLE`: set to `1` to enable listener
+- `WSJTX_UDP_HOST`: bind address (default `0.0.0.0`)
+- `WSJTX_UDP_PORT`: UDP port (default `2237`)
+
 ### WSJT-X (FT8/FT4)
 - Configure WSJT-X to write decoded messages to ALL.TXT.
 - Use the decoder ingest endpoint:

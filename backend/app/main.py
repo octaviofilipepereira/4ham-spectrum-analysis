@@ -11,6 +11,7 @@ from fastapi.responses import PlainTextResponse
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
+from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
 from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy, detect_peaks, estimate_noise_floor
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -49,6 +50,8 @@ _count_cache = {
 }
 _decoder_tasks = []
 _decoder_stop = asyncio.Event()
+_wsjtx_state = WsjtxState()
+_wsjtx_transport = None
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
@@ -135,6 +138,12 @@ async def on_startup():
     _start_decoder_watch("wsjtx", os.getenv("WSJTX_ALLTXT_PATH"), parse_wsjtx_line, "FT8")
     _start_decoder_watch("aprs", os.getenv("DIREWOLF_LOG_PATH"), parse_aprs_line, "APRS")
     _start_decoder_watch("cw", os.getenv("CW_DECODE_PATH"), parse_cw_text, "CW")
+    listener = create_wsjtx_udp_listener(_wsjtx_state, lambda payload: _ingest_callsign_payloads([payload], {}), logger=_log)
+    if listener:
+        transport, _ = await listener
+        global _wsjtx_transport
+        _wsjtx_transport = transport
+        _log(f"wsjtx_udp_listen {describe_wsjtx_udp()}")
 
 
 @app.on_event("shutdown")
@@ -143,6 +152,8 @@ async def on_shutdown():
     for task in _decoder_tasks:
         task.cancel()
     _decoder_tasks.clear()
+    if _wsjtx_transport:
+        _wsjtx_transport.close()
 
 
 @app.get("/api/health")
