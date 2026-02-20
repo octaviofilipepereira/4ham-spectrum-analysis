@@ -16,7 +16,8 @@
         "end_hz": { "type": "integer", "minimum": 0 },
         "step_hz": { "type": "integer", "minimum": 1 },
         "dwell_ms": { "type": "integer", "minimum": 1 },
-        "mode": { "type": "string", "enum": ["auto", "fixed"] }
+        "mode": { "type": "string", "enum": ["auto", "fixed"] },
+        "record_path": { "type": "string" }
       }
     }
   }

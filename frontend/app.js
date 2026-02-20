@@ -4,6 +4,8 @@ const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
 const canvas = document.getElementById("waterfallCanvas");
 const ctx = canvas.getContext("2d");
+const gainInput = document.getElementById("gain");
+const sampleRateInput = document.getElementById("sampleRate");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -49,10 +51,23 @@ function setStatus(text) {
 
 startBtn.addEventListener("click", async () => {
   setStatus("Starting scan...");
+  const gain = Number(gainInput.value);
+  const sampleRate = Number(sampleRateInput.value);
   await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scan: { band: "20m", start_hz: 14000000, end_hz: 14350000, step_hz: 2000, dwell_ms: 250, mode: "auto" } })
+    body: JSON.stringify({
+      scan: {
+        band: "20m",
+        start_hz: 14000000,
+        end_hz: 14350000,
+        step_hz: 2000,
+        dwell_ms: 250,
+        mode: "auto",
+        gain,
+        sample_rate: sampleRate
+      }
+    })
   });
   setStatus("Scan running");
 });
@@ -103,6 +118,28 @@ function connectSpectrum() {
 }
 
 connectSpectrum();
+
+function connectStatus() {
+  try {
+    const ws = new WebSocket("ws://localhost:8000/ws/status");
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        const status = data.status;
+        if (status) {
+          const nf = status.noise_floor_db !== undefined ? status.noise_floor_db.toFixed(1) : "?";
+          statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
+        }
+      } catch (err) {
+        setStatus("Status decode error");
+      }
+    };
+  } catch (err) {
+    setStatus("Status stream unavailable");
+  }
+}
+
+connectStatus();
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

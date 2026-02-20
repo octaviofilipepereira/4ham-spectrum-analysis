@@ -259,6 +259,7 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 - `WS /ws/spectrum`: stream de FFT/waterfall (frames agregados).
 - `WS /ws/events`: eventos de ocupacao e indicativos em tempo real.
 - `WS /ws/status`: estado do scan e estatisticas de processamento.
+	- Inclui noise floor por banda quando disponivel.
 
 ### Payloads principais
 Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.json).
@@ -270,7 +271,8 @@ Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.j
 		"end_hz": 14350000,
 		"step_hz": 2000,
 		"dwell_ms": 250,
-		"mode": "auto"
+		"mode": "auto",
+		"record_path": "data/iq_recording.c64"
 	}
 }
 ```

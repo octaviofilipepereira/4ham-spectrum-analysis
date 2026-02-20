@@ -214,12 +214,14 @@ async def ws_status(websocket: WebSocket):
         frame_age_ms = None
         if _last_frame_ts:
             frame_age_ms = int((now - _last_frame_ts) * 1000)
+        band = _scan_engine.config.get("band") if _scan_engine.config else None
         payload = {
             "status": {
                 "state": _scan_state.get("state"),
                 "device": _scan_state.get("device"),
                 "cpu_pct": _cpu_percent(),
-                "frame_age_ms": frame_age_ms
+                "frame_age_ms": frame_age_ms,
+                "noise_floor_db": _noise_floor.get(band)
             }
         }
         await websocket.send_json(payload)

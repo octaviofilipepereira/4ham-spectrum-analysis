@@ -11,11 +11,13 @@ class ScanEngine:
         self.sample_rate = 48000
         self.center_hz = 0
         self._task = None
+        self._record_fp = None
 
     async def start_async(self, config):
         self.config = config or {}
         self.sample_rate = int(self.config.get("sample_rate", 48000))
         self.center_hz = int(self.config.get("center_hz", self.config.get("start_hz", 0)))
+        record_path = self.config.get("record_path")
         device_id = self.config.get("device_id")
         self.device, self.stream = self.controller.open(
             device_id=device_id,
@@ -23,6 +25,8 @@ class ScanEngine:
             center_hz=self.center_hz,
             gain=self.config.get("gain")
         )
+        if record_path:
+            self._record_fp = open(record_path, "wb")
         self.running = True
         self._task = asyncio.create_task(self._scan_loop())
         return True
@@ -32,6 +36,9 @@ class ScanEngine:
         if self._task:
             self._task.cancel()
             self._task = None
+        if self._record_fp:
+            self._record_fp.close()
+            self._record_fp = None
         self.controller.close(self.device, self.stream)
         return True
 
@@ -55,4 +62,7 @@ class ScanEngine:
     def read_iq(self, num_samples):
         if not self.running:
             return None
-        return self.controller.read_samples(self.device, self.stream, num_samples)
+        samples = self.controller.read_samples(self.device, self.stream, num_samples)
+        if samples is not None and self._record_fp:
+            self._record_fp.write(samples.tobytes())
+        return samples
