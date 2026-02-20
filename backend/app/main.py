@@ -214,7 +214,14 @@ def get_settings(request: Request):
 @app.post("/api/settings")
 def save_settings(payload: dict, request: Request):
     _enforce_auth(request)
-    _db.save_settings(payload)
+    existing = _db.get_settings()
+    if payload.get("band"):
+        existing["band"] = payload.get("band")
+    if payload.get("device_id"):
+        existing["device_id"] = payload.get("device_id")
+    if payload.get("auth_hint"):
+        existing["auth_hint"] = payload.get("auth_hint")
+    _db.save_settings(existing)
     return {"status": "ok"}
 
 

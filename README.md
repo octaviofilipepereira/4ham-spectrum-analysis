@@ -261,6 +261,10 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 - `WS /ws/status`: estado do scan e estatisticas de processamento.
 	- Inclui noise floor por banda quando disponivel.
 
+### Autenticacao (opcional)
+- Defina `BASIC_AUTH_USER` e `BASIC_AUTH_PASS` para proteger REST e WS.
+- O frontend usa Basic Auth e envia credenciais no header.
+
 ### Payloads principais
 Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.json).
 ```json

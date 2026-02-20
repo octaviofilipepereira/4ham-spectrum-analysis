@@ -58,6 +58,7 @@
             Device
             <select id="deviceSelect"></select>
           </label>
+          <button class="btn ghost" id="refreshDevices">Refresh devices</button>
           <label class="control">
             Band
             <select id="bandSelect">
@@ -76,6 +77,25 @@
             <input type="password" id="authPass" />
           </label>
           <button class="btn ghost" id="saveSettings">Save</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Bands</h2>
+        <div class="filters">
+          <label class="control">
+            Band name
+            <input type="text" id="bandName" value="20m" />
+          </label>
+          <label class="control">
+            Start Hz
+            <input type="number" id="bandStart" value="14000000" />
+          </label>
+          <label class="control">
+            End Hz
+            <input type="number" id="bandEnd" value="14350000" />
+          </label>
+          <button class="btn ghost" id="saveBand">Save band</button>
         </div>
       </section>
 

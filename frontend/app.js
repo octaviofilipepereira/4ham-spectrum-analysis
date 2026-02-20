@@ -19,6 +19,11 @@ const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
 const authPassInput = document.getElementById("authPass");
 const saveSettingsBtn = document.getElementById("saveSettings");
+const refreshDevicesBtn = document.getElementById("refreshDevices");
+const bandNameInput = document.getElementById("bandName");
+const bandStartInput = document.getElementById("bandStart");
+const bandEndInput = document.getElementById("bandEnd");
+const saveBandBtn = document.getElementById("saveBand");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -263,7 +268,14 @@ async function loadSettings() {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
     const data = await resp.json();
     if (data.band) {
-      bandSelect.value = data.band;
+      if (typeof data.band === "string") {
+        bandSelect.value = data.band;
+      } else if (data.band.name) {
+        bandSelect.value = data.band.name;
+        bandNameInput.value = data.band.name;
+        bandStartInput.value = data.band.start_hz ?? bandStartInput.value;
+        bandEndInput.value = data.band.end_hz ?? bandEndInput.value;
+      }
     }
     if (data.device_id) {
       deviceSelect.value = data.device_id;
@@ -286,6 +298,26 @@ saveSettingsBtn.addEventListener("click", async () => {
     body: JSON.stringify(payload)
   });
   logLine("Settings saved");
+});
+
+refreshDevicesBtn.addEventListener("click", () => {
+  loadDevices();
+});
+
+saveBandBtn.addEventListener("click", async () => {
+  const payload = {
+    band: {
+      name: bandNameInput.value,
+      start_hz: Number(bandStartInput.value),
+      end_hz: Number(bandEndInput.value)
+    }
+  };
+  await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload)
+  });
+  logLine("Band saved");
 });
 
 loadDevices().then(loadSettings);
