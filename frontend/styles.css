@@ -131,6 +131,15 @@ h1 {
   color: var(--muted);
 }
 
+.summary {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+
 .onboarding {
   position: fixed;
   inset: 0;
@@ -168,6 +177,30 @@ h1 {
   flex-wrap: wrap;
   gap: 12px;
   align-items: flex-end;
+}
+
+.quality {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quality__bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.quality__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--quality, 0%);
+  background: linear-gradient(90deg, #2ec4b6, #ff9f1c);
+  transition: width 0.2s ease;
 }
 
 .control select {

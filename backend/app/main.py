@@ -189,7 +189,7 @@ def events(
             mode = enabled_modes[0]
     data = _db.get_events(limit=limit, offset=offset, band=band, mode=mode, callsign=callsign, start=start, end=end)
     if format == "csv":
-        lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence,snr_db,power_dbm,scan_id"]
+        lines = ["Type,Timestamp,Band,FrequencyHz,Mode,Callsign,Confidence,SNR,PowerDbm,ScanId"]
         for item in data:
             lines.append(",".join([
                 str(item.get("type", "")),
@@ -333,7 +333,10 @@ async def ws_events(websocket: WebSocket):
             }
             settings = _db.get_settings()
             modes = settings.get("modes") or {}
-            if modes and not modes.get("ssb", True):
+            mode_key = str(event.get("mode", "")).lower()
+            if mode_key == "unknown":
+                mode_key = "ssb"
+            if modes and mode_key in modes and not modes.get(mode_key, True):
                 await asyncio.sleep(1.0)
                 continue
             _db.insert_occupancy(event)

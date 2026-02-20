@@ -53,6 +53,7 @@ const prevPageBtn = document.getElementById("prevPage");
 const nextPageBtn = document.getElementById("nextPage");
 const qualityBar = document.getElementById("qualityBar");
 const qualityLabel = document.getElementById("qualityLabel");
+const bandSummary = document.getElementById("bandSummary");
 const ft8Toggle = document.getElementById("ft8Toggle");
 const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
@@ -263,9 +264,19 @@ function addEvent(text) {
 
 function renderEvents(items) {
   eventsEl.innerHTML = "";
+  const counts = {};
   items.forEach((eventItem) => {
     const label = `${eventItem.type} | ${eventItem.band || "?"} | ${eventItem.frequency_hz} Hz`;
     addEvent(label);
+    if (eventItem.band) {
+      counts[eventItem.band] = (counts[eventItem.band] || 0) + 1;
+    }
+  });
+  bandSummary.innerHTML = "";
+  Object.entries(counts).forEach(([band, count]) => {
+    const li = document.createElement("li");
+    li.textContent = `${band}: ${count}`;
+    bandSummary.appendChild(li);
   });
 }
 
