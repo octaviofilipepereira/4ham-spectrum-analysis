@@ -8,6 +8,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
+from app.decoders.ingest import build_callsign_event
 from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -236,12 +237,40 @@ def events_count(
 def events_stats(request: Request = None):
     if request:
         _enforce_auth(request)
-    data = _db.get_events(limit=5000, offset=0)
-    stats = {}
-    for item in data:
-        mode_name = item.get("mode") or "Unknown"
-        stats[mode_name] = stats.get(mode_name, 0) + 1
-    return {"modes": stats}
+    return {"modes": _db.get_event_stats()}
+
+
+@app.get("/api/decoders/status")
+def decoder_status(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    return {
+        "ingest": {
+            "endpoint": "/api/decoders/events",
+            "batch": True
+        },
+        "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
+        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp"]
+    }
+
+
+@app.post("/api/decoders/events")
+def decoder_events(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    items = payload.get("events")
+    if items is None:
+        items = [payload.get("event", payload)]
+    saved = 0
+    errors = []
+    for idx, item in enumerate(items):
+        event = build_callsign_event(item, _scan_state)
+        if not event:
+            errors.append({"index": idx, "error": "invalid_event"})
+            continue
+        _db.insert_callsign(event)
+        saved += 1
+    return {"status": "ok", "saved": saved, "errors": errors}
 
 
 @app.get("/api/export")
@@ -360,15 +389,19 @@ async def ws_events(websocket: WebSocket):
             adapt=False
         )
         if occupancy:
+            offset_hz = occupancy[0].get("offset_hz")
+            frequency_hz = _scan_engine.center_hz
+            if offset_hz is not None:
+                frequency_hz = int(_scan_engine.center_hz + offset_hz)
             event = {
                 "type": "occupancy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "band": band,
-                "frequency_hz": _scan_engine.center_hz,
+                "frequency_hz": frequency_hz,
                 "bandwidth_hz": occupancy[0]["bandwidth_hz"],
                 "power_dbm": power_db,
-                "snr_db": None,
-                "threshold_dbm": threshold_dbm,
+                "snr_db": occupancy[0].get("snr_db"),
+                "threshold_dbm": occupancy[0].get("threshold_dbm", threshold_dbm),
                 "occupied": occupancy[0]["occupied"],
                 "mode": "Unknown",
                 "confidence": 0.4,

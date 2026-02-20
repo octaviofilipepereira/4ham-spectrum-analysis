@@ -233,61 +233,87 @@ paths:
             text/csv:
               schema:
                 type: string
-  /api/settings:
-        /api/events/stats:
-          get:
-            summary: Event stats by mode
-            responses:
-              "200":
-                description: Stats
-                content:
-                  application/json:
-                    schema:
-                      type: object
-                      properties:
-                        modes:
-                          type: object
-      /api/events/count:
-        get:
-          summary: Count events
-          parameters:
-            - name: band
-              in: query
-              required: false
+  /api/events/stats:
+    get:
+      summary: Event stats by mode
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
               schema:
-                type: string
-            - name: mode
-              in: query
-              required: false
-              schema:
-                type: string
-            - name: callsign
-              in: query
-              required: false
-              schema:
-                type: string
-            - name: start
-              in: query
-              required: false
-              schema:
-                type: string
-                format: date-time
-            - name: end
-              in: query
-              required: false
-              schema:
-                type: string
-                format: date-time
-          responses:
-            "200":
-              description: Total events
-              content:
-                application/json:
-                  schema:
+                type: object
+                properties:
+                  modes:
                     type: object
-                    properties:
-                      total:
-                        type: integer
+  /api/events/count:
+    get:
+      summary: Count events
+      parameters:
+        - name: band
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: callsign
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Total events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+  /api/decoders/status:
+    get:
+      summary: Decoder ingest status
+      responses:
+        "200":
+          description: Decoder ingest endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/decoders/events:
+    post:
+      summary: Ingest decoder events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Ingest result
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/settings:
     get:
       summary: Get settings
       responses:

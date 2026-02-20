@@ -319,3 +319,19 @@ class Database:
         ).fetchone()[0]
 
         return int(occ) + int(calls)
+
+    def get_event_stats(self):
+        stats = {}
+        for row in self.conn.execute(
+            "SELECT mode, COUNT(*) AS total FROM occupancy_events GROUP BY mode"
+        ):
+            mode = row["mode"] or "Unknown"
+            stats[mode] = stats.get(mode, 0) + int(row["total"])
+
+        for row in self.conn.execute(
+            "SELECT mode, COUNT(*) AS total FROM callsign_events GROUP BY mode"
+        ):
+            mode = row["mode"] or "Unknown"
+            stats[mode] = stats.get(mode, 0) + int(row["total"])
+
+        return stats
