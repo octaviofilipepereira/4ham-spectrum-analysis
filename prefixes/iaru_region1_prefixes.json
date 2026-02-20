@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "region": "IARU-1",
+    "note": "Seed list only. This file is not complete and must be expanded per national regulator tables.",
+    "version": "0.1"
+  },
+  "countries": [
+    {
+      "country": "Portugal",
+      "prefixes": ["CT", "CQ", "CR", "CS"]
+    },
+    {
+      "country": "Spain",
+      "prefixes": ["EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH"]
+    },
+    {
+      "country": "France",
+      "prefixes": ["F", "TM", "TK"]
+    },
+    {
+      "country": "Germany",
+      "prefixes": ["DA", "DB", "DC", "DD", "DE", "DF", "DG", "DH", "DI", "DJ", "DK", "DL", "DM", "DN", "DO", "DP", "DQ", "DR"]
+    },
+    {
+      "country": "United Kingdom",
+      "prefixes": ["G", "M", "2E", "2F", "2M", "2W", "GM", "GW", "GI", "GJ", "GU", "GD"]
+    },
+    {
+      "country": "Italy",
+      "prefixes": ["I", "IA", "IB", "IC", "ID", "IE", "IF", "IG", "IH", "II", "IJ", "IK", "IL", "IM", "IN", "IO", "IP", "IQ", "IR", "IS", "IT", "IU", "IW", "IX"]
+    }
+  ]
+}

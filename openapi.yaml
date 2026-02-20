@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: 4ham Spectrum Analysis API
+  version: 0.1.0
+  description: REST API for spectrum scan control, device management, and event history.
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/health:
+    get:
+      summary: Health status
+      responses:
+        "200":
+          description: Service status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /api/devices:
+    get:
+      summary: List SDR devices
+      responses:
+        "200":
+          description: Devices list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+  /api/bands:
+    get:
+      summary: List configured bands
+      responses:
+        "200":
+          description: Bands list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Band"
+  /api/scan/start:
+    post:
+      summary: Start scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanStartRequest"
+      responses:
+        "200":
+          description: Scan started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanStatus"
+  /api/scan/stop:
+    post:
+      summary: Stop scan
+      responses:
+        "200":
+          description: Scan stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanStatus"
+  /api/events:
+    get:
+      summary: Query event history
+      parameters:
+        - name: start
+          in: query
+          description: ISO-8601 start timestamp
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          description: ISO-8601 end timestamp
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: band
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: callsign
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+            default: 1000
+      responses:
+        "200":
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+  /api/exports/{id}:
+    get:
+      summary: Download export
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Export file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        version:
+          type: string
+          example: 0.1.0
+        devices:
+          type: integer
+          example: 1
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          example: rtl_sdr_0
+        type:
+          type: string
+          example: rtl_sdr
+        name:
+          type: string
+          example: RTL-SDR Blog V3
+        capabilities:
+          type: array
+          items:
+            type: string
+          example:
+            - rx
+            - agc
+    Band:
+      type: object
+      properties:
+        name:
+          type: string
+          example: 20m
+        start_hz:
+          type: integer
+          example: 14000000
+        end_hz:
+          type: integer
+          example: 14350000
+        region:
+          type: string
+          example: IARU-1
+    ScanStartRequest:
+      type: object
+      properties:
+        scan:
+          $ref: "#/components/schemas/ScanConfig"
+      required:
+        - scan
+    ScanConfig:
+      type: object
+      properties:
+        band:
+          type: string
+          example: 20m
+        start_hz:
+          type: integer
+          example: 14000000
+        end_hz:
+          type: integer
+          example: 14350000
+        step_hz:
+          type: integer
+          example: 2000
+        dwell_ms:
+          type: integer
+          example: 250
+        mode:
+          type: string
+          example: auto
+    ScanStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          example: running
+        device:
+          type: string
+          example: rtl_sdr
+        started_at:
+          type: string
+          format: date-time
+    Event:
+      type: object
+      properties:
+        type:
+          type: string
+          example: callsign
+        timestamp:
+          type: string
+          format: date-time
+        band:
+          type: string
+          example: 20m
+        frequency_hz:
+          type: integer
+          example: 14074000
+        mode:
+          type: string
+          example: FT8
+        snr_db:
+          type: number
+          format: float
+          example: -12.5
+        confidence:
+          type: number
+          format: float
+          example: 0.94
+        source:
+          type: string
+          example: wsjtx
+        device:
+          type: string
+          example: rtl_sdr
+      required:
+        - type
+        - timestamp
+        - frequency_hz
+        - mode

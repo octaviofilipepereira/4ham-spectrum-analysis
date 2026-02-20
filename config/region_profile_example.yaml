@@ -1,0 +1,53 @@
+meta:
+  name: IARU Region 1 - Example
+  region: IARU-1
+  country: PT
+  language_default: pt
+  languages_supported:
+    - pt
+    - en
+    - es
+
+bands:
+  - name: 160m
+    start_hz: 1810000
+    end_hz: 2000000
+  - name: 80m
+    start_hz: 3500000
+    end_hz: 3800000
+  - name: 40m
+    start_hz: 7000000
+    end_hz: 7200000
+  - name: 20m
+    start_hz: 14000000
+    end_hz: 14350000
+  - name: 17m
+    start_hz: 18068000
+    end_hz: 18168000
+  - name: 15m
+    start_hz: 21000000
+    end_hz: 21450000
+  - name: 12m
+    start_hz: 24890000
+    end_hz: 24990000
+  - name: 10m
+    start_hz: 28000000
+    end_hz: 29700000
+  - name: 2m
+    start_hz: 144000000
+    end_hz: 146000000
+  - name: 70cm
+    start_hz: 430000000
+    end_hz: 440000000
+
+aprs:
+  frequency_hz: 144800000
+  modem: afsk1200
+
+callsign_validation:
+  prefixes_file: ../prefixes/iaru_region1_prefixes.json
+  regex_baseline: "\\b[A-Z]{1,3}\\d{1,4}[A-Z]{1,3}(/P|/M|/MM|/QRP|/QRPP)?\\b"
+
+ui:
+  timezone: Europe/Lisbon
+  units: metric

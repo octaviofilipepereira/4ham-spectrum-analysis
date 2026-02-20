@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/4ham/events.schema.json",
+  "title": "4ham Spectrum Events",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/defs/occupancy_event" },
+    { "$ref": "#/defs/callsign_event" }
+  ],
+  "defs": {
+    "base_event": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "band": { "type": "string" },
+        "frequency_hz": { "type": "integer", "minimum": 0 },
+        "mode": {
+          "type": "string",
+          "enum": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"]
+        },
+        "snr_db": { "type": "number" },
+        "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "source": {
+          "type": "string",
+          "enum": ["wsjtx", "direwolf", "cw", "asr", "dsp"]
+        },
+        "device": { "type": "string" }
+      },
+      "required": ["type", "timestamp", "frequency_hz", "mode", "device"],
+      "additionalProperties": false
+    },
+    "occupancy_event": {
+      "allOf": [
+        { "$ref": "#/defs/base_event" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "occupancy" },
+            "bandwidth_hz": { "type": "integer", "minimum": 0 },
+            "power_dbm": { "type": "number" },
+            "threshold_dbm": { "type": "number" },
+            "occupied": { "type": "boolean" }
+          },
+          "required": ["bandwidth_hz", "power_dbm", "threshold_dbm", "occupied"]
+        }
+      ]
+    },
+    "callsign_event": {
+      "allOf": [
+        { "$ref": "#/defs/base_event" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "callsign" },
+            "callsign": { "type": "string" },
+            "df_hz": { "type": "integer" },
+            "raw": { "type": "string" }
+          },
+          "required": ["callsign"]
+        }
+      ]
+    }
+  }
+}
