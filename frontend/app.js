@@ -280,9 +280,65 @@ function renderEvents(items) {
   const counts = {};
   const modeCounts = {};
   eventsTotal.textContent = String(items.length);
+  if (!items.length) {
+    const empty = document.createElement("li");
+    empty.className = "event-empty";
+    empty.textContent = "No events yet. Start a scan or adjust filters.";
+    eventsEl.appendChild(empty);
+  }
   items.forEach((eventItem) => {
-    const label = `${eventItem.type} | ${eventItem.band || "?"} | ${eventItem.frequency_hz} Hz`;
-    addEvent(label);
+    const li = document.createElement("li");
+    li.className = "event-item";
+
+    const header = document.createElement("div");
+    header.className = "event-item__meta";
+
+    const typeBadge = document.createElement("span");
+    typeBadge.className = `badge ${eventItem.type === "callsign" ? "bg-info" : "bg-secondary"}`;
+    typeBadge.textContent = eventItem.type || "event";
+
+    const modeBadge = document.createElement("span");
+    modeBadge.className = "badge bg-primary";
+    modeBadge.textContent = eventItem.mode || "Unknown";
+
+    const timeStamp = document.createElement("span");
+    const timeText = eventItem.timestamp ? new Date(eventItem.timestamp).toLocaleTimeString() : "--";
+    timeStamp.className = "event-item__time";
+    timeStamp.textContent = timeText;
+
+    header.appendChild(typeBadge);
+    header.appendChild(modeBadge);
+    header.appendChild(timeStamp);
+
+    const body = document.createElement("div");
+    body.className = "event-item__body";
+    const freq = eventItem.frequency_hz ? Number(eventItem.frequency_hz).toLocaleString() : "?";
+    const band = eventItem.band || "?";
+    const callsign = eventItem.callsign || "-";
+    body.innerHTML = `<strong>${freq} Hz</strong> <span class="event-item__muted">${band}</span> <span class="event-item__call">${callsign}</span>`;
+
+    const detail = document.createElement("div");
+    detail.className = "event-item__detail";
+    if (eventItem.mode === "APRS") {
+      const lat = eventItem.lat !== null && eventItem.lat !== undefined ? eventItem.lat.toFixed(3) : "--";
+      const lon = eventItem.lon !== null && eventItem.lon !== undefined ? eventItem.lon.toFixed(3) : "--";
+      detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
+    } else if (eventItem.mode === "FT8" || eventItem.mode === "FT4") {
+      const grid = eventItem.grid || "-";
+      const report = eventItem.report || "-";
+      detail.textContent = `grid=${grid} report=${report}`;
+    } else if (eventItem.type === "occupancy") {
+      const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
+      const snr = eventItem.snr_db !== null && eventItem.snr_db !== undefined ? `${eventItem.snr_db.toFixed(1)} dB` : "-";
+      detail.textContent = `bw=${bw} snr=${snr}`;
+    }
+
+    li.appendChild(header);
+    li.appendChild(body);
+    if (detail.textContent) {
+      li.appendChild(detail);
+    }
+    eventsEl.appendChild(li);
     if (eventItem.band) {
       counts[eventItem.band] = (counts[eventItem.band] || 0) + 1;
     }
