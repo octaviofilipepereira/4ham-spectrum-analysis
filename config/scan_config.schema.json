@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/4ham/scan_config.schema.json",
+  "title": "Scan Configuration",
+  "type": "object",
+  "required": ["scan"],
+  "additionalProperties": false,
+  "properties": {
+    "scan": {
+      "type": "object",
+      "required": ["band", "start_hz", "end_hz", "step_hz", "dwell_ms", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "band": { "type": "string" },
+        "start_hz": { "type": "integer", "minimum": 0 },
+        "end_hz": { "type": "integer", "minimum": 0 },
+        "step_hz": { "type": "integer", "minimum": 1 },
+        "dwell_ms": { "type": "integer", "minimum": 1 },
+        "mode": { "type": "string", "enum": ["auto", "fixed"] }
+      }
+    }
+  }
+}

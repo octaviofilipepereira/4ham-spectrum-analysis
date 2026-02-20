@@ -39,6 +39,7 @@ Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-
 
 Nota: os limites podem variar por regulacao nacional; o plano deve suportar perfis por pais.
 Perfil regional de exemplo: ver [config/region_profile_example.yaml](config/region_profile_example.yaml).
+Schema do perfil regional: ver [config/region_profile.schema.json](config/region_profile.schema.json).
 
 ## Arquitetura (alto nivel)
 1. **Camada SDR**
@@ -256,6 +257,7 @@ Schema JSON: ver [events.schema.json](events.schema.json).
 - `WS /ws/status`: estado do scan e estatisticas de processamento.
 
 ### Payloads principais
+Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.json).
 ```json
 {
 	"scan": {
@@ -293,6 +295,7 @@ Schema JSON: ver [events.schema.json](events.schema.json).
 ```
 
 ## WebSocket: detalhes de frames e taxas
+Especificacao detalhada: ver [docs/websocket_spec.md](docs/websocket_spec.md).
 - `WS /ws/spectrum`: envia frames agregados (ex.: 10 a 20 FFT por mensagem).
 - `spectrum_frame` suporta compressao opcional (delta + int8) para Raspberry Pi.
 - Taxas sugeridas:
@@ -339,6 +342,7 @@ Schema JSON: ver [events.schema.json](events.schema.json).
 - Compressao/downsamping para streaming eficiente.
 
 ## Requisitos de recursos (estimativa)
+Detalhes de hardware e performance: ver [docs/hardware_requirements.md](docs/hardware_requirements.md).
 - **Raspberry Pi 4 (4 GB)**: FT8/FT4 + APRS + CW simultaneo; SSB/ASR limitado.
 - **Raspberry Pi 5 (8 GB)**: SSB/ASR leve, melhor para scan rapido.
 - **PC dual-core**: todos os decoders com taxa moderada.
@@ -350,3 +354,4 @@ Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
 - Selecionar decoders digitais a integrar (FT8/FT4/APRS/CW).
 - Detalhar configuracoes por hardware (RTL-SDR/HackRF/Airspy/transceiver).
 - Definir o contrato final do WebSocket e formatos de frame.
+- Backlog tecnico: ver [docs/backlog.md](docs/backlog.md).

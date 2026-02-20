@@ -168,6 +168,110 @@
     {
       "country": "Montenegro",
       "prefixes": ["4O"]
+    },
+    {
+      "country": "Ukraine",
+      "prefixes": ["UR", "US", "UT", "UU", "UV", "UW", "UX", "UY", "UZ"]
+    },
+    {
+      "country": "Belarus",
+      "prefixes": ["EU", "EW"]
+    },
+    {
+      "country": "Israel",
+      "prefixes": ["4X", "4Z"]
+    },
+    {
+      "country": "Morocco",
+      "prefixes": ["CN"]
+    },
+    {
+      "country": "Algeria",
+      "prefixes": ["7X"]
+    },
+    {
+      "country": "Tunisia",
+      "prefixes": ["3V"]
+    },
+    {
+      "country": "Libya",
+      "prefixes": ["5A"]
+    },
+    {
+      "country": "Egypt",
+      "prefixes": ["SU"]
+    },
+    {
+      "country": "South Africa",
+      "prefixes": ["ZS", "ZR", "ZU"]
+    },
+    {
+      "country": "Namibia",
+      "prefixes": ["V5"]
+    },
+    {
+      "country": "Botswana",
+      "prefixes": ["A2"]
+    },
+    {
+      "country": "Kenya",
+      "prefixes": ["5Z"]
+    },
+    {
+      "country": "Tanzania",
+      "prefixes": ["5H"]
+    },
+    {
+      "country": "Uganda",
+      "prefixes": ["5X"]
+    },
+    {
+      "country": "Nigeria",
+      "prefixes": ["5N"]
+    },
+    {
+      "country": "Ghana",
+      "prefixes": ["9G"]
+    },
+    {
+      "country": "Senegal",
+      "prefixes": ["6W"]
+    },
+    {
+      "country": "Cote d'Ivoire",
+      "prefixes": ["TU"]
+    },
+    {
+      "country": "Cameroon",
+      "prefixes": ["TJ"]
+    },
+    {
+      "country": "Ethiopia",
+      "prefixes": ["ET"]
+    },
+    {
+      "country": "Sudan",
+      "prefixes": ["ST"]
+    },
+    {
+      "country": "Mozambique",
+      "prefixes": ["C9"]
+    },
+    {
+      "country": "Zambia",
+      "prefixes": ["9J"]
+    },
+    {
+      "country": "Zimbabwe",
+      "prefixes": ["Z2"]
+    },
+    {
+      "country": "Angola",
+      "prefixes": ["D2"]
+    },
+    {
+      "country": "Cape Verde",
+      "prefixes": ["D4"]
     }
   ]
 }
