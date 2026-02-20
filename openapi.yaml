@@ -164,6 +164,12 @@ paths:
             minimum: 1
             maximum: 10000
             default: 1000
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
       responses:
         "200":
           description: Event list
@@ -178,6 +184,11 @@ paths:
       summary: Export events
       parameters:
         - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
           in: query
           required: false
           schema:

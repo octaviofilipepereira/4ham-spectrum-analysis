@@ -16,6 +16,7 @@ const callsignFilter = document.getElementById("callsignFilter");
 const startFilter = document.getElementById("startFilter");
 const endFilter = document.getElementById("endFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
+const pageOffsetLabel = document.getElementById("pageOffset");
 const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
@@ -295,6 +296,7 @@ async function fetchEvents() {
     }
     const data = await resp.json();
     renderEvents(data);
+    pageOffsetLabel.textContent = `Offset: ${eventOffset}`;
     localStorage.setItem("filters", JSON.stringify({
       band: bandFilter.value,
       mode: modeFilter.value,
@@ -401,6 +403,8 @@ startFilter.addEventListener("change", fetchEvents);
 endFilter.addEventListener("change", fetchEvents);
 
 exportCsvBtn.addEventListener("click", () => {
+  exportCsvBtn.disabled = true;
+  exportCsvBtn.textContent = "Exporting...";
   const params = new URLSearchParams({ limit: "1000", format: "csv" });
   if (bandFilter.value) {
     params.append("band", bandFilter.value);
@@ -418,6 +422,10 @@ exportCsvBtn.addEventListener("click", () => {
     params.append("end", new Date(endFilter.value).toISOString());
   }
   window.location.href = `/api/export?${params.toString()}`;
+  setTimeout(() => {
+    exportCsvBtn.disabled = false;
+    exportCsvBtn.textContent = "Export CSV";
+  }, 1500);
 });
 
 document.addEventListener("keydown", (event) => {

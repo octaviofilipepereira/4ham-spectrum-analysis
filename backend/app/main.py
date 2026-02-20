@@ -331,6 +331,11 @@ async def ws_events(websocket: WebSocket):
                 "device": _scan_state.get("device"),
                 "scan_id": _scan_state.get("scan_id")
             }
+            settings = _db.get_settings()
+            modes = settings.get("modes") or {}
+            if modes and not modes.get("ssb", True):
+                await asyncio.sleep(1.0)
+                continue
             _db.insert_occupancy(event)
             await websocket.send_json({"event": event})
             await asyncio.sleep(1.0)

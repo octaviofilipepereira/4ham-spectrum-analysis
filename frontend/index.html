@@ -241,12 +241,23 @@
             <input type="datetime-local" id="endFilter" />
           </label>
           <button class="btn ghost" id="exportCsv">Export CSV</button>
+          <button class="btn ghost" id="prevPage">Prev</button>
+          <button class="btn ghost" id="nextPage">Next</button>
+          <span class="login-status" id="pageOffset">Offset: 0</span>
         </div>
       </section>
 
       <section class="panel">
         <h2>Logs</h2>
         <pre id="logs">No logs yet.</pre>
+      </section>
+
+      <section class="panel">
+        <h2>Signal Quality</h2>
+        <div class="quality">
+          <div class="quality__bar" id="qualityBar"></div>
+          <span id="qualityLabel">SNR: --</span>
+        </div>
       </section>
     </main>
 
