@@ -303,7 +303,9 @@ async def ws_logs(websocket: WebSocket):
 def scan_status(request: Request = None):
     if request:
         _enforce_auth(request)
-    return _scan_state
+    payload = dict(_scan_state)
+    payload["engine"] = _scan_engine.status()
+    return payload
 
 
 @app.get("/api/settings")
@@ -464,7 +466,8 @@ async def ws_status(websocket: WebSocket):
                 "device": _scan_state.get("device"),
                 "cpu_pct": _cpu_percent(),
                 "frame_age_ms": frame_age_ms,
-                "noise_floor_db": _noise_floor.get(band)
+                "noise_floor_db": _noise_floor.get(band),
+                "scan": _scan_engine.status()
             }
         }
         await websocket.send_json(payload)
