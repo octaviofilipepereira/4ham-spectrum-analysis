@@ -28,6 +28,66 @@
     {
       "country": "Italy",
       "prefixes": ["I", "IA", "IB", "IC", "ID", "IE", "IF", "IG", "IH", "II", "IJ", "IK", "IL", "IM", "IN", "IO", "IP", "IQ", "IR", "IS", "IT", "IU", "IW", "IX"]
+    },
+    {
+      "country": "Netherlands",
+      "prefixes": ["PA", "PB", "PC", "PD", "PE", "PF", "PG", "PH", "PI"]
+    },
+    {
+      "country": "Belgium",
+      "prefixes": ["ON", "OO", "OP", "OQ", "OR", "OS", "OT"]
+    },
+    {
+      "country": "Switzerland",
+      "prefixes": ["HB", "HE"]
+    },
+    {
+      "country": "Austria",
+      "prefixes": ["OE"]
+    },
+    {
+      "country": "Denmark",
+      "prefixes": ["OU", "OV", "OZ", "5P", "5Q"]
+    },
+    {
+      "country": "Sweden",
+      "prefixes": ["SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ", "SK", "SL", "SM"]
+    },
+    {
+      "country": "Finland",
+      "prefixes": ["OF", "OG", "OH", "OI"]
+    },
+    {
+      "country": "Norway",
+      "prefixes": ["LA", "LB", "LC", "LD", "LE", "LF", "LG", "LH", "LI", "LJ", "LK", "LL", "LM", "LN"]
+    },
+    {
+      "country": "Poland",
+      "prefixes": ["SP", "SQ", "SO", "SR", "HF"]
+    },
+    {
+      "country": "Czech Republic",
+      "prefixes": ["OK", "OL"]
+    },
+    {
+      "country": "Slovakia",
+      "prefixes": ["OM"]
+    },
+    {
+      "country": "Hungary",
+      "prefixes": ["HA", "HG"]
+    },
+    {
+      "country": "Greece",
+      "prefixes": ["SV", "SW", "SX", "SY", "SZ"]
+    },
+    {
+      "country": "Turkey",
+      "prefixes": ["TA", "TB", "TC"]
+    },
+    {
+      "country": "Russian Federation",
+      "prefixes": ["RA", "RB", "RC", "RD", "RE", "RF", "RG", "RH", "RI", "RJ", "RK", "RL", "RM", "RN", "RO", "RP", "RQ", "RR", "RS", "RT", "RU", "RV", "RW", "RX", "RY", "RZ", "UA", "UB", "UC", "UD", "UE", "UF", "UG", "UH", "UI"]
     }
   ]
 }
