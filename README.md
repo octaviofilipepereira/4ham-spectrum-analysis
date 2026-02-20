@@ -13,6 +13,8 @@ Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-
 - UI web moderna, limpa e responsiva.
 - Idiomas: Portugues, Ingles, Espanhol (selecionado na instalacao).
 
+Nota: instrucoes de instalacao em [docs/install.md](docs/install.md).
+
 ## Bandas alvo
 - 2 m
 - 70 cm
