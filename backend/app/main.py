@@ -23,6 +23,15 @@ _scan_state = {
     "scan": None,
     "scan_id": None
 }
+_spectrum_cache = {
+    "fft_db": None,
+    "bin_hz": None,
+    "min_db": None,
+    "max_db": None,
+    "timestamp": None,
+    "center_hz": 0,
+    "span_hz": 0
+}
 
 
 @app.get("/api/health")
@@ -86,7 +95,7 @@ async def ws_events(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
-        occupancy = estimate_occupancy(iq, _scan_engine.sample_rate)
+        occupancy = estimate_occupancy(iq, _scan_engine.sample_rate, adapt=True)
         if occupancy:
             event = {
                 "type": "occupancy",
@@ -135,12 +144,21 @@ async def ws_spectrum(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
-        fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate)
+        fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
+        _spectrum_cache.update({
+            "fft_db": fft_db,
+            "bin_hz": bin_hz,
+            "min_db": min_db,
+            "max_db": max_db,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "center_hz": _scan_engine.center_hz,
+            "span_hz": _scan_engine.sample_rate
+        })
         payload = {
             "spectrum_frame": {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "center_hz": _scan_engine.center_hz,
-                "span_hz": _scan_engine.sample_rate,
+                "timestamp": _spectrum_cache["timestamp"],
+                "center_hz": _spectrum_cache["center_hz"],
+                "span_hz": _spectrum_cache["span_hz"],
                 "bin_hz": bin_hz,
                 "fft_db": fft_db,
                 "min_db": min_db,

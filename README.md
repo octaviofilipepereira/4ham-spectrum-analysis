@@ -364,3 +364,4 @@ Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
 - Validacao de prefixos: ver [docs/prefix_validation.md](docs/prefix_validation.md).
 - Testes basicos DSP: ver [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
 - Runner de desenvolvimento: ver [scripts/run_dev.sh](scripts/run_dev.sh).
+- Runner Windows: ver [scripts/run_dev.ps1](scripts/run_dev.ps1).
