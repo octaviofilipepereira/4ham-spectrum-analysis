@@ -1,3 +1,5 @@
+import { loadPresetsFromJson } from "./utils/presets.js";
+
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
 const waterfallEl = document.getElementById("waterfall");
@@ -33,6 +35,10 @@ const favoriteBandsSelect = document.getElementById("favoriteBands");
 const addFavoriteBtn = document.getElementById("addFavorite");
 const removeFavoriteBtn = document.getElementById("removeFavorite");
 const toast = document.getElementById("toast");
+const favoriteFilter = document.getElementById("favoriteFilter");
+const loginUserInput = document.getElementById("loginUser");
+const loginPassInput = document.getElementById("loginPass");
+const loginSaveBtn = document.getElementById("loginSave");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -58,6 +64,12 @@ function loadPresets() {
     option.dataset.payload = JSON.stringify(preset);
     presetSelect.appendChild(option);
   });
+}
+
+function persistPresets(text) {
+  const parsed = loadPresetsFromJson(text);
+  localStorage.setItem("presets", JSON.stringify(parsed));
+  loadPresets();
 }
 
 function exportPresets() {
@@ -99,12 +111,7 @@ importPresetsInput.addEventListener("change", async (event) => {
   }
   const text = await file.text();
   try {
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Invalid presets file");
-    }
-    localStorage.setItem("presets", JSON.stringify(parsed));
-    loadPresets();
+    persistPresets(text);
     showToast("Presets imported");
   } catch (err) {
     showToast("Failed to import presets");
@@ -126,11 +133,16 @@ presetSelect.addEventListener("change", () => {
 function loadFavorites() {
   const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
   favoriteBandsSelect.innerHTML = "";
+  favoriteFilter.innerHTML = "";
   data.forEach((band) => {
     const option = document.createElement("option");
     option.value = band;
     option.textContent = band;
     favoriteBandsSelect.appendChild(option);
+    const filterOption = document.createElement("option");
+    filterOption.value = band;
+    filterOption.textContent = band;
+    favoriteFilter.appendChild(filterOption);
   });
 }
 
@@ -152,6 +164,13 @@ removeFavoriteBtn.addEventListener("click", () => {
   loadFavorites();
   logLine("Favorite removed");
   syncFavorites();
+});
+
+favoriteFilter.addEventListener("change", () => {
+  if (favoriteFilter.value) {
+    bandFilter.value = favoriteFilter.value;
+    fetchEvents();
+  }
 });
 
 async function syncFavorites() {
@@ -411,6 +430,8 @@ async function loadSettings() {
   const authPass = localStorage.getItem("authPass") || "";
   authUserInput.value = authUser;
   authPassInput.value = authPass;
+  loginUserInput.value = authUser;
+  loginPassInput.value = authPass;
 
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
@@ -436,6 +457,12 @@ async function loadSettings() {
     logLine("Failed to load settings");
   }
 }
+
+loginSaveBtn.addEventListener("click", () => {
+  localStorage.setItem("authUser", loginUserInput.value);
+  localStorage.setItem("authPass", loginPassInput.value);
+  showToast("Credentials saved");
+});
 
 saveSettingsBtn.addEventListener("click", async () => {
   localStorage.setItem("authUser", authUserInput.value);

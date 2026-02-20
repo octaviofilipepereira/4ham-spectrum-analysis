@@ -52,6 +52,21 @@
       </section>
 
       <section class="panel">
+        <h2>Login</h2>
+        <div class="filters">
+          <label class="control">
+            User
+            <input type="text" id="loginUser" />
+          </label>
+          <label class="control">
+            Password
+            <input type="password" id="loginPass" />
+          </label>
+          <button class="btn ghost" id="loginSave">Save credentials</button>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Settings</h2>
         <div class="filters">
           <label class="control">
@@ -152,6 +167,10 @@
             </select>
           </label>
           <label class="control">
+            Favorites
+            <select id="favoriteFilter"></select>
+          </label>
+          <label class="control">
             Callsign
             <input type="text" id="callsignFilter" placeholder="CT1ABC" />
           </label>
@@ -173,6 +192,6 @@
       </section>
     </main>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
