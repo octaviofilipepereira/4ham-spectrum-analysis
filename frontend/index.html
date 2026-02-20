@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>4ham Spectrum Analysis</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app__header">
+        <div>
+          <p class="kicker">4ham Spectrum Analysis</p>
+          <h1>Radio Spectrum Monitor</h1>
+          <p class="subtitle">Visualize ocupacao, chamadas e decodificacoes em tempo real.</p>
+        </div>
+        <div class="controls">
+          <button class="btn primary" id="startScan">Start scan</button>
+          <button class="btn ghost" id="stopScan">Stop</button>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="panel">
+          <h2>Waterfall</h2>
+          <div class="waterfall" id="waterfall">Awaiting spectrum stream...</div>
+        </div>
+        <div class="panel">
+          <h2>Eventos</h2>
+          <ul class="events" id="events"></ul>
+        </div>
+      </section>
+
+      <section class="panel status">
+        <h2>Status</h2>
+        <pre id="status">Disconnected</pre>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+
+:root {
+  --bg: #0a0f1f;
+  --bg-2: #101b36;
+  --accent: #ff9f1c;
+  --accent-2: #2ec4b6;
+  --text: #f8f7ff;
+  --muted: #9fb0d0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top left, #1b2a57, var(--bg));
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.app__header {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin: 0;
+}
+
+h1 {
+  margin: 8px 0 0;
+  font-size: 2.4rem;
+}
+
+.subtitle {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  border: none;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--accent-2);
+  color: var(--accent-2);
+}
+
+.grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.panel {
+  background: linear-gradient(135deg, rgba(25, 39, 78, 0.9), rgba(12, 19, 38, 0.95));
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 220px;
+}
+
+.waterfall {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #0c1429;
+  min-height: 180px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.events {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.events li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+}
+
+.status pre {
+  color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .app__header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}

@@ -65,6 +65,7 @@ Schema do perfil regional: ver [config/region_profile.schema.json](config/region
 - **Storage**: SQLite + ficheiros para exportacao (CSV/PNG/JSON).
 
 Backend skeleton: ver [backend/app/main.py](backend/app/main.py).
+Frontend skeleton: ver [frontend/index.html](frontend/index.html).
 
 ## Fluxo de dados
 1. SDR capta IQ por segmentos de frequencia (scan).
@@ -361,3 +362,4 @@ Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
 - Instalacao: ver [docs/install.md](docs/install.md).
 - SQLite schema: ver [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
 - Validacao de prefixos: ver [docs/prefix_validation.md](docs/prefix_validation.md).
+- Testes basicos DSP: ver [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
