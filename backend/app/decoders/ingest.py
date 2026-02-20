@@ -54,6 +54,11 @@ def build_callsign_event(payload, scan_state):
         "df_hz": payload.get("df_hz"),
         "confidence": payload.get("confidence"),
         "raw": payload.get("raw"),
+        "path": payload.get("path"),
+        "payload": payload.get("payload"),
+        "lat": payload.get("lat"),
+        "lon": payload.get("lon"),
+        "msg": payload.get("msg"),
         "source": payload.get("source") or _infer_source(mode),
         "device": payload.get("device") or scan_state.get("device"),
         "scan_id": payload.get("scan_id") or scan_state.get("scan_id")

@@ -38,7 +38,7 @@ Example
 - type: callsign
 - mode: APRS
 - raw: AX.25 payload
-- optional: path, lat, lon, msg
+- optional: path, payload, lat, lon, msg
 
 Example
 ```json

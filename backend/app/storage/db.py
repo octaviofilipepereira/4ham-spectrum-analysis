@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS callsign_events (
   df_hz INTEGER,
   confidence REAL,
   raw TEXT,
+    path TEXT,
+    payload TEXT,
+    lat REAL,
+    lon REAL,
+    msg TEXT,
   source TEXT,
   device TEXT
 );
@@ -86,6 +91,11 @@ class Database:
     def _ensure_columns(self):
         self._add_column("occupancy_events", "scan_id INTEGER")
         self._add_column("callsign_events", "scan_id INTEGER")
+        self._add_column("callsign_events", "path TEXT")
+        self._add_column("callsign_events", "payload TEXT")
+        self._add_column("callsign_events", "lat REAL")
+        self._add_column("callsign_events", "lon REAL")
+        self._add_column("callsign_events", "msg TEXT")
 
     def _add_column(self, table, column_def):
         try:
@@ -201,8 +211,8 @@ class Database:
             """
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
-                df_hz, confidence, raw, source, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                df_hz, confidence, raw, path, payload, lat, lon, msg, source, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -215,6 +225,11 @@ class Database:
                 event.get("df_hz"),
                 event.get("confidence"),
                 event.get("raw"),
+                event.get("path"),
+                event.get("payload"),
+                event.get("lat"),
+                event.get("lon"),
+                event.get("msg"),
                 event.get("source"),
                 event.get("device")
             )
@@ -270,7 +285,8 @@ class Database:
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
-                 mode, callsign, snr_db, df_hz, confidence, raw, source, device
+                 mode, callsign, snr_db, df_hz, confidence, raw, path, payload,
+                 lat, lon, msg, source, device
             FROM callsign_events
             WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {time_filter}
             ORDER BY timestamp DESC

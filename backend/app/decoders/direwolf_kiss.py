@@ -58,15 +58,89 @@ def _decode_callsign(addr):
     return call
 
 
-def parse_ax25_source(frame):
-    if not frame:
+def _decode_address(addr):
+    if len(addr) < 7:
+        return None, False
+    call = _decode_callsign(addr)
+    last = bool(addr[6] & 0x01)
+    return call, last
+
+
+def _parse_ax25(frame):
+    if not frame or len(frame) < 14:
         return None
-    if len(frame) < 14:
+    offset = 0
+    addresses = []
+    for _ in range(10):
+        if offset + 7 > len(frame):
+            break
+        call, last = _decode_address(frame[offset:offset + 7])
+        addresses.append(call)
+        offset += 7
+        if last:
+            break
+
+    if len(addresses) < 2:
         return None
-    dest = frame[0:7]
-    src = frame[7:14]
-    src_call = _decode_callsign(src)
-    return src_call
+
+    dest = addresses[0]
+    src = addresses[1]
+    path = [call for call in addresses[2:] if call]
+    if offset + 2 > len(frame):
+        return {
+            "dest": dest,
+            "src": src,
+            "path": path,
+            "info": None
+        }
+
+    control = frame[offset]
+    pid = frame[offset + 1]
+    info = frame[offset + 2:]
+    if control != 0x03 or pid != 0xF0:
+        info = frame[offset + 2:]
+
+    return {
+        "dest": dest,
+        "src": src,
+        "path": path,
+        "info": info
+    }
+
+
+def _parse_aprs_payload(text):
+    if not text:
+        return {}, None
+    payload = str(text)
+    if len(payload) >= 20 and payload[0] in ("!", "="):
+        lat_raw = payload[1:9]
+        symbol_table = payload[9]
+        lon_raw = payload[10:19]
+        symbol_code = payload[19]
+        comment = payload[20:]
+        try:
+            lat_deg = int(lat_raw[0:2])
+            lat_min = float(lat_raw[2:7])
+            lat_hem = lat_raw[7]
+            lon_deg = int(lon_raw[0:3])
+            lon_min = float(lon_raw[3:8])
+            lon_hem = lon_raw[8]
+            lat = lat_deg + (lat_min / 60.0)
+            lon = lon_deg + (lon_min / 60.0)
+            if lat_hem == "S":
+                lat = -lat
+            if lon_hem == "W":
+                lon = -lon
+            return {
+                "lat": lat,
+                "lon": lon,
+                "msg": comment.strip() if comment else None,
+                "symbol_table": symbol_table,
+                "symbol_code": symbol_code
+            }, payload
+        except (ValueError, IndexError):
+            return {}, payload
+    return {}, payload
 
 
 def parse_kiss_frame(frame):
@@ -76,13 +150,23 @@ def parse_kiss_frame(frame):
     if port_cmd & 0x0F != 0x00:
         return None
     ax25 = frame[1:]
-    callsign = parse_ax25_source(ax25)
-    if not callsign:
+    parsed = _parse_ax25(ax25)
+    if not parsed or not parsed.get("src"):
         return None
+    info_bytes = parsed.get("info")
+    payload_text = None
+    if info_bytes:
+        payload_text = info_bytes.decode("utf-8", errors="ignore")
+    extras, payload = _parse_aprs_payload(payload_text)
     return {
-        "callsign": callsign,
-        "raw": ax25.hex(),
-        "mode": "APRS"
+        "callsign": parsed.get("src"),
+        "raw": payload or (payload_text or ax25.hex()),
+        "mode": "APRS",
+        "path": ",".join(parsed.get("path") or []),
+        "payload": payload,
+        "lat": extras.get("lat"),
+        "lon": extras.get("lon"),
+        "msg": extras.get("msg")
     }
 
 

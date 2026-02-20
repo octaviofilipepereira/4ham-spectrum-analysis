@@ -17,9 +17,13 @@ def _wsjtx_header(message_type):
     return MAGIC + struct.pack(">I", 2) + _qstring("test") + struct.pack(">I", message_type)
 
 
-def _encode_callsign(call):
+def _encode_addr(call, last=False, ssid=0):
     call = call.ljust(6)
-    return bytes([(ord(ch) << 1) & 0xFE for ch in call])
+    addr = bytes([(ord(ch) << 1) & 0xFE for ch in call])
+    ssid_byte = 0x60 | ((ssid & 0x0F) << 1)
+    if last:
+        ssid_byte |= 0x01
+    return addr + bytes([ssid_byte])
 
 
 def test_wsjtx_udp_decode_with_dial():
@@ -48,11 +52,17 @@ def test_wsjtx_udp_decode_with_dial():
 
 
 def test_direwolf_kiss_parser():
-    dest = bytes([0x80] * 6) + bytes([0x60])
-    src = _encode_callsign("CT1ABC") + bytes([0x60])
+    dest = _encode_addr("APRS", last=False)
+    src = _encode_addr("CT1ABC", last=False)
+    digi = _encode_addr("CPNW2", last=True)
     control_pid = bytes([0x03, 0xF0])
-    ax25 = dest + src + control_pid
+    info = "!3859.50N/00911.20W-Test".encode("utf-8")
+    ax25 = dest + src + digi + control_pid + info
     frame = bytes([0x00]) + ax25
     event = parse_kiss_frame(frame)
     assert event is not None
     assert event["callsign"] == "CT1ABC"
+    assert event["path"] == "CPNW2"
+    assert event["payload"].startswith("!")
+    assert round(event["lat"], 3) == 38.992
+    assert round(event["lon"], 3) == -9.187

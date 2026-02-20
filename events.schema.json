@@ -58,7 +58,12 @@
             "type": { "const": "callsign" },
             "callsign": { "type": "string" },
             "df_hz": { "type": "integer" },
-            "raw": { "type": "string" }
+            "raw": { "type": "string" },
+            "path": { "type": "string" },
+            "payload": { "type": "string" },
+            "lat": { "type": "number" },
+            "lon": { "type": "number" },
+            "msg": { "type": "string" }
           },
           "required": ["callsign"]
         }
