@@ -38,6 +38,7 @@ Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-
 - 70 cm: 430 - 440 MHz
 
 Nota: os limites podem variar por regulacao nacional; o plano deve suportar perfis por pais.
+Perfil regional de exemplo: ver [config/region_profile_example.yaml](config/region_profile_example.yaml).
 
 ## Arquitetura (alto nivel)
 1. **Camada SDR**
