@@ -241,6 +241,8 @@ def save_settings(payload: dict, request: Request):
         existing["auth_hint"] = payload.get("auth_hint")
     if payload.get("bands"):
         existing["bands"] = payload.get("bands")
+    if payload.get("favorites"):
+        existing["favorites"] = payload.get("favorites")
     _db.save_settings(existing)
     return {"status": "ok"}
 

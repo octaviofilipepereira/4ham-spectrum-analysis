@@ -28,9 +28,11 @@ const presetNameInput = document.getElementById("presetName");
 const savePresetBtn = document.getElementById("savePreset");
 const presetSelect = document.getElementById("presetSelect");
 const exportPresetsBtn = document.getElementById("exportPresets");
+const importPresetsInput = document.getElementById("importPresets");
 const favoriteBandsSelect = document.getElementById("favoriteBands");
 const addFavoriteBtn = document.getElementById("addFavorite");
 const removeFavoriteBtn = document.getElementById("removeFavorite");
+const toast = document.getElementById("toast");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -38,6 +40,12 @@ let row = 0;
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
   logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
+}
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
 function loadPresets() {
@@ -64,6 +72,7 @@ function exportPresets() {
   link.remove();
   URL.revokeObjectURL(url);
   logLine("Presets exported");
+  showToast("Presets exported");
 }
 
 function savePreset() {
@@ -83,6 +92,24 @@ function savePreset() {
 
 savePresetBtn.addEventListener("click", savePreset);
 exportPresetsBtn.addEventListener("click", exportPresets);
+importPresetsInput.addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) {
+    return;
+  }
+  const text = await file.text();
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid presets file");
+    }
+    localStorage.setItem("presets", JSON.stringify(parsed));
+    loadPresets();
+    showToast("Presets imported");
+  } catch (err) {
+    showToast("Failed to import presets");
+  }
+});
 presetSelect.addEventListener("change", () => {
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
   const selected = data.find((p) => p.name === presetSelect.value);
@@ -114,6 +141,7 @@ addFavoriteBtn.addEventListener("click", () => {
     localStorage.setItem("favoriteBands", JSON.stringify(data));
     loadFavorites();
     logLine("Favorite added");
+    syncFavorites();
   }
 });
 
@@ -123,7 +151,17 @@ removeFavoriteBtn.addEventListener("click", () => {
   localStorage.setItem("favoriteBands", JSON.stringify(filtered));
   loadFavorites();
   logLine("Favorite removed");
+  syncFavorites();
 });
+
+async function syncFavorites() {
+  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ favorites: data })
+  });
+}
 
 function getAuthHeader() {
   const user = localStorage.getItem("authUser");
@@ -390,6 +428,10 @@ async function loadSettings() {
     if (data.device_id) {
       deviceSelect.value = data.device_id;
     }
+    if (Array.isArray(data.favorites)) {
+      localStorage.setItem("favoriteBands", JSON.stringify(data.favorites));
+      loadFavorites();
+    }
   } catch (err) {
     logLine("Failed to load settings");
   }
@@ -422,12 +464,17 @@ saveBandBtn.addEventListener("click", async () => {
       end_hz: Number(bandEndInput.value)
     }
   };
-  await fetch("/api/bands", {
+  const resp = await fetch("/api/bands", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify(payload)
   });
+  if (!resp.ok) {
+    showToast("Band validation failed");
+    return;
+  }
   logLine("Band saved");
+  showToast("Band saved");
   loadBands();
 });
 

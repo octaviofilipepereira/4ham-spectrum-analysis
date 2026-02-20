@@ -89,6 +89,10 @@
           </label>
           <button class="btn ghost" id="savePreset">Save preset</button>
           <button class="btn ghost" id="exportPresets">Export presets</button>
+          <label class="control">
+            Import presets
+            <input type="file" id="importPresets" accept="application/json" />
+          </label>
           <select id="presetSelect"></select>
         </div>
       </section>
@@ -101,6 +105,8 @@
           <button class="btn ghost" id="removeFavorite">Remove favorite</button>
         </div>
       </section>
+
+      <div class="toast" id="toast"></div>
 
       <section class="panel">
         <h2>Bands</h2>
