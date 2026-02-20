@@ -24,6 +24,9 @@ const bandNameInput = document.getElementById("bandName");
 const bandStartInput = document.getElementById("bandStart");
 const bandEndInput = document.getElementById("bandEnd");
 const saveBandBtn = document.getElementById("saveBand");
+const presetNameInput = document.getElementById("presetName");
+const savePresetBtn = document.getElementById("savePreset");
+const presetSelect = document.getElementById("presetSelect");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -32,6 +35,47 @@ function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
   logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
 }
+
+function loadPresets() {
+  const data = JSON.parse(localStorage.getItem("presets") || "[]");
+  presetSelect.innerHTML = "";
+  data.forEach((preset) => {
+    const option = document.createElement("option");
+    option.value = preset.name;
+    option.textContent = preset.name;
+    option.dataset.payload = JSON.stringify(preset);
+    presetSelect.appendChild(option);
+  });
+}
+
+function savePreset() {
+  const data = JSON.parse(localStorage.getItem("presets") || "[]");
+  const preset = {
+    name: presetNameInput.value || `Preset ${data.length + 1}`,
+    band: bandSelect.value,
+    gain: Number(gainInput.value),
+    sample_rate: Number(sampleRateInput.value),
+    record_path: recordPathInput.value || null
+  };
+  data.push(preset);
+  localStorage.setItem("presets", JSON.stringify(data));
+  loadPresets();
+  logLine("Preset saved");
+}
+
+savePresetBtn.addEventListener("click", savePreset);
+presetSelect.addEventListener("change", () => {
+  const data = JSON.parse(localStorage.getItem("presets") || "[]");
+  const selected = data.find((p) => p.name === presetSelect.value);
+  if (!selected) {
+    return;
+  }
+  bandSelect.value = selected.band;
+  gainInput.value = selected.gain;
+  sampleRateInput.value = selected.sample_rate;
+  recordPathInput.value = selected.record_path || "";
+  logLine("Preset applied");
+});
 
 function getAuthHeader() {
   const user = localStorage.getItem("authUser");
@@ -258,6 +302,24 @@ async function loadDevices() {
   }
 }
 
+async function loadBands() {
+  try {
+    const resp = await fetch("/api/bands", { headers: { ...getAuthHeader() } });
+    const bands = await resp.json();
+    if (Array.isArray(bands) && bands.length) {
+      bandSelect.innerHTML = "";
+      bands.forEach((band) => {
+        const option = document.createElement("option");
+        option.value = band.name;
+        option.textContent = band.name;
+        bandSelect.appendChild(option);
+      });
+    }
+  } catch (err) {
+    logLine("Failed to load bands");
+  }
+}
+
 async function loadSettings() {
   const authUser = localStorage.getItem("authUser") || "";
   const authPass = localStorage.getItem("authPass") || "";
@@ -312,15 +374,16 @@ saveBandBtn.addEventListener("click", async () => {
       end_hz: Number(bandEndInput.value)
     }
   };
-  await fetch("/api/settings", {
+  await fetch("/api/bands", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify(payload)
   });
   logLine("Band saved");
+  loadBands();
 });
 
-loadDevices().then(loadSettings);
+loadDevices().then(loadBands).then(loadSettings).then(loadPresets);
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

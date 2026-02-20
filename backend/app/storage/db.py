@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS bands (
+    name TEXT PRIMARY KEY,
+    start_hz INTEGER NOT NULL,
+    end_hz INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
     scan_id INTEGER,
@@ -151,6 +157,19 @@ class Database:
             return json.loads(row[0])
         except json.JSONDecodeError:
             return {}
+
+    def upsert_band(self, band):
+        self.conn.execute(
+            "INSERT OR REPLACE INTO bands(name, start_hz, end_hz) VALUES (?, ?, ?)",
+            (band.get("name"), band.get("start_hz", 0), band.get("end_hz", 0))
+        )
+        self.conn.commit()
+
+    def get_bands(self):
+        rows = self.conn.execute(
+            "SELECT name, start_hz, end_hz FROM bands ORDER BY name"
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def insert_occupancy(self, event):
         self.conn.execute(

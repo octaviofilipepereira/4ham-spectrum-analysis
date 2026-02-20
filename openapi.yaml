@@ -40,6 +40,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Band"
+    post:
+      summary: Save band
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                band:
+                  $ref: "#/components/schemas/Band"
+      responses:
+        "200":
+          description: Saved
   /api/scan/start:
     post:
       summary: Start scan

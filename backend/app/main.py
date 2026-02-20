@@ -109,13 +109,27 @@ def devices(request: Request):
 @app.get("/api/bands")
 def bands(request: Request):
     _enforce_auth(request)
-    return []
+    return _db.get_bands()
+
+
+@app.post("/api/bands")
+def save_band(payload: dict, request: Request):
+    _enforce_auth(request)
+    band = payload.get("band", {})
+    _db.upsert_band(band)
+    return {"status": "ok"}
 
 
 @app.post("/api/scan/start")
 async def scan_start(payload: dict, request: Request):
     _enforce_auth(request)
     scan = payload.get("scan", {})
+    if scan.get("band"):
+        for band in _db.get_bands():
+            if band.get("name") == scan.get("band"):
+                scan["start_hz"] = band.get("start_hz")
+                scan["end_hz"] = band.get("end_hz")
+                break
     await _scan_engine.start_async(scan)
     _scan_state["state"] = "running"
     _scan_state["device"] = payload.get("device", "rtl_sdr")
@@ -221,6 +235,8 @@ def save_settings(payload: dict, request: Request):
         existing["device_id"] = payload.get("device_id")
     if payload.get("auth_hint"):
         existing["auth_hint"] = payload.get("auth_hint")
+    if payload.get("bands"):
+        existing["bands"] = payload.get("bands")
     _db.save_settings(existing)
     return {"status": "ok"}
 
