@@ -1,4 +1,5 @@
 import sqlite3
+import json
 
 
 _SCHEMA_SQL = """
@@ -19,6 +20,11 @@ CREATE TABLE IF NOT EXISTS scans (
   mode TEXT NOT NULL,
   started_at TEXT NOT NULL,
   ended_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS occupancy_events (
@@ -125,6 +131,26 @@ class Database:
         ):
             scans.append(dict(row))
         return scans
+
+    def save_settings(self, settings):
+        payload = json.dumps(settings or {})
+        self.conn.execute(
+            "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+            ("user", payload)
+        )
+        self.conn.commit()
+
+    def get_settings(self):
+        row = self.conn.execute(
+            "SELECT value FROM settings WHERE key = ?",
+            ("user",)
+        ).fetchone()
+        if not row:
+            return {}
+        try:
+            return json.loads(row[0])
+        except json.JSONDecodeError:
+            return {}
 
     def insert_occupancy(self, event):
         self.conn.execute(

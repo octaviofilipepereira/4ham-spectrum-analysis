@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS scans (
   ended_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   scan_id INTEGER,

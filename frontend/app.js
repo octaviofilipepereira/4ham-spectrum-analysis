@@ -14,6 +14,11 @@ const callsignFilter = document.getElementById("callsignFilter");
 const startFilter = document.getElementById("startFilter");
 const endFilter = document.getElementById("endFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
+const deviceSelect = document.getElementById("deviceSelect");
+const bandSelect = document.getElementById("bandSelect");
+const authUserInput = document.getElementById("authUser");
+const authPassInput = document.getElementById("authPass");
+const saveSettingsBtn = document.getElementById("saveSettings");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -21,6 +26,26 @@ let row = 0;
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
   logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
+}
+
+function getAuthHeader() {
+  const user = localStorage.getItem("authUser");
+  const pass = localStorage.getItem("authPass");
+  if (!user || !pass) {
+    return {};
+  }
+  const token = btoa(`${user}:${pass}`);
+  return { Authorization: `Basic ${token}` };
+}
+
+function wsUrl(path) {
+  const user = localStorage.getItem("authUser");
+  const pass = localStorage.getItem("authPass");
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  if (user && pass) {
+    return `${protocol}://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${window.location.host}${path}`;
+  }
+  return `${protocol}://${window.location.host}${path}`;
 }
 
 function resizeCanvas() {
@@ -66,7 +91,9 @@ async function fetchEvents() {
     if (endFilter.value) {
       params.append("end", new Date(endFilter.value).toISOString());
     }
-    const resp = await fetch(`/api/events?${params.toString()}`);
+    const resp = await fetch(`/api/events?${params.toString()}`, {
+      headers: { ...getAuthHeader() }
+    });
     const data = await resp.json();
     renderEvents(data);
   } catch (err) {
@@ -85,10 +112,10 @@ startBtn.addEventListener("click", async () => {
   const recordPath = recordPathInput.value || null;
   await fetch("/api/scan/start", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify({
       scan: {
-        band: "20m",
+        band: bandSelect.value,
         start_hz: 14000000,
         end_hz: 14350000,
         step_hz: 2000,
@@ -96,7 +123,8 @@ startBtn.addEventListener("click", async () => {
         mode: "auto",
         gain,
         sample_rate: sampleRate,
-        record_path: recordPath
+        record_path: recordPath,
+        device_id: deviceSelect.value || null
       }
     })
   });
@@ -106,14 +134,14 @@ startBtn.addEventListener("click", async () => {
 
 stopBtn.addEventListener("click", async () => {
   setStatus("Stopping scan...");
-  await fetch("/api/scan/stop", { method: "POST" });
+  await fetch("/api/scan/stop", { method: "POST", headers: { ...getAuthHeader() } });
   setStatus("Scan stopped");
   logLine("Scan stopped");
 });
 
 function connectEvents() {
   try {
-    const ws = new WebSocket("ws://localhost:8000/ws/events");
+    const ws = new WebSocket(wsUrl("/ws/events"));
     ws.onopen = () => addEvent("Connected to events stream");
     ws.onmessage = (msg) => addEvent(msg.data);
     ws.onerror = () => addEvent("Events stream error");
@@ -163,7 +191,7 @@ document.addEventListener("keydown", (event) => {
 
 function connectSpectrum() {
   try {
-    const ws = new WebSocket("ws://localhost:8000/ws/spectrum");
+    const ws = new WebSocket(wsUrl("/ws/spectrum"));
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
@@ -189,7 +217,7 @@ connectSpectrum();
 
 function connectStatus() {
   try {
-    const ws = new WebSocket("ws://localhost:8000/ws/status");
+    const ws = new WebSocket(wsUrl("/ws/status"));
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
@@ -208,6 +236,59 @@ function connectStatus() {
 }
 
 connectStatus();
+
+async function loadDevices() {
+  try {
+    const resp = await fetch("/api/devices", { headers: { ...getAuthHeader() } });
+    const devices = await resp.json();
+    deviceSelect.innerHTML = "";
+    devices.forEach((device) => {
+      const option = document.createElement("option");
+      option.value = device.id;
+      option.textContent = device.name;
+      deviceSelect.appendChild(option);
+    });
+  } catch (err) {
+    logLine("Failed to load devices");
+  }
+}
+
+async function loadSettings() {
+  const authUser = localStorage.getItem("authUser") || "";
+  const authPass = localStorage.getItem("authPass") || "";
+  authUserInput.value = authUser;
+  authPassInput.value = authPass;
+
+  try {
+    const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
+    const data = await resp.json();
+    if (data.band) {
+      bandSelect.value = data.band;
+    }
+    if (data.device_id) {
+      deviceSelect.value = data.device_id;
+    }
+  } catch (err) {
+    logLine("Failed to load settings");
+  }
+}
+
+saveSettingsBtn.addEventListener("click", async () => {
+  localStorage.setItem("authUser", authUserInput.value);
+  localStorage.setItem("authPass", authPassInput.value);
+  const payload = {
+    band: bandSelect.value,
+    device_id: deviceSelect.value
+  };
+  await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload)
+  });
+  logLine("Settings saved");
+});
+
+loadDevices().then(loadSettings);
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

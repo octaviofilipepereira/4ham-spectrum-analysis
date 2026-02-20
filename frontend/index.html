@@ -52,6 +52,34 @@
       </section>
 
       <section class="panel">
+        <h2>Settings</h2>
+        <div class="filters">
+          <label class="control">
+            Device
+            <select id="deviceSelect"></select>
+          </label>
+          <label class="control">
+            Band
+            <select id="bandSelect">
+              <option value="20m">20m</option>
+              <option value="40m">40m</option>
+              <option value="2m">2m</option>
+              <option value="70cm">70cm</option>
+            </select>
+          </label>
+          <label class="control">
+            Auth user
+            <input type="text" id="authUser" />
+          </label>
+          <label class="control">
+            Auth pass
+            <input type="password" id="authPass" />
+          </label>
+          <button class="btn ghost" id="saveSettings">Save</button>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Filters</h2>
         <div class="filters">
           <label class="control">

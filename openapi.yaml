@@ -130,6 +130,18 @@ paths:
           required: false
           schema:
             type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
         - name: limit
           in: query
           required: false
@@ -147,6 +159,76 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Event"
+  /api/export:
+    get:
+      summary: Export events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: band
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: callsign
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            example: csv
+      responses:
+        "200":
+          description: Export file
+          content:
+            text/csv:
+              schema:
+                type: string
+  /api/settings:
+    get:
+      summary: Get settings
+      responses:
+        "200":
+          description: Settings payload
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      summary: Save settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Saved
   /api/exports/{id}:
     get:
       summary: Download export

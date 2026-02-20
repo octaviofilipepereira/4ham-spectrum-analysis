@@ -1,10 +1,11 @@
 import asyncio
 import os
 import time
+import base64
 from datetime import datetime, timezone
 
 import numpy as np
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy
@@ -38,6 +39,37 @@ _noise_floor = {}
 _last_frame_ts = None
 _last_send_ts = None
 
+_auth_user = os.getenv("BASIC_AUTH_USER")
+_auth_pass = os.getenv("BASIC_AUTH_PASS")
+
+
+def _auth_required():
+    return bool(_auth_user and _auth_pass)
+
+
+def _verify_basic_auth(auth_header):
+    if not auth_header:
+        return False
+    if not auth_header.lower().startswith("basic "):
+        return False
+    try:
+        encoded = auth_header.split(" ", 1)[1].strip()
+        decoded = base64.b64decode(encoded).decode("utf-8")
+    except Exception:
+        return False
+    if ":" not in decoded:
+        return False
+    username, password = decoded.split(":", 1)
+    return username == _auth_user and password == _auth_pass
+
+
+def _enforce_auth(request: Request):
+    if not _auth_required():
+        return
+    auth_header = request.headers.get("authorization")
+    if not _verify_basic_auth(auth_header):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
 
 def _update_noise_floor(band, power_db, alpha=0.05):
     if not band:
@@ -59,7 +91,8 @@ def _cpu_percent():
 
 
 @app.get("/api/health")
-def health():
+def health(request: Request):
+    _enforce_auth(request)
     return {
         "status": "ok",
         "version": "0.1.0",
@@ -68,17 +101,20 @@ def health():
 
 
 @app.get("/api/devices")
-def devices():
+def devices(request: Request):
+    _enforce_auth(request)
     return _controller.list_devices()
 
 
 @app.get("/api/bands")
-def bands():
+def bands(request: Request):
+    _enforce_auth(request)
     return []
 
 
 @app.post("/api/scan/start")
-async def scan_start(payload: dict):
+async def scan_start(payload: dict, request: Request):
+    _enforce_auth(request)
     scan = payload.get("scan", {})
     await _scan_engine.start_async(scan)
     _scan_state["state"] = "running"
@@ -90,7 +126,8 @@ async def scan_start(payload: dict):
 
 
 @app.post("/api/scan/stop")
-async def scan_stop():
+async def scan_stop(request: Request):
+    _enforce_auth(request)
     await _scan_engine.stop_async()
     _scan_state["state"] = "stopped"
     _db.end_scan(_scan_state.get("scan_id"), datetime.now(timezone.utc).isoformat())
@@ -105,8 +142,11 @@ def events(
     callsign: str | None = None,
     start: str | None = None,
     end: str | None = None,
-    format: str | None = None
+    format: str | None = None,
+    request: Request = None
 ):
+    if request:
+        _enforce_auth(request)
     data = _db.get_events(limit=limit, band=band, mode=mode, callsign=callsign, start=start, end=end)
     if format == "csv":
         lines = ["type,timestamp,band,frequency_hz,mode,callsign,confidence,snr_db,power_dbm,scan_id"]
@@ -135,8 +175,11 @@ def export_events(
     callsign: str | None = None,
     start: str | None = None,
     end: str | None = None,
-    format: str = "csv"
+    format: str = "csv",
+    request: Request = None
 ):
+    if request:
+        _enforce_auth(request)
     return events(
         limit=limit,
         band=band,
@@ -149,17 +192,37 @@ def export_events(
 
 
 @app.get("/api/scans")
-def scans(limit: int = 100):
+def scans(limit: int = 100, request: Request = None):
+    if request:
+        _enforce_auth(request)
     return _db.get_scans(limit=limit)
 
 
 @app.get("/api/scan/status")
-def scan_status():
+def scan_status(request: Request = None):
+    if request:
+        _enforce_auth(request)
     return _scan_state
+
+
+@app.get("/api/settings")
+def get_settings(request: Request):
+    _enforce_auth(request)
+    return _db.get_settings()
+
+
+@app.post("/api/settings")
+def save_settings(payload: dict, request: Request):
+    _enforce_auth(request)
+    _db.save_settings(payload)
+    return {"status": "ok"}
 
 
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
+    if _auth_required() and not _verify_basic_auth(websocket.headers.get("authorization")):
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     while True:
         iq = _scan_engine.read_iq(2048)
@@ -218,6 +281,9 @@ async def ws_events(websocket: WebSocket):
 
 @app.websocket("/ws/spectrum")
 async def ws_spectrum(websocket: WebSocket):
+    if _auth_required() and not _verify_basic_auth(websocket.headers.get("authorization")):
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     while True:
         frame_start = time.time()
@@ -255,6 +321,9 @@ async def ws_spectrum(websocket: WebSocket):
 
 @app.websocket("/ws/status")
 async def ws_status(websocket: WebSocket):
+    if _auth_required() and not _verify_basic_auth(websocket.headers.get("authorization")):
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
     while True:
         now = time.time()
