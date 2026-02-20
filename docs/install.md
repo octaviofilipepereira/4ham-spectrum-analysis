@@ -28,3 +28,8 @@
 ## Notes
 - Use a virtual audio cable for WSJT-X integration.
 - For APRS, run Direwolf with KISS TCP enabled.
+
+## Troubleshooting
+- If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.
+- On Linux, ensure your user has USB access (plugdev/udev rules) for RTL-SDR devices.
+- If Python cannot import SoapySDR, confirm `python3-soapysdr` is installed from apt.
