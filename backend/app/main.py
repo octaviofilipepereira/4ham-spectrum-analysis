@@ -69,6 +69,7 @@ def _enforce_auth(request: Request):
         return
     auth_header = request.headers.get("authorization")
     if not _verify_basic_auth(auth_header):
+        _log("auth_failed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -231,6 +232,21 @@ def logs(limit: int = 200, request: Request = None):
     if request:
         _enforce_auth(request)
     return _logs[-limit:]
+
+
+@app.websocket("/ws/logs")
+async def ws_logs(websocket: WebSocket):
+    if _auth_required() and not _verify_basic_auth(websocket.headers.get("authorization")):
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+    last_idx = 0
+    while True:
+        if last_idx < len(_logs):
+            batch = _logs[last_idx:]
+            last_idx = len(_logs)
+            await websocket.send_json({"logs": batch})
+        await asyncio.sleep(1.0)
 
 
 @app.get("/api/scan/status")

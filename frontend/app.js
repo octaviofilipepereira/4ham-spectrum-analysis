@@ -41,7 +41,10 @@ const loginPassInput = document.getElementById("loginPass");
 const loginSaveBtn = document.getElementById("loginSave");
 const loginStatus = document.getElementById("loginStatus");
 const onboarding = document.getElementById("onboarding");
-const onboardingClose = document.getElementById("onboardingClose");
+const onboardingTitle = document.getElementById("onboardingTitle");
+const onboardingText = document.getElementById("onboardingText");
+const onboardingPrev = document.getElementById("onboardingPrev");
+const onboardingNext = document.getElementById("onboardingNext");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -63,6 +66,7 @@ function showToastError(message) {
   toast.classList.add("error");
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 2500);
+  logLine(message);
 }
 
 function loadPresets() {
@@ -295,6 +299,24 @@ async function fetchLogs() {
   }
 }
 
+function connectLogs() {
+  try {
+    const ws = new WebSocket(wsUrl("/ws/logs"));
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        if (Array.isArray(data.logs)) {
+          logsEl.textContent = data.logs.join("\n");
+        }
+      } catch (err) {
+        return;
+      }
+    };
+  } catch (err) {
+    return;
+  }
+}
+
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -505,7 +527,43 @@ loginSaveBtn.addEventListener("click", () => {
   updateLoginStatus();
 });
 
-onboardingClose.addEventListener("click", () => {
+const onboardingSteps = [
+  {
+    title: "Welcome",
+    text: "Configure device, band, and credentials. Use Start or press s."
+  },
+  {
+    title: "Scan",
+    text: "Select band, gain, and sample rate. Start scan and watch the waterfall."
+  },
+  {
+    title: "Events",
+    text: "Use filters to narrow events and export CSV reports."
+  }
+];
+let onboardingStep = 0;
+
+function renderOnboarding() {
+  const step = onboardingSteps[onboardingStep];
+  onboardingTitle.textContent = step.title;
+  onboardingText.textContent = step.text;
+  onboardingPrev.disabled = onboardingStep === 0;
+  onboardingNext.textContent = onboardingStep === onboardingSteps.length - 1 ? "Done" : "Next";
+}
+
+onboardingPrev.addEventListener("click", () => {
+  if (onboardingStep > 0) {
+    onboardingStep -= 1;
+    renderOnboarding();
+  }
+});
+
+onboardingNext.addEventListener("click", () => {
+  if (onboardingStep < onboardingSteps.length - 1) {
+    onboardingStep += 1;
+    renderOnboarding();
+    return;
+  }
   onboarding.classList.remove("show");
   localStorage.setItem("onboardingDone", "1");
 });
@@ -562,11 +620,13 @@ saveBandBtn.addEventListener("click", async () => {
 
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters);
 updateLoginStatus();
+connectLogs();
 fetchLogs();
 setInterval(fetchLogs, 4000);
 
 if (!localStorage.getItem("onboardingDone")) {
   onboarding.classList.add("show");
+  renderOnboarding();
 }
 
 function drawWaterfall(fftDb) {

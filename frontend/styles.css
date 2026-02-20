@@ -150,6 +150,13 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.onboarding__actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  gap: 12px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
