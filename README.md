@@ -64,6 +64,8 @@ Schema do perfil regional: ver [config/region_profile.schema.json](config/region
 - **Frontend**: React + Vite + TypeScript, WebGL para waterfall.
 - **Storage**: SQLite + ficheiros para exportacao (CSV/PNG/JSON).
 
+Backend skeleton: ver [backend/app/main.py](backend/app/main.py).
+
 ## Fluxo de dados
 1. SDR capta IQ por segmentos de frequencia (scan).
 2. DSP gera FFT e energia por bin.
@@ -189,6 +191,7 @@ flowchart LR
 
 ## Formato de eventos/telemetria
 Schema JSON: ver [events.schema.json](events.schema.json).
+Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 
 ### Evento base
 ```json
@@ -355,3 +358,6 @@ Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
 - Detalhar configuracoes por hardware (RTL-SDR/HackRF/Airspy/transceiver).
 - Definir o contrato final do WebSocket e formatos de frame.
 - Backlog tecnico: ver [docs/backlog.md](docs/backlog.md).
+- Instalacao: ver [docs/install.md](docs/install.md).
+- SQLite schema: ver [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
+- Validacao de prefixos: ver [docs/prefix_validation.md](docs/prefix_validation.md).

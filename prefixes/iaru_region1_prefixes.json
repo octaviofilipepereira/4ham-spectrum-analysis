@@ -2,7 +2,17 @@
   "meta": {
     "region": "IARU-1",
     "note": "Seed list only. This file is not complete and must be expanded per national regulator tables.",
-    "version": "0.1"
+    "version": "0.1",
+    "sources": [
+      {
+        "name": "National regulator prefix tables",
+        "status": "pending"
+      }
+    ],
+    "validation": {
+      "last_checked": "pending",
+      "method": "regex + prefix table"
+    }
   },
   "countries": [
     {
