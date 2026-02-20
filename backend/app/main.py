@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import datetime, timezone
 
 import numpy as np
@@ -13,6 +14,7 @@ app = FastAPI(title="4ham Spectrum Analysis")
 
 _controller = SDRController()
 _scan_engine = ScanEngine(_controller)
+os.makedirs("data", exist_ok=True)
 _db = Database("data/events.sqlite")
 _scan_state = {
     "state": "stopped",
@@ -42,9 +44,9 @@ def bands():
 
 
 @app.post("/api/scan/start")
-def scan_start(payload: dict):
+async def scan_start(payload: dict):
     scan = payload.get("scan", {})
-    _scan_engine.start(scan)
+    await _scan_engine.start_async(scan)
     _scan_state["state"] = "running"
     _scan_state["device"] = payload.get("device", "rtl_sdr")
     _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
@@ -53,8 +55,8 @@ def scan_start(payload: dict):
 
 
 @app.post("/api/scan/stop")
-def scan_stop():
-    _scan_engine.stop()
+async def scan_stop():
+    await _scan_engine.stop_async()
     _scan_state["state"] = "stopped"
     return _scan_state
 
@@ -119,14 +121,16 @@ async def ws_spectrum(websocket: WebSocket):
         iq = _scan_engine.read_iq(2048)
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
-        fft_db, bin_hz = compute_fft_db(iq, _scan_engine.sample_rate)
+        fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate)
         payload = {
             "spectrum_frame": {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "center_hz": _scan_engine.center_hz,
                 "span_hz": _scan_engine.sample_rate,
                 "bin_hz": bin_hz,
-                "fft_db": fft_db
+                "fft_db": fft_db,
+                "min_db": min_db,
+                "max_db": max_db
             }
         }
         await websocket.send_json(payload)

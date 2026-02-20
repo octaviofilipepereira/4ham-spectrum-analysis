@@ -67,7 +67,11 @@ function connectSpectrum() {
         const frame = data.spectrum_frame;
         if (frame && frame.fft_db) {
           drawWaterfall(frame.fft_db);
-          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | center ${frame.center_hz}`;
+          const startHz = Math.round(frame.center_hz - frame.span_hz / 2);
+          const endHz = Math.round(frame.center_hz + frame.span_hz / 2);
+          const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
+          const maxDb = frame.max_db !== undefined ? frame.max_db.toFixed(1) : "?";
+          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb}`;
         }
       } catch (err) {
         waterfallStatus.textContent = "Spectrum decode error";

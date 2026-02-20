@@ -51,6 +51,15 @@ class SDRController:
             return None
         return buff[: sr.ret]
 
+    def tune(self, device, center_hz):
+        if device is None or center_hz is None:
+            return
+        try:
+            from SoapySDR import SOAPY_SDR_RX
+        except Exception:
+            return
+        device.setFrequency(SOAPY_SDR_RX, 0, int(center_hz))
+
     def close(self, device, stream):
         if device is None or stream is None:
             return
