@@ -72,6 +72,10 @@ h1,
   color: var(--text);
 }
 
+.card-body > .h5 {
+  margin-bottom: 0.75rem;
+}
+
 .login-status,
 .ws-status {
   font-size: 0.8rem;
@@ -316,4 +320,36 @@ h1,
   justify-content: space-between;
   margin-top: 16px;
   gap: 12px;
+}
+
+@media (max-width: 991px) {
+  .app {
+    padding-top: 1rem;
+    padding-bottom: 2.5rem;
+  }
+
+  h1 {
+    font-size: 2.1rem;
+  }
+
+  .panel {
+    border-radius: 14px;
+  }
+
+  .waterfall canvas {
+    height: 180px;
+  }
+
+  .event-item__body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 575px) {
+  .toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
 }
