@@ -20,7 +20,8 @@ _scan_state = {
     "state": "stopped",
     "device": None,
     "started_at": None,
-    "scan": None
+    "scan": None,
+    "scan_id": None
 }
 
 
@@ -51,6 +52,7 @@ async def scan_start(payload: dict):
     _scan_state["device"] = payload.get("device", "rtl_sdr")
     _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
     _scan_state["scan"] = scan
+    _scan_state["scan_id"] = _db.start_scan(scan, _scan_state["started_at"])
     return _scan_state
 
 
@@ -58,12 +60,23 @@ async def scan_start(payload: dict):
 async def scan_stop():
     await _scan_engine.stop_async()
     _scan_state["state"] = "stopped"
+    _db.end_scan(_scan_state.get("scan_id"), datetime.now(timezone.utc).isoformat())
     return _scan_state
 
 
 @app.get("/api/events")
 def events(limit: int = 1000):
     return _db.get_events(limit=limit)
+
+
+@app.get("/api/scans")
+def scans(limit: int = 100):
+    return _db.get_scans(limit=limit)
+
+
+@app.get("/api/scan/status")
+def scan_status():
+    return _scan_state
 
 
 @app.websocket("/ws/events")
@@ -87,7 +100,8 @@ async def ws_events(websocket: WebSocket):
                 "occupied": occupancy[0]["occupied"],
                 "mode": "Unknown",
                 "confidence": 0.4,
-                "device": _scan_state.get("device")
+                "device": _scan_state.get("device"),
+                "scan_id": _scan_state.get("scan_id")
             }
             _db.insert_occupancy(event)
             await websocket.send_json({"event": event})

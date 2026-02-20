@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS scans (
 
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scan_id INTEGER,
   timestamp TEXT NOT NULL,
   band TEXT,
   frequency_hz INTEGER NOT NULL,
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS occupancy_events (
 
 CREATE TABLE IF NOT EXISTS callsign_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scan_id INTEGER,
   timestamp TEXT NOT NULL,
   band TEXT,
   frequency_hz INTEGER NOT NULL,

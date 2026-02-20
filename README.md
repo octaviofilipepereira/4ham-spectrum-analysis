@@ -363,3 +363,4 @@ Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
 - SQLite schema: ver [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
 - Validacao de prefixos: ver [docs/prefix_validation.md](docs/prefix_validation.md).
 - Testes basicos DSP: ver [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
+- Runner de desenvolvimento: ver [scripts/run_dev.sh](scripts/run_dev.sh).

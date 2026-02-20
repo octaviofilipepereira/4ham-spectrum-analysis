@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS scans (
 
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER,
   timestamp TEXT NOT NULL,
   band TEXT,
   frequency_hz INTEGER NOT NULL,
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS occupancy_events (
 
 CREATE TABLE IF NOT EXISTS callsign_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER,
   timestamp TEXT NOT NULL,
   band TEXT,
   frequency_hz INTEGER NOT NULL,
@@ -67,16 +69,73 @@ class Database:
     def _init_schema(self):
         self.conn.executescript(_SCHEMA_SQL)
         self.conn.commit()
+        self._ensure_columns()
+
+    def _ensure_columns(self):
+        self._add_column("occupancy_events", "scan_id INTEGER")
+        self._add_column("callsign_events", "scan_id INTEGER")
+
+    def _add_column(self, table, column_def):
+        try:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            return
+
+    def start_scan(self, scan, started_at):
+        cursor = self.conn.execute(
+            """
+            INSERT INTO scans(
+                band, start_hz, end_hz, step_hz, dwell_ms, mode, started_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                scan.get("band"),
+                scan.get("start_hz", 0),
+                scan.get("end_hz", 0),
+                scan.get("step_hz", 0),
+                scan.get("dwell_ms", 0),
+                scan.get("mode", "auto"),
+                started_at
+            )
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def end_scan(self, scan_id, ended_at):
+        if scan_id is None:
+            return
+        self.conn.execute(
+            "UPDATE scans SET ended_at = ? WHERE id = ?",
+            (ended_at, scan_id)
+        )
+        self.conn.commit()
+
+    def get_scans(self, limit=100):
+        scans = []
+        for row in self.conn.execute(
+            """
+            SELECT id, band, start_hz, end_hz, step_hz, dwell_ms, mode,
+                   started_at, ended_at
+            FROM scans
+            ORDER BY started_at DESC
+            LIMIT ?
+            """,
+            (limit,)
+        ):
+            scans.append(dict(row))
+        return scans
 
     def insert_occupancy(self, event):
         self.conn.execute(
             """
             INSERT INTO occupancy_events(
-                timestamp, band, frequency_hz, bandwidth_hz, power_dbm, snr_db,
-                threshold_dbm, occupied, mode, confidence, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scan_id, timestamp, band, frequency_hz, bandwidth_hz, power_dbm,
+                snr_db, threshold_dbm, occupied, mode, confidence, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                event.get("scan_id"),
                 event.get("timestamp"),
                 event.get("band"),
                 event.get("frequency_hz", 0),
@@ -96,11 +155,12 @@ class Database:
         self.conn.execute(
             """
             INSERT INTO callsign_events(
-                timestamp, band, frequency_hz, mode, callsign, snr_db, df_hz,
-                confidence, raw, source, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
+                df_hz, confidence, raw, source, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                event.get("scan_id"),
                 event.get("timestamp"),
                 event.get("band"),
                 event.get("frequency_hz", 0),
@@ -120,8 +180,9 @@ class Database:
         events = []
         for row in self.conn.execute(
             """
-            SELECT 'occupancy' AS type, timestamp, band, frequency_hz, mode,
-                   power_dbm, snr_db, threshold_dbm, occupied, confidence, device
+            SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
+                   mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
+                   device
             FROM occupancy_events
             ORDER BY timestamp DESC
             LIMIT ?
@@ -132,8 +193,8 @@ class Database:
 
         for row in self.conn.execute(
             """
-            SELECT 'callsign' AS type, timestamp, band, frequency_hz, mode,
-                   callsign, snr_db, df_hz, confidence, raw, source, device
+             SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
+                 mode, callsign, snr_db, df_hz, confidence, raw, source, device
             FROM callsign_events
             ORDER BY timestamp DESC
             LIMIT ?

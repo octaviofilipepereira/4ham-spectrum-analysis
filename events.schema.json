@@ -15,6 +15,7 @@
         "timestamp": { "type": "string", "format": "date-time" },
         "band": { "type": "string" },
         "frequency_hz": { "type": "integer", "minimum": 0 },
+        "scan_id": { "type": "integer", "minimum": 1 },
         "mode": {
           "type": "string",
           "enum": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"]

@@ -7,6 +7,7 @@ All events must also satisfy the base schema in [events.schema.json](../events.s
 - type: occupancy | callsign
 - timestamp: ISO-8601
 - band, frequency_hz, mode, snr_db, confidence, source, device
+- scan_id (optional)
 
 ## FT8 / FT4
 - type: callsign
