@@ -9,7 +9,8 @@ from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from app.decoders.ingest import build_callsign_event
-from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy
+from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text
+from app.dsp.pipeline import compute_fft_db, compute_power_db, estimate_occupancy, detect_peaks, estimate_noise_floor
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
 from app.storage.db import Database
@@ -261,10 +262,70 @@ def decoder_events(payload: dict, request: Request = None):
     items = payload.get("events")
     if items is None:
         items = [payload.get("event", payload)]
+    return _ingest_callsign_payloads(items, payload)
+
+
+@app.post("/api/decoders/wsjtx")
+def decoder_wsjtx(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    lines = payload.get("lines")
+    if lines is None:
+        lines = [payload.get("line", "")]
+    events = []
+    for line in lines:
+        parsed = parse_wsjtx_line(line)
+        if parsed:
+            events.append(parsed)
+        else:
+            events.append({"raw": str(line).strip(), "mode": "FT8"})
+    return _ingest_callsign_payloads(events, payload)
+
+
+@app.post("/api/decoders/aprs")
+def decoder_aprs(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    lines = payload.get("lines")
+    if lines is None:
+        lines = [payload.get("line", "")]
+    events = []
+    for line in lines:
+        parsed = parse_aprs_line(line)
+        if parsed:
+            events.append(parsed)
+        else:
+            events.append({"raw": str(line).strip(), "mode": "APRS"})
+    return _ingest_callsign_payloads(events, payload)
+
+
+@app.post("/api/decoders/cw")
+def decoder_cw(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    texts = payload.get("texts")
+    if texts is None:
+        texts = [payload.get("text", "")]
+    events = []
+    for text in texts:
+        parsed = parse_cw_text(text)
+        if parsed:
+            events.append(parsed)
+        else:
+            events.append({"raw": str(text).strip(), "mode": "CW"})
+    return _ingest_callsign_payloads(events, payload)
+
+
+def _ingest_callsign_payloads(items, defaults):
     saved = 0
     errors = []
     for idx, item in enumerate(items):
-        event = build_callsign_event(item, _scan_state)
+        if not isinstance(item, dict):
+            errors.append({"index": idx, "error": "invalid_event"})
+            continue
+        payload = dict(defaults)
+        payload.update(item)
+        event = build_callsign_event(payload, _scan_state)
         if not event:
             errors.append({"index": idx, "error": "invalid_event"})
             continue
@@ -389,7 +450,8 @@ async def ws_events(websocket: WebSocket):
             adapt=False
         )
         if occupancy:
-            offset_hz = occupancy[0].get("offset_hz")
+            best = max(occupancy, key=lambda item: item.get("snr_db", 0.0))
+            offset_hz = best.get("offset_hz")
             frequency_hz = _scan_engine.center_hz
             if offset_hz is not None:
                 frequency_hz = int(_scan_engine.center_hz + offset_hz)
@@ -398,11 +460,11 @@ async def ws_events(websocket: WebSocket):
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "band": band,
                 "frequency_hz": frequency_hz,
-                "bandwidth_hz": occupancy[0]["bandwidth_hz"],
+                "bandwidth_hz": best["bandwidth_hz"],
                 "power_dbm": power_db,
-                "snr_db": occupancy[0].get("snr_db"),
-                "threshold_dbm": occupancy[0].get("threshold_dbm", threshold_dbm),
-                "occupied": occupancy[0]["occupied"],
+                "snr_db": best.get("snr_db"),
+                "threshold_dbm": best.get("threshold_dbm", threshold_dbm),
+                "occupied": best["occupied"],
                 "mode": "Unknown",
                 "confidence": 0.4,
                 "device": _scan_state.get("device"),
@@ -453,6 +515,8 @@ async def ws_spectrum(websocket: WebSocket):
         if iq is None:
             iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
+        peaks = detect_peaks(fft_db, bin_hz)
+        noise_floor_db = estimate_noise_floor(fft_db)
         global _last_frame_ts
         _last_frame_ts = time.time()
         _spectrum_cache.update({
@@ -472,7 +536,9 @@ async def ws_spectrum(websocket: WebSocket):
                 "bin_hz": bin_hz,
                 "fft_db": fft_db,
                 "min_db": min_db,
-                "max_db": max_db
+                "max_db": max_db,
+                "noise_floor_db": noise_floor_db,
+                "peaks": peaks
             }
         }
         await websocket.send_json(payload)

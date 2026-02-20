@@ -15,6 +15,36 @@ def _find_segments(mask):
     return segments
 
 
+def estimate_noise_floor(fft_db, percentile=20):
+    if not fft_db:
+        return None
+    return float(np.percentile(fft_db, percentile))
+
+
+def detect_peaks(fft_db, bin_hz, min_snr_db=6.0, max_peaks=6):
+    if not fft_db:
+        return []
+    noise_floor_db = estimate_noise_floor(fft_db, 20)
+    if noise_floor_db is None:
+        return []
+    threshold_db = noise_floor_db + min_snr_db
+    peaks = []
+    for idx in range(1, len(fft_db) - 1):
+        value = fft_db[idx]
+        if value >= threshold_db and value >= fft_db[idx - 1] and value >= fft_db[idx + 1]:
+            peaks.append((idx, value))
+    peaks.sort(key=lambda item: item[1], reverse=True)
+    peaks = peaks[:max_peaks]
+    center_idx = (len(fft_db) - 1) / 2.0
+    return [
+        {
+            "offset_hz": float((idx - center_idx) * bin_hz),
+            "snr_db": float(value - noise_floor_db)
+        }
+        for idx, value in peaks
+    ]
+
+
 def estimate_occupancy(
     iq_samples,
     sample_rate,
@@ -32,7 +62,9 @@ def estimate_occupancy(
         return []
 
     power_db = compute_power_db(iq_samples)
-    noise_floor_db = float(np.percentile(fft_db, 20))
+    noise_floor_db = estimate_noise_floor(fft_db, 20)
+    if noise_floor_db is None:
+        return []
     threshold_db = noise_floor_db + snr_threshold_db
     mask = np.array(fft_db) > threshold_db
     segments = _find_segments(mask)

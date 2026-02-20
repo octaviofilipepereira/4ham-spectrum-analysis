@@ -1,5 +1,7 @@
 # Installation Guide
 
+For a complete, step-by-step manual, see [docs/installation_manual.md](installation_manual.md).
+
 ## Linux (Ubuntu/Debian)
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:

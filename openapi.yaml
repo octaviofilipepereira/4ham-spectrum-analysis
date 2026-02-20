@@ -313,6 +313,54 @@ paths:
             application/json:
               schema:
                 type: object
+  /api/decoders/wsjtx:
+    post:
+      summary: Ingest WSJT-X decoded lines
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Ingest result
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/decoders/aprs:
+    post:
+      summary: Ingest APRS frames
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Ingest result
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/decoders/cw:
+    post:
+      summary: Ingest CW decoded text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Ingest result
+          content:
+            application/json:
+              schema:
+                type: object
   /api/settings:
     get:
       summary: Get settings

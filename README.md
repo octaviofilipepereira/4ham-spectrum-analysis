@@ -1,5 +1,5 @@
 # 4ham-spectrum-analysis
-Automatic radio spectrum analyzer for amateur radio bands
+Plataforma web para analise de espectro nas bandas de radioamador, com DSP, eventos em tempo real e integracao com decoders.
 
 ## Objetivo
 Projeto web-based para varrer bandas de radioamador, detetar ocupacao de frequencias e identificar sinais, incluindo modos digitais e CW.
@@ -13,7 +13,7 @@ Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-
 - UI web moderna, limpa e responsiva.
 - Idiomas: Portugues, Ingles, Espanhol (selecionado na instalacao).
 
-Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo SoapySDR via `apt` no Linux.
+Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo SoapySDR via `apt` no Linux. Manual completo em [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Bandas alvo
 - 2 m

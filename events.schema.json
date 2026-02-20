@@ -38,6 +38,7 @@
           "type": "object",
           "properties": {
             "type": { "const": "occupancy" },
+            "offset_hz": { "type": "number" },
             "bandwidth_hz": { "type": "integer", "minimum": 0 },
             "power_dbm": { "type": "number" },
             "threshold_dbm": { "type": "number" },
