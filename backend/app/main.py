@@ -97,8 +97,8 @@ async def scan_stop():
 
 
 @app.get("/api/events")
-def events(limit: int = 1000):
-    return _db.get_events(limit=limit)
+def events(limit: int = 1000, band: str | None = None, mode: str | None = None):
+    return _db.get_events(limit=limit, band=band, mode=mode)
 
 
 @app.get("/api/scans")

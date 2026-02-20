@@ -23,6 +23,10 @@
             Sample rate
             <input type="number" id="sampleRate" value="48000" />
           </label>
+          <label class="control">
+            Record path
+            <input type="text" id="recordPath" value="data/iq_recording.c64" />
+          </label>
           <button class="btn primary" id="startScan">Start scan</button>
           <button class="btn ghost" id="stopScan">Stop</button>
         </div>
@@ -45,6 +49,11 @@
       <section class="panel status">
         <h2>Status</h2>
         <pre id="status">Disconnected</pre>
+      </section>
+
+      <section class="panel">
+        <h2>Logs</h2>
+        <pre id="logs">No logs yet.</pre>
       </section>
     </main>
 

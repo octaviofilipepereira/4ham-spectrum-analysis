@@ -73,6 +73,15 @@ h1 {
   width: 120px;
 }
 
+.control input[type="text"] {
+  width: 220px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .btn {
   border: none;
   padding: 12px 18px;

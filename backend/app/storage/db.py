@@ -176,30 +176,48 @@ class Database:
         )
         self.conn.commit()
 
-    def get_events(self, limit=1000):
+    def get_events(self, limit=1000, band=None, mode=None):
         events = []
+        params = [limit]
+        band_filter = ""
+        if band:
+            band_filter = "AND band = ?"
+            params.insert(0, band)
+
         for row in self.conn.execute(
             """
             SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
                    mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
                    device
             FROM occupancy_events
+            WHERE 1=1 {band_filter}
             ORDER BY timestamp DESC
             LIMIT ?
-            """,
-            (limit,)
+            """.format(band_filter=band_filter),
+            tuple(params)
         ):
             events.append(dict(row))
+
+        params = [limit]
+        band_filter = ""
+        mode_filter = ""
+        if band:
+            band_filter = "AND band = ?"
+            params.insert(0, band)
+        if mode:
+            mode_filter = "AND mode = ?"
+            params.insert(0, mode)
 
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                  mode, callsign, snr_db, df_hz, confidence, raw, source, device
             FROM callsign_events
+            WHERE 1=1 {band_filter} {mode_filter}
             ORDER BY timestamp DESC
             LIMIT ?
-            """,
-            (limit,)
+            """.format(band_filter=band_filter, mode_filter=mode_filter),
+            tuple(params)
         ):
             events.append(dict(row))
 

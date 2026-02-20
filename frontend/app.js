@@ -6,9 +6,16 @@ const canvas = document.getElementById("waterfallCanvas");
 const ctx = canvas.getContext("2d");
 const gainInput = document.getElementById("gain");
 const sampleRateInput = document.getElementById("sampleRate");
+const recordPathInput = document.getElementById("recordPath");
+const logsEl = document.getElementById("logs");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
+
+function logLine(text) {
+  const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
+  logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
+}
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -37,7 +44,7 @@ function renderEvents(items) {
 
 async function fetchEvents() {
   try {
-    const resp = await fetch("/api/events?limit=25");
+    const resp = await fetch("/api/events?limit=25&band=20m");
     const data = await resp.json();
     renderEvents(data);
   } catch (err) {
@@ -53,6 +60,7 @@ startBtn.addEventListener("click", async () => {
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
   const sampleRate = Number(sampleRateInput.value);
+  const recordPath = recordPathInput.value || null;
   await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -65,17 +73,20 @@ startBtn.addEventListener("click", async () => {
         dwell_ms: 250,
         mode: "auto",
         gain,
-        sample_rate: sampleRate
+        sample_rate: sampleRate,
+        record_path: recordPath
       }
     })
   });
   setStatus("Scan running");
+  logLine("Scan started");
 });
 
 stopBtn.addEventListener("click", async () => {
   setStatus("Stopping scan...");
   await fetch("/api/scan/stop", { method: "POST" });
   setStatus("Scan stopped");
+  logLine("Scan stopped");
 });
 
 function connectEvents() {
