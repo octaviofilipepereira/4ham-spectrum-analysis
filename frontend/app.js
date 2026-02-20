@@ -1,8 +1,23 @@
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
 const waterfallEl = document.getElementById("waterfall");
+const waterfallStatus = document.getElementById("waterfallStatus");
+const canvas = document.getElementById("waterfallCanvas");
+const ctx = canvas.getContext("2d");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
+let row = 0;
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width * window.devicePixelRatio);
+  canvas.height = Math.floor(rect.height * window.devicePixelRatio);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
 function addEvent(text) {
   const li = document.createElement("li");
@@ -51,15 +66,62 @@ function connectSpectrum() {
         const data = JSON.parse(msg.data);
         const frame = data.spectrum_frame;
         if (frame && frame.fft_db) {
-          waterfallEl.textContent = `FFT bins: ${frame.fft_db.length} | center ${frame.center_hz}`;
+          drawWaterfall(frame.fft_db);
+          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | center ${frame.center_hz}`;
         }
       } catch (err) {
-        waterfallEl.textContent = "Spectrum decode error";
+        waterfallStatus.textContent = "Spectrum decode error";
       }
     };
   } catch (err) {
-    waterfallEl.textContent = "Spectrum stream unavailable";
+    waterfallStatus.textContent = "Spectrum stream unavailable";
   }
 }
 
 connectSpectrum();
+
+function drawWaterfall(fftDb) {
+  const width = canvas.width / window.devicePixelRatio;
+  const height = canvas.height / window.devicePixelRatio;
+  if (!fftDb.length) {
+    return;
+  }
+
+  let minDb = Infinity;
+  let maxDb = -Infinity;
+  for (let i = 0; i < fftDb.length; i += 1) {
+    const value = fftDb[i];
+    if (value < minDb) {
+      minDb = value;
+    }
+    if (value > maxDb) {
+      maxDb = value;
+    }
+  }
+  const scale = maxDb - minDb || 1;
+  const rowData = ctx.createImageData(Math.floor(width), 1);
+
+  for (let x = 0; x < width; x += 1) {
+    const idx = Math.floor((x / width) * fftDb.length);
+    const value = (fftDb[idx] - minDb) / scale;
+    const color = colorMap(value);
+    const offset = x * 4;
+    rowData.data[offset] = color[0];
+    rowData.data[offset + 1] = color[1];
+    rowData.data[offset + 2] = color[2];
+    rowData.data[offset + 3] = 255;
+  }
+
+  ctx.putImageData(rowData, 0, row);
+  row = (row + 1) % height;
+  if (row === 0) {
+    ctx.clearRect(0, 0, width, height);
+  }
+}
+
+function colorMap(value) {
+  const r = Math.floor(255 * value);
+  const g = Math.floor(140 + 80 * (1 - value));
+  const b = Math.floor(255 * (1 - value));
+  return [r, g, b];
+}

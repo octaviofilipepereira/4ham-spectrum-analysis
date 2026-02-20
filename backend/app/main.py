@@ -4,14 +4,16 @@ from datetime import datetime, timezone
 import numpy as np
 from fastapi import FastAPI, WebSocket
 
-from app.dsp.pipeline import compute_fft_db
+from app.dsp.pipeline import compute_fft_db, estimate_occupancy
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
+from app.storage.db import Database
 
 app = FastAPI(title="4ham Spectrum Analysis")
 
 _controller = SDRController()
 _scan_engine = ScanEngine(_controller)
+_db = Database("data/events.sqlite")
 _scan_state = {
     "state": "stopped",
     "device": None,
@@ -58,14 +60,38 @@ def scan_stop():
 
 
 @app.get("/api/events")
-def events():
-    return []
+def events(limit: int = 1000):
+    return _db.get_events(limit=limit)
 
 
 @app.websocket("/ws/events")
 async def ws_events(websocket: WebSocket):
     await websocket.accept()
     while True:
+        iq = _scan_engine.read_iq(2048)
+        if iq is None:
+            iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+        occupancy = estimate_occupancy(iq, _scan_engine.sample_rate)
+        if occupancy:
+            event = {
+                "type": "occupancy",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "band": _scan_engine.config.get("band") if _scan_engine.config else None,
+                "frequency_hz": _scan_engine.center_hz,
+                "bandwidth_hz": occupancy[0]["bandwidth_hz"],
+                "power_dbm": occupancy[0]["power_dbm"],
+                "snr_db": None,
+                "threshold_dbm": occupancy[0]["threshold_dbm"],
+                "occupied": occupancy[0]["occupied"],
+                "mode": "Unknown",
+                "confidence": 0.4,
+                "device": _scan_state.get("device")
+            }
+            _db.insert_occupancy(event)
+            await websocket.send_json({"event": event})
+            await asyncio.sleep(1.0)
+            continue
+
         payload = {
             "event": {
                 "type": "occupancy",
@@ -89,15 +115,16 @@ async def ws_events(websocket: WebSocket):
 @app.websocket("/ws/spectrum")
 async def ws_spectrum(websocket: WebSocket):
     await websocket.accept()
-    sample_rate = 48000
     while True:
-        iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
-        fft_db, bin_hz = compute_fft_db(iq, sample_rate)
+        iq = _scan_engine.read_iq(2048)
+        if iq is None:
+            iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+        fft_db, bin_hz = compute_fft_db(iq, _scan_engine.sample_rate)
         payload = {
             "spectrum_frame": {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "center_hz": 14074000,
-                "span_hz": sample_rate,
+                "center_hz": _scan_engine.center_hz,
+                "span_hz": _scan_engine.sample_rate,
                 "bin_hz": bin_hz,
                 "fft_db": fft_db
             }
