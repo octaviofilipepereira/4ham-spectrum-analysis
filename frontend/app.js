@@ -27,6 +27,10 @@ const saveBandBtn = document.getElementById("saveBand");
 const presetNameInput = document.getElementById("presetName");
 const savePresetBtn = document.getElementById("savePreset");
 const presetSelect = document.getElementById("presetSelect");
+const exportPresetsBtn = document.getElementById("exportPresets");
+const favoriteBandsSelect = document.getElementById("favoriteBands");
+const addFavoriteBtn = document.getElementById("addFavorite");
+const removeFavoriteBtn = document.getElementById("removeFavorite");
 const startBtn = document.getElementById("startScan");
 const stopBtn = document.getElementById("stopScan");
 let row = 0;
@@ -48,6 +52,20 @@ function loadPresets() {
   });
 }
 
+function exportPresets() {
+  const data = localStorage.getItem("presets") || "[]";
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "presets.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  logLine("Presets exported");
+}
+
 function savePreset() {
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
   const preset = {
@@ -64,6 +82,7 @@ function savePreset() {
 }
 
 savePresetBtn.addEventListener("click", savePreset);
+exportPresetsBtn.addEventListener("click", exportPresets);
 presetSelect.addEventListener("change", () => {
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
   const selected = data.find((p) => p.name === presetSelect.value);
@@ -75,6 +94,35 @@ presetSelect.addEventListener("change", () => {
   sampleRateInput.value = selected.sample_rate;
   recordPathInput.value = selected.record_path || "";
   logLine("Preset applied");
+});
+
+function loadFavorites() {
+  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  favoriteBandsSelect.innerHTML = "";
+  data.forEach((band) => {
+    const option = document.createElement("option");
+    option.value = band;
+    option.textContent = band;
+    favoriteBandsSelect.appendChild(option);
+  });
+}
+
+addFavoriteBtn.addEventListener("click", () => {
+  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  if (!data.includes(bandSelect.value)) {
+    data.push(bandSelect.value);
+    localStorage.setItem("favoriteBands", JSON.stringify(data));
+    loadFavorites();
+    logLine("Favorite added");
+  }
+});
+
+removeFavoriteBtn.addEventListener("click", () => {
+  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  const filtered = data.filter((band) => band !== favoriteBandsSelect.value);
+  localStorage.setItem("favoriteBands", JSON.stringify(filtered));
+  loadFavorites();
+  logLine("Favorite removed");
 });
 
 function getAuthHeader() {
@@ -383,7 +431,7 @@ saveBandBtn.addEventListener("click", async () => {
   loadBands();
 });
 
-loadDevices().then(loadBands).then(loadSettings).then(loadPresets);
+loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites);
 
 function drawWaterfall(fftDb) {
   const width = canvas.width / window.devicePixelRatio;

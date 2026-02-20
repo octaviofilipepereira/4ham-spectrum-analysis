@@ -116,6 +116,10 @@ def bands(request: Request):
 def save_band(payload: dict, request: Request):
     _enforce_auth(request)
     band = payload.get("band", {})
+    start_hz = int(band.get("start_hz", 0))
+    end_hz = int(band.get("end_hz", 0))
+    if start_hz <= 0 or end_hz <= 0 or start_hz >= end_hz:
+        raise HTTPException(status_code=400, detail="Invalid band range")
     _db.upsert_band(band)
     return {"status": "ok"}
 
