@@ -1,21 +1,21 @@
 # 4ham-spectrum-analysis
-Plataforma web para analise de espectro nas bandas de radioamador, com DSP, eventos em tempo real e integracao com decoders.
+Web platform for amateur radio spectrum analysis, with DSP, real-time events, and decoder integration.
 
-## Objetivo
-Projeto web-based para varrer bandas de radioamador, detetar ocupacao de frequencias e identificar sinais, incluindo modos digitais e CW.
-Deve correr em Raspberry Pi e PC (Linux/Windows), com interface moderna e multi-idioma (pt/en/es).
+## Goal
+Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
+It is designed to run on Raspberry Pi and PC (Linux/Windows), with a modern multilingual interface (pt/en/es).
 
-## Requisitos principais
-- Hardware: RTL-SDR (principal), preparado para HackRF, Airspy e transceiver com interface SDR.
-- Varrimento de banda com deteccao de ocupacao (power/threshold adaptativo).
-- Waterfall em tempo real e historico.
-- Identificacao automatica de indicativos em FT8/FT4, APRS, CW e SSB (voz).
-- UI web moderna, limpa e responsiva.
-- Idiomas: Portugues, Ingles, Espanhol (selecionado na instalacao).
+## Main requirements
+- Hardware: RTL-SDR (primary), with readiness for HackRF, Airspy, and transceivers with SDR interface.
+- Band scanning with occupancy detection (adaptive power/threshold).
+- Real-time waterfall and history.
+- Automatic callsign identification for FT8/FT4, APRS, CW, and SSB (voice).
+- Modern, clean, and responsive web UI.
+- Languages: Portuguese, English, Spanish (selected during installation).
 
-Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo SoapySDR via `apt` no Linux. Manual completo em [docs/installation_manual.md](docs/installation_manual.md).
+Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
-## Bandas alvo
+## Target bands
 - 2 m
 - 70 cm
 - 10 m
@@ -27,7 +27,7 @@ Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo 
 - 80 m
 - 160 m
 
-## Bandas alvo (IARU Regiao 1 - limites de banda)
+## Target bands (IARU Region 1 - band limits)
 - 160 m: 1.810 - 2.000 MHz
 - 80 m: 3.500 - 3.800 MHz
 - 40 m: 7.000 - 7.200 MHz
@@ -39,139 +39,139 @@ Nota: instrucoes de instalacao em [docs/install.md](docs/install.md), incluindo 
 - 2 m: 144 - 146 MHz
 - 70 cm: 430 - 440 MHz
 
-Nota: os limites podem variar por regulacao nacional; o plano deve suportar perfis por pais.
-Perfil regional de exemplo: ver [config/region_profile_example.yaml](config/region_profile_example.yaml).
-Schema do perfil regional: ver [config/region_profile.schema.json](config/region_profile.schema.json).
+Note: limits may vary by national regulation; the plan supports per-country profiles.
+Regional profile example: see [config/region_profile_example.yaml](config/region_profile_example.yaml).
+Regional profile schema: see [config/region_profile.schema.json](config/region_profile.schema.json).
 
-## Arquitetura (alto nivel)
-1. **Camada SDR**
-	- Controle do dispositivo (tuning, ganho, sample rate).
-	- Abstracao por driver (SoapySDR ou backends nativos).
-2. **Camada DSP**
-	- FFT, windowing, noise floor, detecao de picos.
-	- Estimativa de largura de banda e ocupacao.
-3. **Camada de identificacao**
-	- Classificacao de modos (AM/FM/SSB/FSK/PSK).
-	- Decodificacao digital (ex.: FT8/FT4, APRS) e CW.
+## Architecture (high level)
+1. **SDR Layer**
+	- Device control (tuning, gain, sample rate).
+	- Driver abstraction (SoapySDR or native backends).
+2. **DSP Layer**
+	- FFT, windowing, noise floor, peak detection.
+	- Bandwidth and occupancy estimation.
+3. **Identification Layer**
+	- Mode classification (AM/FM/SSB/FSK/PSK).
+	- Digital decoding (e.g., FT8/FT4, APRS) and CW.
 4. **Backend API**
-	- REST + WebSocket para streaming do espectro e eventos.
-5. **Frontend Web**
-	- Waterfall em tempo real, controlos de scan, logs, exportacao.
-6. **Persistencia**
-	- SQLite para historico, eventos e configuracoes.
+	- REST + WebSocket for spectrum and event streaming.
+5. **Web Frontend**
+	- Real-time waterfall, scan controls, logs, export.
+6. **Persistence**
+	- SQLite for history, events, and settings.
 
-## Stack sugerida
+## Suggested stack
 - **Backend/DSP**: Python + GNU Radio + SoapySDR + NumPy/SciPy.
 - **API**: FastAPI (REST + WebSocket).
-- **Frontend**: React + Vite + TypeScript, WebGL para waterfall.
-- **Storage**: SQLite + ficheiros para exportacao (CSV/PNG/JSON).
+- **Frontend**: React + Vite + TypeScript, WebGL for waterfall.
+- **Storage**: SQLite + files for export (CSV/PNG/JSON).
 
-Backend skeleton: ver [backend/app/main.py](backend/app/main.py).
-Frontend skeleton: ver [frontend/index.html](frontend/index.html).
+Backend skeleton: see [backend/app/main.py](backend/app/main.py).
+Frontend skeleton: see [frontend/index.html](frontend/index.html).
 
-## Fluxo de dados
-1. SDR capta IQ por segmentos de frequencia (scan).
-2. DSP gera FFT e energia por bin.
-3. Deteccao de ocupacao aplica threshold adaptativo.
-4. Resultados e waterfall enviados por WebSocket.
-5. UI atualiza em tempo real e grava historico.
+## Data flow
+1. SDR captures IQ by frequency segments (scan).
+2. DSP generates FFT and per-bin energy.
+3. Occupancy detection applies adaptive threshold.
+4. Results and waterfall are sent over WebSocket.
+5. UI updates in real time and stores history.
 
-## Modulos sugeridos
-- `sdr_controller`: descoberta de hardware, tuning, ganho.
-- `scan_engine`: varrimento por banda (step/dwell).
-- `dsp_pipeline`: FFT, deteccao de picos, ocupacao.
-- `signal_classifier`: heuristicas de modos.
-- `digital_decoder`: integracao com decoders digitais.
-- `cw_decoder`: detecao e decodificacao CW.
+## Suggested modules
+- `sdr_controller`: hardware discovery, tuning, gain.
+- `scan_engine`: per-band scanning (step/dwell).
+- `dsp_pipeline`: FFT, peak detection, occupancy.
+- `signal_classifier`: mode heuristics.
+- `digital_decoder`: integration with digital decoders.
+- `cw_decoder`: CW detection and decoding.
 - `api_gateway`: REST + WebSocket.
-- `ui`: waterfall, controlos, logs.
-- `storage`: eventos e historico.
+- `ui`: waterfall, controls, logs.
+- `storage`: events and history.
 
-## Identificacao de indicativos (design)
-- FT8/FT4: integracao via WSJT-X (UDP/arquivos de decoded), extrair callsigns e SNR.
-- APRS: Direwolf como TNC, leitura via KISS TCP/AGW, extrair callsigns e mensagens.
-- CW: detecao de tom, binarizacao adaptativa, decoder Morse, correcao de timing.
-- SSB (voz): VAD + ASR para sugerir callsigns (pipeline complexo, baixa confianca).
+## Callsign identification (design)
+- FT8/FT4: integration via WSJT-X (UDP/decoded files), extract callsigns and SNR.
+- APRS: Direwolf as TNC, read via KISS TCP/AGW, extract callsigns and messages.
+- CW: tone detection, adaptive binarization, Morse decoder, timing correction.
+- SSB (voice): VAD + ASR to suggest callsigns (complex pipeline, lower confidence).
 
-Nota: o backend suporta ingestao automatica por ficheiros (ALL.TXT/ logs) via variaveis de ambiente; ver o manual completo.
+Note: backend supports automated file ingestion (ALL.TXT/logs) via environment variables; see the full manual.
 
-## Pipelines tecnicos por decoder
+## Technical decoder pipelines
 ### FT8 / FT4 (WSJT-X)
-1. Captura IQ e sintonizacao no segmento FT8/FT4 da banda.
-2. Downconvert + filtros de banda + ajuste de ganho.
-3. Encaminhar audio para WSJT-X (via sound device virtual ou arquivo).
-4. Ler saida de decodes via UDP/arquivos (ALL.TXT/decoded). 
-5. Normalizar chamadas, SNR, DF, tempo e frequencia.
-6. Emitir eventos de identificacao com confianca alta.
+1. Capture IQ and tune to the FT8/FT4 segment of the band.
+2. Downconvert + band filters + gain adjustment.
+3. Route audio to WSJT-X (virtual sound device or file).
+4. Read decoded output via UDP/files (ALL.TXT/decoded).
+5. Normalize callsigns, SNR, DF, time, and frequency.
+6. Emit identification events with high confidence.
 
 ### APRS (Direwolf)
-1. Captura IQ e sintonizacao na frequencia APRS (ex.: 144.800 MHz na Regiao 1).
-2. Demodulacao FM e filtro audio (AFSK 1200).
-3. Encaminhar audio para Direwolf (virtual audio ou stdin).
-4. Ler frames via KISS TCP/AGW.
-5. Parse AX.25: callsign, path, payload, posicao.
-6. Emitir eventos APRS e anexar mensagens/telemetria.
+1. Capture IQ and tune to APRS frequency (e.g., 144.800 MHz in Region 1).
+2. FM demodulation and audio filtering (AFSK 1200).
+3. Route audio to Direwolf (virtual audio or stdin).
+4. Read frames via KISS TCP/AGW.
+5. Parse AX.25: callsign, path, payload, position.
+6. Emit APRS events and attach messages/telemetry.
 
 ### CW (Morse)
-1. Captura IQ e detecao de pico estreito (portadora CW).
-2. Demodulacao (BFO) e filtro passa-banda estreito.
-3. Envelope + binarizacao adaptativa (AGC + threshold).
-4. Detecao de dits/dahs com estimativa de WPM.
-5. Decoder Morse com correcao de timing.
-6. Emitir eventos de callsign com confianca media.
+1. Capture IQ and detect narrow peak (CW carrier).
+2. Demodulation (BFO) and narrow band-pass filter.
+3. Envelope + adaptive binarization (AGC + threshold).
+4. Dit/dah detection with WPM estimation.
+5. Morse decoder with timing correction.
+6. Emit callsign events with medium confidence.
 
-### SSB (voz)
-1. Captura IQ e detecao de ocupacao em largura tipica SSB.
-2. Demodulacao SSB (USB/LSB) e filtro de voz.
-3. VAD (voice activity detection) para segmentos.
-4. ASR com vocabulario de chamadas e alfabeto fonetico.
-5. Normalizar callsign, score/confidence.
-6. Emitir eventos com confianca baixa/media.
+### SSB (voice)
+1. Capture IQ and detect occupancy in typical SSB bandwidth.
+2. SSB demodulation (USB/LSB) and voice filtering.
+3. VAD (voice activity detection) for segmentation.
+4. ASR with callsign vocabulary and phonetic alphabet.
+5. Normalize callsign, score/confidence.
+6. Emit events with low/medium confidence.
 
-## Pipeline ASR para SSB (detalhado)
-1. **Pre-processamento audio**: 3 kHz BW, normalizacao de nivel, denoise leve.
-2. **VAD**: segmentacao da fala (ex.: WebRTC VAD) para reduzir custo.
-3. **ASR leve**: modelo pequeno para edge (ex.: Vosk/Kaldi) ou Whisper tiny/base em PC.
-4. **Vocabulario controlado**:
-	- Callsigns (regex e dicionario dinâmico por pais).
-	- Alfabeto fonetico (NATO/ICAO) e numeros.
-	- Palavras comuns em chamadas (CQ, QRZ, de, portable, mobile).
-5. **Pos-processamento**:
-	- Parse de sequencias foneticas (ex.: "Charlie Tango One" -> CT1).
-	- Validacao com regex de callsign (IARU/pais).
-	- Score final combinado (ASR confidence + consistencia regex).
-6. **Emissao de evento**:
-	- `callsign` com `confidence` baixa/media.
-	- `raw` com transcricao original.
+## ASR pipeline for SSB (detailed)
+1. **Audio pre-processing**: 3 kHz BW, level normalization, light denoise.
+2. **VAD**: speech segmentation (e.g., WebRTC VAD) to reduce cost.
+3. **Light ASR**: edge-friendly model (e.g., Vosk/Kaldi) or Whisper tiny/base on PC.
+4. **Controlled vocabulary**:
+	- Callsigns (regex and dynamic per-country dictionary).
+	- Phonetic alphabet (NATO/ICAO) and numbers.
+	- Common calling words (CQ, QRZ, de, portable, mobile).
+5. **Post-processing**:
+	- Parse phonetic sequences (e.g., "Charlie Tango One" -> CT1).
+	- Validate with callsign regex (IARU/country).
+	- Combined final score (ASR confidence + regex consistency).
+6. **Event emission**:
+	- `callsign` with low/medium `confidence`.
+	- `raw` with original transcript.
 
-Nota: a precisao varia muito com ruido e sotaque; tratar ASR como sugestao.
+Note: accuracy varies significantly with noise and accent; treat ASR as a suggestion.
 
-## ASR: modelos recomendados por hardware
-- **Raspberry Pi 4 (4 GB)**: Vosk (pt/en/es) com modelos pequenos; latencia moderada.
-- **Raspberry Pi 5 (8 GB)**: Vosk + gramaticas; Whisper tiny com cargas leves.
-- **PC dual-core**: Whisper base/small ou Vosk grande.
-- **PC com GPU**: Whisper medium/large, melhor para ruido e sotaques.
+## ASR: recommended models by hardware
+- **Raspberry Pi 4 (4 GB)**: Vosk (pt/en/es) with small models; moderate latency.
+- **Raspberry Pi 5 (8 GB)**: Vosk + grammars; Whisper tiny with light workloads.
+- **Dual-core PC**: Whisper base/small or larger Vosk models.
+- **GPU PC**: Whisper medium/large, better for noise and accents.
 
-Nota: usar vocabulario controlado e rescoring melhora taxa de acerto em callsigns.
+Note: controlled vocabulary and rescoring improve callsign hit rate.
 
-## Callsigns: regex e normalizacao (baseline)
-- **Regex global (simplificado)**: `\b[A-Z]{1,3}\d{1,4}[A-Z]{1,3}(/P|/M|/MM|/QRP|/QRPP)?\b`
-- **Normalizacao**:
+## Callsigns: regex and normalization (baseline)
+- **Global regex (simplified)**: `\b[A-Z]{1,3}\d{1,4}[A-Z]{1,3}(/P|/M|/MM|/QRP|/QRPP)?\b`
+- **Normalization**:
 	- Uppercase.
-	- Remover separadores e ruido (ex.: "CT 1 ABC" -> CT1ABC).
-	- Mapear fonetico para letras (ex.: "Charlie Tango One" -> CT1).
-	- Preservar sufixos operacionais (/P, /M, /MM, /QRP).
-- **Validacao regional**:
-	- Tabela por pais (prefixos e formatos) para reduzir falsos positivos.
-	- Perfil IARU Regiao 1 por defeito.
+	- Remove separators/noise (e.g., "CT 1 ABC" -> CT1ABC).
+	- Map phonetics to letters (e.g., "Charlie Tango One" -> CT1).
+	- Preserve operational suffixes (/P, /M, /MM, /QRP).
+- **Regional validation**:
+	- Per-country table (prefixes and formats) to reduce false positives.
+	- IARU Region 1 as default profile.
 
-Nota: formatos variam por pais; criar tabelas de prefixos por regulador nacional.
+Note: formats vary by country; create prefix tables per national regulator.
 
-## Diagrama (componentes e fluxo)
+## Diagram (components and flow)
 SDR (RTL-SDR/HackRF/Airspy/Transceiver)
 	-> sdr_controller
 	-> scan_engine
-	-> dsp_pipeline (FFT/ocupacao)
+	-> dsp_pipeline (FFT/occupancy)
 	-> signal_classifier
 	-> decoders (FT8/FT4 | APRS | CW | SSB)
 	-> event_bus
@@ -194,11 +194,11 @@ flowchart LR
 	DSP --> STORE
 ```
 
-## Formato de eventos/telemetria
-Schema JSON: ver [events.schema.json](events.schema.json).
-Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
+## Event/telemetry format
+JSON schema: see [events.schema.json](events.schema.json).
+Per-mode contract: see [docs/events_contract.md](docs/events_contract.md).
 
-### Evento base
+### Base event
 ```json
 {
 	"type": "occupancy|callsign",
@@ -213,7 +213,7 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 }
 ```
 
-### Evento de ocupacao
+### Occupancy event
 ```json
 {
 	"type": "occupancy",
@@ -231,7 +231,7 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 }
 ```
 
-### Evento de identificacao (callsign)
+### Identification event (callsign)
 ```json
 {
 	"type": "callsign",
@@ -249,28 +249,28 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 }
 ```
 
-## Contrato API (REST/WS)
+## API contract (REST/WS)
 ### REST (JSON)
-- `GET /api/health`: status do servico e dispositivos.
-- `GET /api/devices`: lista de SDR disponiveis.
-- `POST /api/scan/start`: iniciar scan (payload inline `scan` ou `scan_config_path` para YAML/JSON; opcional `region_profile_path` para resolver limites por banda).
-- `POST /api/scan/stop`: parar scan.
-- `GET /api/bands`: bandas e limites configurados.
-- `GET /api/events`: historico filtrado (time range, banda, modo, callsign).
-- `GET /api/exports/{id}`: download de CSV/JSON/PNG.
+- `GET /api/health`: service and device status.
+- `GET /api/devices`: list of available SDR devices.
+- `POST /api/scan/start`: start scan (inline `scan` payload or `scan_config_path` for YAML/JSON; optional `region_profile_path` to resolve per-band limits).
+- `POST /api/scan/stop`: stop scan.
+- `GET /api/bands`: configured bands and limits.
+- `GET /api/events`: filtered history (time range, band, mode, callsign).
+- `GET /api/exports/{id}`: CSV/JSON/PNG download.
 
 ### WebSocket
-- `WS /ws/spectrum`: stream de FFT/waterfall (frames agregados).
-- `WS /ws/events`: eventos de ocupacao e indicativos em tempo real.
-- `WS /ws/status`: estado do scan e estatisticas de processamento.
-	- Inclui noise floor por banda quando disponivel.
+- `WS /ws/spectrum`: FFT/waterfall stream (aggregated frames).
+- `WS /ws/events`: real-time occupancy and callsign events.
+- `WS /ws/status`: scan state and processing statistics.
+	- Includes per-band noise floor when available.
 
-### Autenticacao (opcional)
-- Defina `BASIC_AUTH_USER` e `BASIC_AUTH_PASS` para proteger REST e WS.
-- O frontend usa Basic Auth e envia credenciais no header.
+### Authentication (optional)
+- Set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` to protect REST and WS.
+- Frontend uses Basic Auth and sends credentials in the header.
 
-### Payloads principais
-Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.json).
+### Main payloads
+Scan schema: see [config/scan_config.schema.json](config/scan_config.schema.json).
 ```json
 {
 	"scan": {
@@ -308,16 +308,16 @@ Schema do scan: ver [config/scan_config.schema.json](config/scan_config.schema.j
 }
 ```
 
-## WebSocket: detalhes de frames e taxas
-Especificacao detalhada: ver [docs/websocket_spec.md](docs/websocket_spec.md).
-- `WS /ws/spectrum`: envia frames agregados (ex.: 10 a 20 FFT por mensagem).
-- `spectrum_frame` suporta compressao opcional (delta + int8) para Raspberry Pi.
-- Taxas sugeridas:
-  - Waterfall: 5 a 15 fps (ajustavel).
-  - Eventos: em tempo real (latencia < 500 ms).
-  - Status: 1 a 2 Hz.
+## WebSocket: frame details and rates
+Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
+- `WS /ws/spectrum`: sends aggregated frames (e.g., 10 to 20 FFTs per message).
+- `spectrum_frame` supports optional compression (delta + int8) for Raspberry Pi.
+- Suggested rates:
+  - Waterfall: 5 to 15 fps (adjustable).
+  - Events: real-time (latency < 500 ms).
+  - Status: 1 to 2 Hz.
 
-### Frame comprimido (exemplo)
+### Compressed frame (example)
 ```json
 {
 	"spectrum_frame": {
@@ -332,46 +332,46 @@ Especificacao detalhada: ver [docs/websocket_spec.md](docs/websocket_spec.md).
 }
 ```
 
-## Integracao de decoders (configuracao minima)
+## Decoder integration (minimum configuration)
 ### WSJT-X (FT8/FT4)
-- Usar audio virtual (Linux: ALSA loopback/Pulse; Windows: VB-Cable).
-- Ativar envio UDP de decodes (porta configuravel).
-- Ler arquivos `ALL.TXT` e `decoded` como fallback.
-- Sincronizar tempo (NTP) para evitar perda de decodes.
+- Use virtual audio (Linux: ALSA loopback/Pulse; Windows: VB-Cable).
+- Enable UDP decoded output (configurable port).
+- Read `ALL.TXT` and `decoded` files as fallback.
+- Sync time (NTP) to avoid decode losses.
 
 ### Direwolf (APRS)
-- Demodulacao FM -> audio 1200 AFSK.
-- Direwolf em modo KISS TCP (porta configuravel).
-- Parse de frames AX.25 com validacao de CRC.
-- Frequencia APRS Regiao 1: 144.800 MHz (configuravel por pais).
+- FM demodulation -> 1200 AFSK audio.
+- Direwolf in KISS TCP mode (configurable port).
+- Parse AX.25 frames with CRC validation.
+- Region 1 APRS frequency: 144.800 MHz (country-configurable).
 
-## Roadmap (sugestao)
-1. MVP: scan + ocupacao + waterfall + exportacao.
-2. Identificacao de modos analogicos.
-3. Decodificacao digital (FT8/FT4/APRS) e CW.
-4. Alertas e analitica de ocupacao.
+## Roadmap (suggested)
+1. MVP: scan + occupancy + waterfall + export.
+2. Analog mode identification.
+3. Digital decoding (FT8/FT4/APRS) and CW.
+4. Occupancy alerts and analytics.
 
-## Notas de performance
-- Raspberry Pi: limitar sample rate, FFT em lotes, WebGL para render.
-- Compressao/downsamping para streaming eficiente.
+## Performance notes
+- Raspberry Pi: limit sample rate, batch FFT processing, use WebGL rendering.
+- Compression/downsampling for efficient streaming.
 
-## Requisitos de recursos (estimativa)
-Detalhes de hardware e performance: ver [docs/hardware_requirements.md](docs/hardware_requirements.md).
-- **Raspberry Pi 4 (4 GB)**: FT8/FT4 + APRS + CW simultaneo; SSB/ASR limitado.
-- **Raspberry Pi 5 (8 GB)**: SSB/ASR leve, melhor para scan rapido.
-- **PC dual-core**: todos os decoders com taxa moderada.
+## Resource requirements (estimate)
+Hardware and performance details: see [docs/hardware_requirements.md](docs/hardware_requirements.md).
+- **Raspberry Pi 4 (4 GB)**: FT8/FT4 + APRS + CW simultaneously; limited SSB/ASR.
+- **Raspberry Pi 5 (8 GB)**: light SSB/ASR, better for fast scanning.
+- **Dual-core PC**: all decoders at moderate rate.
 
-Nota: ASR em SSB exige CPU/GPU mais forte; recomendado opcional.
+Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 
 ## Next steps
-- Mapear frequencias exatas por banda e regioes (IARU).
-- Selecionar decoders digitais a integrar (FT8/FT4/APRS/CW).
-- Detalhar configuracoes por hardware (RTL-SDR/HackRF/Airspy/transceiver).
-- Definir o contrato final do WebSocket e formatos de frame.
-- Backlog tecnico: ver [docs/backlog.md](docs/backlog.md).
-- Instalacao: ver [docs/install.md](docs/install.md).
-- SQLite schema: ver [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
-- Validacao de prefixos: ver [docs/prefix_validation.md](docs/prefix_validation.md).
-- Testes basicos DSP: ver [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
-- Runner de desenvolvimento: ver [scripts/run_dev.sh](scripts/run_dev.sh).
-- Runner Windows: ver [scripts/run_dev.ps1](scripts/run_dev.ps1).
+- Map exact frequencies per band and region (IARU).
+- Select digital decoders to integrate (FT8/FT4/APRS/CW).
+- Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
+- Finalize WebSocket contract and frame formats.
+- Technical backlog: see [docs/backlog.md](docs/backlog.md).
+- Installation: see [docs/install.md](docs/install.md).
+- SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
+- Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
+- Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
+- Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).
+- Windows runner: see [scripts/run_dev.ps1](scripts/run_dev.ps1).
