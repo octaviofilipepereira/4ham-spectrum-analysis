@@ -15,6 +15,31 @@ def _find_segments(mask):
     return segments
 
 
+def classify_mode_heuristic(bandwidth_hz, snr_db=None):
+    if bandwidth_hz is None:
+        return "Unknown", 0.25
+
+    bw = float(max(0.0, bandwidth_hz))
+    if bw < 350:
+        mode = "CW"
+    elif bw < 1200:
+        mode = "FSK/PSK"
+    elif bw < 3200:
+        mode = "SSB"
+    elif bw < 9000:
+        mode = "AM"
+    elif bw < 20000:
+        mode = "FM"
+    else:
+        mode = "Unknown"
+
+    snr = 0.0 if snr_db is None else float(max(0.0, snr_db))
+    snr_factor = min(1.0, snr / 20.0)
+    base = 0.5 if mode != "Unknown" else 0.25
+    confidence = min(0.95, base + 0.4 * snr_factor)
+    return mode, float(confidence)
+
+
 def estimate_noise_floor(fft_db, percentile=20):
     if not fft_db:
         return None

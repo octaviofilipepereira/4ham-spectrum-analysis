@@ -6,9 +6,9 @@
 - [x] Create scan scheduler (band profiles, step, dwell)
 
 ## DSP Pipeline
-- FFT pipeline with noise floor estimation
-- Peak detection and occupancy classification
-- Mode heuristics (AM/FM/SSB/FSK/PSK)
+- [x] FFT pipeline with noise floor estimation
+- [x] Peak detection and occupancy classification
+- [x] Mode heuristics (AM/FM/SSB/FSK/PSK)
 
 ## Decoders
 - WSJT-X integration (FT8/FT4)

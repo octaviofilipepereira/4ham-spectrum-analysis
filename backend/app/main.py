@@ -25,7 +25,8 @@ from app.dsp.pipeline import (
     estimate_occupancy,
     detect_peaks,
     estimate_noise_floor,
-    apply_agc_smoothed
+    apply_agc_smoothed,
+    classify_mode_heuristic
 )
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -660,6 +661,10 @@ async def ws_events(websocket: WebSocket):
             if offset_hz is not None:
                 frequency_hz = int(_scan_engine.center_hz + offset_hz)
             adaptive_threshold = _update_threshold(band, best.get("threshold_dbm"))
+            mode_name, mode_confidence = classify_mode_heuristic(
+                best.get("bandwidth_hz"),
+                best.get("snr_db")
+            )
             event = {
                 "type": "occupancy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -671,16 +676,14 @@ async def ws_events(websocket: WebSocket):
                 "snr_db": best.get("snr_db"),
                 "threshold_dbm": adaptive_threshold or best.get("threshold_dbm", threshold_dbm),
                 "occupied": best["occupied"],
-                "mode": "Unknown",
-                "confidence": 0.4,
+                "mode": mode_name,
+                "confidence": mode_confidence,
                 "device": _scan_state.get("device"),
                 "scan_id": _scan_state.get("scan_id")
             }
             settings = _db.get_settings()
             modes = settings.get("modes") or {}
             mode_key = str(event.get("mode", "")).lower()
-            if mode_key == "unknown":
-                mode_key = "ssb"
             if modes and mode_key in modes and not modes.get(mode_key, True):
                 await asyncio.sleep(1.0)
                 continue
