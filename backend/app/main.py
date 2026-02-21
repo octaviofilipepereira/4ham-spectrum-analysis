@@ -592,6 +592,10 @@ def _ingest_callsign_payloads(items, defaults):
             continue
         payload = dict(defaults)
         payload.update(item)
+        if payload.get("frequency_hz") in (None, 0, "0", ""):
+            center_hz = _scan_engine.center_hz or _spectrum_cache.get("center_hz")
+            if center_hz:
+                payload["frequency_hz"] = int(center_hz)
         event = build_callsign_event(payload, _scan_state)
         if not event:
             errors.append({"index": idx, "error": "invalid_event"})

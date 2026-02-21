@@ -4,6 +4,7 @@ import re
 _CALLSIGN_RE = re.compile(r"\b[A-Z0-9]{1,3}\d{1,4}[A-Z0-9]{1,3}(?:/[A-Z0-9]+)?\b")
 _GRID_RE = re.compile(r"^[A-R]{2}\d{2}[A-X]{0,2}$", re.IGNORECASE)
 _REPORT_RE = re.compile(r"^(R)?[+-]?\d{1,2}$", re.IGNORECASE)
+_SSB_REPORT_RE = re.compile(r"^(?:[1-5][1-9]{1,2}|R?[+-]?\d{1,2})$", re.IGNORECASE)
 
 _PHONETIC_MAP = {
     "ALFA": "A",
@@ -179,15 +180,42 @@ def parse_ssb_asr_text(text):
         return None
 
     raw = str(text).strip()
+    tokens = re.findall(r"[A-Za-z0-9./+-]+", raw.upper())
+
+    grid = None
+    report = None
+    frequency_hz = None
+    for token in tokens:
+        cleaned = token.strip(".,;:()[]{}")
+        if not cleaned:
+            continue
+        if grid is None and _GRID_RE.match(cleaned):
+            grid = cleaned.upper()
+            continue
+        if report is None and _SSB_REPORT_RE.match(cleaned):
+            report = cleaned.upper()
+            continue
+        if frequency_hz is None:
+            if re.fullmatch(r"\d{6,10}", cleaned):
+                frequency_hz = int(cleaned)
+                continue
+            mhz_match = re.fullmatch(r"(\d{1,3}\.\d{1,6})(?:MHZ)?", cleaned)
+            if mhz_match:
+                mhz_value = float(mhz_match.group(1))
+                if 1.0 <= mhz_value <= 1000.0:
+                    frequency_hz = int(round(mhz_value * 1_000_000))
+
     direct = extract_callsign(raw)
     if direct:
         return {
             "callsign": direct,
             "raw": raw,
-            "mode": "SSB"
+            "mode": "SSB",
+            "frequency_hz": frequency_hz,
+            "grid": grid,
+            "report": report
         }
 
-    tokens = re.findall(r"[A-Za-z0-9/]+", raw.upper())
     if not tokens:
         return None
 
@@ -225,5 +253,8 @@ def parse_ssb_asr_text(text):
     return {
         "callsign": callsign,
         "raw": raw,
-        "mode": "SSB"
+        "mode": "SSB",
+        "frequency_hz": frequency_hz,
+        "grid": grid,
+        "report": report
     }

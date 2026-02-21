@@ -82,6 +82,15 @@ def test_ssb_asr_parser_returns_none_without_callsign():
     assert event is None
 
 
+def test_ssb_asr_parser_extracts_grid_report_and_frequency():
+    event = parse_ssb_asr_text("CT1ABC IN51 59 14.255 MHz")
+    assert event is not None
+    assert event["callsign"] == "CT1ABC"
+    assert event["grid"] == "IN51"
+    assert event["report"] == "59"
+    assert event["frequency_hz"] == 14255000
+
+
 def test_parse_wsjtx_line_extracts_grid():
     line = "200109  -12  0.2  14074000  FT8  CQ CT1ABC IN50"
     event = parse_wsjtx_line(line)
