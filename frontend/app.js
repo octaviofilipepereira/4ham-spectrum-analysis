@@ -598,7 +598,7 @@ function connectSpectrum() {
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
-        const frame = data.spectrum_frame;
+        const frame = decodeSpectrumFrame(data.spectrum_frame);
         if (frame && frame.fft_db) {
           drawWaterfall(frame);
           const startHz = Math.round(frame.center_hz - frame.span_hz / 2);
@@ -638,6 +638,25 @@ function connectSpectrum() {
 }
 
 connectSpectrum();
+
+function decodeSpectrumFrame(frame) {
+  if (!frame) {
+    return frame;
+  }
+  if (Array.isArray(frame.fft_db)) {
+    return frame;
+  }
+  if (frame.encoding !== "delta_int8" || !Array.isArray(frame.fft_delta)) {
+    return frame;
+  }
+  const ref = Number(frame.fft_ref_db ?? 0);
+  const step = Number(frame.fft_step_db ?? 0.5) || 0.5;
+  const fftDb = frame.fft_delta.map((value) => ref + (Number(value) + 128) * step);
+  return {
+    ...frame,
+    fft_db: fftDb
+  };
+}
 
 function connectStatus() {
   try {

@@ -30,6 +30,7 @@ from app.dsp.pipeline import (
 )
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
+from app.streaming import encode_delta_int8
 from app.storage.db import Database
 
 app = FastAPI(title="4ham Spectrum Analysis")
@@ -85,14 +86,26 @@ def _env_int(name, default):
         return int(default)
 
 
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return bool(default)
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 _agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
 _agc_target_rms = _env_float("DSP_AGC_TARGET_RMS", 0.25)
 _agc_max_gain_db = _env_float("DSP_AGC_MAX_GAIN_DB", 30.0)
 _agc_alpha = _env_float("DSP_AGC_ALPHA", 0.2)
 _snr_threshold_db = _env_float("DSP_SNR_THRESHOLD_DB", 6.0)
 _min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
+_ws_spectrum_fps = max(1.0, _env_float("WS_SPECTRUM_FPS", 5.0))
+_ws_send_timeout_s = max(0.01, _env_float("WS_SEND_TIMEOUT_S", 0.1))
+_ws_compress_spectrum = _env_bool("WS_COMPRESS_SPECTRUM", True)
+_ws_protocol_version = "1.1"
 _agc_state = {}
 _last_agc_gain_db = None
+_spectrum_send_stats = {"sent": 0, "dropped": 0}
 _decoder_status = {
     "sources": {},
     "wsjtx_udp": {
@@ -773,7 +786,6 @@ async def ws_spectrum(websocket: WebSocket):
                 "center_hz": _spectrum_cache["center_hz"],
                 "span_hz": _spectrum_cache["span_hz"],
                 "bin_hz": bin_hz,
-                "fft_db": fft_db,
                 "min_db": min_db,
                 "max_db": max_db,
                 "noise_floor_db": noise_floor_db,
@@ -781,10 +793,25 @@ async def ws_spectrum(websocket: WebSocket):
                 "agc_gain_db": agc_gain_db
             }
         }
-        await websocket.send_json(payload)
+
+        if _ws_compress_spectrum:
+            payload["spectrum_frame"].update(encode_delta_int8(fft_db))
+        else:
+            payload["spectrum_frame"]["fft_db"] = fft_db
+
+        try:
+            await asyncio.wait_for(websocket.send_json(payload), timeout=_ws_send_timeout_s)
+            _spectrum_send_stats["sent"] += 1
+        except asyncio.TimeoutError:
+            _spectrum_send_stats["dropped"] += 1
+            _log("ws_spectrum_drop send_timeout")
+
         global _last_send_ts
         _last_send_ts = time.time()
-        await asyncio.sleep(0.2)
+        elapsed = time.time() - frame_start
+        period = 1.0 / _ws_spectrum_fps
+        delay = max(0.0, period - elapsed)
+        await asyncio.sleep(delay)
 
 
 @app.websocket("/ws/status")
@@ -799,6 +826,10 @@ async def ws_status(websocket: WebSocket):
         if _last_frame_ts:
             frame_age_ms = int((now - _last_frame_ts) * 1000)
         band = _scan_engine.config.get("band") if _scan_engine.config else None
+        sent = _spectrum_send_stats.get("sent", 0)
+        dropped = _spectrum_send_stats.get("dropped", 0)
+        total = sent + dropped
+        drop_rate_pct = (float(dropped) / float(total) * 100.0) if total > 0 else 0.0
         payload = {
             "status": {
                 "state": _scan_state.get("state"),
@@ -808,6 +839,8 @@ async def ws_status(websocket: WebSocket):
                 "noise_floor_db": _noise_floor.get(band),
                 "threshold_db": _threshold_state.get(band),
                 "agc_gain_db": _last_agc_gain_db,
+                "drop_rate_pct": round(drop_rate_pct, 2),
+                "protocol_version": _ws_protocol_version,
                 "scan": _scan_engine.status()
             }
         }

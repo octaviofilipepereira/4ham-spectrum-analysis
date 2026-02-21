@@ -39,6 +39,7 @@ All messages use a single root object with one top-level key:
     "bin_hz": 3.9,
     "encoding": "delta_int8",
     "fft_ref_db": -120.0,
+    "fft_step_db": 0.5,
     "fft_delta": [0, 1, 0, -1]
   }
 }

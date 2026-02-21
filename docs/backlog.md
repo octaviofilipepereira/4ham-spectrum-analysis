@@ -17,9 +17,9 @@
 - [x] SSB ASR pipeline with controlled vocabulary
 
 ## API and Streaming
-- REST endpoints (OpenAPI driven)
-- WebSocket server with backpressure
-- Spectrum frame compression (delta_int8)
+- [x] REST endpoints (OpenAPI driven)
+- [x] WebSocket server with backpressure
+- [x] Spectrum frame compression (delta_int8)
 
 ## UI
 - Waterfall rendering (WebGL)

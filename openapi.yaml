@@ -115,20 +115,6 @@ paths:
     get:
       summary: Query event history
       parameters:
-        - name: start
-          in: query
-          description: ISO-8601 start timestamp
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: end
-          in: query
-          description: ISO-8601 end timestamp
-          required: false
-          schema:
-            type: string
-            format: date-time
         - name: band
           in: query
           required: false
@@ -239,6 +225,22 @@ paths:
       responses:
         "200":
           description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/decoders/ssb:
+    post:
+      summary: Ingest SSB ASR decoded text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Ingest result
           content:
             application/json:
               schema:
@@ -463,10 +465,17 @@ components:
     ScanStartRequest:
       type: object
       properties:
+        scan_config_path:
+          type: string
+          example: config/scan_config.yaml
+        region_profile_path:
+          type: string
+          example: config/region_profile_example.yaml
+        device:
+          type: string
+          example: rtl_sdr
         scan:
           $ref: "#/components/schemas/ScanConfig"
-      required:
-        - scan
     ScanConfig:
       type: object
       properties:
