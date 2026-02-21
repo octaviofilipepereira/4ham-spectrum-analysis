@@ -408,6 +408,11 @@ Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 - Map exact frequencies per band and region (IARU).
 - Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
 - Add occupancy alerts and analytics API/UI endpoints.
+- Add multi-node aggregation support (multiple receivers feeding one backend).
+- Improve SSB ASR confidence calibration and noisy-channel robustness.
+- Add packaged operational defaults (retention, log rotation, service health checks).
+
+## References
 - Technical backlog: see [docs/backlog.md](docs/backlog.md).
 - Installation: see [docs/install.md](docs/install.md).
 - SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
