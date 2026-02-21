@@ -379,11 +379,18 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - Parse AX.25 frames with CRC validation.
 - Region 1 APRS frequency: 144.800 MHz (country-configurable).
 
-## Roadmap (suggested)
-1. MVP: scan + occupancy + waterfall + export.
-2. Analog mode identification.
-3. Digital decoding (FT8/FT4/APRS) and CW.
-4. Occupancy alerts and analytics.
+## Roadmap
+### Completed milestones
+- [x] MVP: scan + occupancy + waterfall + export.
+- [x] Analog mode identification (heuristic classifier).
+- [x] Digital decoding pipeline (FT8/FT4/APRS/CW) and SSB ASR baseline.
+- [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
+
+### Next milestones
+1. Occupancy alerts and analytics dashboards.
+2. Multi-node aggregation (multiple receivers feeding one backend).
+3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness).
+4. Deployment hardening (service templates + operational monitoring/retention defaults).
 
 ## Performance notes
 - Raspberry Pi: limit sample rate, batch FFT processing, use WebGL rendering.
@@ -399,9 +406,8 @@ Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 
 ## Next steps
 - Map exact frequencies per band and region (IARU).
-- Select digital decoders to integrate (FT8/FT4/APRS/CW).
 - Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
-- Finalize WebSocket contract and frame formats.
+- Add occupancy alerts and analytics API/UI endpoints.
 - Technical backlog: see [docs/backlog.md](docs/backlog.md).
 - Installation: see [docs/install.md](docs/install.md).
 - SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
