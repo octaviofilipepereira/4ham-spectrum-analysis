@@ -15,7 +15,7 @@ from app.config.loader import (
     load_scan_request,
 )
 from app.decoders.ingest import build_callsign_event
-from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text
+from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text, parse_ssb_asr_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
 from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
 from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
@@ -110,7 +110,8 @@ _decoder_status = {
     "files": {
         "wsjtx": None,
         "aprs": None,
-        "cw": None
+        "cw": None,
+        "ssb": None
     },
     "dsp": {
         "agc_enabled": _agc_enabled,
@@ -226,6 +227,7 @@ async def on_startup():
     _start_decoder_watch("wsjtx", os.getenv("WSJTX_ALLTXT_PATH"), parse_wsjtx_line, "FT8")
     _start_decoder_watch("aprs", os.getenv("DIREWOLF_LOG_PATH"), parse_aprs_line, "APRS")
     _start_decoder_watch("cw", os.getenv("CW_DECODE_PATH"), parse_cw_text, "CW")
+    _start_decoder_watch("ssb", os.getenv("SSB_ASR_PATH"), parse_ssb_asr_text, "SSB")
     listener = create_wsjtx_udp_listener(_wsjtx_state, _handle_wsjtx_udp, logger=_log)
     if listener:
         transport, _ = await listener
@@ -482,6 +484,23 @@ def decoder_cw(payload: dict, request: Request = None):
             events.append(parsed)
         else:
             events.append({"raw": str(text).strip(), "mode": "CW"})
+    return _ingest_callsign_payloads(events, payload)
+
+
+@app.post("/api/decoders/ssb")
+def decoder_ssb(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    texts = payload.get("texts")
+    if texts is None:
+        texts = [payload.get("text", "")]
+    events = []
+    for text in texts:
+        parsed = parse_ssb_asr_text(text)
+        if parsed:
+            events.append(parsed)
+        else:
+            events.append({"raw": str(text).strip(), "mode": "SSB"})
     return _ingest_callsign_payloads(events, payload)
 
 

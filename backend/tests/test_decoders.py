@@ -1,6 +1,7 @@
 import struct
 
 from app.decoders.direwolf_kiss import parse_kiss_frame
+from app.decoders.parsers import parse_ssb_asr_text
 from app.decoders.wsjtx_udp import WsjtxState, parse_wsjtx_datagram
 
 
@@ -67,3 +68,15 @@ def test_direwolf_kiss_parser():
     assert event["payload"].startswith("!")
     assert round(event["lat"], 3) == 38.992
     assert round(event["lon"], 3) == -9.187
+
+
+def test_ssb_asr_parser_phonetic_callsign():
+    event = parse_ssb_asr_text("CQ CQ this is Charlie Tango One Alpha Bravo Charlie portable")
+    assert event is not None
+    assert event["mode"] == "SSB"
+    assert event["callsign"] == "CT1ABC/P"
+
+
+def test_ssb_asr_parser_returns_none_without_callsign():
+    event = parse_ssb_asr_text("good afternoon station with strong signal")
+    assert event is None

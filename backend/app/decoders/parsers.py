@@ -3,6 +3,94 @@ import re
 
 _CALLSIGN_RE = re.compile(r"\b[A-Z0-9]{1,3}\d{1,4}[A-Z0-9]{1,3}(?:/[A-Z0-9]+)?\b")
 
+_PHONETIC_MAP = {
+    "ALFA": "A",
+    "ALPHA": "A",
+    "BRAVO": "B",
+    "CHARLIE": "C",
+    "DELTA": "D",
+    "ECHO": "E",
+    "FOXTROT": "F",
+    "GOLF": "G",
+    "HOTEL": "H",
+    "INDIA": "I",
+    "JULIET": "J",
+    "JULIETT": "J",
+    "KILO": "K",
+    "LIMA": "L",
+    "MIKE": "M",
+    "NOVEMBER": "N",
+    "OSCAR": "O",
+    "PAPA": "P",
+    "QUEBEC": "Q",
+    "ROMEO": "R",
+    "SIERRA": "S",
+    "TANGO": "T",
+    "UNIFORM": "U",
+    "VICTOR": "V",
+    "WHISKEY": "W",
+    "XRAY": "X",
+    "YANKEE": "Y",
+    "ZULU": "Z",
+}
+
+_NUMBER_WORD_MAP = {
+    "ZERO": "0",
+    "OH": "0",
+    "NIL": "0",
+    "CERO": "0",
+    "UM": "1",
+    "ONE": "1",
+    "UNO": "1",
+    "DOIS": "2",
+    "TWO": "2",
+    "DOS": "2",
+    "TRES": "3",
+    "THREE": "3",
+    "CUATRO": "4",
+    "QUATRO": "4",
+    "FOUR": "4",
+    "CINCO": "5",
+    "FIVE": "5",
+    "SEIS": "6",
+    "SIX": "6",
+    "SETE": "7",
+    "SIETE": "7",
+    "SEVEN": "7",
+    "OITO": "8",
+    "OCHO": "8",
+    "EIGHT": "8",
+    "NOVE": "9",
+    "NUEVE": "9",
+    "NINE": "9",
+}
+
+_SKIP_WORDS = {
+    "CQ",
+    "QRZ",
+    "DE",
+    "DX",
+    "THIS",
+    "IS",
+    "FROM",
+    "CHAMANDO",
+    "LLAMANDO",
+}
+
+_SLASH_WORDS = {
+    "SLASH",
+    "BARRA",
+    "DIAGONAL",
+}
+
+_SUFFIX_WORDS = {
+    "PORTABLE": "P",
+    "MOBILE": "M",
+    "MARITIME": "MM",
+    "QRP": "QRP",
+    "QRPP": "QRPP",
+}
+
 
 def extract_callsign(text):
     if not text:
@@ -65,4 +153,59 @@ def parse_cw_text(text):
         "callsign": callsign,
         "raw": str(text).strip(),
         "mode": "CW"
+    }
+
+
+def parse_ssb_asr_text(text):
+    if not text:
+        return None
+
+    raw = str(text).strip()
+    direct = extract_callsign(raw)
+    if direct:
+        return {
+            "callsign": direct,
+            "raw": raw,
+            "mode": "SSB"
+        }
+
+    tokens = re.findall(r"[A-Za-z0-9/]+", raw.upper())
+    if not tokens:
+        return None
+
+    stream = []
+    for token in tokens:
+        if token in _SKIP_WORDS:
+            continue
+        if token in _SLASH_WORDS:
+            stream.append("/")
+            continue
+        if token in _SUFFIX_WORDS:
+            stream.append("/")
+            stream.append(_SUFFIX_WORDS[token])
+            continue
+        mapped = _PHONETIC_MAP.get(token)
+        if mapped:
+            stream.append(mapped)
+            continue
+        digit = _NUMBER_WORD_MAP.get(token)
+        if digit:
+            stream.append(digit)
+            continue
+        if re.fullmatch(r"[A-Z0-9/]+", token):
+            stream.append(token)
+
+    if not stream:
+        return None
+
+    candidate = "".join(stream)
+    candidate = re.sub(r"/{2,}", "/", candidate)
+    callsign = extract_callsign(candidate)
+    if not callsign:
+        return None
+
+    return {
+        "callsign": callsign,
+        "raw": raw,
+        "mode": "SSB"
     }

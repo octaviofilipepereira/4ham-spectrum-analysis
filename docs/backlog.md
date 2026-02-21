@@ -11,10 +11,10 @@
 - [x] Mode heuristics (AM/FM/SSB/FSK/PSK)
 
 ## Decoders
-- WSJT-X integration (FT8/FT4)
-- Direwolf integration (APRS)
-- CW decoder pipeline
-- SSB ASR pipeline with controlled vocabulary
+- [x] WSJT-X integration (FT8/FT4)
+- [x] Direwolf integration (APRS)
+- [x] CW decoder pipeline
+- [x] SSB ASR pipeline with controlled vocabulary
 
 ## API and Streaming
 - REST endpoints (OpenAPI driven)
