@@ -481,10 +481,14 @@ function renderEvents(items) {
       const lat = eventItem.lat !== null && eventItem.lat !== undefined ? eventItem.lat.toFixed(3) : "--";
       const lon = eventItem.lon !== null && eventItem.lon !== undefined ? eventItem.lon.toFixed(3) : "--";
       detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
-    } else if (eventItem.mode === "FT8" || eventItem.mode === "FT4" || eventItem.mode === "SSB") {
-      const grid = eventItem.grid || "-";
-      const report = eventItem.report || "-";
-      detail.textContent = `grid=${grid} report=${report}`;
+    } else if (eventItem.type === "callsign") {
+      const hasGrid = eventItem.grid !== null && eventItem.grid !== undefined && eventItem.grid !== "";
+      const hasReport = eventItem.report !== null && eventItem.report !== undefined && eventItem.report !== "";
+      if (hasGrid || hasReport) {
+        const grid = hasGrid ? eventItem.grid : "-";
+        const report = hasReport ? eventItem.report : "-";
+        detail.textContent = `grid=${grid} report=${report}`;
+      }
     } else if (eventItem.type === "occupancy") {
       const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
       const snr = eventItem.snr_db !== null && eventItem.snr_db !== undefined ? `${eventItem.snr_db.toFixed(1)} dB` : "-";
