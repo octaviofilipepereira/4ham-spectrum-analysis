@@ -2,6 +2,8 @@ import re
 
 
 _CALLSIGN_RE = re.compile(r"\b[A-Z0-9]{1,3}\d{1,4}[A-Z0-9]{1,3}(?:/[A-Z0-9]+)?\b")
+_GRID_RE = re.compile(r"^[A-R]{2}\d{2}[A-X]{0,2}$", re.IGNORECASE)
+_REPORT_RE = re.compile(r"^(R)?[+-]?\d{1,2}$", re.IGNORECASE)
 
 _PHONETIC_MAP = {
     "ALFA": "A",
@@ -117,13 +119,29 @@ def parse_wsjtx_line(line):
         frequency_hz = int(float(parts[3]))
     except ValueError:
         frequency_hz = None
-    callsign = extract_callsign(line)
+    message_tokens = parts[5:] if len(parts) > 5 else parts
+    message_text = " ".join(message_tokens).strip()
+
+    callsign = extract_callsign(message_text)
     if not callsign:
         return None
+
+    grid = None
+    report = None
+    for token in message_tokens:
+        token = token.strip()
+        if grid is None and _GRID_RE.match(token):
+            grid = token.upper()
+            continue
+        if report is None and _REPORT_RE.match(token):
+            report = token.upper()
+
     return {
         "callsign": callsign,
         "snr_db": snr_db,
         "frequency_hz": frequency_hz,
+        "grid": grid,
+        "report": report,
         "raw": str(line).strip(),
         "mode": "FT8"
     }

@@ -1,7 +1,7 @@
 import struct
 
 from app.decoders.direwolf_kiss import parse_kiss_frame
-from app.decoders.parsers import parse_ssb_asr_text
+from app.decoders.parsers import parse_ssb_asr_text, parse_wsjtx_line
 from app.decoders.wsjtx_udp import WsjtxState, parse_wsjtx_datagram
 
 
@@ -80,3 +80,18 @@ def test_ssb_asr_parser_phonetic_callsign():
 def test_ssb_asr_parser_returns_none_without_callsign():
     event = parse_ssb_asr_text("good afternoon station with strong signal")
     assert event is None
+
+
+def test_parse_wsjtx_line_extracts_grid():
+    line = "200109  -12  0.2  14074000  FT8  CQ CT1ABC IN50"
+    event = parse_wsjtx_line(line)
+    assert event is not None
+    assert event["callsign"] == "CT1ABC"
+    assert event["grid"] == "IN50"
+
+
+def test_parse_wsjtx_line_extracts_report():
+    line = "200109  -07  0.2  14074000  FT8  CT1ABC EA1XYZ -03"
+    event = parse_wsjtx_line(line)
+    assert event is not None
+    assert event["report"] == "-03"

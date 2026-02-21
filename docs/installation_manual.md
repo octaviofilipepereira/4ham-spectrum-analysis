@@ -127,6 +127,35 @@ The backend can connect to Direwolf KISS TCP and ingest APRS frames automaticall
 - `DIREWOLF_KISS_HOST`: host (default `127.0.0.1`)
 - `DIREWOLF_KISS_PORT`: TCP port (default `8001`)
 
+### Decoder process auto-start
+To auto-start WSJT-X and Direwolf when the backend starts:
+
+- `WSJTX_AUTOSTART=1`
+- `WSJTX_CMD="wsjtx"` (or absolute path to executable)
+- `DIREWOLF_AUTOSTART=1`
+- `DIREWOLF_CMD="direwolf -t 0 -p"` (or absolute path and options)
+
+Linux package installation example (Mint/Ubuntu):
+
+```
+sudo apt update
+sudo apt install -y wsjtx direwolf
+```
+
+Quick verify:
+
+```
+command -v wsjtx
+command -v direwolf
+```
+
+If binaries are not in `PATH`, use absolute commands, e.g.:
+
+```
+WSJTX_CMD="/usr/bin/wsjtx"
+DIREWOLF_CMD="/usr/bin/direwolf -t 0 -p"
+```
+
 ## DSP Tuning
 Optional environment variables to refine DSP behavior:
 

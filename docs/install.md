@@ -33,6 +33,15 @@ For a complete, step-by-step manual, see [docs/installation_manual.md](installat
 - Optional: set decoder file paths (e.g., `WSJTX_ALLTXT_PATH`) for automatic ingest.
 - Optional: enable native WSJT-X UDP ingest with `WSJTX_UDP_ENABLE=1`.
 - Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
+- To auto-start decoder processes at backend startup, install binaries and set:
+	- `WSJTX_AUTOSTART=1`, `WSJTX_CMD="wsjtx"`
+	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
+
+### Decoder binaries (Mint/Ubuntu)
+```
+sudo apt update
+sudo apt install -y wsjtx direwolf
+```
 
 ## Troubleshooting
 - If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.
