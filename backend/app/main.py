@@ -342,7 +342,7 @@ def health(request: Request):
     _enforce_auth(request)
     return {
         "status": "ok",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "devices": len(_controller.list_devices())
     }
 
