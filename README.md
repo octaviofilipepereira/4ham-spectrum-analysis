@@ -15,6 +15,40 @@ It is designed to run on Raspberry Pi and PC (Linux/Windows), with a modern mult
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
+## Quick Start (3 minutes)
+Run from the repository root.
+
+1) Create and activate a virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+2) Install backend dependencies:
+```bash
+python -m pip install -r backend/requirements.txt
+```
+
+3) Start backend + UI (same-origin):
+```bash
+python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+4) Open the app and verify health:
+- UI: `http://127.0.0.1:8000/`
+- API health: `http://127.0.0.1:8000/api/health`
+
+5) Optional smoke test (start/stop scan):
+```bash
+curl -X POST http://127.0.0.1:8000/api/scan/start \
+	-H "Content-Type: application/json" \
+	-d '{"scan":{"band":"20m","start_hz":14000000,"end_hz":14002000,"step_hz":1000,"dwell_ms":200,"mode":"auto","sample_rate":48000,"center_hz":14001000}}'
+
+curl -X POST http://127.0.0.1:8000/api/scan/stop
+```
+
+For full platform-specific installation and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
+
 ## Target bands
 - 2 m
 - 70 cm
