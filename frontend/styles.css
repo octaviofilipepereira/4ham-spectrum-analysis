@@ -146,6 +146,52 @@ h1,
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+.waterfall-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.waterfall-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waterfall-mode-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.waterfall-mode-badge.is-live {
+  color: var(--accent-2);
+  border-color: rgba(69, 214, 197, 0.5);
+}
+
+.waterfall-mode-badge.is-fake {
+  color: var(--accent);
+  border-color: rgba(255, 179, 71, 0.5);
+}
+
+.waterfall-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waterfall-mode .form-label {
+  margin: 0;
+}
+
+.waterfall-mode .form-select {
+  min-width: 110px;
+}
+
 .waterfall canvas {
   width: 100%;
   height: 200px;

@@ -55,7 +55,19 @@
         <div class="col-12">
           <div class="card panel h-100">
             <div class="card-body">
-              <h2 class="h5">Waterfall</h2>
+              <div class="waterfall-toolbar">
+                <div class="waterfall-heading">
+                  <h2 class="h5 mb-0">Waterfall</h2>
+                  <span class="waterfall-mode-badge is-live" id="waterfallModeBadge">LIVE</span>
+                </div>
+                <div class="waterfall-mode">
+                  <label class="form-label mb-0" for="waterfallMode">Mode</label>
+                  <select id="waterfallMode" class="form-select form-select-sm">
+                    <option value="real">Real</option>
+                    <option value="fake">Fake</option>
+                  </select>
+                </div>
+              </div>
               <div class="waterfall" id="waterfall">
                 <canvas id="waterfallCanvas" width="640" height="240"></canvas>
                 <p class="waterfall__status" id="waterfallStatus">Awaiting spectrum stream...</p>

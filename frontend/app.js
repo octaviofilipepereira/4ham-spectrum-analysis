@@ -13,6 +13,8 @@ const eventsSearchResultsEl = document.getElementById("eventsSearchResults");
 const copyrightYearEl = document.getElementById("copyrightYear");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
+const waterfallModeSelect = document.getElementById("waterfallMode");
+const waterfallModeBadge = document.getElementById("waterfallModeBadge");
 const canvas = document.getElementById("waterfallCanvas");
 let ctx = null;
 let webglWaterfall = null;
@@ -90,10 +92,46 @@ let eventOffset = 0;
 let eventsPanelPage = 0;
 let latestEvents = [];
 let row = 0;
+let lastSpectrumFrameTs = 0;
+let spectrumFallbackTimer = null;
+let spectrumWs = null;
+const WATERFALL_MODE_KEY = "waterfallMode";
+let waterfallMode = localStorage.getItem(WATERFALL_MODE_KEY) === "fake" ? "fake" : "real";
+
+function isFakeSpectrumEnabled() {
+  return waterfallMode === "fake";
+}
+
+function updateWaterfallModeBadge() {
+  if (!waterfallModeBadge) {
+    return;
+  }
+  const fakeMode = isFakeSpectrumEnabled();
+  waterfallModeBadge.textContent = fakeMode ? "FAKE" : "LIVE";
+  waterfallModeBadge.classList.toggle("is-fake", fakeMode);
+  waterfallModeBadge.classList.toggle("is-live", !fakeMode);
+}
+
+function applyWaterfallModeUI() {
+  if (waterfallModeSelect) {
+    waterfallModeSelect.value = waterfallMode;
+  }
+  updateWaterfallModeBadge();
+  localStorage.setItem(WATERFALL_MODE_KEY, waterfallMode);
+}
+
+function setWaterfallMode(nextMode) {
+  waterfallMode = nextMode === "fake" ? "fake" : "real";
+  applyWaterfallModeUI();
+  lastSpectrumFrameTs = 0;
+  connectSpectrum();
+}
 
 if (copyrightYearEl) {
   copyrightYearEl.textContent = String(new Date().getFullYear());
 }
+
+applyWaterfallModeUI();
 
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
@@ -992,13 +1030,25 @@ document.addEventListener("keydown", (event) => {
 });
 
 function connectSpectrum() {
+  if (spectrumWs) {
+    spectrumWs.close();
+    spectrumWs = null;
+  }
+
+  if (isFakeSpectrumEnabled()) {
+    wsStatus.textContent = "WS: local simulated";
+    waterfallStatus.textContent = "Simulated spectrum (manual mode)";
+    return;
+  }
   try {
     const ws = new WebSocket(wsUrl("/ws/spectrum"));
+    spectrumWs = ws;
     ws.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data);
         const frame = decodeSpectrumFrame(data.spectrum_frame);
         if (frame && frame.fft_db) {
+          lastSpectrumFrameTs = Date.now();
           drawWaterfall(frame);
           const startHz = Math.round(frame.center_hz - frame.span_hz / 2);
           const endHz = Math.round(frame.center_hz + frame.span_hz / 2);
@@ -1029,14 +1079,66 @@ function connectSpectrum() {
       wsStatus.textContent = "WS: connected";
     };
     ws.onclose = () => {
-      wsStatus.textContent = "WS: disconnected";
+      if (spectrumWs === ws) {
+        wsStatus.textContent = "WS: disconnected";
+        spectrumWs = null;
+      }
     };
   } catch (err) {
+    wsStatus.textContent = "WS: disconnected";
     waterfallStatus.textContent = "Spectrum stream unavailable";
   }
 }
 
+function buildSimulatedSpectrumFrame() {
+  const bins = 512;
+  const now = Date.now() / 1000;
+  const fftDb = Array.from({ length: bins }, (_, i) => {
+    const base = -112 + 5 * Math.sin((i / bins) * Math.PI * 4 + now * 0.5);
+    const noise = (Math.random() - 0.5) * 6;
+    const peak1 = Math.exp(-((i - (140 + (now * 18) % bins)) ** 2) / 240) * 22;
+    const peak2 = Math.exp(-((i - (360 + (now * 10) % bins)) ** 2) / 180) * 16;
+    return base + noise + peak1 + peak2;
+  });
+  return {
+    fft_db: fftDb,
+    center_hz: Number(bandStartInput?.value || 14074000),
+    span_hz: Number(sampleRateInput?.value || 48000),
+    min_db: -130,
+    max_db: -60,
+    noise_floor_db: -110,
+    peaks: []
+  };
+}
+
+function ensureWaterfallFallback() {
+  if (spectrumFallbackTimer) {
+    clearInterval(spectrumFallbackTimer);
+  }
+  spectrumFallbackTimer = setInterval(() => {
+    if (isFakeSpectrumEnabled()) {
+      const simulated = buildSimulatedSpectrumFrame();
+      drawWaterfall(simulated);
+      waterfallStatus.textContent = "Simulated spectrum (manual mode)";
+      return;
+    }
+    const staleMs = Date.now() - lastSpectrumFrameTs;
+    if (lastSpectrumFrameTs === 0 || staleMs > 2500) {
+      const simulated = buildSimulatedSpectrumFrame();
+      drawWaterfall(simulated);
+      waterfallStatus.textContent = "Simulated spectrum (fallback mode)";
+    }
+  }, 400);
+}
+
+if (waterfallModeSelect) {
+  waterfallModeSelect.addEventListener("change", (event) => {
+    setWaterfallMode(event.target.value);
+  });
+}
+
 connectSpectrum();
+ensureWaterfallFallback();
 
 function decodeSpectrumFrame(frame) {
   if (!frame) {
@@ -1098,9 +1200,17 @@ async function fetchDecoderStatus() {
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
-    wsjtxUdpStatusEl.textContent = wsjtx.enabled ? `Listening ${wsjtx.listen || "?"}` : "Disabled";
+    const wsjtxDisabledReason = wsjtx.last_error
+      ? ` (${wsjtx.last_error})`
+      : " (set WSJTX_UDP_ENABLE=1 or WSJTX_UDP_PORT)";
+    wsjtxUdpStatusEl.textContent = wsjtx.enabled
+      ? `Listening ${wsjtx.listen || "?"}`
+      : `Disabled${wsjtxDisabledReason}`;
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
-    kissStatusEl.textContent = kissState;
+    const kissDisabledReason = kiss.last_error
+      ? ` (${kiss.last_error})`
+      : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
+    kissStatusEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
     decoderLastEventEl.textContent = lastEvent;
     agcStatusEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
