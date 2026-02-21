@@ -1,6 +1,7 @@
 import struct
 
 from app.decoders.direwolf_kiss import parse_kiss_frame
+from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_ssb_asr_text, parse_wsjtx_line
 from app.decoders.wsjtx_udp import WsjtxState, parse_wsjtx_datagram
 
@@ -104,3 +105,15 @@ def test_parse_wsjtx_line_extracts_report():
     event = parse_wsjtx_line(line)
     assert event is not None
     assert event["report"] == "-03"
+
+
+def test_build_callsign_event_infers_20m_band_from_frequency():
+    event = build_callsign_event({"callsign": "CT1ABC", "frequency_hz": 14255000}, {})
+    assert event is not None
+    assert event["band"] == "20m"
+
+
+def test_build_callsign_event_infers_15m_band_from_frequency():
+    event = build_callsign_event({"callsign": "CT1ABC", "frequency_hz": 21250000}, {})
+    assert event is not None
+    assert event["band"] == "15m"

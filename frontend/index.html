@@ -17,9 +17,10 @@
       <header class="app__header mb-4">
         <div class="row g-3 align-items-center">
           <div class="col-lg-5">
-            <p class="kicker">4ham Spectrum Analysis</p>
-            <h1>Radio Spectrum Monitor</h1>
-            <p class="subtitle">Visualize occupancy, callsigns, and decodes in real time.</p>
+            <h1>4ham Spectrum Analysis</h1>
+            <p class="kicker">Coded &amp; Powered by CT7BFV</p>
+            <p class="header-meta">&copy; <span id="copyrightYear"></span> Octávio Filipe Gonçalves</p>
+            <p class="header-meta">License: <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a></p>
           </div>
           <div class="col-lg-7">
             <div class="card panel shadow-sm">
@@ -51,7 +52,7 @@
       </header>
 
       <section class="row g-3 mb-3">
-        <div class="col-12 col-lg-7">
+        <div class="col-12">
           <div class="card panel h-100">
             <div class="card-body">
               <h2 class="h5">Waterfall</h2>
@@ -62,11 +63,42 @@
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-5">
-          <div class="card panel h-100">
+        <div class="col-12 col-lg-7">
+          <div class="card panel">
             <div class="card-body">
               <h2 class="h5">Events</h2>
-              <ul class="events" id="events"></ul>
+              <div class="d-flex align-items-center gap-2 events-pager">
+                <button class="btn btn-outline-info btn-sm" id="eventsPrev">Prev</button>
+                <button class="btn btn-outline-info btn-sm" id="eventsNext">Next</button>
+                <span class="login-status" id="eventsPageInfo">Page: 1/1</span>
+              </div>
+              <ul class="events events--fixed" id="events"></ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-5">
+          <div class="card panel">
+            <div class="card-body">
+              <h2 class="h5">Events Search</h2>
+              <div class="filters row g-2 align-items-end">
+                <div class="col-6">
+                  <label class="form-label">Callsign</label>
+                  <input type="text" id="eventsSearchCallsign" placeholder="CT1ABC" class="form-control form-control-sm" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Mode</label>
+                  <input type="text" id="eventsSearchMode" placeholder="FT8/SSB/APRS" class="form-control form-control-sm" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Grid</label>
+                  <input type="text" id="eventsSearchGrid" placeholder="IN51" class="form-control form-control-sm" />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Report</label>
+                  <input type="text" id="eventsSearchReport" placeholder="-03 / 59" class="form-control form-control-sm" />
+                </div>
+              </div>
+              <ul class="events events--search" id="eventsSearchResults"></ul>
             </div>
           </div>
         </div>

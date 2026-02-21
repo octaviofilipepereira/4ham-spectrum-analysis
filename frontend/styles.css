@@ -61,6 +61,16 @@ h1,
   color: var(--muted);
 }
 
+.header-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.header-meta a {
+  color: var(--muted);
+}
+
 .panel {
   background: linear-gradient(145deg, rgba(22, 30, 54, 0.96), rgba(12, 18, 34, 0.98));
   border: 1px solid var(--panel-edge);
@@ -179,6 +189,33 @@ h1,
 .event-item__time {
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.events--fixed {
+  height: auto;
+  max-height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: 0.85rem;
+}
+
+.events--search {
+  height: auto;
+  max-height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: 0.85rem;
+}
+
+#eventsSearchCallsign,
+#eventsSearchMode,
+#eventsSearchGrid,
+#eventsSearchReport {
+  color: #000;
+}
+
+.events-pager {
+  margin-top: 0.35rem;
 }
 
 .event-item__body {

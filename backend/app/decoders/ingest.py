@@ -3,6 +3,21 @@ import re
 
 
 _ALLOWED_MODES = {"FT8", "FT4", "APRS", "CW", "SSB", "Unknown"}
+_BAND_RANGES = [
+    ("160m", 1800000, 2000000),
+    ("80m", 3500000, 4000000),
+    ("60m", 5250000, 5450000),
+    ("40m", 7000000, 7300000),
+    ("30m", 10100000, 10150000),
+    ("20m", 14000000, 14350000),
+    ("17m", 18068000, 18168000),
+    ("15m", 21000000, 21450000),
+    ("12m", 24890000, 24990000),
+    ("10m", 28000000, 29700000),
+    ("6m", 50000000, 54000000),
+    ("2m", 144000000, 148000000),
+    ("70cm", 430000000, 440000000),
+]
 
 
 def _normalize_mode(value):
@@ -31,6 +46,19 @@ def normalize_callsign(value):
     return cleaned or None
 
 
+def _infer_band_from_frequency(frequency_hz):
+    try:
+        value = int(frequency_hz)
+    except (TypeError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    for band, start_hz, end_hz in _BAND_RANGES:
+        if start_hz <= value <= end_hz:
+            return band
+    return None
+
+
 def build_callsign_event(payload, scan_state):
     if not isinstance(payload, dict):
         return None
@@ -42,12 +70,17 @@ def build_callsign_event(payload, scan_state):
     frequency_hz = payload.get("frequency_hz")
     if frequency_hz is None:
         frequency_hz = 0
+    try:
+        frequency_hz = int(frequency_hz)
+    except (TypeError, ValueError):
+        frequency_hz = 0
+    band = payload.get("band") or _infer_band_from_frequency(frequency_hz)
 
     return {
         "type": "callsign",
         "timestamp": payload.get("timestamp") or datetime.now(timezone.utc).isoformat(),
-        "band": payload.get("band"),
-        "frequency_hz": int(frequency_hz),
+        "band": band,
+        "frequency_hz": frequency_hz,
         "mode": mode,
         "callsign": callsign,
         "snr_db": payload.get("snr_db"),

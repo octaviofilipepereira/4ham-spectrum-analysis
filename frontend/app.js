@@ -2,6 +2,15 @@ import { loadPresetsFromJson } from "./utils/presets.js";
 
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
+const eventsSearchCallsignInput = document.getElementById("eventsSearchCallsign");
+const eventsSearchModeInput = document.getElementById("eventsSearchMode");
+const eventsSearchGridInput = document.getElementById("eventsSearchGrid");
+const eventsSearchReportInput = document.getElementById("eventsSearchReport");
+const eventsPrevBtn = document.getElementById("eventsPrev");
+const eventsNextBtn = document.getElementById("eventsNext");
+const eventsPageInfo = document.getElementById("eventsPageInfo");
+const eventsSearchResultsEl = document.getElementById("eventsSearchResults");
+const copyrightYearEl = document.getElementById("copyrightYear");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
 const canvas = document.getElementById("waterfallCanvas");
@@ -76,8 +85,15 @@ const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
 const ssbToggle = document.getElementById("ssbToggle");
 const saveModesBtn = document.getElementById("saveModes");
+const EVENTS_PANEL_PAGE_SIZE = 7;
 let eventOffset = 0;
+let eventsPanelPage = 0;
+let latestEvents = [];
 let row = 0;
+
+if (copyrightYearEl) {
+  copyrightYearEl.textContent = String(new Date().getFullYear());
+}
 
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
@@ -433,17 +449,95 @@ function addEvent(text) {
   eventsEl.prepend(li);
 }
 
-function renderEvents(items) {
-  eventsEl.innerHTML = "";
-  const counts = {};
-  const modeCounts = {};
-  eventsTotal.textContent = String(items.length);
+function applyEventsPanelFilters(items) {
+  const callsignTerm = (eventsSearchCallsignInput?.value || "").trim().toLowerCase();
+  const modeTerm = (eventsSearchModeInput?.value || "").trim().toLowerCase();
+  const gridTerm = (eventsSearchGridInput?.value || "").trim().toLowerCase();
+  const reportTerm = (eventsSearchReportInput?.value || "").trim().toLowerCase();
+  return items.filter((eventItem) => {
+    const callsignText = String(eventItem.callsign || "").toLowerCase();
+    const modeText = String(eventItem.mode || "").toLowerCase();
+    const gridText = String(eventItem.grid || "").toLowerCase();
+    const reportText = String(eventItem.report ?? "").toLowerCase();
+    if (callsignTerm && !callsignText.includes(callsignTerm)) {
+      return false;
+    }
+    if (modeTerm && !modeText.includes(modeTerm)) {
+      return false;
+    }
+    if (gridTerm && !gridText.includes(gridTerm)) {
+      return false;
+    }
+    if (reportTerm && !reportText.includes(reportTerm)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function hasEventsSearchCriteria() {
+  return Boolean(
+    (eventsSearchCallsignInput?.value || "").trim()
+    || (eventsSearchModeInput?.value || "").trim()
+    || (eventsSearchGridInput?.value || "").trim()
+    || (eventsSearchReportInput?.value || "").trim()
+  );
+}
+
+function updateEventsPager(totalItems) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / EVENTS_PANEL_PAGE_SIZE));
+  if (eventsPageInfo) {
+    eventsPageInfo.textContent = `Page: ${eventsPanelPage + 1}/${totalPages}`;
+  }
+  if (eventsPrevBtn) {
+    eventsPrevBtn.disabled = eventsPanelPage <= 0;
+  }
+  if (eventsNextBtn) {
+    eventsNextBtn.disabled = eventsPanelPage >= totalPages - 1;
+  }
+}
+
+function renderEventsPanelFromCache() {
+  renderEvents(latestEvents);
+}
+
+function inferBandFromFrequency(frequencyHz) {
+  const value = Number(frequencyHz);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  const bandRanges = [
+    { name: "160m", min: 1800000, max: 2000000 },
+    { name: "80m", min: 3500000, max: 4000000 },
+    { name: "60m", min: 5250000, max: 5450000 },
+    { name: "40m", min: 7000000, max: 7300000 },
+    { name: "30m", min: 10100000, max: 10150000 },
+    { name: "20m", min: 14000000, max: 14350000 },
+    { name: "17m", min: 18068000, max: 18168000 },
+    { name: "15m", min: 21000000, max: 21450000 },
+    { name: "12m", min: 24890000, max: 24990000 },
+    { name: "10m", min: 28000000, max: 29700000 },
+    { name: "6m", min: 50000000, max: 54000000 },
+    { name: "2m", min: 144000000, max: 148000000 },
+    { name: "70cm", min: 430000000, max: 440000000 }
+  ];
+  const match = bandRanges.find((range) => value >= range.min && value <= range.max);
+  return match ? match.name : null;
+}
+
+function renderEventList(targetEl, items, emptyMessage) {
+  if (!targetEl) {
+    return;
+  }
+  targetEl.innerHTML = "";
   if (!items.length) {
     const empty = document.createElement("li");
     empty.className = "event-empty";
-    empty.textContent = "No events yet. Start a scan or adjust filters.";
-    eventsEl.appendChild(empty);
+    empty.textContent = emptyMessage;
+    targetEl.appendChild(empty);
+    return;
   }
+
   items.forEach((eventItem) => {
     const li = document.createElement("li");
     li.className = "event-item";
@@ -470,8 +564,9 @@ function renderEvents(items) {
 
     const body = document.createElement("div");
     body.className = "event-item__body";
-    const freq = eventItem.frequency_hz ? Number(eventItem.frequency_hz).toLocaleString() : "?";
-    const band = eventItem.band || "?";
+    const frequencyValue = Number(eventItem.frequency_hz);
+    const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
+    const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
     const callsign = eventItem.callsign || "-";
     body.innerHTML = `<strong>${freq} Hz</strong> <span class="event-item__muted">${band}</span> <span class="event-item__call">${callsign}</span>`;
 
@@ -500,7 +595,47 @@ function renderEvents(items) {
     if (detail.textContent) {
       li.appendChild(detail);
     }
-    eventsEl.appendChild(li);
+    targetEl.appendChild(li);
+  });
+}
+
+function renderEvents(items) {
+  latestEvents = Array.isArray(items) ? items : [];
+  const counts = {};
+  const modeCounts = {};
+
+  const totalEvents = latestEvents.length;
+  const totalEventPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
+  if (eventsPanelPage > totalEventPages - 1) {
+    eventsPanelPage = totalEventPages - 1;
+  }
+  if (eventsPanelPage < 0) {
+    eventsPanelPage = 0;
+  }
+  const eventsStartIndex = eventsPanelPage * EVENTS_PANEL_PAGE_SIZE;
+  const eventsPagedItems = latestEvents.slice(eventsStartIndex, eventsStartIndex + EVENTS_PANEL_PAGE_SIZE);
+
+  renderEventList(
+    eventsEl,
+    eventsPagedItems,
+    "No events yet. Start a scan or adjust filters."
+  );
+
+  const filteredItems = applyEventsPanelFilters(latestEvents);
+
+  const shouldShowSearchResults = hasEventsSearchCriteria();
+  renderEventList(
+    eventsSearchResultsEl,
+    shouldShowSearchResults ? filteredItems : [],
+    shouldShowSearchResults
+      ? (latestEvents.length ? "No events match the current Events search." : "No events yet.")
+      : "Use search fields to display results."
+  );
+
+  eventsTotal.textContent = String(totalEvents);
+  updateEventsPager(totalEvents);
+
+  filteredItems.forEach((eventItem) => {
     if (eventItem.band) {
       counts[eventItem.band] = (counts[eventItem.band] || 0) + 1;
     }
@@ -508,6 +643,7 @@ function renderEvents(items) {
       modeCounts[eventItem.mode] = (modeCounts[eventItem.mode] || 0) + 1;
     }
   });
+
   bandSummary.innerHTML = "";
   if (showBandSummary.value === "on") {
     Object.entries(counts).forEach(([band, count]) => {
@@ -718,6 +854,50 @@ modeFilter.addEventListener("change", fetchTotal);
 callsignFilter.addEventListener("change", fetchTotal);
 startFilter.addEventListener("change", fetchTotal);
 endFilter.addEventListener("change", fetchTotal);
+
+if (eventsSearchCallsignInput) {
+  eventsSearchCallsignInput.addEventListener("input", () => {
+    eventsPanelPage = 0;
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsSearchModeInput) {
+  eventsSearchModeInput.addEventListener("input", () => {
+    eventsPanelPage = 0;
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsSearchGridInput) {
+  eventsSearchGridInput.addEventListener("input", () => {
+    eventsPanelPage = 0;
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsSearchReportInput) {
+  eventsSearchReportInput.addEventListener("input", () => {
+    eventsPanelPage = 0;
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsPrevBtn) {
+  eventsPrevBtn.addEventListener("click", () => {
+    eventsPanelPage = Math.max(0, eventsPanelPage - 1);
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsNextBtn) {
+  eventsNextBtn.addEventListener("click", () => {
+    const filteredItems = applyEventsPanelFilters(latestEvents);
+    const totalPages = Math.max(1, Math.ceil(filteredItems.length / EVENTS_PANEL_PAGE_SIZE));
+    eventsPanelPage = Math.min(totalPages - 1, eventsPanelPage + 1);
+    renderEventsPanelFromCache();
+  });
+}
 
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });
