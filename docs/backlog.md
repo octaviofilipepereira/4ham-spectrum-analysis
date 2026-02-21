@@ -22,10 +22,10 @@
 - [x] Spectrum frame compression (delta_int8)
 
 ## UI
-- Waterfall rendering (WebGL)
-- Scan control panel and presets
-- Event list and filters
-- Export UI for CSV/JSON/PNG
+- [x] Waterfall rendering (WebGL)
+- [x] Scan control panel and presets
+- [x] Event list and filters
+- [x] Export UI for CSV/JSON/PNG
 
 ## Storage
 - SQLite schema for events and occupancy

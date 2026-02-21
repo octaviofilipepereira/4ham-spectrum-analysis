@@ -5,7 +5,9 @@ const eventsEl = document.getElementById("events");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
 const canvas = document.getElementById("waterfallCanvas");
-const ctx = canvas.getContext("2d");
+let ctx = null;
+let webglWaterfall = null;
+let waterfallRenderer = "2d";
 const gainInput = document.getElementById("gain");
 const sampleRateInput = document.getElementById("sampleRate");
 const recordPathInput = document.getElementById("recordPath");
@@ -16,6 +18,8 @@ const callsignFilter = document.getElementById("callsignFilter");
 const startFilter = document.getElementById("startFilter");
 const endFilter = document.getElementById("endFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
+const exportJsonBtn = document.getElementById("exportJson");
+const exportPngBtn = document.getElementById("exportPng");
 const pageOffsetLabel = document.getElementById("pageOffset");
 const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
@@ -258,14 +262,168 @@ function wsUrl(path) {
   return `${protocol}://${window.location.host}${path}`;
 }
 
+function createWebglWaterfallRenderer(targetCanvas) {
+  const gl = targetCanvas.getContext("webgl", {
+    alpha: false,
+    antialias: false,
+    preserveDrawingBuffer: true,
+    powerPreference: "high-performance"
+  }) || targetCanvas.getContext("experimental-webgl");
+
+  if (!gl) {
+    return null;
+  }
+
+  const vertexSource = `
+    attribute vec2 a_pos;
+    attribute vec2 a_uv;
+    varying vec2 v_uv;
+    void main() {
+      gl_Position = vec4(a_pos, 0.0, 1.0);
+      v_uv = a_uv;
+    }
+  `;
+
+  const fragmentSource = `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_tex;
+    void main() {
+      gl_FragColor = texture2D(u_tex, vec2(v_uv.x, 1.0 - v_uv.y));
+    }
+  `;
+
+  function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const info = gl.getShaderInfoLog(shader) || "shader_compile_failed";
+      gl.deleteShader(shader);
+      throw new Error(info);
+    }
+    return shader;
+  }
+
+  let program;
+  try {
+    const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+    program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(program) || "program_link_failed");
+    }
+  } catch (err) {
+    return null;
+  }
+
+  const vertices = new Float32Array([
+    -1, -1, 0, 0,
+    1, -1, 1, 0,
+    -1, 1, 0, 1,
+    1, 1, 1, 1
+  ]);
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(program, "a_pos");
+  const aUv = gl.getAttribLocation(program, "a_uv");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 16, 0);
+  gl.enableVertexAttribArray(aUv);
+  gl.vertexAttribPointer(aUv, 2, gl.FLOAT, false, 16, 8);
+
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  gl.useProgram(program);
+  gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0);
+
+  let width = 0;
+  let height = 0;
+  let pixels = null;
+
+  function resize(displayWidth, displayHeight) {
+    width = Math.max(2, Math.floor(displayWidth));
+    height = Math.max(2, Math.floor(displayHeight));
+    targetCanvas.width = width;
+    targetCanvas.height = height;
+    gl.viewport(0, 0, width, height);
+    pixels = new Uint8Array(width * height * 4);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  }
+
+  function render(fftDb) {
+    if (!Array.isArray(fftDb) || !fftDb.length || !pixels) {
+      return;
+    }
+    let minDb = Infinity;
+    let maxDb = -Infinity;
+    for (let i = 0; i < fftDb.length; i += 1) {
+      const value = fftDb[i];
+      if (value < minDb) minDb = value;
+      if (value > maxDb) maxDb = value;
+    }
+    const scale = maxDb - minDb || 1;
+    const rowBytes = width * 4;
+    pixels.copyWithin(0, rowBytes);
+    const rowOffset = (height - 1) * rowBytes;
+
+    for (let x = 0; x < width; x += 1) {
+      const idx = Math.floor((x / width) * fftDb.length);
+      const value = (fftDb[idx] - minDb) / scale;
+      const color = colorMap(value);
+      const offset = rowOffset + x * 4;
+      pixels[offset] = color[0];
+      pixels[offset + 1] = color[1];
+      pixels[offset + 2] = color[2];
+      pixels[offset + 3] = 255;
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  return { resize, render };
+}
+
+
+function initWaterfallRenderer() {
+  webglWaterfall = createWebglWaterfallRenderer(canvas);
+  if (webglWaterfall) {
+    waterfallRenderer = "webgl";
+    return;
+  }
+  ctx = canvas.getContext("2d");
+  waterfallRenderer = "2d";
+}
+
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
+  if (webglWaterfall) {
+    webglWaterfall.resize(rect.width, rect.height);
+    return;
+  }
   canvas.width = Math.floor(rect.width * window.devicePixelRatio);
   canvas.height = Math.floor(rect.height * window.devicePixelRatio);
+  if (!ctx) {
+    ctx = canvas.getContext("2d");
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 }
 
+initWaterfallRenderer();
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
@@ -557,10 +715,8 @@ callsignFilter.addEventListener("change", fetchTotal);
 startFilter.addEventListener("change", fetchTotal);
 endFilter.addEventListener("change", fetchTotal);
 
-exportCsvBtn.addEventListener("click", () => {
-  exportCsvBtn.disabled = true;
-  exportCsvBtn.textContent = "Exporting...";
-  const params = new URLSearchParams({ limit: "1000", format: "csv" });
+function buildEventExportParams() {
+  const params = new URLSearchParams({ limit: "1000" });
   if (bandFilter.value) {
     params.append("band", bandFilter.value);
   }
@@ -576,11 +732,70 @@ exportCsvBtn.addEventListener("click", () => {
   if (endFilter.value) {
     params.append("end", new Date(endFilter.value).toISOString());
   }
+  return params;
+}
+
+
+exportCsvBtn.addEventListener("click", () => {
+  exportCsvBtn.disabled = true;
+  exportCsvBtn.textContent = "Exporting...";
+  const params = buildEventExportParams();
+  params.set("format", "csv");
   window.location.href = `/api/export?${params.toString()}`;
   setTimeout(() => {
     exportCsvBtn.disabled = false;
     exportCsvBtn.textContent = "Export CSV";
   }, 1500);
+});
+
+
+exportJsonBtn.addEventListener("click", async () => {
+  exportJsonBtn.disabled = true;
+  exportJsonBtn.textContent = "Exporting...";
+  try {
+    const params = buildEventExportParams();
+    const resp = await fetch(`/api/events?${params.toString()}`, { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      throw new Error("json_export_failed");
+    }
+    const payload = await resp.json();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `events-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("JSON exported");
+  } catch (err) {
+    showToastError("JSON export failed");
+  } finally {
+    exportJsonBtn.disabled = false;
+    exportJsonBtn.textContent = "Export JSON";
+  }
+});
+
+
+exportPngBtn.addEventListener("click", () => {
+  exportPngBtn.disabled = true;
+  exportPngBtn.textContent = "Exporting...";
+  try {
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `waterfall-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast("PNG exported");
+  } catch (err) {
+    showToastError("PNG export failed");
+  } finally {
+    exportPngBtn.disabled = false;
+    exportPngBtn.textContent = "Export PNG";
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -619,7 +834,7 @@ function connectSpectrum() {
             peaksInfo = ` | peaks ${frame.peaks.length}: ${topPeaks.join(", ")}`;
           }
           const agcInfo = agcGain ? ` | agc ${agcGain}dB` : "";
-          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo}`;
+          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo} | ${waterfallRenderer.toUpperCase()}`;
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
@@ -959,6 +1174,10 @@ if (!localStorage.getItem("onboardingDone")) {
 
 function drawWaterfall(frame) {
   const fftDb = frame.fft_db || [];
+  if (webglWaterfall) {
+    webglWaterfall.render(fftDb);
+    return;
+  }
   const width = canvas.width / window.devicePixelRatio;
   const height = canvas.height / window.devicePixelRatio;
   if (!fftDb.length) {
