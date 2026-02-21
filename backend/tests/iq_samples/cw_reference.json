@@ -1,0 +1,17 @@
+{
+  "name": "cw_reference",
+  "sample_rate": 8000,
+  "iq_pattern": [
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [-1.0, 0.0],
+    [0.0, -1.0]
+  ],
+  "repeat": 512,
+  "noise_std": 0.01,
+  "expect": {
+    "min_occupied_segments": 1,
+    "min_peak_snr_db": 5.0,
+    "mode": "CW"
+  }
+}

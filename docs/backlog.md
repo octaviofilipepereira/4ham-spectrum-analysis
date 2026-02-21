@@ -32,6 +32,6 @@
 - [x] Exporters and rotation policies
 
 ## QA and Ops
-- Test harness with recorded IQ samples
-- Performance benchmarks per platform
-- Packaging: Linux (systemd) and Windows service
+- [x] Test harness with recorded IQ samples
+- [x] Performance benchmarks per platform
+- [x] Packaging: Linux (systemd) and Windows service

@@ -1,6 +1,7 @@
 # Installation Guide
 
 For a complete, step-by-step manual, see [docs/installation_manual.md](installation_manual.md).
+For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
 
 ## Linux (Ubuntu/Debian)
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.

@@ -1,0 +1,23 @@
+[Unit]
+Description=4ham Spectrum Analysis Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=REPLACE_USER
+Group=REPLACE_GROUP
+WorkingDirectory=REPLACE_PROJECT_DIR
+Environment=WSJTX_UDP_ENABLE=1
+Environment=WSJTX_AUTOSTART=0
+Environment=DIREWOLF_KISS_ENABLE=1
+Environment=DIREWOLF_AUTOSTART=1
+Environment=DIREWOLF_CMD=direwolf -t 0 -p
+ExecStart=REPLACE_PROJECT_DIR/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
