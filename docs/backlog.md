@@ -1,9 +1,9 @@
 # Technical Backlog
 
 ## Foundation
-- Define config loader and validation (YAML + JSON Schema)
-- Implement device abstraction layer (SoapySDR first)
-- Create scan scheduler (band profiles, step, dwell)
+- [x] Define config loader and validation (YAML + JSON Schema)
+- [x] Implement device abstraction layer (SoapySDR first)
+- [x] Create scan scheduler (band profiles, step, dwell)
 
 ## DSP Pipeline
 - FFT pipeline with noise floor estimation

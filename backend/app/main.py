@@ -8,6 +8,12 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
+from app.config.loader import (
+    ConfigError,
+    apply_region_profile_to_scan,
+    load_region_profile,
+    load_scan_request,
+)
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
@@ -286,16 +292,34 @@ def save_band(payload: dict, request: Request):
 @app.post("/api/scan/start")
 async def scan_start(payload: dict, request: Request):
     _enforce_auth(request)
-    scan = payload.get("scan", {})
+    try:
+        normalized_payload = load_scan_request(payload)
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    scan = normalized_payload.get("scan", {})
+    region_profile_path = normalized_payload.get("region_profile_path")
+    if region_profile_path:
+        try:
+            region_profile = load_region_profile(region_profile_path)
+            apply_region_profile_to_scan(scan, region_profile)
+        except ConfigError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if scan.get("band"):
-        for band in _db.get_bands():
-            if band.get("name") == scan.get("band"):
-                scan["start_hz"] = band.get("start_hz")
-                scan["end_hz"] = band.get("end_hz")
-                break
+        start_hz = int(scan.get("start_hz", 0) or 0)
+        end_hz = int(scan.get("end_hz", 0) or 0)
+        if start_hz <= 0 or end_hz <= 0:
+            for band in _db.get_bands():
+                if str(band.get("name", "")).lower() == str(scan.get("band", "")).lower():
+                    if start_hz <= 0:
+                        scan["start_hz"] = band.get("start_hz")
+                    if end_hz <= 0:
+                        scan["end_hz"] = band.get("end_hz")
+                    break
     await _scan_engine.start_async(scan)
     _scan_state["state"] = "running"
-    _scan_state["device"] = payload.get("device", "rtl_sdr")
+    _scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
     _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
     _scan_state["scan"] = scan
     _scan_state["scan_id"] = _db.start_scan(scan, _scan_state["started_at"])

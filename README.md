@@ -253,7 +253,7 @@ Contrato por modo: ver [docs/events_contract.md](docs/events_contract.md).
 ### REST (JSON)
 - `GET /api/health`: status do servico e dispositivos.
 - `GET /api/devices`: lista de SDR disponiveis.
-- `POST /api/scan/start`: iniciar scan (payload com banda, step, dwell, modo).
+- `POST /api/scan/start`: iniciar scan (payload inline `scan` ou `scan_config_path` para YAML/JSON; opcional `region_profile_path` para resolver limites por banda).
 - `POST /api/scan/stop`: parar scan.
 - `GET /api/bands`: bandas e limites configurados.
 - `GET /api/events`: historico filtrado (time range, banda, modo, callsign).
