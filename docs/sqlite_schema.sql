@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS bands (
   end_hz INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS exports (
+  id TEXT PRIMARY KEY,
+  format TEXT NOT NULL,
+  path TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  row_count INTEGER NOT NULL,
+  size_bytes INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   scan_id INTEGER,

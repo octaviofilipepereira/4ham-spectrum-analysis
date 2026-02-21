@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS bands (
     end_hz INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS exports (
+    id TEXT PRIMARY KEY,
+    format TEXT NOT NULL,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    size_bytes INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS occupancy_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
     scan_id INTEGER,
@@ -190,6 +199,46 @@ class Database:
             "SELECT name, start_hz, end_hz FROM bands ORDER BY name"
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def add_export(self, metadata):
+        self.conn.execute(
+            """
+            INSERT OR REPLACE INTO exports(id, format, path, created_at, row_count, size_bytes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                metadata.get("id"),
+                metadata.get("format"),
+                metadata.get("path"),
+                metadata.get("created_at"),
+                int(metadata.get("row_count", 0) or 0),
+                int(metadata.get("size_bytes", 0) or 0),
+            )
+        )
+        self.conn.commit()
+
+    def get_export(self, export_id):
+        row = self.conn.execute(
+            "SELECT id, format, path, created_at, row_count, size_bytes FROM exports WHERE id = ?",
+            (export_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_exports(self, limit=100):
+        rows = self.conn.execute(
+            """
+            SELECT id, format, path, created_at, row_count, size_bytes
+            FROM exports
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,)
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_export(self, export_id):
+        self.conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
+        self.conn.commit()
 
     def insert_occupancy(self, event):
         self.conn.execute(

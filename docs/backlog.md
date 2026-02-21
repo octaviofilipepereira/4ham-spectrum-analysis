@@ -28,8 +28,8 @@
 - [x] Export UI for CSV/JSON/PNG
 
 ## Storage
-- SQLite schema for events and occupancy
-- Exporters and rotation policies
+- [x] SQLite schema for events and occupancy
+- [x] Exporters and rotation policies
 
 ## QA and Ops
 - Test harness with recorded IQ samples

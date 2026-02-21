@@ -3,10 +3,12 @@ import os
 import time
 import base64
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, WebSocket, Request, HTTPException, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config.loader import (
     ConfigError,
@@ -32,6 +34,7 @@ from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
 from app.streaming import encode_delta_int8
 from app.storage.db import Database
+from app.storage.exporter import ExportManager
 
 app = FastAPI(title="4ham Spectrum Analysis")
 
@@ -39,6 +42,7 @@ _controller = SDRController()
 _scan_engine = ScanEngine(_controller)
 os.makedirs("data", exist_ok=True)
 _db = Database("data/events.sqlite")
+_export_manager = None
 _scan_state = {
     "state": "stopped",
     "device": None,
@@ -103,6 +107,12 @@ _ws_spectrum_fps = max(1.0, _env_float("WS_SPECTRUM_FPS", 5.0))
 _ws_send_timeout_s = max(0.01, _env_float("WS_SEND_TIMEOUT_S", 0.1))
 _ws_compress_spectrum = _env_bool("WS_COMPRESS_SPECTRUM", True)
 _ws_protocol_version = "1.1"
+_export_manager = ExportManager(
+    export_dir="data/exports",
+    db=_db,
+    max_files=_env_int("EXPORT_MAX_FILES", 50),
+    max_age_days=_env_int("EXPORT_MAX_AGE_DAYS", 7),
+)
 _agc_state = {}
 _last_agc_gain_db = None
 _spectrum_send_stats = {"sent": 0, "dropped": 0}
@@ -582,6 +592,64 @@ def export_events(
     )
 
 
+@app.post("/api/exports")
+def create_export(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    payload = payload or {}
+    format_name = str(payload.get("format", "csv")).lower()
+    if format_name not in {"csv", "json"}:
+        raise HTTPException(status_code=400, detail="Unsupported export format")
+
+    data = _db.get_events(
+        limit=int(payload.get("limit", 1000)),
+        offset=int(payload.get("offset", 0)),
+        band=payload.get("band"),
+        mode=payload.get("mode"),
+        callsign=payload.get("callsign"),
+        start=payload.get("start"),
+        end=payload.get("end"),
+    )
+    item = _export_manager.create_export(data, format_name=format_name)
+    return {
+        "status": "ok",
+        "export": {
+            **item,
+            "download_url": f"/api/exports/{item['id']}"
+        }
+    }
+
+
+@app.get("/api/exports")
+def list_exports(limit: int = 100, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    items = _export_manager.list_exports(limit=limit)
+    return {
+        "items": [
+            {
+                **item,
+                "download_url": f"/api/exports/{item['id']}"
+            }
+            for item in items
+        ]
+    }
+
+
+@app.get("/api/exports/{export_id}")
+def download_export(export_id: str, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    item = _export_manager.get_export(export_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Export not found")
+    path = item.get("path")
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Export file missing")
+    media = "application/json" if item.get("format") == "json" else "text/csv"
+    return FileResponse(path, media_type=media, filename=os.path.basename(path))
+
+
 @app.get("/api/scans")
 def scans(limit: int = 100, request: Request = None):
     if request:
@@ -846,3 +914,8 @@ async def ws_status(websocket: WebSocket):
         }
         await websocket.send_json(payload)
         await asyncio.sleep(1.0)
+
+
+_FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if _FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="frontend")

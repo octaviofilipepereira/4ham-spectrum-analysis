@@ -219,6 +219,40 @@ paths:
             text/csv:
               schema:
                 type: string
+  /api/exports:
+    get:
+      summary: List persisted exports
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Export list
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      summary: Create persisted export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Export created
+          content:
+            application/json:
+              schema:
+                type: object
   /api/events/stats:
     get:
       summary: Event stats by mode
