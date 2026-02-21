@@ -50,13 +50,12 @@ python -m pip install -r backend/requirements.txt
 
 ### 4) Run backend
 ```
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 ```
 
 ### 5) Open the UI
-Open the static frontend in your browser:
-- Open [frontend/index.html](../frontend/index.html)
-- Or serve it with any static server of your choice.
+Open the backend-served UI in your browser:
+- `http://localhost:8000/`
 
 ## Windows
 
@@ -77,11 +76,11 @@ python -m pip install -r backend\requirements.txt
 
 ### 4) Run backend
 ```
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 ```
 
 ### 5) Open the UI
-Open [frontend/index.html](../frontend/index.html) in your browser.
+Open `http://localhost:8000/` in your browser.
 
 ## Raspberry Pi
 

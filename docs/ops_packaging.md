@@ -9,7 +9,7 @@ Files:
 
 ### Install
 
-1. Ensure project virtualenv exists in `<project_dir>/.venv`.
+1. Ensure the project virtual environment exists in `<project_dir>/.venv`.
 2. Run:
 
 ```bash
