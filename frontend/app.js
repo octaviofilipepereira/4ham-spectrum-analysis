@@ -481,7 +481,7 @@ function renderEvents(items) {
       const lat = eventItem.lat !== null && eventItem.lat !== undefined ? eventItem.lat.toFixed(3) : "--";
       const lon = eventItem.lon !== null && eventItem.lon !== undefined ? eventItem.lon.toFixed(3) : "--";
       detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
-    } else if (eventItem.mode === "FT8" || eventItem.mode === "FT4") {
+    } else if (eventItem.mode === "FT8" || eventItem.mode === "FT4" || eventItem.mode === "SSB") {
       const grid = eventItem.grid || "-";
       const report = eventItem.report || "-";
       detail.textContent = `grid=${grid} report=${report}`;
