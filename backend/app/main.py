@@ -20,6 +20,7 @@ from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text, parse_ssb_asr_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
 from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
+from app.decoders.launchers import env_flag, resolve_command, start_process, stop_process
 from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
 from app.dsp.pipeline import (
     compute_fft_db,
@@ -72,7 +73,9 @@ _decoder_tasks = []
 _decoder_stop = asyncio.Event()
 _wsjtx_state = WsjtxState()
 _wsjtx_transport = None
+_wsjtx_process = None
 _kiss_task = None
+_direwolf_process = None
 _threshold_state = {}
 
 
@@ -121,14 +124,21 @@ _decoder_status = {
     "wsjtx_udp": {
         "enabled": False,
         "listen": None,
-        "last_packet_at": None
+        "last_packet_at": None,
+        "autostart": False,
+        "process_running": False,
+        "process_pid": None,
+        "last_error": None
     },
     "direwolf_kiss": {
         "enabled": False,
         "address": None,
         "connected": False,
         "last_packet_at": None,
-        "last_error": None
+        "last_error": None,
+        "autostart": False,
+        "process_running": False,
+        "process_pid": None
     },
     "files": {
         "wsjtx": None,
@@ -222,6 +232,30 @@ def _touch_decoder_source(source):
     _decoder_status["sources"][source] = datetime.now(timezone.utc).isoformat()
 
 
+async def _maybe_autostart_decoder_process(kind, enabled, flag_env, cmd_env, default_command, status_key):
+    if not enabled and not env_flag(flag_env, default=False):
+        return None
+
+    command = resolve_command(cmd_env, default_command)
+    _decoder_status[status_key]["autostart"] = True
+    if not command:
+        _decoder_status[status_key]["last_error"] = f"{kind}_autostart_missing_command"
+        return None
+
+    try:
+        process = await start_process(command)
+    except Exception as exc:
+        _decoder_status[status_key]["last_error"] = f"{kind}_autostart_failed {exc}"
+        _log(f"{kind}_autostart_failed {exc}")
+        return None
+
+    _decoder_status[status_key]["process_running"] = bool(process and process.returncode is None)
+    _decoder_status[status_key]["process_pid"] = process.pid if process else None
+    _decoder_status[status_key]["last_error"] = None
+    _log(f"{kind}_autostart_ok pid={process.pid if process else 'na'}")
+    return process
+
+
 def _start_decoder_watch(kind, path, parser, default_mode):
     if not path:
         return
@@ -259,6 +293,15 @@ async def on_startup():
         listen_addr = describe_wsjtx_udp()
         _decoder_status["wsjtx_udp"].update({"enabled": True, "listen": listen_addr})
         _log(f"wsjtx_udp_listen {listen_addr}")
+    global _wsjtx_process
+    _wsjtx_process = await _maybe_autostart_decoder_process(
+        kind="wsjtx",
+        enabled=bool(describe_wsjtx_udp()),
+        flag_env="WSJTX_AUTOSTART",
+        cmd_env="WSJTX_CMD",
+        default_command="wsjtx",
+        status_key="wsjtx_udp"
+    )
     global _kiss_task
     _kiss_task = asyncio.create_task(
         kiss_loop(_handle_kiss_event, _decoder_stop, logger=_log, status_cb=_handle_kiss_status)
@@ -267,6 +310,15 @@ async def on_startup():
     if kiss_addr:
         _decoder_status["direwolf_kiss"].update({"enabled": True, "address": kiss_addr})
         _log(f"direwolf_kiss_listen {kiss_addr}")
+    global _direwolf_process
+    _direwolf_process = await _maybe_autostart_decoder_process(
+        kind="direwolf",
+        enabled=bool(kiss_addr),
+        flag_env="DIREWOLF_AUTOSTART",
+        cmd_env="DIREWOLF_CMD",
+        default_command="direwolf -t 0 -p",
+        status_key="direwolf_kiss"
+    )
 
 
 @app.on_event("shutdown")
@@ -279,6 +331,10 @@ async def on_shutdown():
         _wsjtx_transport.close()
     if _kiss_task:
         _kiss_task.cancel()
+    if _wsjtx_process:
+        await stop_process(_wsjtx_process)
+    if _direwolf_process:
+        await stop_process(_direwolf_process)
 
 
 @app.get("/api/health")
@@ -564,6 +620,15 @@ def _handle_kiss_status(event, detail):
         _decoder_status["direwolf_kiss"]["connected"] = False
     elif event == "error":
         _decoder_status["direwolf_kiss"]["last_error"] = detail
+
+
+def _refresh_decoder_process_status():
+    if _wsjtx_process:
+        _decoder_status["wsjtx_udp"]["process_running"] = _wsjtx_process.returncode is None
+        _decoder_status["wsjtx_udp"]["process_pid"] = _wsjtx_process.pid
+    if _direwolf_process:
+        _decoder_status["direwolf_kiss"]["process_running"] = _direwolf_process.returncode is None
+        _decoder_status["direwolf_kiss"]["process_pid"] = _direwolf_process.pid
 
 
 @app.get("/api/export")
