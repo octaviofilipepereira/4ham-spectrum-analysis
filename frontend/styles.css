@@ -40,6 +40,8 @@ body::before {
 .app {
   position: relative;
   z-index: 1;
+  padding-left: clamp(12px, 2vw, 28px);
+  padding-right: clamp(12px, 2vw, 28px);
 }
 
 .kicker {
@@ -190,6 +192,11 @@ h1,
 
 .waterfall-mode .form-select {
   min-width: 110px;
+}
+
+#waterfallFullscreenBtn {
+  white-space: nowrap;
+  min-width: 130px;
 }
 
 .waterfall canvas {
@@ -409,6 +416,8 @@ h1,
   .app {
     padding-top: 1rem;
     padding-bottom: 2.5rem;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   h1 {

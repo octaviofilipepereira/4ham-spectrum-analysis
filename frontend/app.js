@@ -15,6 +15,7 @@ const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
 const waterfallModeSelect = document.getElementById("waterfallMode");
 const waterfallModeBadge = document.getElementById("waterfallModeBadge");
+const waterfallFullscreenBtn = document.getElementById("waterfallFullscreenBtn");
 const canvas = document.getElementById("waterfallCanvas");
 let ctx = null;
 let webglWaterfall = null;
@@ -120,6 +121,14 @@ function applyWaterfallModeUI() {
   localStorage.setItem(WATERFALL_MODE_KEY, waterfallMode);
 }
 
+function updateFullscreenButtonState() {
+  if (!waterfallFullscreenBtn) {
+    return;
+  }
+  const isFullscreen = Boolean(document.fullscreenElement);
+  waterfallFullscreenBtn.textContent = isFullscreen ? "Exit fullscreen" : "Fullscreen";
+}
+
 function setWaterfallMode(nextMode) {
   waterfallMode = nextMode === "fake" ? "fake" : "real";
   applyWaterfallModeUI();
@@ -132,6 +141,7 @@ if (copyrightYearEl) {
 }
 
 applyWaterfallModeUI();
+updateFullscreenButtonState();
 
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
@@ -1136,6 +1146,22 @@ if (waterfallModeSelect) {
     setWaterfallMode(event.target.value);
   });
 }
+
+if (waterfallFullscreenBtn) {
+  waterfallFullscreenBtn.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      showToastError("Fullscreen unavailable");
+    }
+  });
+}
+
+document.addEventListener("fullscreenchange", updateFullscreenButtonState);
 
 connectSpectrum();
 ensureWaterfallFallback();
