@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 16:27:19 UTC
 -->
 
 # Installation Manual
@@ -215,6 +215,19 @@ curl http://localhost:8000/api/health
 python backend/cli.py --start --band 20m --start-hz 14000000 --end-hz 14350000
 python backend/cli.py --stop
 ```
+
+### Waterfall tooltip (mode labels)
+- Open the web UI and ensure scan is running so mode labels (e.g., FT8/CW/SSB) appear over the waterfall.
+- Hover a mode label to see tooltip details:
+  - mode
+  - frequency (MHz)
+  - callsign
+  - last seen time
+  - SNR
+- Callsign resolution policy:
+  - first: nearest-frequency match from recent callsign events
+  - fallback: most recently detected callsign when no local frequency match exists
+- If the browser still shows stale tooltip behavior after updates, do a hard refresh (`Ctrl+Shift+R`).
 
 ## Troubleshooting
 - If SoapySDR devices are not found, verify drivers and run `SoapySDRUtil --find`.

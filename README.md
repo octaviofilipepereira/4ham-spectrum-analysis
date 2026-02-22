@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 01:21:48 UTC
+Last update: 2026-02-22 16:27:19 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -57,6 +57,16 @@ curl -X POST http://127.0.0.1:8000/api/scan/stop
 For full platform-specific installation and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
+
+### v0.2.6
+- Added waterfall mode-label hover tooltip with frequency, latest callsign, last-seen time, and SNR.
+- Callsign in tooltip is resolved by nearest frequency match in cache; when no local match exists, it falls back to the most recent detected callsign.
+- Improved operator feedback with immediate custom tooltip rendering on hover.
+
+### v0.2.5
+- Removed Fake waterfall mode from the UI and runtime flow; waterfall now runs in LIVE mode only.
+- Replaced simulated waterfall fallback with a clear generic status message when live spectrum frames are unavailable.
+- Improved waterfall no-data communication with a larger, centered, high-visibility message for operators.
 
 ### v0.2.4
 - Added quick band switching row near Start scanning for faster operator workflow.

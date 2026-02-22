@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 01:19:16 UTC
+Last update: 2026-02-22 16:27:19 UTC
 -->
 
 # Installation Guide
@@ -68,6 +68,13 @@ Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 - To auto-start decoder processes at backend startup, install binaries and set:
 	- `WSJTX_AUTOSTART=1`, `WSJTX_CMD="wsjtx"`
 	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
+
+## Waterfall tooltip
+- Hovering mode labels (FT8/CW/SSB) in the waterfall shows mode, frequency, callsign, last-seen time, and SNR.
+- Callsign resolution order:
+	1. nearest frequency match from recent callsign events
+	2. fallback to the most recent detected callsign if no local match exists
+- If UI behavior looks stale after an update, force reload with `Ctrl+Shift+R`.
 
 ### Decoder binaries (Mint/Ubuntu)
 ```

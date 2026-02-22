@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:53:18 UTC
+Last update: 2026-02-22 16:27:19 UTC
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Space+Grotesk:wght@400;600;700&display=swap");
@@ -224,10 +224,10 @@ h1,
 
 .waterfall {
   margin-top: 12px;
-  padding: 16px;
+  padding: 44px 16px 16px;
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(12, 18, 34, 0.9), rgba(10, 14, 26, 0.95));
-  min-height: 180px;
+  min-height: 220px;
   color: var(--muted);
   display: flex;
   align-items: center;
@@ -272,6 +272,7 @@ h1,
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .waterfall-mode .form-label {
@@ -287,10 +288,102 @@ h1,
   min-width: 130px;
 }
 
+#waterfallExplorerToggle,
+#waterfallResetViewBtn {
+  min-width: 120px;
+}
+
+.waterfall-zoom {
+  width: 108px;
+}
+
+.waterfall.is-draggable {
+  cursor: grab;
+}
+
+.waterfall.is-dragging {
+  cursor: grabbing;
+}
+
 .waterfall canvas {
   width: 100%;
-  height: 200px;
+  height: 230px;
   border-radius: 10px;
+}
+
+.waterfall-ruler {
+  position: absolute;
+  inset: 8px 16px auto 16px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 3;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.waterfall-ruler__tick {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.waterfall-ruler__label {
+  position: absolute;
+  bottom: 12px;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.waterfall-mode-overlay {
+  position: absolute;
+  inset: 56px 16px 50px 16px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.waterfall-mode-label {
+  position: absolute;
+  top: var(--lane-top, 0px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+  cursor: help;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 12, 24, 0.72);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.waterfall-hover-tooltip {
+  position: absolute;
+  z-index: 4;
+  transform: translate(10px, -110%);
+  max-width: min(360px, calc(100% - 24px));
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(6, 10, 20, 0.95);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.waterfall-hover-tooltip.is-hidden {
+  display: none;
 }
 
 .waterfall__status {
@@ -299,6 +392,22 @@ h1,
   font-size: 0.85rem;
   color: var(--muted);
   margin: 0;
+}
+
+.waterfall__status.is-generic {
+  inset: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.06rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text);
+  background: rgba(8, 12, 24, 0.62);
+  border: 1px dashed rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+  padding: 12px 14px;
 }
 
 .events {
@@ -311,13 +420,13 @@ h1,
 }
 
 .event-item {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
-  font-size: 0.9rem;
+  font-size: 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.06);
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 
 .event-item__meta {
@@ -329,7 +438,7 @@ h1,
 
 .event-item__time {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 1.08rem;
 }
 
 .events--fixed {
@@ -359,26 +468,46 @@ h1,
   margin-top: 0.35rem;
 }
 
+.events-pager .btn {
+  min-height: 42px;
+  min-width: 88px;
+  padding: 0.42rem 0.9rem;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+#eventsPageInfo {
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+#eventsPrev,
+#eventsNext {
+  letter-spacing: 0.01em;
+}
+
 .event-item__body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  font-size: 1.28rem;
 }
 
 .event-item__muted {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 1.12rem;
 }
 
 .event-item__call {
   color: var(--accent-2);
   font-weight: 600;
+  font-size: 1.22rem;
 }
 
 .event-item__detail {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 1.12rem;
 }
 
 .event-empty {
@@ -387,6 +516,7 @@ h1,
   background: rgba(255, 255, 255, 0.03);
   border: 1px dashed rgba(255, 255, 255, 0.1);
   color: var(--muted);
+  font-size: 1.14rem;
 }
 
 .summary {

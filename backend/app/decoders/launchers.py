@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:34:50 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 import asyncio
 import os
@@ -24,10 +24,14 @@ def resolve_command(env_name, default_command):
 async def start_process(command):
     if not command:
         return None
+    env = dict(os.environ)
+    env["FOURHAM_MANAGED"] = "1"
+    env["FOURHAM_MANAGED_BY"] = "4ham-spectrum-analysis"
     process = await asyncio.create_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
+        env=env,
     )
     return process
 

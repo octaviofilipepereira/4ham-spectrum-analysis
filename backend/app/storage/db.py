@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:34:50 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 import sqlite3
 import json
@@ -322,7 +322,7 @@ class Database:
         for row in self.conn.execute(
             """
             SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
-                   mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
+                 bandwidth_hz, mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
                    device
             FROM occupancy_events
             WHERE 1=1 {band_filter} {time_filter}
@@ -421,6 +421,78 @@ class Database:
             stats[mode] = stats.get(mode, 0) + int(row["total"])
 
         return stats
+
+    def purge_invalid_events(self):
+        occupancy_where_clause = """
+        (timestamp IS NULL OR TRIM(CAST(timestamp AS TEXT)) = '')
+        OR (
+            (frequency_hz IS NULL OR CAST(frequency_hz AS REAL) <= 0)
+            AND (band IS NULL OR TRIM(CAST(band AS TEXT)) = '' OR LOWER(TRIM(CAST(band AS TEXT))) = 'null')
+        )
+        OR (
+            (scan_id IS NULL)
+            AND (mode IS NULL OR TRIM(CAST(mode AS TEXT)) = '' OR LOWER(TRIM(CAST(mode AS TEXT))) = 'unknown')
+            AND COALESCE(CAST(occupied AS INTEGER), 0) = 0
+            AND (snr_db IS NULL)
+            AND (power_dbm IS NULL)
+            AND (frequency_hz IS NULL OR CAST(frequency_hz AS REAL) <= 0)
+        )
+        """
+        callsign_where_clause = """
+        (timestamp IS NULL OR TRIM(CAST(timestamp AS TEXT)) = '')
+        OR (
+            callsign IS NULL
+            OR TRIM(CAST(callsign AS TEXT)) = ''
+            OR LOWER(TRIM(CAST(callsign AS TEXT))) IN ('unknown', 'null', 'n/a', '?')
+        )
+        OR (
+            (frequency_hz IS NULL OR CAST(frequency_hz AS REAL) <= 0)
+            AND (band IS NULL OR TRIM(CAST(band AS TEXT)) = '' OR LOWER(TRIM(CAST(band AS TEXT))) = 'null')
+        )
+        """
+
+        occ_before = self.conn.execute(
+            f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
+        ).fetchone()[0]
+        occ_cursor = self.conn.execute(
+            f"DELETE FROM occupancy_events WHERE {occupancy_where_clause}"
+        )
+        occ_deleted = occ_cursor.rowcount
+
+        calls_before = self.conn.execute(
+            f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
+        ).fetchone()[0]
+        calls_cursor = self.conn.execute(
+            f"DELETE FROM callsign_events WHERE {callsign_where_clause}"
+        )
+        calls_deleted = calls_cursor.rowcount
+
+        self.conn.commit()
+
+        occ_after = self.conn.execute(
+            f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
+        ).fetchone()[0]
+        calls_after = self.conn.execute(
+            f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
+        ).fetchone()[0]
+
+        return {
+            "before": int(occ_before) + int(calls_before),
+            "deleted": int(occ_deleted) + int(calls_deleted),
+            "after": int(occ_after) + int(calls_after),
+            "details": {
+                "occupancy": {
+                    "before": int(occ_before),
+                    "deleted": int(occ_deleted),
+                    "after": int(occ_after),
+                },
+                "callsign": {
+                    "before": int(calls_before),
+                    "deleted": int(calls_deleted),
+                    "after": int(calls_after),
+                },
+            },
+        }
 
     def clear_configuration(self):
         self.conn.execute("DELETE FROM settings")

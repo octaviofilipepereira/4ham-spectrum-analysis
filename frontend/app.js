@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 01:07:17 UTC
+Last update: 2026-02-22 16:27:19 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -20,9 +20,13 @@ const eventsSearchResultsEl = document.getElementById("eventsSearchResults");
 const copyrightYearEl = document.getElementById("copyrightYear");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
-const waterfallModeSelect = document.getElementById("waterfallMode");
 const waterfallModeBadge = document.getElementById("waterfallModeBadge");
 const waterfallFullscreenBtn = document.getElementById("waterfallFullscreenBtn");
+const waterfallExplorerToggle = document.getElementById("waterfallExplorerToggle");
+const waterfallZoomInput = document.getElementById("waterfallZoom");
+const waterfallResetViewBtn = document.getElementById("waterfallResetViewBtn");
+const waterfallModeOverlay = document.getElementById("waterfallModeOverlay");
+const waterfallRuler = document.getElementById("waterfallRuler");
 const canvas = document.getElementById("waterfallCanvas");
 let ctx = null;
 let webglWaterfall = null;
@@ -48,6 +52,7 @@ const testConfigBtn = document.getElementById("testConfig");
 const refreshDevicesBtn = document.getElementById("refreshDevices");
 const adminDeviceSetupBtn = document.getElementById("adminDeviceSetup");
 const adminAudioAutoDetectBtn = document.getElementById("adminAudioAutoDetect");
+const purgeInvalidEventsBtn = document.getElementById("purgeInvalidEvents");
 const resetDefaultsBtn = document.getElementById("resetDefaults");
 const resetAllConfigBtn = document.getElementById("resetAllConfig");
 const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
@@ -307,35 +312,602 @@ let spectrumFallbackTimer = null;
 let spectrumWs = null;
 let isScanRunning = false;
 let scanActionInFlight = false;
-const WATERFALL_MODE_KEY = "waterfallMode";
 const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
-let waterfallMode = localStorage.getItem(WATERFALL_MODE_KEY) === "fake" ? "fake" : "real";
 let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
+const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR device connection and scan status.";
+const WATERFALL_SIMULATE_MODE_MARKERS = true;
+const WATERFALL_MARKER_TTL_MS = 12000;
+const waterfallMarkerCache = new Map();
+const WATERFALL_CALLSIGN_TTL_MS = 15 * 60 * 1000;
+const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 25000;
+const waterfallCallsignCache = new Map();
+let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
+let waterfallHoverTooltip = null;
+const WATERFALL_EXPLORER_KEY = "waterfallExplorerEnabled";
+const WATERFALL_EXPLORER_ZOOM_KEY = "waterfallExplorerZoom";
+const WATERFALL_SEGMENT_COUNT = 12;
+let waterfallExplorerEnabled = localStorage.getItem(WATERFALL_EXPLORER_KEY) !== "0";
+let waterfallExplorerZoom = Number(localStorage.getItem(WATERFALL_EXPLORER_ZOOM_KEY) || 1);
+if (!Number.isFinite(waterfallExplorerZoom)) {
+  waterfallExplorerZoom = 1;
+}
+waterfallExplorerZoom = Math.max(1, Math.min(16, Math.round(waterfallExplorerZoom)));
+let waterfallExplorerPan = 0;
+let waterfallDragActive = false;
+let waterfallDragStartX = 0;
+let waterfallDragStartPan = 0;
+let lastSpectrumFrame = null;
 
 if (showNonSdrDevicesToggle) {
   showNonSdrDevicesToggle.checked = showNonSdrDevices;
-}
-
-function isFakeSpectrumEnabled() {
-  return waterfallMode === "fake";
 }
 
 function updateWaterfallModeBadge() {
   if (!waterfallModeBadge) {
     return;
   }
-  const fakeMode = isFakeSpectrumEnabled();
-  waterfallModeBadge.textContent = fakeMode ? "FAKE" : "LIVE";
-  waterfallModeBadge.classList.toggle("is-fake", fakeMode);
-  waterfallModeBadge.classList.toggle("is-live", !fakeMode);
+  waterfallModeBadge.textContent = "LIVE";
+  waterfallModeBadge.classList.remove("is-fake");
+  waterfallModeBadge.classList.add("is-live");
 }
 
-function applyWaterfallModeUI() {
-  if (waterfallModeSelect) {
-    waterfallModeSelect.value = waterfallMode;
+function setWaterfallGenericStatus(message = WATERFALL_GENERIC_STATUS) {
+  if (!waterfallStatus) {
+    return;
   }
-  updateWaterfallModeBadge();
-  localStorage.setItem(WATERFALL_MODE_KEY, waterfallMode);
+  waterfallStatus.textContent = message;
+  waterfallStatus.classList.add("is-generic");
+  if (waterfallRuler) {
+    waterfallRuler.innerHTML = "";
+  }
+  if (waterfallModeOverlay) {
+    waterfallModeOverlay.innerHTML = "";
+  }
+}
+
+function clearWaterfallGenericStatus() {
+  if (!waterfallStatus) {
+    return;
+  }
+  waterfallStatus.classList.remove("is-generic");
+}
+
+function applyWaterfallExplorerUi() {
+  if (waterfallExplorerToggle) {
+    waterfallExplorerToggle.textContent = `Explorer SIM: ${waterfallExplorerEnabled ? "ON" : "OFF"}`;
+  }
+  if (waterfallZoomInput) {
+    waterfallZoomInput.value = String(waterfallExplorerZoom);
+    waterfallZoomInput.disabled = !waterfallExplorerEnabled;
+  }
+  if (waterfallResetViewBtn) {
+    waterfallResetViewBtn.disabled = !waterfallExplorerEnabled;
+  }
+  if (waterfallEl) {
+    waterfallEl.classList.toggle("is-draggable", waterfallExplorerEnabled);
+    waterfallEl.classList.remove("is-dragging");
+  }
+}
+
+function buildSegmentedSpectrumSimulation(frame) {
+  const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
+  if (!base.length) {
+    return [];
+  }
+  const now = Date.now() / 1000;
+  const bins = base.length;
+  const stitched = [];
+  for (let segmentIndex = 0; segmentIndex < WATERFALL_SEGMENT_COUNT; segmentIndex += 1) {
+    const shift = Math.floor(((segmentIndex * 0.67) % 1) * bins);
+    const gain = 0.9 + 0.25 * Math.sin(now * 0.2 + segmentIndex * 0.6);
+    for (let idx = 0; idx < bins; idx += 1) {
+      const source = base[(idx + shift) % bins];
+      const ripple = Math.sin((idx / bins) * Math.PI * 6 + segmentIndex + now * 0.45) * 2.2;
+      stitched.push((source * gain) + ripple);
+    }
+  }
+  return stitched;
+}
+
+function getWaterfallViewport(frame) {
+  const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
+  const centerHz = Number(frame?.center_hz || 0);
+  const spanHz = Number(frame?.span_hz || 0);
+  const scanStartHz = Number(frame?.scan_start_hz || 0);
+  const scanEndHz = Number(frame?.scan_end_hz || 0);
+  const hasScanRange = Number.isFinite(scanStartHz)
+    && Number.isFinite(scanEndHz)
+    && scanStartHz > 0
+    && scanEndHz > scanStartHz;
+  if (!base.length || spanHz <= 0) {
+    return {
+      fftDb: base,
+      startHz: centerHz - (spanHz / 2),
+      endHz: centerHz + (spanHz / 2),
+      visibleSpanHz: spanHz,
+      simulated: false
+    };
+  }
+  if (!waterfallExplorerEnabled) {
+    return {
+      fftDb: base,
+      startHz: centerHz - (spanHz / 2),
+      endHz: centerHz + (spanHz / 2),
+      visibleSpanHz: spanHz,
+      simulated: false
+    };
+  }
+
+  const stitched = buildSegmentedSpectrumSimulation(frame);
+  const zoom = Math.max(1, waterfallExplorerZoom);
+  const totalBins = stitched.length;
+  const visibleBins = Math.max(256, Math.floor(totalBins / zoom));
+  const maxPan = Math.max(0, 1 - (1 / zoom));
+  waterfallExplorerPan = Math.max(0, Math.min(maxPan, waterfallExplorerPan));
+  const startBin = Math.max(0, Math.min(totalBins - visibleBins, Math.round(waterfallExplorerPan * totalBins)));
+  const fftDb = stitched.slice(startBin, startBin + visibleBins);
+
+  const fullSpanHz = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
+  const visibleSpanHz = fullSpanHz / zoom;
+  const fullStartHz = hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2));
+  const startHz = fullStartHz + (waterfallExplorerPan * fullSpanHz);
+  const endHz = startHz + visibleSpanHz;
+
+  return {
+    fftDb,
+    startHz,
+    endHz,
+    visibleSpanHz,
+    simulated: true
+  };
+}
+
+function clearWaterfallFrame() {
+  row = 0;
+  if (webglWaterfall) {
+    resizeCanvas();
+    return;
+  }
+  if (!ctx) {
+    ctx = canvas.getContext("2d");
+  }
+  if (!ctx) {
+    return;
+  }
+  const width = canvas.width / window.devicePixelRatio;
+  const height = canvas.height / window.devicePixelRatio;
+  ctx.clearRect(0, 0, width, height);
+}
+
+function normalizeModeLabel(mode) {
+  const text = String(mode || "").trim().toUpperCase();
+  return text || "SIG";
+}
+
+function formatRulerFrequencyLabel(frequencyHz) {
+  const mhz = Number(frequencyHz) / 1_000_000;
+  if (!Number.isFinite(mhz)) {
+    return "-";
+  }
+  return `${mhz.toFixed(3)} MHz`;
+}
+
+function formatLastSeenTime(seenAtMs) {
+  const timestamp = Number(seenAtMs);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "-";
+  }
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) {
+    return "-";
+  }
+  return date.toLocaleTimeString();
+}
+
+function ensureWaterfallHoverTooltip() {
+  if (waterfallHoverTooltip || !waterfallEl) {
+    return waterfallHoverTooltip;
+  }
+  const tooltip = document.createElement("div");
+  tooltip.className = "waterfall-hover-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  tooltip.classList.add("is-hidden");
+  waterfallEl.appendChild(tooltip);
+  waterfallHoverTooltip = tooltip;
+  return waterfallHoverTooltip;
+}
+
+function hideWaterfallHoverTooltip() {
+  const tooltip = ensureWaterfallHoverTooltip();
+  if (!tooltip) {
+    return;
+  }
+  tooltip.classList.add("is-hidden");
+}
+
+function showWaterfallHoverTooltip(text, clientX, clientY) {
+  const tooltip = ensureWaterfallHoverTooltip();
+  if (!tooltip || !text) {
+    return;
+  }
+  tooltip.textContent = text;
+  const rect = waterfallEl.getBoundingClientRect();
+  const x = Math.max(10, Math.min(rect.width - 10, clientX - rect.left));
+  const y = Math.max(10, Math.min(rect.height - 10, clientY - rect.top));
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+  tooltip.classList.remove("is-hidden");
+}
+
+function computeRulerStepHz(spanHz, bandName = "") {
+  const band = String(bandName || "").trim();
+  if (band === "12m" || band === "17m" || band === "160m") {
+    return 50_000;
+  }
+  return 100_000;
+}
+
+function renderWaterfallRuler(startHz, endHz) {
+  if (!waterfallRuler) {
+    return;
+  }
+  const start = Number(startHz);
+  const end = Number(endHz);
+  const span = end - start;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || span <= 0) {
+    waterfallRuler.innerHTML = "";
+    return;
+  }
+
+  const stepHz = computeRulerStepHz(span, bandSelect?.value || "20m");
+  const selectedBandRange = getScanRangeForBand(bandSelect?.value || "20m");
+  const gridOriginHz = Number(selectedBandRange?.start_hz || start);
+  const firstTick = gridOriginHz + (Math.ceil((start - gridOriginHz) / stepHz) * stepHz);
+  const maxTicks = 500;
+  let count = 0;
+  waterfallRuler.innerHTML = "";
+
+  for (let tickHz = firstTick; tickHz <= end && count < maxTicks; tickHz += stepHz) {
+    const normalized = (tickHz - start) / span;
+    if (normalized < 0 || normalized > 1) {
+      continue;
+    }
+    const left = `${(normalized * 100).toFixed(2)}%`;
+
+    const tick = document.createElement("span");
+    tick.className = "waterfall-ruler__tick";
+    tick.style.left = left;
+
+    const label = document.createElement("span");
+    label.className = "waterfall-ruler__label";
+    label.style.left = left;
+    label.textContent = formatRulerFrequencyLabel(tickHz);
+
+    waterfallRuler.appendChild(tick);
+    waterfallRuler.appendChild(label);
+    count += 1;
+  }
+}
+
+function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, stableRangeEndHz = null) {
+  const isValidRange = (startValue, endValue) => {
+    const start = Number(startValue);
+    const end = Number(endValue);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      return false;
+    }
+    const center = (start + end) / 2;
+    return center > 1_000_000;
+  };
+
+  if (isValidRange(stableRangeStartHz, stableRangeEndHz)) {
+    if (Boolean(viewport?.simulated) && isValidRange(viewport?.startHz, viewport?.endHz)) {
+      return { startHz: Number(viewport.startHz), endHz: Number(viewport.endHz) };
+    }
+    return { startHz: Number(stableRangeStartHz), endHz: Number(stableRangeEndHz) };
+  }
+  if (isValidRange(frame?.scan_start_hz, frame?.scan_end_hz)) {
+    return { startHz: Number(frame.scan_start_hz), endHz: Number(frame.scan_end_hz) };
+  }
+  if (isValidRange(viewport?.startHz, viewport?.endHz)) {
+    return { startHz: Number(viewport.startHz), endHz: Number(viewport.endHz) };
+  }
+  const bandRange = getScanRangeForBand(bandSelect?.value || "20m");
+  return {
+    startHz: Number(bandRange.start_hz),
+    endHz: Number(bandRange.end_hz)
+  };
+}
+
+function buildStableWaterfallMarkers(frame) {
+  const scanStartHz = Number(frame?.scan_start_hz || 0);
+  const scanEndHz = Number(frame?.scan_end_hz || 0);
+  const hasScanRange = Number.isFinite(scanStartHz)
+    && Number.isFinite(scanEndHz)
+    && scanStartHz > 0
+    && scanEndHz > scanStartHz;
+  const defaultStartHz = Number(frame?.center_hz || 0) - (Number(frame?.span_hz || 0) / 2);
+  const defaultEndHz = Number(frame?.center_hz || 0) + (Number(frame?.span_hz || 0) / 2);
+  const rangeStartHz = hasScanRange ? scanStartHz : defaultStartHz;
+  const rangeEndHz = hasScanRange ? scanEndHz : defaultEndHz;
+  const now = Date.now();
+
+  if (Array.isArray(frame?.mode_markers)) {
+    frame.mode_markers.forEach((marker) => {
+      const markerMode = normalizeModeLabel(marker?.mode);
+      if (markerMode === "UNKNOWN" || markerMode === "SIG") {
+        return;
+      }
+      const markerFreq = Number(marker?.frequency_hz);
+      const markerOffset = Number(marker?.offset_hz ?? 0);
+      const inferredFreq = Number(frame?.center_hz || 0) + markerOffset;
+      const frequencyHz = Number.isFinite(markerFreq) && markerFreq > 0 ? markerFreq : inferredFreq;
+      if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) {
+        return;
+      }
+      if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
+        return;
+      }
+      const key = `${Math.round(frequencyHz / 50) * 50}`;
+      waterfallMarkerCache.set(key, {
+        frequency_hz: frequencyHz,
+        mode: markerMode,
+        snr_db: Number(marker?.snr_db),
+        seen_at: now
+      });
+    });
+  }
+
+  for (const [key, marker] of waterfallMarkerCache.entries()) {
+    if ((now - Number(marker?.seen_at || 0)) > WATERFALL_MARKER_TTL_MS) {
+      waterfallMarkerCache.delete(key);
+    }
+  }
+
+  const markers = Array.from(waterfallMarkerCache.values())
+    .filter((marker) => {
+      const frequencyHz = Number(marker?.frequency_hz);
+      return Number.isFinite(frequencyHz)
+        && frequencyHz >= rangeStartHz
+        && frequencyHz <= rangeEndHz;
+    })
+    .sort((left, right) => Number(left.frequency_hz) - Number(right.frequency_hz));
+
+  return {
+    markers,
+    rangeStartHz,
+    rangeEndHz
+  };
+}
+
+function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, rangeEndHz = null) {
+  if (!waterfallModeOverlay) {
+    return;
+  }
+  const span = Number(spanHz || 0);
+  if (!Array.isArray(modeMarkers) || !modeMarkers.length || span <= 0) {
+    waterfallModeOverlay.innerHTML = "";
+    hideWaterfallHoverTooltip();
+    return;
+  }
+
+  waterfallModeOverlay.innerHTML = "";
+  hideWaterfallHoverTooltip();
+  const sortedMarkers = modeMarkers
+    .slice()
+    .sort((left, right) => Number(left?.offset_hz || 0) - Number(right?.offset_hz || 0));
+  const lanes = [[], [], []];
+
+  const hasRange = Number.isFinite(rangeStartHz)
+    && Number.isFinite(rangeEndHz)
+    && Number(rangeEndHz) > Number(rangeStartHz);
+  const safeRangeStartHz = hasRange ? Number(rangeStartHz) : null;
+  const safeRangeEndHz = hasRange ? Number(rangeEndHz) : null;
+
+  sortedMarkers.forEach((marker) => {
+    const offsetHz = Number(marker?.offset_hz ?? 0);
+    const markerFreq = Number(marker?.frequency_hz);
+    let normalized = 0.5;
+    if (hasRange && Number.isFinite(markerFreq)) {
+      normalized = (markerFreq - safeRangeStartHz) / (safeRangeEndHz - safeRangeStartHz);
+    } else {
+      normalized = (offsetHz + span / 2) / span;
+    }
+    normalized = Math.max(0, Math.min(1, normalized));
+    let laneIndex = 0;
+    const minDistance = 0.06;
+    for (let idx = 0; idx < lanes.length; idx += 1) {
+      const lane = lanes[idx];
+      const tooClose = lane.some((existingPos) => Math.abs(existingPos - normalized) < minDistance);
+      if (!tooClose) {
+        laneIndex = idx;
+        break;
+      }
+    }
+    lanes[laneIndex].push(normalized);
+
+    const label = document.createElement("span");
+    label.className = "waterfall-mode-label";
+    label.style.left = `${(normalized * 100).toFixed(2)}%`;
+    label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
+    label.textContent = normalizeModeLabel(marker?.mode);
+    const snr = Number(marker?.snr_db);
+    const callsignMatch = findLatestCallsignForFrequency(markerFreq);
+    const markerCallsign = callsignMatch?.callsign || "";
+    const markerSeenAtText = formatLastSeenTime(callsignMatch?.seenAtMs);
+    const freqText = Number.isFinite(markerFreq) && markerFreq > 0
+      ? ` | ${(markerFreq / 1_000_000).toFixed(3)} MHz`
+      : "";
+    const callsignText = ` | callsign ${markerCallsign || "-"}`;
+    const seenAtText = ` | last ${markerSeenAtText}`;
+    const tooltipText = Number.isFinite(snr)
+      ? `${label.textContent}${freqText}${callsignText}${seenAtText} | ${snr.toFixed(1)} dB`
+      : `${label.textContent}${freqText}${callsignText}${seenAtText}`;
+    label.title = tooltipText;
+    label.setAttribute("aria-label", tooltipText);
+    label.addEventListener("mouseenter", (event) => {
+      showWaterfallHoverTooltip(tooltipText, event.clientX, event.clientY);
+    });
+    label.addEventListener("mousemove", (event) => {
+      showWaterfallHoverTooltip(tooltipText, event.clientX, event.clientY);
+    });
+    label.addEventListener("mouseleave", () => {
+      hideWaterfallHoverTooltip();
+    });
+    waterfallModeOverlay.appendChild(label);
+  });
+}
+
+function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now()) {
+  const normalizedCallsign = String(callsign || "").trim().toUpperCase();
+  const numericFrequency = Number(frequencyHz);
+  if (!normalizedCallsign || !isValidCallsign(normalizedCallsign)) {
+    return;
+  }
+  if (!Number.isFinite(numericFrequency) || numericFrequency <= 0) {
+    return;
+  }
+  const bucketHz = Math.round(numericFrequency / 50) * 50;
+  waterfallCallsignCache.set(String(bucketHz), {
+    callsign: normalizedCallsign,
+    frequency_hz: numericFrequency,
+    seen_at: seenAtMs
+  });
+}
+
+function cacheLatestCallsign(callsign, seenAtMs = Date.now()) {
+  const normalizedCallsign = String(callsign || "").trim().toUpperCase();
+  const timestampMs = Number(seenAtMs);
+  if (!normalizedCallsign || !isValidCallsign(normalizedCallsign)) {
+    return;
+  }
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
+    return;
+  }
+  const currentSeenAt = Number(waterfallLatestCallsign?.seenAtMs || 0);
+  if (timestampMs >= currentSeenAt) {
+    waterfallLatestCallsign = { callsign: normalizedCallsign, seenAtMs: timestampMs };
+  }
+}
+
+function cleanupWaterfallCallsignCache() {
+  const now = Date.now();
+  for (const [key, entry] of waterfallCallsignCache.entries()) {
+    if ((now - Number(entry?.seen_at || 0)) > WATERFALL_CALLSIGN_TTL_MS) {
+      waterfallCallsignCache.delete(key);
+    }
+  }
+}
+
+function updateCallsignCacheFromEvent(eventItem) {
+  if (!eventItem || typeof eventItem !== "object") {
+    return;
+  }
+  const callsign = String(eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "").trim().toUpperCase();
+  const frequencyHz = Number(eventItem.frequency_hz);
+  const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
+  const seenAtMs = Number.isFinite(timestampMs) ? timestampMs : Date.now();
+  cacheLatestCallsign(callsign, seenAtMs);
+  cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs);
+  cleanupWaterfallCallsignCache();
+}
+
+function updateCallsignCacheFromEvents(items) {
+  if (!Array.isArray(items)) {
+    return;
+  }
+  items.forEach((eventItem) => updateCallsignCacheFromEvent(eventItem));
+}
+
+function findLatestCallsignForFrequency(frequencyHz) {
+  const targetFrequency = Number(frequencyHz);
+  cleanupWaterfallCallsignCache();
+
+  let bestCallsign = "";
+  let bestDeltaHz = Infinity;
+  let bestSeenAt = -Infinity;
+  let latestCallsign = "";
+  let latestSeenAt = -Infinity;
+
+  for (const entry of waterfallCallsignCache.values()) {
+    const entryFrequency = Number(entry?.frequency_hz);
+    if (!Number.isFinite(entryFrequency) || entryFrequency <= 0) {
+      continue;
+    }
+    const seenAt = Number(entry?.seen_at || 0);
+    const callsign = String(entry?.callsign || "");
+    if (callsign && seenAt > latestSeenAt) {
+      latestSeenAt = seenAt;
+      latestCallsign = callsign;
+    }
+    if (!Number.isFinite(targetFrequency) || targetFrequency <= 0) {
+      continue;
+    }
+    const deltaHz = Math.abs(entryFrequency - targetFrequency);
+    if (deltaHz > WATERFALL_CALLSIGN_MAX_DELTA_HZ) {
+      continue;
+    }
+    const isBetter = deltaHz < bestDeltaHz || (deltaHz === bestDeltaHz && seenAt > bestSeenAt);
+    if (!isBetter) {
+      continue;
+    }
+    bestDeltaHz = deltaHz;
+    bestSeenAt = seenAt;
+    bestCallsign = callsign;
+  }
+
+  if (bestCallsign) {
+    return { callsign: bestCallsign, seenAtMs: Number.isFinite(bestSeenAt) ? bestSeenAt : null };
+  }
+  if (latestCallsign) {
+    return {
+      callsign: latestCallsign,
+      seenAtMs: Number.isFinite(latestSeenAt) && latestSeenAt > 0 ? latestSeenAt : null,
+    };
+  }
+  return {
+    callsign: String(waterfallLatestCallsign?.callsign || ""),
+    seenAtMs: Number(waterfallLatestCallsign?.seenAtMs || 0) || null,
+  };
+}
+
+function buildSimulatedModeMarkers(spanHz, rangeStartHz = null, rangeEndHz = null) {
+  if (!WATERFALL_SIMULATE_MODE_MARKERS) {
+    return [];
+  }
+  const nextSpanHz = Number(spanHz || 0);
+  if (nextSpanHz <= 0) {
+    return [];
+  }
+  const hasRange = Number.isFinite(rangeStartHz)
+    && Number.isFinite(rangeEndHz)
+    && Number(rangeEndHz) > Number(rangeStartHz);
+  const startHz = hasRange ? Number(rangeStartHz) : -nextSpanHz / 2;
+  const endHz = hasRange ? Number(rangeEndHz) : nextSpanHz / 2;
+  const spanForPlacementHz = endHz - startHz;
+
+  const buildModeSet = (mode, count, snrBase, segmentStartRatio, segmentEndRatio) => {
+    const items = [];
+    const modeSpanRatio = Math.max(0.01, segmentEndRatio - segmentStartRatio);
+    for (let index = 0; index < count; index += 1) {
+      const ratio = segmentStartRatio + (((index + 0.5) / count) * modeSpanRatio);
+      const frequencyHz = startHz + (ratio * spanForPlacementHz);
+      const centeredOffsetHz = frequencyHz - (startHz + spanForPlacementHz / 2);
+      items.push({
+        mode,
+        offset_hz: centeredOffsetHz,
+        frequency_hz: hasRange ? frequencyHz : undefined,
+        snr_db: snrBase + ((index % 5) * 0.8)
+      });
+    }
+    return items;
+  };
+
+  return [
+    ...buildModeSet("FT8", 10, 8.0, 0.0, 0.33),
+    ...buildModeSet("CW", 20, 10.0, 0.33, 0.66),
+    ...buildModeSet("SSB", 30, 12.0, 0.66, 1.0)
+  ];
 }
 
 function updateFullscreenButtonState() {
@@ -346,19 +918,13 @@ function updateFullscreenButtonState() {
   waterfallFullscreenBtn.textContent = isFullscreen ? "Exit fullscreen" : "Fullscreen";
 }
 
-function setWaterfallMode(nextMode) {
-  waterfallMode = nextMode === "fake" ? "fake" : "real";
-  applyWaterfallModeUI();
-  lastSpectrumFrameTs = 0;
-  connectSpectrum();
-}
-
 if (copyrightYearEl) {
   copyrightYearEl.textContent = String(new Date().getFullYear());
 }
 
-applyWaterfallModeUI();
+updateWaterfallModeBadge();
 updateFullscreenButtonState();
+applyWaterfallExplorerUi();
 
 function logLine(text) {
   const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
@@ -418,6 +984,15 @@ function isValidCallsign(value) {
     return true;
   }
   return /^[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
+}
+
+function extractCallsignFromRaw(value) {
+  const text = String(value || "").toUpperCase();
+  if (!text) {
+    return "";
+  }
+  const match = text.match(/\b[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
+  return match ? match[0] : "";
 }
 
 function isValidLocator(value) {
@@ -864,9 +1439,16 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 function addEvent(text) {
-  const li = document.createElement("li");
-  li.textContent = text;
-  eventsEl.prepend(li);
+  logLine(`events: ${text}`);
+}
+
+function pushLiveEventToPanel(eventPayload) {
+  if (!eventPayload || typeof eventPayload !== "object") {
+    return;
+  }
+  updateCallsignCacheFromEvent(eventPayload);
+  latestEvents = [eventPayload, ...latestEvents].slice(0, 500);
+  renderEventsPanelFromCache();
 }
 
 function applyEventsPanelFilters(items) {
@@ -919,6 +1501,30 @@ function updateEventsPager(totalItems) {
 
 function renderEventsPanelFromCache() {
   renderEvents(latestEvents);
+}
+
+function orderEventsForDisplay(items) {
+  const source = Array.isArray(items) ? items.slice() : [];
+  source.sort((a, b) => {
+    const aType = String(a?.type || "").toLowerCase();
+    const bType = String(b?.type || "").toLowerCase();
+    if (aType === "callsign" && bType !== "callsign") {
+      return -1;
+    }
+    if (aType !== "callsign" && bType === "callsign") {
+      return 1;
+    }
+    const aTs = String(a?.timestamp || "");
+    const bTs = String(b?.timestamp || "");
+    if (aTs > bTs) {
+      return -1;
+    }
+    if (aTs < bTs) {
+      return 1;
+    }
+    return 0;
+  });
+  return source;
 }
 
 function inferBandFromFrequency(frequencyHz) {
@@ -987,14 +1593,16 @@ function renderEventList(targetEl, items, emptyMessage) {
     const frequencyValue = Number(eventItem.frequency_hz);
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
-    const callsign = eventItem.callsign || "-";
+    const callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "-";
     body.innerHTML = `<strong>${freq} Hz</strong> <span class="event-item__muted">${band}</span> <span class="event-item__call">${callsign}</span>`;
 
     const detail = document.createElement("div");
     detail.className = "event-item__detail";
     if (eventItem.mode === "APRS") {
-      const lat = eventItem.lat !== null && eventItem.lat !== undefined ? eventItem.lat.toFixed(3) : "--";
-      const lon = eventItem.lon !== null && eventItem.lon !== undefined ? eventItem.lon.toFixed(3) : "--";
+      const latValue = Number(eventItem.lat);
+      const lonValue = Number(eventItem.lon);
+      const lat = Number.isFinite(latValue) ? latValue.toFixed(3) : "--";
+      const lon = Number.isFinite(lonValue) ? lonValue.toFixed(3) : "--";
       detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
     } else if (eventItem.type === "callsign") {
       const hasGrid = eventItem.grid !== null && eventItem.grid !== undefined && eventItem.grid !== "";
@@ -1006,7 +1614,8 @@ function renderEventList(targetEl, items, emptyMessage) {
       }
     } else if (eventItem.type === "occupancy") {
       const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
-      const snr = eventItem.snr_db !== null && eventItem.snr_db !== undefined ? `${eventItem.snr_db.toFixed(1)} dB` : "-";
+      const snrValue = Number(eventItem.snr_db);
+      const snr = Number.isFinite(snrValue) ? `${snrValue.toFixed(1)} dB` : "-";
       detail.textContent = `bw=${bw} snr=${snr}`;
     }
 
@@ -1020,12 +1629,27 @@ function renderEventList(targetEl, items, emptyMessage) {
 }
 
 function renderEvents(items) {
-  latestEvents = Array.isArray(items) ? items : [];
+  const sourceItems = Array.isArray(items) ? items : [];
+  updateCallsignCacheFromEvents(sourceItems);
+  latestEvents = sourceItems.filter((eventItem) => {
+    if (String(eventItem?.type || "") !== "occupancy") {
+      return true;
+    }
+    const freq = Number(eventItem?.frequency_hz || 0);
+    const mode = String(eventItem?.mode || "").trim().toLowerCase();
+    const band = String(eventItem?.band || "").trim();
+    const scanId = eventItem?.scan_id;
+    const occupied = Boolean(eventItem?.occupied);
+    const invalidNoise = (!occupied) && freq <= 0 && (!band || band.toLowerCase() === "null") && mode === "unknown";
+    const invalidUnbound = (scanId === null || scanId === undefined) && freq <= 0 && (!band || band.toLowerCase() === "null");
+    return !(invalidNoise || invalidUnbound);
+  });
   const matrix = {};
   const bandsSeen = new Set();
   const modesSeen = new Set();
 
   const totalEvents = latestEvents.length;
+  const orderedEvents = orderEventsForDisplay(latestEvents);
   const totalEventPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
   if (eventsPanelPage > totalEventPages - 1) {
     eventsPanelPage = totalEventPages - 1;
@@ -1034,7 +1658,7 @@ function renderEvents(items) {
     eventsPanelPage = 0;
   }
   const eventsStartIndex = eventsPanelPage * EVENTS_PANEL_PAGE_SIZE;
-  const eventsPagedItems = latestEvents.slice(eventsStartIndex, eventsStartIndex + EVENTS_PANEL_PAGE_SIZE);
+  const eventsPagedItems = orderedEvents.slice(eventsStartIndex, eventsStartIndex + EVENTS_PANEL_PAGE_SIZE);
 
   renderEventList(
     eventsEl,
@@ -1042,7 +1666,7 @@ function renderEvents(items) {
     "No events yet. Start a scan or adjust filters."
   );
 
-  const filteredItems = applyEventsPanelFilters(latestEvents);
+  const filteredItems = applyEventsPanelFilters(orderedEvents);
 
   const shouldShowSearchResults = hasEventsSearchCriteria();
   renderEventList(
@@ -1166,7 +1790,7 @@ function renderEvents(items) {
 
 async function fetchEvents() {
   try {
-    const params = new URLSearchParams({ limit: "25", offset: String(eventOffset) });
+    const params = new URLSearchParams({ limit: "200", offset: String(eventOffset) });
     if (bandFilter.value) {
       params.append("band", bandFilter.value);
     }
@@ -1561,14 +2185,27 @@ startBtn.addEventListener("click", () => {
 function connectEvents() {
   try {
     const ws = new WebSocket(wsUrl("/ws/events"));
-    ws.onopen = () => addEvent("Connected to events stream");
-    ws.onmessage = (msg) => addEvent(msg.data);
-    ws.onerror = () => addEvent("Events stream error");
+    ws.onopen = () => logLine("Connected to events stream");
+    ws.onmessage = (msg) => {
+      try {
+        const payload = JSON.parse(msg.data);
+        if (payload && typeof payload === "object" && payload.event && typeof payload.event === "object") {
+          pushLiveEventToPanel(payload.event);
+          return;
+        }
+        if (payload && typeof payload === "object") {
+          pushLiveEventToPanel(payload);
+        }
+      } catch (err) {
+        logLine("Events stream decode error");
+      }
+    };
+    ws.onerror = () => logLine("Events stream error");
     ws.onclose = () => {
       wsStatus.textContent = "WS: disconnected";
     };
   } catch (err) {
-    addEvent("WebSocket not available");
+    logLine("WebSocket not available");
   }
 }
 
@@ -1732,12 +2369,6 @@ function connectSpectrum() {
     spectrumWs.close();
     spectrumWs = null;
   }
-
-  if (isFakeSpectrumEnabled()) {
-    wsStatus.textContent = "WS: local simulated";
-    waterfallStatus.textContent = "Simulated spectrum (manual mode)";
-    return;
-  }
   try {
     const ws = new WebSocket(wsUrl("/ws/spectrum"));
     spectrumWs = ws;
@@ -1746,10 +2377,29 @@ function connectSpectrum() {
         const data = JSON.parse(msg.data);
         const frame = decodeSpectrumFrame(data.spectrum_frame);
         if (frame && frame.fft_db) {
+          lastSpectrumFrame = frame;
           lastSpectrumFrameTs = Date.now();
-          drawWaterfall(frame);
-          const startHz = Math.round(frame.center_hz - frame.span_hz / 2);
-          const endHz = Math.round(frame.center_hz + frame.span_hz / 2);
+          const viewport = getWaterfallViewport(frame);
+          drawWaterfall(frame, viewport);
+          const stableMarkers = buildStableWaterfallMarkers(frame);
+          const rulerRange = resolveWaterfallRulerRange(
+            frame,
+            viewport,
+            stableMarkers.rangeStartHz,
+            stableMarkers.rangeEndHz
+          );
+          renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
+          const simulatedMarkers = buildSimulatedModeMarkers(
+            viewport.visibleSpanHz,
+            rulerRange.startHz,
+            rulerRange.endHz
+          );
+          const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
+            ? [...stableMarkers.markers, ...simulatedMarkers]
+            : stableMarkers.markers;
+          renderWaterfallModeOverlay(modeMarkers, viewport.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
+          const startHz = Math.round(viewport.startHz);
+          const endHz = Math.round(viewport.endHz);
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
           const maxDb = frame.max_db !== undefined ? frame.max_db.toFixed(1) : "?";
           const noiseFloor = frame.noise_floor_db !== undefined ? frame.noise_floor_db.toFixed(1) : "?";
@@ -1766,11 +2416,13 @@ function connectSpectrum() {
             peaksInfo = ` | peaks ${frame.peaks.length}: ${topPeaks.join(", ")}`;
           }
           const agcInfo = agcGain ? ` | agc ${agcGain}dB` : "";
-          waterfallStatus.textContent = `FFT bins: ${frame.fft_db.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo} | ${waterfallRenderer.toUpperCase()}`;
+          const explorerInfo = viewport.simulated ? ` | explorer zoom x${waterfallExplorerZoom}` : "";
+          clearWaterfallGenericStatus();
+          waterfallStatus.textContent = `FFT bins: ${viewport.fftDb.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo}${explorerInfo} | ${waterfallRenderer.toUpperCase()}`;
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
-        waterfallStatus.textContent = "Spectrum decode error";
+        setWaterfallGenericStatus("No live spectrum data available. Check SDR device connection and backend status.");
       }
     };
     ws.onopen = () => {
@@ -1779,34 +2431,14 @@ function connectSpectrum() {
     ws.onclose = () => {
       if (spectrumWs === ws) {
         wsStatus.textContent = "WS: disconnected";
+        setWaterfallGenericStatus();
         spectrumWs = null;
       }
     };
   } catch (err) {
     wsStatus.textContent = "WS: disconnected";
-    waterfallStatus.textContent = "Spectrum stream unavailable";
+    setWaterfallGenericStatus();
   }
-}
-
-function buildSimulatedSpectrumFrame() {
-  const bins = 512;
-  const now = Date.now() / 1000;
-  const fftDb = Array.from({ length: bins }, (_, i) => {
-    const base = -112 + 5 * Math.sin((i / bins) * Math.PI * 4 + now * 0.5);
-    const noise = (Math.random() - 0.5) * 6;
-    const peak1 = Math.exp(-((i - (140 + (now * 18) % bins)) ** 2) / 240) * 22;
-    const peak2 = Math.exp(-((i - (360 + (now * 10) % bins)) ** 2) / 180) * 16;
-    return base + noise + peak1 + peak2;
-  });
-  return {
-    fft_db: fftDb,
-    center_hz: Number(bandStartInput?.value || 14074000),
-    span_hz: Number(sampleRateInput?.value || 48000),
-    min_db: -130,
-    max_db: -60,
-    noise_floor_db: -110,
-    peaks: []
-  };
 }
 
 function ensureWaterfallFallback() {
@@ -1814,25 +2446,11 @@ function ensureWaterfallFallback() {
     clearInterval(spectrumFallbackTimer);
   }
   spectrumFallbackTimer = setInterval(() => {
-    if (isFakeSpectrumEnabled()) {
-      const simulated = buildSimulatedSpectrumFrame();
-      drawWaterfall(simulated);
-      waterfallStatus.textContent = "Simulated spectrum (manual mode)";
-      return;
-    }
     const staleMs = Date.now() - lastSpectrumFrameTs;
     if (lastSpectrumFrameTs === 0 || staleMs > 2500) {
-      const simulated = buildSimulatedSpectrumFrame();
-      drawWaterfall(simulated);
-      waterfallStatus.textContent = "Simulated spectrum (fallback mode)";
+      setWaterfallGenericStatus();
     }
   }, 400);
-}
-
-if (waterfallModeSelect) {
-  waterfallModeSelect.addEventListener("change", (event) => {
-    setWaterfallMode(event.target.value);
-  });
 }
 
 if (waterfallFullscreenBtn) {
@@ -1850,6 +2468,111 @@ if (waterfallFullscreenBtn) {
 }
 
 document.addEventListener("fullscreenchange", updateFullscreenButtonState);
+
+function redrawWaterfallFromLastFrame() {
+  if (!lastSpectrumFrame || !lastSpectrumFrame.fft_db) {
+    return;
+  }
+  const viewport = getWaterfallViewport(lastSpectrumFrame);
+  drawWaterfall(lastSpectrumFrame, viewport);
+  const stableMarkers = buildStableWaterfallMarkers(lastSpectrumFrame);
+  const rulerRange = resolveWaterfallRulerRange(
+    lastSpectrumFrame,
+    viewport,
+    stableMarkers.rangeStartHz,
+    stableMarkers.rangeEndHz
+  );
+  renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
+  const simulatedMarkers = buildSimulatedModeMarkers(
+    viewport.visibleSpanHz,
+    rulerRange.startHz,
+    rulerRange.endHz
+  );
+  const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
+    ? [...stableMarkers.markers, ...simulatedMarkers]
+    : stableMarkers.markers;
+  renderWaterfallModeOverlay(modeMarkers, viewport.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
+}
+
+function resetWaterfallExplorerView() {
+  waterfallExplorerZoom = 1;
+  waterfallExplorerPan = 0;
+  localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
+  applyWaterfallExplorerUi();
+  redrawWaterfallFromLastFrame();
+}
+
+if (waterfallExplorerToggle) {
+  waterfallExplorerToggle.addEventListener("click", () => {
+    waterfallExplorerEnabled = !waterfallExplorerEnabled;
+    localStorage.setItem(WATERFALL_EXPLORER_KEY, waterfallExplorerEnabled ? "1" : "0");
+    if (!waterfallExplorerEnabled) {
+      waterfallExplorerPan = 0;
+      waterfallExplorerZoom = 1;
+      localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
+    }
+    applyWaterfallExplorerUi();
+    redrawWaterfallFromLastFrame();
+  });
+}
+
+if (waterfallZoomInput) {
+  waterfallZoomInput.addEventListener("input", () => {
+    const nextZoom = Math.max(1, Math.min(16, Math.round(Number(waterfallZoomInput.value) || 1)));
+    const currentCenter = waterfallExplorerPan + (0.5 / waterfallExplorerZoom);
+    waterfallExplorerZoom = nextZoom;
+    const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
+    waterfallExplorerPan = Math.max(0, Math.min(maxPan, currentCenter - (0.5 / waterfallExplorerZoom)));
+    localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
+    applyWaterfallExplorerUi();
+    clearWaterfallFrame();
+    redrawWaterfallFromLastFrame();
+  });
+}
+
+if (waterfallResetViewBtn) {
+  waterfallResetViewBtn.addEventListener("click", () => {
+    clearWaterfallFrame();
+    resetWaterfallExplorerView();
+  });
+}
+
+if (waterfallEl) {
+  waterfallEl.addEventListener("pointerdown", (event) => {
+    if (!waterfallExplorerEnabled) {
+      return;
+    }
+    waterfallDragActive = true;
+    waterfallDragStartX = event.clientX;
+    waterfallDragStartPan = waterfallExplorerPan;
+    waterfallEl.classList.add("is-dragging");
+  });
+}
+
+document.addEventListener("pointermove", (event) => {
+  if (!waterfallDragActive || !waterfallExplorerEnabled || !waterfallEl) {
+    return;
+  }
+  const rect = waterfallEl.getBoundingClientRect();
+  if (!rect.width) {
+    return;
+  }
+  const deltaNorm = ((event.clientX - waterfallDragStartX) / rect.width) * (1 / waterfallExplorerZoom);
+  const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
+  waterfallExplorerPan = Math.max(0, Math.min(maxPan, waterfallDragStartPan - deltaNorm));
+  clearWaterfallFrame();
+  redrawWaterfallFromLastFrame();
+});
+
+document.addEventListener("pointerup", () => {
+  if (!waterfallDragActive) {
+    return;
+  }
+  waterfallDragActive = false;
+  if (waterfallEl) {
+    waterfallEl.classList.remove("is-dragging");
+  }
+});
 
 connectSpectrum();
 ensureWaterfallFallback();
@@ -1881,8 +2604,10 @@ function connectStatus() {
         const data = JSON.parse(msg.data);
         const status = data.status;
         if (status) {
-          const nf = status.noise_floor_db !== undefined ? status.noise_floor_db.toFixed(1) : "?";
-          const threshold = status.threshold_db !== undefined ? status.threshold_db.toFixed(1) : "?";
+          const noiseFloor = Number(status.noise_floor_db);
+          const thresholdValue = Number(status.threshold_db);
+          const nf = Number.isFinite(noiseFloor) ? noiseFloor.toFixed(1) : "?";
+          const threshold = Number.isFinite(thresholdValue) ? thresholdValue.toFixed(1) : "?";
           const agc = status.agc_gain_db !== undefined && status.agc_gain_db !== null
             ? status.agc_gain_db.toFixed(1)
             : "?";
@@ -1914,12 +2639,16 @@ async function fetchDecoderStatus() {
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
-    const wsjtxDisabledReason = wsjtx.last_error
-      ? ` (${wsjtx.last_error})`
-      : " (set WSJTX_UDP_ENABLE=1 or WSJTX_UDP_PORT)";
-    wsjtxUdpStatusEl.textContent = wsjtx.enabled
-      ? `Listening ${wsjtx.listen || "?"}`
-      : `Disabled${wsjtxDisabledReason}`;
+    const wsjtxListen = String(wsjtx.listen || "").trim();
+    if (wsjtx.enabled) {
+      wsjtxUdpStatusEl.textContent = `Listening ${wsjtxListen || "?"}`;
+    } else if (wsjtx.last_error) {
+      wsjtxUdpStatusEl.textContent = `Error (${wsjtx.last_error})`;
+    } else if (wsjtxListen) {
+      wsjtxUdpStatusEl.textContent = `Stopped (${wsjtxListen})`;
+    } else {
+      wsjtxUdpStatusEl.textContent = "Not configured (set WSJTX_UDP_ENABLE=1 or WSJTX_UDP_PORT)";
+    }
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
     const kissDisabledReason = kiss.last_error
       ? ` (${kiss.last_error})`
@@ -1970,6 +2699,7 @@ async function loadDevices() {
       option.value = "";
       option.textContent = "No SDR devices detected";
       deviceSelect.appendChild(option);
+      setWaterfallGenericStatus();
       if (devices.length) {
         showToastError("Only non-SDR devices detected. Connect RTL/HackRF/Airspy or run Administration.");
       } else {
@@ -2587,6 +3317,39 @@ if (resetAllConfigBtn) {
   });
 }
 
+if (purgeInvalidEventsBtn) {
+  purgeInvalidEventsBtn.addEventListener("click", async () => {
+    const confirmed = window.confirm("Purge invalid/incomplete events from local database?");
+    if (!confirmed) {
+      return;
+    }
+    const previousLabel = purgeInvalidEventsBtn.textContent;
+    purgeInvalidEventsBtn.disabled = true;
+    purgeInvalidEventsBtn.textContent = "Purging...";
+    try {
+      const resp = await fetch("/api/admin/events/purge-invalid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({})
+      });
+      if (!resp.ok) {
+        throw new Error(`purge_failed_${resp.status}`);
+      }
+      const data = await resp.json();
+      const deleted = Number(data?.purge?.deleted || 0);
+      showToast(`Invalid events purged: ${deleted}`);
+      fetchEvents();
+      fetchTotal();
+      fetchModeStats();
+    } catch (err) {
+      showToastError("Failed to purge invalid events");
+    } finally {
+      purgeInvalidEventsBtn.disabled = false;
+      purgeInvalidEventsBtn.textContent = previousLabel || "Purge invalid events";
+    }
+  });
+}
+
 refreshDevicesBtn.addEventListener("click", () => {
   loadDevices();
 });
@@ -2700,8 +3463,9 @@ if (!localStorage.getItem("onboardingDone")) {
   renderOnboarding();
 }
 
-function drawWaterfall(frame) {
-  const fftDb = frame.fft_db || [];
+function drawWaterfall(frame, viewport = null) {
+  const resolvedViewport = viewport || getWaterfallViewport(frame);
+  const fftDb = resolvedViewport.fftDb || [];
   if (webglWaterfall) {
     webglWaterfall.render(fftDb);
     return;
@@ -2738,7 +3502,7 @@ function drawWaterfall(frame) {
   }
 
   ctx.putImageData(rowData, 0, row);
-  if (Array.isArray(frame.peaks) && frame.peaks.length && frame.span_hz) {
+  if (!resolvedViewport.simulated && Array.isArray(frame.peaks) && frame.peaks.length && frame.span_hz) {
     ctx.save();
     ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
     const span = frame.span_hz;

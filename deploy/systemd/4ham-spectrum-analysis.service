@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:34:50 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 [Unit]
 Description=4ham Spectrum Analysis Backend
@@ -23,6 +23,9 @@ Restart=always
 RestartSec=3
 TimeoutStopSec=20
 KillSignal=SIGTERM
+KillMode=control-group
+SendSIGKILL=yes
+FinalKillSignal=SIGKILL
 
 [Install]
 WantedBy=multi-user.target

@@ -2,10 +2,20 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 16:27:19 UTC
 -->
 
 # Changelog
+
+## v0.2.5 - 2026-02-22
+
+### Changed
+- Removed Fake waterfall mode from frontend controls and runtime behavior.
+- Waterfall now stays in LIVE mode and does not render simulated spectrum data.
+
+### Fixed
+- Replaced simulated fallback rendering with a generic user-facing no-data message when no SDR device is available or live frames become stale.
+- Improved readability of the waterfall no-data message with larger, centered, high-contrast presentation.
 
 ## v0.2.0 - 2026-02-21
 

@@ -2,7 +2,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 01:13:28 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 set -euo pipefail
 
@@ -15,6 +15,83 @@ PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 
 usage() {
   echo "Usage: $(basename "$0") {start|stop|logs|status}"
+}
+
+collect_uvicorn_pids() {
+  pgrep -f 'uvicorn app.main:app' || true
+}
+
+kill_process_tree() {
+  local parent_pid="$1"
+  local child
+  for child in $(pgrep -P "$parent_pid" 2>/dev/null || true); do
+    kill_process_tree "$child"
+  done
+  kill -TERM "$parent_pid" >/dev/null 2>&1 || true
+}
+
+stop_managed_decoder_processes() {
+  "$PYTHON_BIN" - <<'PY'
+import os
+import signal
+import time
+
+TARGET_KEYS = ("FOURHAM_MANAGED=1", "FOURHAM_MANAGED_BY=4ham-spectrum-analysis")
+
+def iter_managed_pids():
+    for name in os.listdir('/proc'):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        environ_path = f'/proc/{pid}/environ'
+        cmdline_path = f'/proc/{pid}/cmdline'
+        try:
+            with open(environ_path, 'rb') as f:
+                env = f.read().decode('utf-8', errors='ignore')
+            with open(cmdline_path, 'rb') as f:
+                cmdline = f.read().decode('utf-8', errors='ignore').replace('\x00', ' ')
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+        if all(key in env for key in TARGET_KEYS) and ('wsjtx' in cmdline.lower() or 'direwolf' in cmdline.lower()):
+            yield pid
+
+managed = sorted(set(iter_managed_pids()))
+for pid in managed:
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+deadline = time.time() + 4.0
+while managed and time.time() < deadline:
+    managed = [pid for pid in managed if os.path.exists(f'/proc/{pid}')]
+    if managed:
+        time.sleep(0.15)
+
+for pid in managed:
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+PY
+}
+
+wait_for_shutdown() {
+  local deadline=$((SECONDS + 8))
+  while true; do
+    local pids
+    pids="$(collect_uvicorn_pids)"
+    if [[ -z "$pids" ]]; then
+      break
+    fi
+    if (( SECONDS >= deadline )); then
+      for pid in $pids; do
+        kill -KILL "$pid" >/dev/null 2>&1 || true
+      done
+      break
+    fi
+    sleep 0.2
+  done
 }
 
 export WSJTX_UDP_ENABLE="${WSJTX_UDP_ENABLE:-1}"
@@ -32,8 +109,8 @@ ensure_environment() {
 
 start_backend() {
   ensure_environment
-  pkill -f 'uvicorn app.main:app' >/dev/null 2>&1 || true
-  sleep 1
+  stop_backend >/dev/null 2>&1 || true
+  sleep 0.5
   local reload_args=()
   if [[ "${RUN_DEV_RELOAD:-0}" == "1" ]]; then
     reload_args=(--reload --reload-dir "$BACKEND_DIR")
@@ -51,7 +128,15 @@ start_backend() {
 }
 
 stop_backend() {
-  pkill -f 'uvicorn app.main:app' >/dev/null 2>&1 || true
+  local pids
+  pids="$(collect_uvicorn_pids)"
+  if [[ -n "$pids" ]]; then
+    for pid in $pids; do
+      kill_process_tree "$pid"
+    done
+  fi
+  wait_for_shutdown
+  stop_managed_decoder_processes
   rm -f "$PID_FILE"
   echo "Backend stopped"
 }

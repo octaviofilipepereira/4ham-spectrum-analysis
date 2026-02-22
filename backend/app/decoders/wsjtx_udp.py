@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:34:50 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 import asyncio
 import os
@@ -168,6 +168,8 @@ def get_wsjtx_udp_config():
     port = os.getenv("WSJTX_UDP_PORT")
     host = os.getenv("WSJTX_UDP_HOST", "0.0.0.0")
     enabled = os.getenv("WSJTX_UDP_ENABLE")
+    if enabled is not None and str(enabled).strip().lower() in {"0", "false", "off", "no"}:
+        return None
     if not enabled and not port:
         return None
     try:

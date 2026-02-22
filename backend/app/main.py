@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 01:06:09 UTC
+# Last update: 2026-02-22 16:27:19 UTC
 
 import asyncio
 import os
@@ -17,6 +17,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.websockets import WebSocketDisconnect
 
 from app.config.loader import (
     ConfigError,
@@ -607,6 +608,149 @@ def _score_to_state(score):
     return "Poor"
 
 
+def _infer_band_from_frequency(frequency_hz):
+    try:
+        value = int(frequency_hz)
+    except (TypeError, ValueError):
+        return None
+    if value <= 0:
+        return None
+    ranges = [
+        ("160m", 1800000, 2000000),
+        ("80m", 3500000, 4000000),
+        ("60m", 5250000, 5450000),
+        ("40m", 7000000, 7300000),
+        ("30m", 10100000, 10150000),
+        ("20m", 14000000, 14350000),
+        ("17m", 18068000, 18168000),
+        ("15m", 21000000, 21450000),
+        ("12m", 24890000, 24990000),
+        ("10m", 28000000, 29700000),
+        ("6m", 50000000, 54000000),
+        ("2m", 144000000, 148000000),
+        ("70cm", 430000000, 440000000),
+    ]
+    for band_name, start_hz, end_hz in ranges:
+        if start_hz <= value <= end_hz:
+            return band_name
+    return None
+
+
+def _scan_band_bounds():
+    if not _scan_engine or not _scan_engine.config:
+        return None, None
+    start_hz = int(_safe_float(_scan_engine.config.get("start_hz"), default=0) or 0)
+    end_hz = int(_safe_float(_scan_engine.config.get("end_hz"), default=0) or 0)
+    if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
+        return None, None
+    return int(start_hz), int(end_hz)
+
+
+def _frequency_within_scan_band(frequency_hz, bandwidth_hz=None):
+    start_hz, end_hz = _scan_band_bounds()
+    if start_hz is None or end_hz is None:
+        return True
+    freq = _safe_float(frequency_hz, default=None)
+    if freq is None:
+        return False
+    half_bw = max(0.0, _safe_float(bandwidth_hz, default=0.0) / 2.0)
+    return (freq + half_bw) >= start_hz and (freq - half_bw) <= end_hz
+
+
+def _normalize_mode_for_band(mode_name, band_name, bandwidth_hz=None):
+    mode = str(mode_name or "Unknown")
+    band = str(band_name or "").strip().lower()
+    hf_bands = {"160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m"}
+    if band in hf_bands and mode in {"FM", "AM"}:
+        bw = _safe_float(bandwidth_hz, default=0.0)
+        if bw >= 1800:
+            return "SSB"
+        if bw > 0:
+            return "FSK/PSK"
+    return mode
+
+
+def _hint_mode_by_frequency(frequency_hz, band_name=None, bandwidth_hz=None):
+    freq = _safe_float(frequency_hz, default=None)
+    if freq is None or freq <= 0:
+        return None
+    band = str(band_name or _infer_band_from_frequency(freq) or "").strip().lower()
+
+    known_windows = {
+        "20m": [(14_074_000, 2500, "FT8"), (14_080_000, 2000, "FT4"), (14_095_600, 2000, "WSPR")],
+        "40m": [(7_074_000, 2500, "FT8"), (7_047_500, 2000, "FT4"), (7_038_600, 2000, "WSPR")],
+        "80m": [(3_573_000, 2500, "FT8"), (3_575_500, 2000, "FT4"), (3_568_600, 2000, "WSPR")],
+        "15m": [(21_074_000, 2500, "FT8"), (21_080_000, 2000, "FT4")],
+        "10m": [(28_074_000, 2500, "FT8"), (28_180_000, 3000, "FT4")],
+    }
+    for center_hz, tolerance_hz, mode in known_windows.get(band, []):
+        if abs(freq - center_hz) <= tolerance_hz:
+            return mode
+
+    bw = _safe_float(bandwidth_hz, default=0.0)
+    if bw >= 1200:
+        return "SSB"
+    if bw > 0:
+        return "FSK/PSK"
+    return "SSB"
+
+
+def _is_plausible_occupancy_event(event):
+    if not isinstance(event, dict):
+        return False
+    if not bool(event.get("occupied")):
+        return False
+
+    freq = _safe_float(event.get("frequency_hz"), default=None)
+    bw = _safe_float(event.get("bandwidth_hz"), default=None)
+    snr = _safe_float(event.get("snr_db"), default=None)
+    band = str(event.get("band") or "").strip().lower()
+
+    if freq is None or freq <= 0:
+        return False
+    if bw is None or bw <= 0:
+        return False
+    if snr is None or snr < 0:
+        return False
+
+    hf_bands = {"160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"}
+    if band in hf_bands:
+        if bw < 150 or bw > 5000:
+            return False
+    else:
+        if bw > 25000:
+            return False
+
+    if not _frequency_within_scan_band(freq, bandwidth_hz=bw):
+        return False
+
+    return True
+
+
+def _sanitize_events_for_api(items):
+    sanitized = []
+    for item in items or []:
+        row = dict(item)
+        if str(row.get("type") or "") == "occupancy":
+            freq = _safe_float(row.get("frequency_hz"), default=0.0) or 0.0
+            band = str(row.get("band") or "").strip()
+            scan_id = row.get("scan_id")
+            mode = str(row.get("mode") or "").strip().lower()
+            occupied = bool(row.get("occupied"))
+            invalid_noise = (not occupied) and freq <= 0 and (not band or band.lower() == "null") and mode == "unknown"
+            invalid_unbound = (scan_id is None) and freq <= 0 and (not band or band.lower() == "null")
+            if invalid_noise or invalid_unbound:
+                continue
+
+        if not row.get("band"):
+            inferred_band = _infer_band_from_frequency(row.get("frequency_hz"))
+            if inferred_band:
+                row["band"] = inferred_band
+
+        sanitized.append(row)
+    return sanitized
+
+
 def _build_propagation_summary(window_minutes=30, limit=3000):
     safe_window_minutes = max(1, int(window_minutes or 30))
     safe_limit = max(100, min(int(limit or 3000), 10000))
@@ -729,7 +873,9 @@ async def _maybe_autostart_decoder_process(kind, enabled, flag_env, cmd_env, def
 
     _decoder_status[status_key]["process_running"] = bool(process and process.returncode is None)
     _decoder_status[status_key]["process_pid"] = process.pid if process else None
-    _decoder_status[status_key]["last_error"] = None
+    existing_error = str(_decoder_status[status_key].get("last_error") or "").strip().lower()
+    if not existing_error or existing_error.startswith(f"{kind}_autostart_"):
+        _decoder_status[status_key]["last_error"] = None
     _log(f"{kind}_autostart_ok pid={process.pid if process else 'na'}")
     return process
 
@@ -765,12 +911,20 @@ async def on_startup():
     _start_decoder_watch("ssb", os.getenv("SSB_ASR_PATH"), parse_ssb_asr_text, "SSB")
     listener = create_wsjtx_udp_listener(_wsjtx_state, _handle_wsjtx_udp, logger=_log)
     if listener:
-        transport, _ = await listener
-        global _wsjtx_transport
-        _wsjtx_transport = transport
-        listen_addr = describe_wsjtx_udp()
-        _decoder_status["wsjtx_udp"].update({"enabled": True, "listen": listen_addr})
-        _log(f"wsjtx_udp_listen {listen_addr}")
+        try:
+            transport, _ = await listener
+            global _wsjtx_transport
+            _wsjtx_transport = transport
+            listen_addr = describe_wsjtx_udp()
+            _decoder_status["wsjtx_udp"].update({"enabled": True, "listen": listen_addr})
+            _log(f"wsjtx_udp_listen {listen_addr}")
+        except OSError as exc:
+            _decoder_status["wsjtx_udp"].update({
+                "enabled": False,
+                "listen": describe_wsjtx_udp(),
+                "last_error": f"wsjtx_udp_bind_failed {exc}"
+            })
+            _log(f"wsjtx_udp_bind_failed {exc}")
     global _wsjtx_process
     _wsjtx_process = await _maybe_autostart_decoder_process(
         kind="wsjtx",
@@ -941,17 +1095,8 @@ def events(
 ):
     if request:
         _enforce_auth(request)
-    settings = _db.get_settings()
-    modes = settings.get("modes") or {}
-    if mode is None and modes:
-        enabled_modes = [
-            name.upper()
-            for name, enabled in modes.items()
-            if enabled
-        ]
-        if enabled_modes:
-            mode = enabled_modes[0]
     data = _db.get_events(limit=limit, offset=offset, band=band, mode=mode, callsign=callsign, start=start, end=end)
+    data = _sanitize_events_for_api(data)
     if format == "csv":
         lines = ["Type,Timestamp,Band,FrequencyHz,Mode,Callsign,Confidence,SNR,PowerDbm,ScanId"]
         for item in data:
@@ -969,6 +1114,16 @@ def events(
             ]))
         return PlainTextResponse("\n".join(lines), media_type="text/csv")
     return data
+
+
+@app.post("/api/admin/events/purge-invalid")
+def admin_purge_invalid_events(request: Request):
+    _enforce_auth(request)
+    result = _db.purge_invalid_events()
+    return {
+        "status": "ok",
+        "purge": result,
+    }
 
 
 @app.get("/api/events/count")
@@ -1259,12 +1414,15 @@ async def ws_logs(websocket: WebSocket):
         return
     await websocket.accept()
     last_idx = 0
-    while True:
-        if last_idx < len(_logs):
-            batch = _logs[last_idx:]
-            last_idx = len(_logs)
-            await websocket.send_json({"logs": batch})
-        await asyncio.sleep(1.0)
+    try:
+        while True:
+            if last_idx < len(_logs):
+                batch = _logs[last_idx:]
+                last_idx = len(_logs)
+                await websocket.send_json({"logs": batch})
+            await asyncio.sleep(1.0)
+    except WebSocketDisconnect:
+        return
 
 
 @app.get("/api/scan/status")
@@ -1467,9 +1625,14 @@ async def ws_events(websocket: WebSocket):
         return
     await websocket.accept()
     while True:
+        if not _scan_engine.running or _scan_state.get("state") != "running":
+            await asyncio.sleep(0.5)
+            continue
+
         iq = _scan_engine.read_iq(2048)
         if iq is None:
-            iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+            await asyncio.sleep(0.2)
+            continue
         if _agc_enabled:
             iq, gain_db = apply_agc_smoothed(
                 iq,
@@ -1501,6 +1664,9 @@ async def ws_events(websocket: WebSocket):
             frequency_hz = _scan_engine.center_hz
             if offset_hz is not None:
                 frequency_hz = int(_scan_engine.center_hz + offset_hz)
+            if not frequency_hz or frequency_hz <= 0:
+                await asyncio.sleep(0.5)
+                continue
             adaptive_threshold = _update_threshold(band, best.get("threshold_dbm"))
             mode_name, mode_confidence = classify_mode_heuristic(
                 best.get("bandwidth_hz"),
@@ -1522,35 +1688,28 @@ async def ws_events(websocket: WebSocket):
                 "device": _scan_state.get("device"),
                 "scan_id": _scan_state.get("scan_id")
             }
+            event["mode"] = _normalize_mode_for_band(
+                event.get("mode"),
+                event.get("band"),
+                bandwidth_hz=event.get("bandwidth_hz")
+            )
+            if not _is_plausible_occupancy_event(event):
+                await asyncio.sleep(0.2)
+                continue
             settings = _db.get_settings()
             modes = settings.get("modes") or {}
             mode_key = str(event.get("mode", "")).lower()
             if modes and mode_key in modes and not modes.get(mode_key, True):
                 await asyncio.sleep(1.0)
                 continue
+            if not event.get("occupied"):
+                await asyncio.sleep(0.5)
+                continue
             _db.insert_occupancy(event)
             await websocket.send_json({"event": event})
             await asyncio.sleep(1.0)
             continue
-
-        payload = {
-            "event": {
-                "type": "occupancy",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "band": "20m",
-                "frequency_hz": 14074000,
-                "bandwidth_hz": 2700,
-                "power_dbm": -90.0,
-                "snr_db": 6.0,
-                "threshold_dbm": -98.0,
-                "occupied": True,
-                "mode": "SSB",
-                "confidence": 0.6,
-                "device": _scan_state.get("device")
-            }
-        }
-        await websocket.send_json(payload)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(0.5)
 
 
 @app.websocket("/ws/spectrum")
@@ -1578,6 +1737,51 @@ async def ws_spectrum(websocket: WebSocket):
         fft_db, bin_hz, min_db, max_db = compute_fft_db(iq, _scan_engine.sample_rate, smooth_bins=6)
         peaks = detect_peaks(fft_db, bin_hz)
         noise_floor_db = estimate_noise_floor(fft_db)
+        threshold_dbm = (noise_floor_db + _snr_threshold_db) if noise_floor_db is not None else -95.0
+        occupancy_segments = estimate_occupancy(
+            iq,
+            _scan_engine.sample_rate,
+            threshold_dbm=threshold_dbm,
+            adapt=False,
+            snr_threshold_db=_snr_threshold_db,
+            min_bw_hz=_min_bw_hz
+        )
+        mode_markers = []
+        band_name = _scan_engine.config.get("band") if _scan_engine.config else None
+        center_hz = float(_scan_engine.center_hz or 0.0)
+        for segment in occupancy_segments:
+            offset_hz = float(segment.get("offset_hz") or 0.0)
+            bandwidth_hz = int(segment.get("bandwidth_hz") or 0)
+            frequency_hz = int(round(center_hz + offset_hz)) if center_hz > 0 else None
+            mode_name, mode_confidence = classify_mode_heuristic(
+                bandwidth_hz,
+                segment.get("snr_db")
+            )
+            mode_name = _normalize_mode_for_band(mode_name, band_name, bandwidth_hz=bandwidth_hz)
+            if str(mode_name).strip().lower() == "unknown":
+                mode_name = _hint_mode_by_frequency(frequency_hz, band_name=band_name, bandwidth_hz=bandwidth_hz) or "Unknown"
+            if not _frequency_within_scan_band(frequency_hz, bandwidth_hz=bandwidth_hz):
+                continue
+            if str(mode_name).strip().lower() == "unknown":
+                continue
+            mode_markers.append({
+                "offset_hz": offset_hz,
+                "frequency_hz": frequency_hz,
+                "mode": mode_name,
+                "snr_db": float(segment.get("snr_db") or 0.0),
+                "bandwidth_hz": bandwidth_hz,
+                "confidence": float(mode_confidence)
+            })
+        mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
+        mode_markers = mode_markers[:24]
+        scan_start_hz = None
+        scan_end_hz = None
+        if _scan_engine.config:
+            scan_start_hz = int(_safe_float(_scan_engine.config.get("start_hz"), default=0) or 0)
+            scan_end_hz = int(_safe_float(_scan_engine.config.get("end_hz"), default=0) or 0)
+            if scan_start_hz <= 0 or scan_end_hz <= 0 or scan_end_hz <= scan_start_hz:
+                scan_start_hz = None
+                scan_end_hz = None
         global _last_frame_ts
         _last_frame_ts = time.time()
         _spectrum_cache.update({
@@ -1599,6 +1803,9 @@ async def ws_spectrum(websocket: WebSocket):
                 "max_db": max_db,
                 "noise_floor_db": noise_floor_db,
                 "peaks": peaks,
+                "mode_markers": mode_markers,
+                "scan_start_hz": scan_start_hz,
+                "scan_end_hz": scan_end_hz,
                 "agc_gain_db": agc_gain_db
             }
         }
@@ -1629,32 +1836,35 @@ async def ws_status(websocket: WebSocket):
         await websocket.close(code=1008)
         return
     await websocket.accept()
-    while True:
-        now = time.time()
-        frame_age_ms = None
-        if _last_frame_ts:
-            frame_age_ms = int((now - _last_frame_ts) * 1000)
-        band = _scan_engine.config.get("band") if _scan_engine.config else None
-        sent = _spectrum_send_stats.get("sent", 0)
-        dropped = _spectrum_send_stats.get("dropped", 0)
-        total = sent + dropped
-        drop_rate_pct = (float(dropped) / float(total) * 100.0) if total > 0 else 0.0
-        payload = {
-            "status": {
-                "state": _scan_state.get("state"),
-                "device": _scan_state.get("device"),
-                "cpu_pct": _cpu_percent(),
-                "frame_age_ms": frame_age_ms,
-                "noise_floor_db": _noise_floor.get(band),
-                "threshold_db": _threshold_state.get(band),
-                "agc_gain_db": _last_agc_gain_db,
-                "drop_rate_pct": round(drop_rate_pct, 2),
-                "protocol_version": _ws_protocol_version,
-                "scan": _scan_engine.status()
+    try:
+        while True:
+            now = time.time()
+            frame_age_ms = None
+            if _last_frame_ts:
+                frame_age_ms = int((now - _last_frame_ts) * 1000)
+            band = _scan_engine.config.get("band") if _scan_engine.config else None
+            sent = _spectrum_send_stats.get("sent", 0)
+            dropped = _spectrum_send_stats.get("dropped", 0)
+            total = sent + dropped
+            drop_rate_pct = (float(dropped) / float(total) * 100.0) if total > 0 else 0.0
+            payload = {
+                "status": {
+                    "state": _scan_state.get("state"),
+                    "device": _scan_state.get("device"),
+                    "cpu_pct": _cpu_percent(),
+                    "frame_age_ms": frame_age_ms,
+                    "noise_floor_db": _noise_floor.get(band),
+                    "threshold_db": _threshold_state.get(band),
+                    "agc_gain_db": _last_agc_gain_db,
+                    "drop_rate_pct": round(drop_rate_pct, 2),
+                    "protocol_version": _ws_protocol_version,
+                    "scan": _scan_engine.status()
+                }
             }
-        }
-        await websocket.send_json(payload)
-        await asyncio.sleep(1.0)
+            await websocket.send_json(payload)
+            await asyncio.sleep(1.0)
+    except WebSocketDisconnect:
+        return
 
 
 _FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
