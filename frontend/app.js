@@ -315,7 +315,7 @@ let scanActionInFlight = false;
 const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
 let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
 const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR device connection and scan status.";
-const WATERFALL_SIMULATE_MODE_MARKERS = true;
+const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;
 const waterfallMarkerCache = new Map();
 const WATERFALL_CALLSIGN_TTL_MS = 15 * 60 * 1000;
