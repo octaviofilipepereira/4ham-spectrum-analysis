@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 17:24:00 UTC
+Last update: 2026-02-22 17:40:00 UTC
 -->
 
 # Internal Native Decoder Migration Plan
