@@ -32,19 +32,117 @@ const endFilter = document.getElementById("endFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
 const exportJsonBtn = document.getElementById("exportJson");
 const exportPngBtn = document.getElementById("exportPng");
-const pageOffsetLabel = document.getElementById("pageOffset");
 const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
 const authPassInput = document.getElementById("authPass");
 const saveSettingsBtn = document.getElementById("saveSettings");
+const testConfigBtn = document.getElementById("testConfig");
 const refreshDevicesBtn = document.getElementById("refreshDevices");
+const adminDeviceSetupBtn = document.getElementById("adminDeviceSetup");
+const adminAudioAutoDetectBtn = document.getElementById("adminAudioAutoDetect");
+const resetDefaultsBtn = document.getElementById("resetDefaults");
+const resetAllConfigBtn = document.getElementById("resetAllConfig");
+const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
+const stationCallsignInput = document.getElementById("stationCallsign");
+const stationOperatorInput = document.getElementById("stationOperator");
+const stationLocatorInput = document.getElementById("stationLocator");
+const stationQthInput = document.getElementById("stationQth");
+const deviceClassSelect = document.getElementById("deviceClass");
+const devicePpmInput = document.getElementById("devicePpm");
+const deviceOffsetHzInput = document.getElementById("deviceOffsetHz");
+const deviceGainProfileSelect = document.getElementById("deviceGainProfile");
+const saveDeviceConfigBtn = document.getElementById("saveDeviceConfig");
+const saveAudioConfigBtn = document.getElementById("saveAudioConfig");
+const audioInputDeviceInput = document.getElementById("audioInputDevice");
+const audioOutputDeviceInput = document.getElementById("audioOutputDevice");
+const audioSampleRateInput = document.getElementById("audioSampleRate");
+const audioRxGainInput = document.getElementById("audioRxGain");
+const audioTxGainInput = document.getElementById("audioTxGain");
+const adminSetupStatus = document.getElementById("adminSetupStatus");
+
+function updateAdminAudioStatus(audioProfile, options = {}) {
+  if (!adminSetupStatus) {
+    return;
+  }
+  const profile = audioProfile || {};
+  const inputDevice = String(profile.input_device || "").trim();
+  const outputDevice = String(profile.output_device || "").trim();
+  const sampleRate = Number(profile.sample_rate || 48000);
+  const sourceLabel = options.sourceLabel || "guardado";
+  const methods = options.methods || "defaults";
+  const hasDetectedEndpoints = Boolean(inputDevice || outputDevice);
+
+  adminSetupStatus.classList.remove("d-none", "alert-success", "alert-warning");
+  if (hasDetectedEndpoints) {
+    adminSetupStatus.classList.add("alert-success");
+    adminSetupStatus.textContent = `Áudio ${sourceLabel}: entrada=${inputDevice || "não definido"} | saída=${outputDevice || "não definido"} | sample rate=${sampleRate} Hz (${methods})`;
+  } else {
+    adminSetupStatus.classList.add("alert-warning");
+    adminSetupStatus.textContent = `Áudio não detetado automaticamente: entrada/saída por definir | sample rate=${sampleRate} Hz. Configure manualmente ou execute Auto-detect Device novamente.`;
+  }
+}
+
+function normalizeNumberInputValue(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function applyDeviceConfigToForm(deviceConfig) {
+  const config = deviceConfig || {};
+  const nextClass = String(config.device_class || "auto").trim().toLowerCase() || "auto";
+  const nextPpm = normalizeNumberInputValue(config.ppm_correction, 0);
+  const nextOffset = normalizeNumberInputValue(config.frequency_offset_hz, 0);
+  const nextGainProfile = String(config.gain_profile || "auto").trim().toLowerCase() || "auto";
+
+  if (deviceClassSelect) {
+    const validClass = Array.from(deviceClassSelect.options || []).some((option) => option.value === nextClass)
+      ? nextClass
+      : "auto";
+    deviceClassSelect.value = validClass;
+  }
+
+  if (devicePpmInput) {
+    devicePpmInput.value = String(nextPpm);
+  }
+
+  if (deviceOffsetHzInput) {
+    deviceOffsetHzInput.value = String(nextOffset);
+  }
+
+  if (deviceGainProfileSelect) {
+    const validGain = Array.from(deviceGainProfileSelect.options || []).some((option) => option.value === nextGainProfile)
+      ? nextGainProfile
+      : "auto";
+    deviceGainProfileSelect.value = validGain;
+  }
+}
+
+function buildDeviceConfigPayload() {
+  return {
+    device_class: deviceClassSelect.value,
+    ppm_correction: Number(devicePpmInput.value || 0),
+    frequency_offset_hz: Number(deviceOffsetHzInput.value || 0),
+    gain_profile: deviceGainProfileSelect.value,
+  };
+}
+
+function buildAudioConfigPayload() {
+  return {
+    input_device: audioInputDeviceInput.value.trim(),
+    output_device: audioOutputDeviceInput.value.trim(),
+    sample_rate: Number(audioSampleRateInput.value || 48000),
+    rx_gain: Number(audioRxGainInput.value || 1),
+    tx_gain: Number(audioTxGainInput.value || 1),
+  };
+}
 const bandNameInput = document.getElementById("bandName");
 const bandStartInput = document.getElementById("bandStart");
 const bandEndInput = document.getElementById("bandEnd");
 const saveBandBtn = document.getElementById("saveBand");
 const presetNameInput = document.getElementById("presetName");
 const savePresetBtn = document.getElementById("savePreset");
+const deletePresetBtn = document.getElementById("deletePreset");
 const presetSelect = document.getElementById("presetSelect");
 const exportPresetsBtn = document.getElementById("exportPresets");
 const importPresetsInput = document.getElementById("importPresets");
@@ -64,18 +162,13 @@ const onboardingText = document.getElementById("onboardingText");
 const onboardingPrev = document.getElementById("onboardingPrev");
 const onboardingNext = document.getElementById("onboardingNext");
 const startBtn = document.getElementById("startScan");
-const stopBtn = document.getElementById("stopScan");
 const prevPageBtn = document.getElementById("prevPage");
 const nextPageBtn = document.getElementById("nextPage");
 const qualityBar = document.getElementById("qualityBar");
 const qualityLabel = document.getElementById("qualityLabel");
-const bandSummary = document.getElementById("bandSummary");
-const modeSummary = document.getElementById("modeSummary");
-const pageNumberLabel = document.getElementById("pageNumber");
-const showBandSummary = document.getElementById("showBandSummary");
-const showModeSummary = document.getElementById("showModeSummary");
+const summaryMatrixTable = document.getElementById("summaryMatrixTable");
+const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
 const eventsTotal = document.getElementById("eventsTotal");
-const totalGlobal = document.getElementById("totalGlobal");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
 const decoderStatusEl = document.getElementById("decoderStatus");
@@ -88,6 +181,70 @@ const aprsToggle = document.getElementById("aprsToggle");
 const cwToggle = document.getElementById("cwToggle");
 const ssbToggle = document.getElementById("ssbToggle");
 const saveModesBtn = document.getElementById("saveModes");
+const DEVICE_AUTO_PROFILES = {
+  rtl: { sample_rate: 2048000, gain: 30, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
+  hackrf: { sample_rate: 2000000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
+  airspy: { sample_rate: 2500000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
+  other: { sample_rate: 48000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" }
+};
+const BAND_PRESETS = {
+  "160m": { start_hz: 1810000, end_hz: 2000000 },
+  "80m": { start_hz: 3500000, end_hz: 3800000 },
+  "40m": { start_hz: 7000000, end_hz: 7200000 },
+  "20m": { start_hz: 14000000, end_hz: 14350000 },
+  "17m": { start_hz: 18068000, end_hz: 18168000 },
+  "15m": { start_hz: 21000000, end_hz: 21450000 },
+  "12m": { start_hz: 24890000, end_hz: 24990000 },
+  "10m": { start_hz: 28000000, end_hz: 29700000 },
+  "2m": { start_hz: 144000000, end_hz: 146000000 },
+  "70cm": { start_hz: 430000000, end_hz: 440000000 },
+};
+const DEFAULT_BAND_OPTIONS = [
+  { name: "160m", label: "160 m" },
+  { name: "80m", label: "80 m" },
+  { name: "40m", label: "40 m" },
+  { name: "20m", label: "20 m" },
+  { name: "17m", label: "17 m" },
+  { name: "15m", label: "15 m" },
+  { name: "12m", label: "12 m" },
+  { name: "10m", label: "10 m" },
+  { name: "2m", label: "2 m" },
+  { name: "70cm", label: "70 cm" },
+];
+
+function populateBandSelectOptions(sourceBands) {
+  if (!bandSelect) {
+    return;
+  }
+  const byName = new Map();
+  DEFAULT_BAND_OPTIONS.forEach((item) => {
+    byName.set(item.name, item.label);
+  });
+  (sourceBands || []).forEach((item) => {
+    const name = String(item?.name || "").trim();
+    if (!name) {
+      return;
+    }
+    if (!byName.has(name)) {
+      byName.set(name, name);
+    }
+  });
+
+  const current = bandSelect.value;
+  bandSelect.innerHTML = "";
+  byName.forEach((label, name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = label;
+    bandSelect.appendChild(option);
+  });
+
+  if (current && byName.has(current)) {
+    bandSelect.value = current;
+  } else {
+    bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
+  }
+}
 const EVENTS_PANEL_PAGE_SIZE = 7;
 let eventOffset = 0;
 let eventsPanelPage = 0;
@@ -96,8 +253,16 @@ let row = 0;
 let lastSpectrumFrameTs = 0;
 let spectrumFallbackTimer = null;
 let spectrumWs = null;
+let isScanRunning = false;
+let scanActionInFlight = false;
 const WATERFALL_MODE_KEY = "waterfallMode";
+const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
 let waterfallMode = localStorage.getItem(WATERFALL_MODE_KEY) === "fake" ? "fake" : "real";
+let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
+
+if (showNonSdrDevicesToggle) {
+  showNonSdrDevicesToggle.checked = showNonSdrDevices;
+}
 
 function isFakeSpectrumEnabled() {
   return waterfallMode === "fake";
@@ -148,31 +313,96 @@ function logLine(text) {
   logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
 }
 
+function renderToast(message, isError = false) {
+  if (!toast) {
+    return;
+  }
+
+  const MAX_TOAST_NOTICES = 5;
+  while (toast.childElementCount >= MAX_TOAST_NOTICES) {
+    const oldest = toast.firstElementChild;
+    if (!oldest) {
+      break;
+    }
+    oldest.remove();
+  }
+
+  const noticeEl = document.createElement("div");
+  noticeEl.className = "toast-notice";
+  if (isError) {
+    noticeEl.classList.add("error");
+  }
+
+  const messageEl = document.createElement("span");
+  messageEl.className = "toast__message";
+  messageEl.textContent = message;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "toast__close";
+  closeBtn.textContent = "×";
+  closeBtn.setAttribute("aria-label", "Close notification");
+  closeBtn.addEventListener("click", () => {
+    noticeEl.remove();
+  });
+
+  noticeEl.appendChild(messageEl);
+  noticeEl.appendChild(closeBtn);
+  toast.appendChild(noticeEl);
+}
+
 function showToast(message) {
-  toast.textContent = message;
-  toast.classList.remove("error");
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2500);
+  renderToast(message, false);
 }
 
 function showToastError(message) {
-  toast.textContent = message;
-  toast.classList.add("error");
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2500);
+  renderToast(message, true);
   logLine(message);
+}
+
+function isValidCallsign(value) {
+  const text = String(value || "").trim().toUpperCase();
+  if (!text) {
+    return true;
+  }
+  return /^[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
+}
+
+function isValidLocator(value) {
+  const text = String(value || "").trim().toUpperCase();
+  if (!text) {
+    return true;
+  }
+  return /^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(text);
 }
 
 function loadPresets() {
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
   presetSelect.innerHTML = "";
-  data.forEach((preset) => {
+  if (!data.length) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "No presets saved";
+    emptyOption.selected = true;
+    presetSelect.appendChild(emptyOption);
+    updatePresetActionsState();
+    return;
+  }
+
+  data.forEach((preset, index) => {
     const option = document.createElement("option");
-    option.value = preset.name;
+    option.value = String(index);
     option.textContent = preset.name;
     option.dataset.payload = JSON.stringify(preset);
     presetSelect.appendChild(option);
   });
+  updatePresetActionsState();
+}
+
+function updatePresetActionsState() {
+  const selectedIndex = Number(presetSelect.value);
+  const hasValidSelection = Number.isInteger(selectedIndex) && selectedIndex >= 0;
+  deletePresetBtn.disabled = !hasValidSelection;
 }
 
 function persistPresets(text) {
@@ -208,10 +438,40 @@ function savePreset() {
   data.push(preset);
   localStorage.setItem("presets", JSON.stringify(data));
   loadPresets();
+  presetSelect.value = String(data.length - 1);
+  updatePresetActionsState();
   logLine("Preset saved");
 }
 
+function deletePreset() {
+  const selectedIndex = Number(presetSelect.value);
+  if (!Number.isInteger(selectedIndex) || selectedIndex < 0) {
+    showToast("Select a preset to delete");
+    return;
+  }
+
+  const data = JSON.parse(localStorage.getItem("presets") || "[]");
+  if (selectedIndex >= data.length) {
+    showToast("Preset not found");
+    loadPresets();
+    return;
+  }
+
+  const selected = data[selectedIndex];
+  const confirmed = window.confirm(`Delete preset \"${selected.name}\"?`);
+  if (!confirmed) {
+    return;
+  }
+
+  data.splice(selectedIndex, 1);
+  localStorage.setItem("presets", JSON.stringify(data));
+  loadPresets();
+  showToast("Preset deleted");
+  logLine("Preset deleted");
+}
+
 savePresetBtn.addEventListener("click", savePreset);
+deletePresetBtn.addEventListener("click", deletePreset);
 exportPresetsBtn.addEventListener("click", exportPresets);
 importPresetsInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -227,9 +487,12 @@ importPresetsInput.addEventListener("change", async (event) => {
   }
 });
 presetSelect.addEventListener("change", () => {
+  updatePresetActionsState();
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
-  const selected = data.find((p) => p.name === presetSelect.value);
+  const selectedIndex = Number(presetSelect.value);
+  const selected = Number.isInteger(selectedIndex) ? data[selectedIndex] : null;
   if (!selected) {
+    showToast("No preset selected");
     return;
   }
   bandSelect.value = selected.band;
@@ -241,8 +504,25 @@ presetSelect.addEventListener("change", () => {
 
 function loadFavorites() {
   const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  const currentSelection = favoriteBandsSelect.value;
   favoriteBandsSelect.innerHTML = "";
   favoriteFilter.innerHTML = "";
+
+  const allFavoritesOption = document.createElement("option");
+  allFavoritesOption.value = "";
+  allFavoritesOption.textContent = "All";
+  favoriteFilter.appendChild(allFavoritesOption);
+
+  if (!data.length) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "No favorite bands";
+    emptyOption.selected = true;
+    favoriteBandsSelect.appendChild(emptyOption);
+    updateFavoriteActionsState();
+    return;
+  }
+
   data.forEach((band) => {
     const option = document.createElement("option");
     option.value = band;
@@ -253,26 +533,66 @@ function loadFavorites() {
     filterOption.textContent = band;
     favoriteFilter.appendChild(filterOption);
   });
+
+  if (currentSelection && data.includes(currentSelection)) {
+    favoriteBandsSelect.value = currentSelection;
+  }
+
+  updateFavoriteActionsState();
+}
+
+function updateFavoriteActionsState() {
+  const hasValidSelection = Boolean(favoriteBandsSelect.value);
+  removeFavoriteBtn.disabled = !hasValidSelection;
 }
 
 addFavoriteBtn.addEventListener("click", () => {
-  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  if (!data.includes(bandSelect.value)) {
-    data.push(bandSelect.value);
-    localStorage.setItem("favoriteBands", JSON.stringify(data));
-    loadFavorites();
-    logLine("Favorite added");
-    syncFavorites();
+  const selectedBand = String(bandNameInput?.value || bandSelect.value || "").trim();
+  if (!selectedBand) {
+    showToast("Select a band first");
+    return;
   }
+
+  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
+  if (data.includes(selectedBand)) {
+    showToast("Band is already a favorite");
+    return;
+  }
+
+  data.push(selectedBand);
+  localStorage.setItem("favoriteBands", JSON.stringify(data));
+  loadFavorites();
+  favoriteBandsSelect.value = selectedBand;
+  updateFavoriteActionsState();
+  showToast("Favorite added");
+  logLine("Favorite added");
+  syncFavorites();
 });
 
 removeFavoriteBtn.addEventListener("click", () => {
+  const selectedFavorite = String(favoriteBandsSelect.value || "").trim();
+  if (!selectedFavorite) {
+    showToast("No favorite selected");
+    return;
+  }
+
   const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  const filtered = data.filter((band) => band !== favoriteBandsSelect.value);
+  if (!data.includes(selectedFavorite)) {
+    showToast("Favorite not found");
+    loadFavorites();
+    return;
+  }
+
+  const filtered = data.filter((band) => band !== selectedFavorite);
   localStorage.setItem("favoriteBands", JSON.stringify(filtered));
   loadFavorites();
+  showToast("Favorite removed");
   logLine("Favorite removed");
   syncFavorites();
+});
+
+favoriteBandsSelect.addEventListener("change", () => {
+  updateFavoriteActionsState();
 });
 
 favoriteFilter.addEventListener("change", () => {
@@ -649,8 +969,9 @@ function renderEventList(targetEl, items, emptyMessage) {
 
 function renderEvents(items) {
   latestEvents = Array.isArray(items) ? items : [];
-  const counts = {};
-  const modeCounts = {};
+  const matrix = {};
+  const bandsSeen = new Set();
+  const modesSeen = new Set();
 
   const totalEvents = latestEvents.length;
   const totalEventPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
@@ -684,30 +1005,111 @@ function renderEvents(items) {
   updateEventsPager(totalEvents);
 
   filteredItems.forEach((eventItem) => {
-    if (eventItem.band) {
-      counts[eventItem.band] = (counts[eventItem.band] || 0) + 1;
+    const bandName = eventItem.band || inferBandFromFrequency(eventItem.frequency_hz);
+    const modeName = eventItem.mode;
+    if (!bandName || !modeName) {
+      return;
     }
-    if (eventItem.mode) {
-      modeCounts[eventItem.mode] = (modeCounts[eventItem.mode] || 0) + 1;
-    }
+
+    bandsSeen.add(bandName);
+    modesSeen.add(modeName);
+    matrix[bandName] = matrix[bandName] || {};
+    matrix[bandName][modeName] = (matrix[bandName][modeName] || 0) + 1;
   });
 
-  bandSummary.innerHTML = "";
-  if (showBandSummary.value === "on") {
-    Object.entries(counts).forEach(([band, count]) => {
-      const li = document.createElement("li");
-      li.textContent = `${band}: ${count}`;
-      bandSummary.appendChild(li);
-    });
+  const renderedBands = Array.from(bandsSeen).sort((a, b) => a.localeCompare(b));
+  const renderedModes = Array.from(modesSeen).sort((a, b) => a.localeCompare(b));
+
+  if (summaryMatrixCaption) {
+    summaryMatrixCaption.textContent = "Live data from current events";
   }
-  modeSummary.innerHTML = "";
-  if (showModeSummary.value === "on") {
-    Object.entries(modeCounts).forEach(([mode, count]) => {
-      const li = document.createElement("li");
-      li.textContent = `${mode}: ${count}`;
-      modeSummary.appendChild(li);
-    });
+
+  if (!summaryMatrixTable) {
+    return;
   }
+
+  const head = summaryMatrixTable.querySelector("thead");
+  const body = summaryMatrixTable.querySelector("tbody");
+  const foot = summaryMatrixTable.querySelector("tfoot");
+  if (!head || !body || !foot) {
+    return;
+  }
+
+  head.innerHTML = "";
+  body.innerHTML = "";
+  foot.innerHTML = "";
+
+  if (!renderedBands.length || !renderedModes.length) {
+    const emptyRow = document.createElement("tr");
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = 2;
+    emptyCell.textContent = "No summary matrix available for current events";
+    emptyRow.appendChild(emptyCell);
+    body.appendChild(emptyRow);
+    return;
+  }
+
+  const headRow = document.createElement("tr");
+  const corner = document.createElement("th");
+  corner.scope = "col";
+  corner.textContent = "Band \\ Mode";
+  headRow.appendChild(corner);
+  renderedModes.forEach((mode) => {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = mode;
+    headRow.appendChild(th);
+  });
+  const totalCol = document.createElement("th");
+  totalCol.scope = "col";
+  totalCol.textContent = "Total";
+  headRow.appendChild(totalCol);
+  head.appendChild(headRow);
+
+  const modeTotals = Object.fromEntries(renderedModes.map((mode) => [mode, 0]));
+  let grandTotal = 0;
+
+  renderedBands.forEach((band) => {
+    const row = document.createElement("tr");
+    const bandCell = document.createElement("th");
+    bandCell.scope = "row";
+    bandCell.textContent = band;
+    row.appendChild(bandCell);
+
+    let rowTotal = 0;
+    renderedModes.forEach((mode) => {
+      const value = Number(matrix?.[band]?.[mode] || 0);
+      rowTotal += value;
+      modeTotals[mode] += value;
+
+      const cell = document.createElement("td");
+      cell.textContent = String(value);
+      row.appendChild(cell);
+    });
+
+    grandTotal += rowTotal;
+    const totalCell = document.createElement("td");
+    totalCell.textContent = String(rowTotal);
+    row.appendChild(totalCell);
+    body.appendChild(row);
+  });
+
+  const footRow = document.createElement("tr");
+  const totalLabel = document.createElement("th");
+  totalLabel.scope = "row";
+  totalLabel.textContent = "Total";
+  footRow.appendChild(totalLabel);
+
+  renderedModes.forEach((mode) => {
+    const cell = document.createElement("td");
+    cell.textContent = String(modeTotals[mode]);
+    footRow.appendChild(cell);
+  });
+
+  const grandCell = document.createElement("td");
+  grandCell.textContent = String(grandTotal);
+  footRow.appendChild(grandCell);
+  foot.appendChild(footRow);
 }
 
 async function fetchEvents() {
@@ -737,18 +1139,12 @@ async function fetchEvents() {
     }
     const data = await resp.json();
     renderEvents(data);
-    pageOffsetLabel.textContent = `Offset: ${eventOffset}`;
-    pageNumberLabel.textContent = `Page: ${Math.floor(eventOffset / 25) + 1}`;
     localStorage.setItem("filters", JSON.stringify({
       band: bandFilter.value,
       mode: modeFilter.value,
       callsign: callsignFilter.value,
       start: startFilter.value,
       end: endFilter.value
-    }));
-    localStorage.setItem("summary", JSON.stringify({
-      showBand: showBandSummary.value === "on",
-      showMode: showModeSummary.value === "on"
     }));
   } catch (err) {
     addEvent("Failed to load events");
@@ -779,8 +1175,7 @@ async function fetchTotal() {
     if (!resp.ok) {
       return;
     }
-    const data = await resp.json();
-    totalGlobal.textContent = `Total: ${data.total}`;
+    await resp.json();
   } catch (err) {
     return;
   }
@@ -794,12 +1189,6 @@ async function fetchModeStats() {
     }
     const data = await resp.json();
     modeStatsCache = data.modes || {};
-    modeSummary.innerHTML = "";
-    Object.entries(modeStatsCache).forEach(([mode, count]) => {
-      const li = document.createElement("li");
-      li.textContent = `${mode}: ${count}`;
-      modeSummary.appendChild(li);
-    });
   } catch (err) {
     return;
   }
@@ -840,15 +1229,64 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
-startBtn.addEventListener("click", async () => {
+function initMenuDropdownModalBehavior() {
+  const modalDropdownItems = document.querySelectorAll('.menu-toolbar .dropdown-item[data-bs-toggle="modal"]');
+  if (!modalDropdownItems.length) {
+    return;
+  }
+
+  modalDropdownItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const dropdownRoot = item.closest(".dropdown");
+      const toggle = dropdownRoot ? dropdownRoot.querySelector('[data-bs-toggle="dropdown"]') : null;
+      if (!toggle || typeof bootstrap === "undefined" || !bootstrap.Dropdown) {
+        return;
+      }
+      const dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle);
+      dropdown.hide();
+    });
+  });
+}
+
+async function parseApiError(response, fallbackMessage) {
+  try {
+    const payload = await response.json();
+    const detail = payload?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+  } catch (err) {
+    return `${fallbackMessage} (HTTP ${response.status})`;
+  }
+  return `${fallbackMessage} (HTTP ${response.status})`;
+}
+
+function updateScanButtonState() {
+  if (!startBtn) {
+    return;
+  }
+  if (scanActionInFlight) {
+    startBtn.textContent = isScanRunning ? "Stopping..." : "Starting...";
+    startBtn.disabled = true;
+    return;
+  }
+  startBtn.textContent = isScanRunning ? "Stop scanning" : "Start scanning";
+  startBtn.disabled = false;
+  startBtn.classList.toggle("btn-primary", !isScanRunning);
+  startBtn.classList.toggle("btn-danger", isScanRunning);
+}
+
+async function startScan() {
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
   const sampleRate = Number(sampleRateInput.value);
   const recordPath = recordPathInput.value || null;
-  await fetch("/api/scan/start", {
+  const selectedDeviceId = deviceSelect.value || null;
+  const response = await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify({
+      device: selectedDeviceId,
       scan: {
         band: bandSelect.value,
         start_hz: 14000000,
@@ -858,20 +1296,71 @@ startBtn.addEventListener("click", async () => {
         mode: "auto",
         gain,
         sample_rate: sampleRate,
-        record_path: recordPath,
-        device_id: deviceSelect.value || null
+        record_path: recordPath
       }
     })
   });
+  if (!response.ok) {
+    const message = await parseApiError(response, "Failed to start scan");
+    throw new Error(message);
+  }
+  isScanRunning = true;
   setStatus("Scan running");
   logLine("Scan started");
-});
+}
 
-stopBtn.addEventListener("click", async () => {
+async function stopScan() {
   setStatus("Stopping scan...");
-  await fetch("/api/scan/stop", { method: "POST", headers: { ...getAuthHeader() } });
+  const response = await fetch("/api/scan/stop", { method: "POST", headers: { ...getAuthHeader() } });
+  if (!response.ok) {
+    const message = await parseApiError(response, "Failed to stop scan");
+    throw new Error(message);
+  }
+  isScanRunning = false;
   setStatus("Scan stopped");
   logLine("Scan stopped");
+}
+
+async function syncScanState() {
+  try {
+    const response = await fetch("/api/scan/status", { headers: { ...getAuthHeader() } });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    const nextRunning = data?.state === "running";
+    if (!scanActionInFlight) {
+      isScanRunning = nextRunning;
+      setStatus(nextRunning ? "Scan running" : "Scan stopped");
+      updateScanButtonState();
+    }
+  } catch (err) {
+    return;
+  }
+}
+
+async function toggleScan() {
+  if (scanActionInFlight) {
+    return;
+  }
+  scanActionInFlight = true;
+  updateScanButtonState();
+  try {
+    if (isScanRunning) {
+      await stopScan();
+    } else {
+      await startScan();
+    }
+  } catch (err) {
+    showToastError(err?.message || (isScanRunning ? "Failed to stop scan" : "Failed to start scan"));
+  } finally {
+    scanActionInFlight = false;
+    updateScanButtonState();
+  }
+}
+
+startBtn.addEventListener("click", () => {
+  toggleScan();
 });
 
 function connectEvents() {
@@ -1032,10 +1521,14 @@ exportPngBtn.addEventListener("click", () => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "s") {
-    startBtn.click();
+    if (!isScanRunning) {
+      toggleScan();
+    }
   }
   if (event.key === "x") {
-    stopBtn.click();
+    if (isScanRunning) {
+      toggleScan();
+    }
   }
 });
 
@@ -1248,18 +1741,275 @@ async function fetchDecoderStatus() {
 }
 
 async function loadDevices() {
+  const previousLabel = refreshDevicesBtn ? refreshDevicesBtn.textContent : null;
+  if (refreshDevicesBtn) {
+    refreshDevicesBtn.disabled = true;
+    refreshDevicesBtn.textContent = "Refreshing...";
+  }
   try {
     const resp = await fetch("/api/devices", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      throw new Error(`devices_fetch_failed_${resp.status}`);
+    }
     const devices = await resp.json();
+    if (!Array.isArray(devices)) {
+      throw new Error("devices_invalid_response");
+    }
+    const isLikelySdrDevice = (device) => {
+      const haystack = [device?.id, device?.type, device?.name]
+        .map((value) => String(value || "").toLowerCase())
+        .join(" ");
+      if (!haystack) {
+        return false;
+      }
+      if (haystack.includes("audio") || haystack.includes("microphone") || haystack.includes("headphones")) {
+        return false;
+      }
+      return ["rtl", "rtlsdr", "hackrf", "airspy", "limesdr", "sdrplay", "bladerf", "pluto", "uhd", "osmosdr"].some((token) => haystack.includes(token));
+    };
+    const sdrDevices = devices.filter((device) => isLikelySdrDevice(device));
+    const visibleDevices = showNonSdrDevices ? devices : sdrDevices;
     deviceSelect.innerHTML = "";
-    devices.forEach((device) => {
+    if (!visibleDevices.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No SDR devices detected";
+      deviceSelect.appendChild(option);
+      if (devices.length) {
+        showToastError("Only non-SDR devices detected. Connect RTL/HackRF/Airspy or run Administration.");
+      } else {
+        showToastError("No SDR devices detected. Check RTL/Soapy drivers or use Administration.");
+      }
+      return;
+    }
+    visibleDevices.forEach((device) => {
       const option = document.createElement("option");
       option.value = device.id;
       option.textContent = device.name;
       deviceSelect.appendChild(option);
     });
+    if (showNonSdrDevices) {
+      showToast(`Detected ${visibleDevices.length} device(s) (${sdrDevices.length} SDR)`);
+    } else {
+      showToast(`Detected ${sdrDevices.length} SDR device(s)`);
+    }
   } catch (err) {
     logLine("Failed to load devices");
+    showToastError("Failed to refresh devices");
+  } finally {
+    if (refreshDevicesBtn) {
+      refreshDevicesBtn.disabled = false;
+      refreshDevicesBtn.textContent = previousLabel || "Refresh devices";
+    }
+  }
+}
+
+function normalizeDeviceChoice(choice) {
+  const raw = String(choice || "").trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+  if (raw.includes("rtl")) {
+    return "rtl";
+  }
+  if (raw.includes("hackrf") || raw.includes("hack")) {
+    return "hackrf";
+  }
+  if (raw.includes("airspy") || raw.includes("air")) {
+    return "airspy";
+  }
+  if (raw.includes("other") || raw.includes("outro")) {
+    return "other";
+  }
+  return raw;
+}
+
+function findDeviceByChoice(devices, choice) {
+  const term = String(choice || "").toLowerCase();
+  return devices.find((device) => {
+    const id = String(device.id || "").toLowerCase();
+    const type = String(device.type || "").toLowerCase();
+    const name = String(device.name || "").toLowerCase();
+    return id.includes(term) || type.includes(term) || name.includes(term);
+  });
+}
+
+async function runAdministrationSetup() {
+  if (adminSetupStatus) {
+    adminSetupStatus.textContent = "";
+    adminSetupStatus.classList.add("d-none");
+    adminSetupStatus.classList.remove("alert-warning");
+    adminSetupStatus.classList.add("alert-success");
+  }
+  const input = window.prompt("Which device are you using? (RTL-SDR, HackRF, Airspy, Other)", "RTL-SDR");
+  if (input === null) {
+    return;
+  }
+  const choice = normalizeDeviceChoice(input);
+  if (!choice) {
+    showToastError("Device type not provided");
+    return;
+  }
+
+  let preflight;
+  try {
+    const resp = await fetch("/api/admin/device/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({
+        device_type: choice,
+        dry_run: true,
+        auto_install: false,
+        apply_config: false,
+      })
+    });
+    if (!resp.ok) {
+      throw new Error("admin_preflight_failed");
+    }
+    preflight = await resp.json();
+  } catch (err) {
+    showToastError("Automatic setup pre-check failed");
+    return;
+  }
+
+  const pkgList = preflight?.requirements?.linux_apt_packages || [];
+  const installedPkgs = preflight?.probe_before?.apt_packages?.installed || [];
+  const missingPkgs = preflight?.probe_before?.apt_packages?.missing || [];
+  const moduleList = preflight?.requirements?.python_modules || [];
+  const foundNow = Boolean(preflight?.probe_before?.match_found);
+  const summaryText = [
+    `Device type: ${input}`,
+    `Detected now: ${foundNow ? "yes" : "no"}`,
+    `Python modules: ${moduleList.length ? moduleList.join(", ") : "none"}`,
+    `Linux packages required: ${pkgList.length ? pkgList.join(", ") : "none"}`,
+    `Linux packages installed: ${installedPkgs.length ? installedPkgs.join(", ") : "none"}`,
+    `Linux packages missing: ${missingPkgs.length ? missingPkgs.join(", ") : "none"}`,
+    "Proceed with automatic installation and configuration?"
+  ].join("\n");
+
+  const approve = window.confirm(summaryText);
+  if (!approve) {
+    return;
+  }
+
+  let setupData;
+  try {
+    const resp = await fetch("/api/admin/device/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({
+        device_type: choice,
+        dry_run: false,
+        auto_install: true,
+        apply_config: true,
+      })
+    });
+    if (!resp.ok) {
+      throw new Error("admin_setup_failed");
+    }
+    setupData = await resp.json();
+  } catch (err) {
+    showToastError("Automatic setup failed");
+    return;
+  }
+
+  const selected = setupData?.probe_after?.matched_device;
+  if (!selected) {
+    const installErr = setupData?.install?.error;
+    if (installErr) {
+      if (installErr === "elevation_required") {
+        showToastError("Automatic install needs system authorization. Approve the OS prompt and try again.");
+      } else if (installErr === "no_privilege_escalation_tool") {
+        showToastError("Automatic install unavailable: install sudo or pkexec on this Linux system.");
+      } else {
+        showToastError(`Device not ready (${installErr}).`);
+      }
+    } else {
+      showToastError(`No ${input} device found`);
+    }
+    return;
+  }
+
+  showToast(`Device found: ${selected.name || selected.id}`);
+  const installMethod = setupData?.install?.method;
+  if (installMethod) {
+    logLine(`Automatic package install method: ${installMethod}`);
+  }
+  const profile = setupData?.configured?.profile || DEVICE_AUTO_PROFILES[choice] || DEVICE_AUTO_PROFILES.other;
+  const appliedDeviceConfig = setupData?.configured?.device_config || {};
+  const audioProfile = setupData?.configured?.audio_config || setupData?.audio_probe?.suggested || {
+    input_device: "",
+    output_device: "",
+    sample_rate: 48000,
+    rx_gain: 1,
+    tx_gain: 1,
+  };
+  deviceSelect.value = selected.id;
+  const setupDeviceConfig = {
+    device_class: choice,
+    ppm_correction: appliedDeviceConfig.ppm_correction ?? profile.ppm_correction ?? 0,
+    frequency_offset_hz: appliedDeviceConfig.frequency_offset_hz ?? profile.frequency_offset_hz ?? 0,
+    gain_profile: appliedDeviceConfig.gain_profile || profile.gain_profile || "auto",
+  };
+  applyDeviceConfigToForm(setupDeviceConfig);
+  sampleRateInput.value = String(profile.sample_rate);
+  gainInput.value = String(profile.gain);
+  audioInputDeviceInput.value = audioProfile.input_device || "";
+  audioOutputDeviceInput.value = audioProfile.output_device || "";
+  audioSampleRateInput.value = String(audioProfile.sample_rate ?? 48000);
+  audioRxGainInput.value = String(audioProfile.rx_gain ?? 1);
+  audioTxGainInput.value = String(audioProfile.tx_gain ?? 1);
+
+  const methods = (setupData?.audio_probe?.methods || []).join("/") || "defaults";
+  updateAdminAudioStatus(audioProfile, { sourceLabel: "auto-configurado", methods });
+
+  const appliedDeviceClass = (deviceClassSelect?.value || "auto").toUpperCase();
+  const appliedPpm = devicePpmInput.value || "0";
+  const appliedOffset = deviceOffsetHzInput.value || "0";
+  const appliedGainProfile = deviceGainProfileSelect.value || "auto";
+  showToast(`Configuração automática: classe=${appliedDeviceClass}, PPM=${appliedPpm}, offset=${appliedOffset} Hz, gain=${appliedGainProfile}`);
+  logLine(`Admin setup applied: device=${selected.id}, class=${appliedDeviceClass}, ppm=${appliedPpm}, offset_hz=${appliedOffset}, gain_profile=${appliedGainProfile}`);
+  await loadSettings();
+}
+
+async function runAudioAutoDetect() {
+  const choice = normalizeDeviceChoice(deviceClassSelect?.value || deviceSelect?.value || "other") || "other";
+  try {
+    const resp = await fetch("/api/admin/device/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({
+        device_type: choice,
+        dry_run: true,
+        auto_install: false,
+        apply_config: false,
+      })
+    });
+    if (!resp.ok) {
+      throw new Error("audio_auto_detect_failed");
+    }
+    const data = await resp.json();
+    const audioProfile = data?.audio_probe?.suggested || {
+      input_device: "",
+      output_device: "",
+      sample_rate: 48000,
+      rx_gain: 1,
+      tx_gain: 1,
+    };
+    const methods = (data?.audio_probe?.methods || []).join("/") || "defaults";
+
+    audioInputDeviceInput.value = audioProfile.input_device || "";
+    audioOutputDeviceInput.value = audioProfile.output_device || "";
+    audioSampleRateInput.value = String(audioProfile.sample_rate ?? 48000);
+    audioRxGainInput.value = String(audioProfile.rx_gain ?? 1);
+    audioTxGainInput.value = String(audioProfile.tx_gain ?? 1);
+
+    const hasDetectedEndpoints = Boolean((audioProfile.input_device || "").trim() || (audioProfile.output_device || "").trim());
+    updateAdminAudioStatus(audioProfile, { sourceLabel: "auto-detectado", methods });
+    showToast("Auto-detect áudio concluído");
+    logLine(`Audio auto-detect: detected=${hasDetectedEndpoints}, input=${audioProfile.input_device || ""}, output=${audioProfile.output_device || ""}, sample_rate=${audioProfile.sample_rate ?? 48000}, method=${methods}`);
+  } catch (err) {
+    showToastError("Falha no auto-detect de áudio");
   }
 }
 
@@ -1267,18 +2017,14 @@ async function loadBands() {
   try {
     const resp = await fetch("/api/bands", { headers: { ...getAuthHeader() } });
     const bands = await resp.json();
-    if (Array.isArray(bands) && bands.length) {
-      bandSelect.innerHTML = "";
-      bands.forEach((band) => {
-        const option = document.createElement("option");
-        option.value = band.name;
-        option.textContent = band.name;
-        bandSelect.appendChild(option);
-      });
+    if (Array.isArray(bands)) {
+      populateBandSelectOptions(bands);
+      return;
     }
   } catch (err) {
     logLine("Failed to load bands");
   }
+  populateBandSelectOptions([]);
 }
 
 async function loadSettings() {
@@ -1315,9 +2061,25 @@ async function loadSettings() {
       cwToggle.value = data.modes.cw ? "on" : "off";
       ssbToggle.value = data.modes.ssb ? "on" : "off";
     }
-    if (data.summary) {
-      showBandSummary.value = data.summary.showBand ? "on" : "off";
-      showModeSummary.value = data.summary.showMode ? "on" : "off";
+    if (data.station) {
+      stationCallsignInput.value = data.station.callsign || "";
+      stationOperatorInput.value = data.station.operator || "";
+      stationLocatorInput.value = data.station.locator || "";
+      stationQthInput.value = data.station.qth || "";
+    }
+    applyDeviceConfigToForm(data.device_config || {});
+    if (data.audio_config) {
+      audioInputDeviceInput.value = data.audio_config.input_device || "";
+      audioOutputDeviceInput.value = data.audio_config.output_device || "";
+      audioSampleRateInput.value = data.audio_config.sample_rate ?? 48000;
+      audioRxGainInput.value = data.audio_config.rx_gain ?? 1;
+      audioTxGainInput.value = data.audio_config.tx_gain ?? 1;
+      updateAdminAudioStatus(data.audio_config, { sourceLabel: "guardado" });
+    } else if (adminSetupStatus) {
+      adminSetupStatus.textContent = "";
+      adminSetupStatus.classList.add("d-none");
+      adminSetupStatus.classList.remove("alert-warning");
+      adminSetupStatus.classList.add("alert-success");
     }
   } catch (err) {
     logLine("Failed to load settings");
@@ -1341,43 +2103,26 @@ saveModesBtn.addEventListener("click", async () => {
   showToast("Modes saved");
 });
 
-showBandSummary.addEventListener("change", () => {
-  persistSummary();
-  fetchEvents();
-});
-
-showModeSummary.addEventListener("change", () => {
-  persistSummary();
-  fetchEvents();
-});
-
-function persistSummary() {
-  const summary = {
-    showBand: showBandSummary.value === "on",
-    showMode: showModeSummary.value === "on"
-  };
-  localStorage.setItem("summary", JSON.stringify(summary));
-  fetch("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
-    body: JSON.stringify({ summary })
+if (prevPageBtn) {
+  prevPageBtn.addEventListener("click", () => {
+    eventOffset = Math.max(0, eventOffset - 25);
+    fetchEvents();
   });
 }
 
-prevPageBtn.addEventListener("click", () => {
-  eventOffset = Math.max(0, eventOffset - 25);
-  fetchEvents();
-});
+if (nextPageBtn) {
+  nextPageBtn.addEventListener("click", () => {
+    eventOffset += 25;
+    fetchEvents();
+  });
+}
 
-nextPageBtn.addEventListener("click", () => {
-  eventOffset += 25;
-  fetchEvents();
-});
-
-compactToggle.addEventListener("click", () => {
-  const panel = compactToggle.closest(".filters");
-  panel.classList.toggle("compact");
-});
+if (compactToggle) {
+  compactToggle.addEventListener("click", () => {
+    const panel = compactToggle.closest(".filters");
+    panel?.classList.toggle("compact");
+  });
+}
 
 loginSaveBtn.addEventListener("click", () => {
   localStorage.setItem("authUser", loginUserInput.value);
@@ -1439,21 +2184,270 @@ function loadFilters() {
 saveSettingsBtn.addEventListener("click", async () => {
   localStorage.setItem("authUser", authUserInput.value);
   localStorage.setItem("authPass", authPassInput.value);
+  if (!isValidCallsign(stationCallsignInput.value)) {
+    showToastError("Invalid callsign format");
+    return;
+  }
+  if (!isValidLocator(stationLocatorInput.value)) {
+    showToastError("Invalid locator format (use IN51 or IN51ab)");
+    return;
+  }
+
   const payload = {
     band: bandSelect.value,
-    device_id: deviceSelect.value
+    device_id: deviceSelect.value,
+    station: {
+      callsign: stationCallsignInput.value.trim(),
+      operator: stationOperatorInput.value.trim(),
+      locator: stationLocatorInput.value.trim(),
+      qth: stationQthInput.value.trim(),
+    },
+    device_config: buildDeviceConfigPayload(),
+    audio_config: buildAudioConfigPayload()
   };
-  await fetch("/api/settings", {
+  const response = await fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify(payload)
   });
+  if (!response.ok) {
+    const message = await parseApiError(response, "Failed to save settings");
+    showToastError(message);
+    return;
+  }
+  await loadSettings();
   logLine("Settings saved");
+  showToast("Settings saved");
 });
+
+if (saveDeviceConfigBtn) {
+  saveDeviceConfigBtn.addEventListener("click", async () => {
+    const response = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ device_config: buildDeviceConfigPayload() })
+    });
+    if (!response.ok) {
+      const message = await parseApiError(response, "Failed to save device configuration");
+      showToastError(message);
+      return;
+    }
+    await loadSettings();
+    logLine("Device configuration saved");
+    showToast("Device configuration saved");
+  });
+}
+
+if (saveAudioConfigBtn) {
+  saveAudioConfigBtn.addEventListener("click", async () => {
+    const response = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ audio_config: buildAudioConfigPayload() })
+    });
+    if (!response.ok) {
+      const message = await parseApiError(response, "Failed to save audio configuration");
+      showToastError(message);
+      return;
+    }
+    await loadSettings();
+    logLine("Audio configuration saved");
+    showToast("Audio configuration saved");
+  });
+}
+
+if (testConfigBtn) {
+  testConfigBtn.addEventListener("click", async () => {
+    const payload = {
+      device_id: deviceSelect.value || null,
+      audio_config: {
+        input_device: audioInputDeviceInput.value.trim(),
+        output_device: audioOutputDeviceInput.value.trim(),
+        sample_rate: Number(audioSampleRateInput.value || 48000),
+        rx_gain: Number(audioRxGainInput.value || 1),
+        tx_gain: Number(audioTxGainInput.value || 1),
+      }
+    };
+    try {
+      const resp = await fetch("/api/admin/config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        if (resp.status === 404 || resp.status === 405) {
+          throw new Error("Config test endpoint unavailable (HTTP 405/404). Restart backend service to load latest API.");
+        }
+        const message = await parseApiError(resp, "Config test failed");
+        throw new Error(message);
+      }
+      const data = await resp.json();
+      const deviceOk = Boolean(data?.device?.ok);
+      const audioOk = Boolean(data?.audio?.ok);
+      const soapyOk = Boolean(data?.device?.soapy_import_ok);
+
+      const failedChecks = [];
+      const audioChecks = data?.audio?.checks || {};
+      Object.entries(audioChecks).forEach(([checkName, passed]) => {
+        if (!passed) {
+          failedChecks.push(checkName);
+        }
+      });
+
+      if (!deviceOk) {
+        const detectedCount = Number(data?.device?.detected_count || 0);
+        failedChecks.push(detectedCount > 0 ? "selected_device" : "device_detection");
+      }
+      if (!soapyOk) {
+        failedChecks.push("soapy_import");
+      }
+
+      if (deviceOk && audioOk && soapyOk) {
+        showToast("Config test passed");
+      } else {
+        const checkLabels = {
+          arecord: "arecord",
+          aplay: "aplay",
+          pactl: "pactl",
+          "pw-cli": "pw-cli",
+          sample_rate_valid: "sample rate",
+          rx_gain_valid: "RX gain",
+          tx_gain_valid: "TX gain",
+          selected_device: "selected device",
+          device_detection: "device detection",
+          soapy_import: "SoapySDR import",
+          unknown_checks: "unknown checks",
+        };
+        const issueText = failedChecks.length
+          ? failedChecks.map((checkName) => checkLabels[checkName] || checkName).join(", ")
+          : checkLabels.unknown_checks;
+        const soapyError = data?.device?.soapy_import_error;
+        const suffix = soapyError ? ` | soapy: ${soapyError}` : "";
+        showToastError(`Config test issues: ${issueText}${suffix}`);
+      }
+      logLine(`Config test: device_ok=${deviceOk} audio_ok=${audioOk} soapy_ok=${soapyOk}`);
+    } catch (err) {
+      showToastError(err?.message || "Config test failed");
+    }
+  });
+}
+
+if (resetDefaultsBtn) {
+  resetDefaultsBtn.addEventListener("click", async () => {
+    const approved = window.confirm("Reset settings defaults? This will replace current mode/summary settings.");
+    if (!approved) {
+      return;
+    }
+    const previousLabel = resetDefaultsBtn.textContent;
+    resetDefaultsBtn.disabled = true;
+    resetDefaultsBtn.textContent = "Resetting...";
+    try {
+      const resp = await fetch("/api/settings/reset-defaults", {
+        method: "POST",
+        headers: { ...getAuthHeader() },
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to reset defaults");
+        throw new Error(message);
+      }
+      await loadSettings();
+      fetchEvents();
+      fetchModeStats();
+      showToast("Defaults restored");
+      logLine("Settings defaults restored");
+    } catch (err) {
+      showToastError(err?.message || "Failed to reset defaults");
+    } finally {
+      resetDefaultsBtn.disabled = false;
+      resetDefaultsBtn.textContent = previousLabel || "Reset defaults";
+    }
+  });
+}
+
+if (resetAllConfigBtn) {
+  resetAllConfigBtn.addEventListener("click", async () => {
+    const approved = window.confirm("Reset total? This will clear backend settings/bands and local browser data.");
+    if (!approved) {
+      return;
+    }
+    const previousLabel = resetAllConfigBtn.textContent;
+    resetAllConfigBtn.disabled = true;
+    resetAllConfigBtn.textContent = "Resetting...";
+    try {
+      const resp = await fetch("/api/admin/reset-all-config", {
+        method: "POST",
+        headers: { ...getAuthHeader() },
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to reset total config");
+        throw new Error(message);
+      }
+      localStorage.clear();
+      window.location.reload();
+    } catch (err) {
+      showToastError(err?.message || "Failed to reset total config");
+      resetAllConfigBtn.disabled = false;
+      resetAllConfigBtn.textContent = previousLabel || "Reset total";
+    }
+  });
+}
 
 refreshDevicesBtn.addEventListener("click", () => {
   loadDevices();
 });
+
+if (showNonSdrDevicesToggle) {
+  showNonSdrDevicesToggle.addEventListener("change", () => {
+    showNonSdrDevices = Boolean(showNonSdrDevicesToggle.checked);
+    localStorage.setItem(SHOW_NON_SDR_DEVICES_KEY, showNonSdrDevices ? "1" : "0");
+    loadDevices();
+  });
+}
+
+if (adminDeviceSetupBtn) {
+  adminDeviceSetupBtn.addEventListener("click", () => {
+    runAdministrationSetup();
+  });
+}
+
+if (adminAudioAutoDetectBtn) {
+  adminAudioAutoDetectBtn.addEventListener("click", () => {
+    runAudioAutoDetect();
+  });
+}
+
+if (bandNameInput) {
+  bandNameInput.addEventListener("change", () => {
+    if (bandSelect) {
+      const hasOption = Array.from(bandSelect.options || []).some((option) => option.value === bandNameInput.value);
+      if (hasOption) {
+        bandSelect.value = bandNameInput.value;
+      }
+    }
+
+    const preset = BAND_PRESETS[String(bandNameInput.value)];
+    if (!preset) {
+      return;
+    }
+    bandStartInput.value = String(preset.start_hz);
+    bandEndInput.value = String(preset.end_hz);
+  });
+
+  const initialPreset = BAND_PRESETS[String(bandNameInput.value)];
+  if (initialPreset) {
+    bandStartInput.value = String(initialPreset.start_hz);
+    bandEndInput.value = String(initialPreset.end_hz);
+  }
+}
+
+if (bandSelect && bandNameInput) {
+  bandSelect.addEventListener("change", () => {
+    const hasOption = Array.from(bandNameInput.options || []).some((option) => option.value === bandSelect.value);
+    if (hasOption) {
+      bandNameInput.value = bandSelect.value;
+    }
+  });
+}
 
 saveBandBtn.addEventListener("click", async () => {
   const payload = {
@@ -1478,6 +2472,8 @@ saveBandBtn.addEventListener("click", async () => {
 });
 
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
+syncScanState();
+setInterval(syncScanState, 5000);
 fetchModeStats();
 setInterval(fetchModeStats, 10000);
 fetchDecoderStatus();
@@ -1486,6 +2482,7 @@ updateLoginStatus();
 connectLogs();
 fetchLogs();
 setInterval(fetchLogs, 4000);
+initMenuDropdownModalBehavior();
 
 if (!localStorage.getItem("onboardingDone")) {
   onboarding.classList.add("show");

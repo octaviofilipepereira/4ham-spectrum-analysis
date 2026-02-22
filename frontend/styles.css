@@ -73,6 +73,46 @@ h1,
   color: var(--muted);
 }
 
+.menu-toolbar .card-body {
+  padding: 0.75rem;
+}
+
+.menu-toolbar .btn {
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.menu-toolbar .btn.btn-sm {
+  min-height: 40px;
+  padding: 0.35rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+}
+
+.menu-toolbar .dropdown-toggle {
+  width: 148px;
+}
+
+.menu-toolbar .dropdown-menu {
+  border: 1px solid var(--panel-edge);
+  background: linear-gradient(145deg, rgba(22, 30, 54, 0.98), rgba(12, 18, 34, 0.99));
+}
+
+.menu-toolbar .dropdown-item {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.menu-toolbar .dropdown-item:hover,
+.menu-toolbar .dropdown-item:focus {
+  background: rgba(69, 214, 197, 0.12);
+  color: var(--text);
+}
+
 .panel {
   background: linear-gradient(145deg, rgba(22, 30, 54, 0.96), rgba(12, 18, 34, 0.98));
   border: 1px solid var(--panel-edge);
@@ -94,24 +134,39 @@ h1,
   color: var(--muted);
 }
 
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
 .ws-status {
   color: var(--accent-2);
 }
 
 .form-label {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .form-control,
 .form-select {
   background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text);
 }
 
 .form-control:focus,
 .form-select:focus {
+  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 179, 71, 0.6);
   box-shadow: 0 0 0 0.2rem rgba(255, 179, 71, 0.2);
   color: var(--text);
@@ -353,30 +408,59 @@ h1,
   transition: width 0.2s ease;
 }
 
-.toast {
+.toast-stack {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  max-width: min(480px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.toast-notice {
   background: rgba(20, 25, 40, 0.95);
   color: var(--text);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-radius: 10px;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: none;
-  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
 }
 
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.toast.error {
+.toast-notice.error {
   border-color: rgba(255, 99, 99, 0.6);
   color: #ffd6d6;
+}
+
+.toast__message {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+}
+
+.toast__close {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  font-size: 1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast__close:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .onboarding {
@@ -412,6 +496,57 @@ h1,
   gap: 12px;
 }
 
+.app-modal {
+  --bs-modal-color: var(--text);
+}
+
+.app-modal .modal-content {
+  background: linear-gradient(145deg, rgba(22, 30, 54, 0.98), rgba(12, 18, 34, 0.99));
+  border: 1px solid var(--panel-edge);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(4, 8, 18, 0.6);
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.app-modal .modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.9rem 1rem;
+}
+
+.app-modal .modal-title {
+  font-family: "Chakra Petch", sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.app-modal .modal-body {
+  color: var(--text);
+}
+
+.app-modal .h6 {
+  font-family: "Chakra Petch", sans-serif;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.app-modal .form-check-label {
+  color: var(--muted);
+}
+
+.app-modal .btn-close {
+  filter: invert(1) brightness(1.2);
+  opacity: 0.85;
+}
+
+.app-modal .btn-close:hover {
+  opacity: 1;
+}
+
+.modal-backdrop.show {
+  opacity: 0.62;
+}
+
 @media (max-width: 991px) {
   .app {
     padding-top: 1rem;
@@ -439,9 +574,10 @@ h1,
 }
 
 @media (max-width: 575px) {
-  .toast {
+  .toast-stack {
     left: 16px;
     right: 16px;
     bottom: 16px;
+    max-width: none;
   }
 }

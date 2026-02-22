@@ -416,3 +416,8 @@ class Database:
             stats[mode] = stats.get(mode, 0) + int(row["total"])
 
         return stats
+
+    def clear_configuration(self):
+        self.conn.execute("DELETE FROM settings")
+        self.conn.execute("DELETE FROM bands")
+        self.conn.commit()

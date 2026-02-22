@@ -14,6 +14,29 @@
   </head>
   <body>
     <main class="app container-fluid py-4">
+      <nav class="card panel menu-toolbar mb-3">
+        <div class="card-body">
+          <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Bands</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#modesModal">Modes</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#favoriteBandsModal">Favorite Bands</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#filtersModal">Filters</button>
+            <div class="dropdown">
+              <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Logs &amp; Reports
+              </button>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#logsModal">Logs</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#summaryModal">Summary</button></li>
+              </ul>
+            </div>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#adminModal">Administration</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#helpModal">Help</button>
+          </div>
+        </div>
+      </nav>
+
       <header class="app__header mb-4">
         <div class="row g-3 align-items-center">
           <div class="col-lg-5">
@@ -39,10 +62,9 @@
                     <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
                   </div>
                   <div class="col-12 d-flex flex-wrap gap-2 mt-2">
-                    <button class="btn btn-primary" id="startScan">Start scan</button>
-                    <button class="btn btn-outline-info" id="stopScan">Stop</button>
-                    <span class="login-status" id="loginStatus">Auth: guest</span>
-                    <span class="ws-status" id="wsStatus">WS: disconnected</span>
+                    <button class="btn btn-primary" id="startScan">Start scanning</button>
+                    <span class="login-status status-chip" id="loginStatus">Auth: guest</span>
+                    <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
                   </div>
                 </div>
               </div>
@@ -154,292 +176,11 @@
         <div class="col-12 col-lg-6">
           <div class="card panel">
             <div class="card-body">
-              <h2 class="h5">Login</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-6">
-                  <label class="form-label">User</label>
-                  <input type="text" id="loginUser" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Password</label>
-                  <input type="password" id="loginPass" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12">
-                  <button class="btn btn-outline-info" id="loginSave">Save credentials</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Settings</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-6">
-                  <label class="form-label">Device</label>
-                  <select id="deviceSelect" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Band</label>
-                  <select id="bandSelect" class="form-select form-select-sm">
-                    <option value="20m">20m</option>
-                    <option value="40m">40m</option>
-                    <option value="2m">2m</option>
-                    <option value="70cm">70cm</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Auth user</label>
-                  <input type="text" id="authUser" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Auth pass</label>
-                  <input type="password" id="authPass" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12 d-flex gap-2">
-                  <button class="btn btn-outline-info" id="refreshDevices">Refresh devices</button>
-                  <button class="btn btn-outline-info" id="saveSettings">Save</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Modes</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-6 col-md-3">
-                  <label class="form-label">FT8/FT4</label>
-                  <select id="ft8Toggle" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">APRS</label>
-                  <select id="aprsToggle" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">CW</label>
-                  <select id="cwToggle" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">SSB</label>
-                  <select id="ssbToggle" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <button class="btn btn-outline-info" id="saveModes">Save modes</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Presets</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-12">
-                  <label class="form-label">Preset name</label>
-                  <input type="text" id="presetName" placeholder="Morning scan" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12 d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-info" id="savePreset">Save preset</button>
-                  <button class="btn btn-outline-info" id="exportPresets">Export presets</button>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Import presets</label>
-                  <input type="file" id="importPresets" accept="application/json" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12">
-                  <select id="presetSelect" class="form-select form-select-sm"></select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Favorite Bands</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-12">
-                  <select id="favoriteBands" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-12 d-flex gap-2">
-                  <button class="btn btn-outline-info" id="addFavorite">Add favorite</button>
-                  <button class="btn btn-outline-info" id="removeFavorite">Remove favorite</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Help</h2>
-              <ul class="help">
-                <li>Press <strong>s</strong> to start scan.</li>
-                <li>Press <strong>x</strong> to stop scan.</li>
-                <li>Use filters to narrow events and export CSV/JSON/PNG.</li>
-                <li>Favorites apply quick band filter.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Bands</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-12 col-md-4">
-                  <label class="form-label">Band name</label>
-                  <input type="text" id="bandName" value="20m" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label">Start Hz</label>
-                  <input type="number" id="bandStart" value="14000000" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label">End Hz</label>
-                  <input type="number" id="bandEnd" value="14350000" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12">
-                  <button class="btn btn-outline-info" id="saveBand">Save band</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Filters</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Band</label>
-                  <select id="bandFilter" class="form-select form-select-sm">
-                    <option value="">All</option>
-                    <option value="20m">20m</option>
-                    <option value="40m">40m</option>
-                    <option value="2m">2m</option>
-                    <option value="70cm">70cm</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Mode</label>
-                  <select id="modeFilter" class="form-select form-select-sm">
-                    <option value="">All</option>
-                    <option value="FT8">FT8</option>
-                    <option value="FT4">FT4</option>
-                    <option value="APRS">APRS</option>
-                    <option value="CW">CW</option>
-                    <option value="SSB">SSB</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Favorites</label>
-                  <select id="favoriteFilter" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Callsign</label>
-                  <input type="text" id="callsignFilter" placeholder="CT1ABC" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Start</label>
-                  <input type="datetime-local" id="startFilter" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">End</label>
-                  <input type="datetime-local" id="endFilter" class="form-control form-control-sm" />
-                </div>
-                <div class="col-12 d-flex flex-wrap gap-2">
-                  <button class="btn btn-outline-info" id="exportCsv">Export CSV</button>
-                  <button class="btn btn-outline-info" id="exportJson">Export JSON</button>
-                  <button class="btn btn-outline-info" id="exportPng">Export PNG</button>
-                  <button class="btn btn-outline-info" id="prevPage">Prev</button>
-                  <button class="btn btn-outline-info" id="nextPage">Next</button>
-                  <span class="login-status" id="pageOffset">Offset: 0</span>
-                  <span class="login-status" id="pageNumber">Page: 1</span>
-                  <span class="login-status" id="totalGlobal">Total: 0</span>
-                  <button class="btn btn-outline-info" id="compactToggle">Compact</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Logs</h2>
-              <pre id="logs">No logs yet.</pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
               <h2 class="h5">Signal Quality</h2>
               <div class="quality">
                 <div class="quality__bar" id="qualityBar"></div>
                 <span id="qualityLabel">SNR: --</span>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Band Summary</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-4">
-                  <label class="form-label">Show</label>
-                  <select id="showBandSummary" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-              </div>
-              <ul class="summary" id="bandSummary"></ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Mode Summary</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-4">
-                  <label class="form-label">Show</label>
-                  <select id="showModeSummary" class="form-select form-select-sm">
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                  </select>
-                </div>
-              </div>
-              <ul class="summary" id="modeSummary"></ul>
             </div>
           </div>
         </div>
@@ -454,14 +195,454 @@
         </div>
       </section>
 
-      <div class="toast" id="toast"></div>
+      <div class="toast-stack" id="toast"></div>
     </main>
+
+    <div class="modal fade app-modal" id="adminModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Administration</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="filters row g-2 align-items-end">
+              <div class="col-6">
+                <label class="form-label">Device</label>
+                <select id="deviceSelect" class="form-select form-select-sm"></select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Band</label>
+                <select id="bandSelect" class="form-select form-select-sm">
+                  <option value="160m">160 m</option>
+                  <option value="80m">80 m</option>
+                  <option value="40m">40 m</option>
+                  <option value="20m" selected>20 m</option>
+                  <option value="17m">17 m</option>
+                  <option value="15m">15 m</option>
+                  <option value="12m">12 m</option>
+                  <option value="10m">10 m</option>
+                  <option value="2m">2 m</option>
+                  <option value="70cm">70 cm</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Auth user</label>
+                <input type="text" id="authUser" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Auth pass</label>
+                <input type="password" id="authPass" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12"><h3 class="h6 mb-1">Login</h3></div>
+              <div class="col-6">
+                <label class="form-label">User</label>
+                <input type="text" id="loginUser" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Password</label>
+                <input type="password" id="loginPass" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12">
+                <button class="btn btn-outline-info" id="loginSave">Save credentials</button>
+              </div>
+              <div class="col-12 d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline-info" id="refreshDevices">Refresh devices</button>
+                <button class="btn btn-outline-info" id="saveSettings">Save</button>
+                <button class="btn btn-outline-info" id="testConfig">Test config</button>
+                <button class="btn btn-outline-info" id="adminDeviceSetup">Auto-detect Device</button>
+                <button class="btn btn-outline-info" id="adminAudioAutoDetect">Auto-detect áudio</button>
+                <button class="btn btn-outline-danger" id="resetDefaults">Reset defaults</button>
+                <button class="btn btn-outline-danger" id="resetAllConfig">Reset total</button>
+              </div>
+              <div class="col-12">
+                <div id="adminSetupStatus" class="alert alert-success py-2 mb-0 d-none" role="status"></div>
+                <small class="text-muted">Este estado mostra o áudio guardado e é atualizado após "Auto-detect Device" ou "Auto-detect áudio".</small>
+              </div>
+              <div class="col-12">
+                <div class="form-check mt-1">
+                  <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
+                  <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
+                </div>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
+              <div class="col-6">
+                <label class="form-label">Callsign</label>
+                <input type="text" id="stationCallsign" placeholder="CT7BFV" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Operator</label>
+                <input type="text" id="stationOperator" placeholder="Octávio" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Locator/Grid</label>
+                <input type="text" id="stationLocator" placeholder="IN51" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">QTH</label>
+                <input type="text" id="stationQth" placeholder="Lisboa" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12"><h3 class="h6 mb-1">Device Configuration</h3></div>
+              <div class="col-6">
+                <label class="form-label">Device class</label>
+                <select id="deviceClass" class="form-select form-select-sm">
+                  <option value="auto">Auto</option>
+                  <option value="rtl">RTL-SDR</option>
+                  <option value="hackrf">HackRF</option>
+                  <option value="airspy">Airspy</option>
+                  <option value="transceiver_sdr">Transceiver SDR interface</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">PPM correction</label>
+                <input type="number" id="devicePpm" value="0" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Frequency offset (Hz)</label>
+                <input type="number" id="deviceOffsetHz" value="0" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">RF gain profile</label>
+                <select id="deviceGainProfile" class="form-select form-select-sm">
+                  <option value="auto">Auto</option>
+                  <option value="low">Low</option>
+                  <option value="mid">Mid</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <button class="btn btn-outline-info" id="saveDeviceConfig">Save device</button>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12"><h3 class="h6 mb-1">Audio Configuration</h3></div>
+              <div class="col-6">
+                <label class="form-label">Input device</label>
+                <input type="text" id="audioInputDevice" placeholder="default" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Output device</label>
+                <input type="text" id="audioOutputDevice" placeholder="default" class="form-control form-control-sm" />
+              </div>
+              <div class="col-4">
+                <label class="form-label">Sample rate</label>
+                <input type="number" id="audioSampleRate" value="48000" class="form-control form-control-sm" />
+              </div>
+              <div class="col-4">
+                <label class="form-label">RX gain</label>
+                <input type="number" id="audioRxGain" value="1" step="0.1" class="form-control form-control-sm" />
+              </div>
+              <div class="col-4">
+                <label class="form-label">TX gain</label>
+                <input type="number" id="audioTxGain" value="1" step="0.1" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12">
+                <button class="btn btn-outline-info" id="saveAudioConfig">Save audio</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="bandsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">0. Bands</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Bands</h2>
+                <div class="filters row g-2 align-items-end">
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Band name</label>
+                    <select id="bandName" class="form-select form-select-sm">
+                      <option value="160m">160 m (1.810 - 2.000 MHz)</option>
+                      <option value="80m">80 m (3.500 - 3.800 MHz)</option>
+                      <option value="40m">40 m (7.000 - 7.200 MHz)</option>
+                      <option value="20m" selected>20 m (14.000 - 14.350 MHz)</option>
+                      <option value="17m">17 m (18.068 - 18.168 MHz)</option>
+                      <option value="15m">15 m (21.000 - 21.450 MHz)</option>
+                      <option value="12m">12 m (24.890 - 24.990 MHz)</option>
+                      <option value="10m">10 m (28.000 - 29.700 MHz)</option>
+                      <option value="2m">2 m (144 - 146 MHz)</option>
+                      <option value="70cm">70 cm (430 - 440 MHz)</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <label class="form-label">Start Hz</label>
+                    <input type="number" id="bandStart" value="14000000" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <label class="form-label">End Hz</label>
+                    <input type="number" id="bandEnd" value="14350000" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-12">
+                    <button class="btn btn-outline-info" id="saveBand">Save band</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="modesModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">1. Modes</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Modes</h2>
+                <div class="filters row g-2 align-items-end">
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">FT8/FT4</label>
+                    <select id="ft8Toggle" class="form-select form-select-sm">
+                      <option value="on">On</option>
+                      <option value="off" selected>Off</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">APRS</label>
+                    <select id="aprsToggle" class="form-select form-select-sm">
+                      <option value="on">On</option>
+                      <option value="off" selected>Off</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">CW</label>
+                    <select id="cwToggle" class="form-select form-select-sm">
+                      <option value="on">On</option>
+                      <option value="off" selected>Off</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">SSB</label>
+                    <select id="ssbToggle" class="form-select form-select-sm">
+                      <option value="on" selected>On</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <button class="btn btn-outline-info" id="saveModes">Save modes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="presetsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">2. Presets</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Presets</h2>
+                <div class="filters row g-2 align-items-end">
+                  <div class="col-12">
+                    <label class="form-label">Preset name</label>
+                    <input type="text" id="presetName" placeholder="Morning scan" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-info" id="savePreset">Save preset</button>
+                    <button class="btn btn-outline-danger" id="deletePreset">Delete preset</button>
+                    <button class="btn btn-outline-info" id="exportPresets">Export presets</button>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Import presets</label>
+                    <input type="file" id="importPresets" accept="application/json" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-12">
+                    <select id="presetSelect" class="form-select form-select-sm"></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="favoriteBandsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">3. Favorite Bands</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Favorite Bands</h2>
+                <div class="filters row g-2 align-items-end">
+                  <div class="col-12">
+                    <select id="favoriteBands" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-outline-info" id="addFavorite">Add favorite</button>
+                    <button class="btn btn-outline-info" id="removeFavorite">Remove favorite</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="filtersModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">4. Filters</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Filters</h2>
+                <div class="filters row g-2 align-items-end">
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">Band</label>
+                    <select id="bandFilter" class="form-select form-select-sm">
+                      <option value="">All</option>
+                      <option value="20m">20m</option>
+                      <option value="40m">40m</option>
+                      <option value="2m">2m</option>
+                      <option value="70cm">70cm</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">Mode</label>
+                    <select id="modeFilter" class="form-select form-select-sm">
+                      <option value="">All</option>
+                      <option value="FT8">FT8</option>
+                      <option value="FT4">FT4</option>
+                      <option value="APRS">APRS</option>
+                      <option value="CW">CW</option>
+                      <option value="SSB">SSB</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">Favorites</label>
+                    <select id="favoriteFilter" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">Callsign</label>
+                    <input type="text" id="callsignFilter" placeholder="CT1ABC" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">Start</label>
+                    <input type="datetime-local" id="startFilter" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">End</label>
+                    <input type="datetime-local" id="endFilter" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-info" id="exportCsv">Export CSV</button>
+                    <button class="btn btn-outline-info" id="exportJson">Export JSON</button>
+                    <button class="btn btn-outline-info" id="exportPng">Export PNG</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="logsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">5.1 Logs</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Logs</h2>
+                <pre id="logs">No logs yet.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="summaryModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">5.2 Summary</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Summary Matrix (Bands × Modes)</h2>
+                <p class="small text-muted mb-2" id="summaryMatrixCaption"></p>
+                <div class="table-responsive">
+                  <table class="table table-sm table-dark align-middle mb-0" id="summaryMatrixTable">
+                    <thead></thead>
+                    <tbody></tbody>
+                    <tfoot></tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="helpModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Help</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Help</h2>
+                <ul class="help">
+                  <li>Press <strong>s</strong> to start scan.</li>
+                  <li>Press <strong>x</strong> to stop scan.</li>
+                  <li>Use filters to narrow events and export CSV/JSON/PNG.</li>
+                  <li>Favorites apply quick band filter.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=20260222"></script>
   </body>
 </html>

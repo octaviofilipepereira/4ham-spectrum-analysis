@@ -2,6 +2,9 @@ import asyncio
 import os
 import time
 import base64
+import shutil
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,7 +35,7 @@ from app.dsp.pipeline import (
     classify_mode_heuristic
 )
 from app.scan.engine import ScanEngine
-from app.sdr.controller import SDRController
+from app.sdr.controller import SDRController, soapy_import_status
 from app.streaming import encode_delta_int8
 from app.storage.db import Database
 from app.storage.exporter import ExportManager
@@ -51,6 +54,19 @@ _scan_state = {
     "scan": None,
     "scan_id": None
 }
+_default_modes = {
+    "ft8": False,
+    "aprs": False,
+    "cw": False,
+    "ssb": True,
+}
+
+
+def _default_settings_payload():
+    return {
+        "modes": dict(_default_modes),
+        "summary": {"showBand": True, "showMode": True},
+    }
 _spectrum_cache = {
     "fft_db": None,
     "bin_hz": None,
@@ -158,6 +174,328 @@ _decoder_status = {
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
+
+
+def _command_exists(command):
+    return shutil.which(command) is not None
+
+
+def _run_command(command, timeout=180):
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        return {
+            "command": " ".join(command),
+            "returncode": result.returncode,
+            "stdout": (result.stdout or "")[-4000:],
+            "stderr": (result.stderr or "")[-4000:],
+        }
+    except Exception as exc:
+        return {
+            "command": " ".join(command),
+            "returncode": -1,
+            "stdout": "",
+            "stderr": str(exc),
+        }
+
+
+def _is_apt_package_installed(package_name):
+    result = _run_command(["dpkg-query", "-W", "-f=${Status}", package_name], timeout=30)
+    if result.get("returncode") != 0:
+        return False
+    status_text = (result.get("stdout") or "").strip().lower()
+    return "install ok installed" in status_text
+
+
+def _check_apt_packages(packages):
+    installed = []
+    missing = []
+    for package_name in packages:
+        if _is_apt_package_installed(package_name):
+            installed.append(package_name)
+        else:
+            missing.append(package_name)
+    return {"installed": installed, "missing": missing}
+
+
+def _list_audio_devices_from_pactl(kind):
+    result = _run_command(["pactl", "list", "short", kind], timeout=15)
+    if result.get("returncode") != 0:
+        return []
+    devices = []
+    for line in (result.get("stdout") or "").splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[1].strip():
+            devices.append(parts[1].strip())
+    return devices
+
+
+def _parse_default_pactl_endpoint(info_text, label):
+    for line in (info_text or "").splitlines():
+        if line.startswith(label):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def _list_audio_devices_from_alsa(command):
+    result = _run_command([command, "-L"], timeout=15)
+    if result.get("returncode") != 0:
+        return []
+    devices = []
+    for line in (result.get("stdout") or "").splitlines():
+        item = line.strip()
+        if not item or item.startswith("#"):
+            continue
+        if line[:1].isspace() or line.startswith("\t"):
+            continue
+        devices.append(item)
+    return devices
+
+
+def _probe_audio_setup():
+    inputs = []
+    outputs = []
+    default_input = None
+    default_output = None
+    methods = []
+
+    if _command_exists("pactl"):
+        methods.append("pactl")
+        info = _run_command(["pactl", "info"], timeout=15)
+        info_text = info.get("stdout") or ""
+        default_input = _parse_default_pactl_endpoint(info_text, "Default Source")
+        default_output = _parse_default_pactl_endpoint(info_text, "Default Sink")
+        inputs = _list_audio_devices_from_pactl("sources")
+        outputs = _list_audio_devices_from_pactl("sinks")
+
+    if not inputs and _command_exists("arecord"):
+        methods.append("arecord")
+        inputs = _list_audio_devices_from_alsa("arecord")
+    if not outputs and _command_exists("aplay"):
+        methods.append("aplay")
+        outputs = _list_audio_devices_from_alsa("aplay")
+
+    suggested = {
+        "input_device": default_input or (inputs[0] if inputs else ""),
+        "output_device": default_output or (outputs[0] if outputs else ""),
+        "sample_rate": 48000,
+        "rx_gain": 1,
+        "tx_gain": 1,
+    }
+    return {
+        "methods": methods,
+        "inputs": inputs,
+        "outputs": outputs,
+        "default_input": default_input,
+        "default_output": default_output,
+        "suggested": suggested,
+    }
+
+
+def _normalize_device_choice(choice):
+    value = str(choice or "").strip().lower()
+    if "rtl" in value:
+        return "rtl"
+    if "hack" in value:
+        return "hackrf"
+    if "air" in value:
+        return "airspy"
+    if not value:
+        return "other"
+    return value
+
+
+def _find_device_by_choice(devices, choice):
+    term = str(choice or "").lower()
+    for item in devices:
+        haystack = " ".join([
+            str(item.get("id", "")).lower(),
+            str(item.get("type", "")).lower(),
+            str(item.get("name", "")).lower(),
+        ])
+        if term in haystack:
+            return item
+    return None
+
+
+def _device_profile(choice):
+    profiles = {
+        "rtl": {
+            "sample_rate": 2048000,
+            "gain": 30,
+            "ppm_correction": 0,
+            "frequency_offset_hz": 0,
+            "gain_profile": "auto",
+        },
+        "hackrf": {
+            "sample_rate": 2000000,
+            "gain": 20,
+            "ppm_correction": 0,
+            "frequency_offset_hz": 0,
+            "gain_profile": "auto",
+        },
+        "airspy": {
+            "sample_rate": 2500000,
+            "gain": 20,
+            "ppm_correction": 0,
+            "frequency_offset_hz": 0,
+            "gain_profile": "auto",
+        },
+        "other": {
+            "sample_rate": 48000,
+            "gain": 20,
+            "ppm_correction": 0,
+            "frequency_offset_hz": 0,
+            "gain_profile": "auto",
+        },
+    }
+    return profiles.get(choice, profiles["other"])
+
+
+def _device_requirements(choice):
+    linux_packages = ["python3-soapysdr", "soapysdr-tools", "libsoapysdr-dev"]
+    if choice == "rtl":
+        linux_packages.extend(["soapysdr-module-rtlsdr", "rtl-sdr"])
+    elif choice == "hackrf":
+        linux_packages.extend(["soapysdr-module-hackrf", "hackrf"])
+    elif choice == "airspy":
+        linux_packages.extend(["soapysdr-module-airspy", "airspy"])
+    else:
+        linux_packages.append("soapysdr-module-all")
+    return {
+        "python_modules": ["SoapySDR"],
+        "linux_apt_packages": linux_packages,
+        "required_commands": ["SoapySDRUtil", "rtl_test", "lsusb"],
+    }
+
+
+def _probe_device_setup(choice):
+    devices = _controller.list_devices()
+    matched = _find_device_by_choice(devices, choice)
+    soapy_import, soapy_error = soapy_import_status()
+
+    requirements = _device_requirements(choice)
+    apt_status = {"installed": [], "missing": []}
+    if sys.platform.startswith("linux"):
+        apt_status = _check_apt_packages(requirements.get("linux_apt_packages", []))
+
+    return {
+        "platform": sys.platform,
+        "commands": {
+            "SoapySDRUtil": _command_exists("SoapySDRUtil"),
+            "rtl_test": _command_exists("rtl_test"),
+            "lsusb": _command_exists("lsusb"),
+        },
+        "python": {
+            "soapy_import_ok": soapy_import,
+            "soapy_import_error": soapy_error,
+        },
+        "apt_packages": apt_status,
+        "devices_detected": devices,
+        "match_found": bool(matched),
+        "matched_device": matched,
+    }
+
+
+def _run_linux_auto_install(choice, missing_packages=None):
+    attempted = False
+    steps = []
+
+    if not sys.platform.startswith("linux"):
+        return {
+            "attempted": False,
+            "success": False,
+            "error": "auto_install_only_supported_on_linux",
+            "method": None,
+            "steps": steps,
+        }
+
+    base_packages = list(missing_packages or [])
+    if not base_packages:
+        return {
+            "attempted": False,
+            "success": True,
+            "error": None,
+            "method": None,
+            "steps": steps,
+        }
+
+    strategies = []
+    if _command_exists("apt-get") and hasattr(os, "geteuid") and os.geteuid() == 0:
+        strategies.append({
+            "name": "root_direct",
+            "commands": [
+                ["apt-get", "update"],
+                ["apt-get", "install", "-y", *base_packages],
+            ],
+        })
+    if _command_exists("sudo"):
+        strategies.append({
+            "name": "sudo_nopasswd",
+            "commands": [
+                ["sudo", "-n", "apt-get", "update"],
+                ["sudo", "-n", "apt-get", "install", "-y", *base_packages],
+            ],
+        })
+    if _command_exists("pkexec"):
+        strategies.append({
+            "name": "pkexec_gui",
+            "commands": [
+                ["pkexec", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "update"],
+                ["pkexec", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", *base_packages],
+            ],
+        })
+
+    if not strategies:
+        return {
+            "attempted": False,
+            "success": False,
+            "error": "no_privilege_escalation_tool",
+            "method": None,
+            "steps": steps,
+        }
+
+    for strategy in strategies:
+        strategy_ok = True
+        for command in strategy["commands"]:
+            attempted = True
+            result = _run_command(command, timeout=900)
+            result["strategy"] = strategy["name"]
+            steps.append(result)
+            if result.get("returncode") != 0:
+                strategy_ok = False
+                break
+        if strategy_ok:
+            return {
+                "attempted": attempted,
+                "success": True,
+                "error": None,
+                "method": strategy["name"],
+                "steps": steps,
+            }
+
+    combined_stderr = "\n".join((item.get("stderr") or "") for item in steps).lower()
+    needs_elevation = any(token in combined_stderr for token in [
+        "password is required",
+        "authentication",
+        "polkit",
+        "not authorized",
+        "not allowed",
+        "permission denied",
+    ])
+
+    return {
+        "attempted": attempted,
+        "success": False,
+        "error": "elevation_required" if needs_elevation else "apt_install_failed",
+        "method": None,
+        "steps": steps,
+    }
 
 
 def _auth_required():
@@ -380,6 +718,9 @@ async def scan_start(payload: dict, request: Request):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     scan = normalized_payload.get("scan", {})
+    selected_device = normalized_payload.get("device")
+    if selected_device and not scan.get("device_id"):
+        scan["device_id"] = selected_device
     region_profile_path = normalized_payload.get("region_profile_path")
     if region_profile_path:
         try:
@@ -761,6 +1102,13 @@ def scan_status(request: Request = None):
 def get_settings(request: Request):
     _enforce_auth(request)
     settings = _db.get_settings()
+    modes = settings.get("modes") or {}
+    settings["modes"] = {
+        "ft8": bool(modes.get("ft8", _default_modes["ft8"])),
+        "aprs": bool(modes.get("aprs", _default_modes["aprs"])),
+        "cw": bool(modes.get("cw", _default_modes["cw"])),
+        "ssb": bool(modes.get("ssb", _default_modes["ssb"])),
+    }
     if "summary" not in settings:
         settings["summary"] = {"showBand": True, "showMode": True}
     return settings
@@ -781,11 +1129,157 @@ def save_settings(payload: dict, request: Request):
     if payload.get("favorites"):
         existing["favorites"] = payload.get("favorites")
     if payload.get("modes"):
-        existing["modes"] = payload.get("modes")
+        modes = payload.get("modes") or {}
+        existing["modes"] = {
+            "ft8": bool(modes.get("ft8", _default_modes["ft8"])),
+            "aprs": bool(modes.get("aprs", _default_modes["aprs"])),
+            "cw": bool(modes.get("cw", _default_modes["cw"])),
+            "ssb": bool(modes.get("ssb", _default_modes["ssb"])),
+        }
     if payload.get("summary"):
         existing["summary"] = payload.get("summary")
+    if "station" in payload:
+        existing["station"] = payload.get("station") or {}
+    if "device_config" in payload:
+        existing["device_config"] = payload.get("device_config") or {}
+    if "audio_config" in payload:
+        existing["audio_config"] = payload.get("audio_config") or {}
     _db.save_settings(existing)
     return {"status": "ok"}
+
+
+@app.post("/api/settings/reset-defaults")
+def reset_settings_defaults(request: Request):
+    _enforce_auth(request)
+    defaults = _default_settings_payload()
+    _db.save_settings(defaults)
+    return {"status": "ok", "settings": defaults}
+
+
+@app.post("/api/admin/reset-all-config")
+def admin_reset_all_config(request: Request):
+    _enforce_auth(request)
+    _db.clear_configuration()
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/device/setup")
+def admin_device_setup(payload: dict, request: Request):
+    _enforce_auth(request)
+    payload = payload or {}
+    choice = _normalize_device_choice(payload.get("device_type"))
+    dry_run = bool(payload.get("dry_run", False))
+    auto_install = bool(payload.get("auto_install", False))
+    apply_config = bool(payload.get("apply_config", True))
+    requirements = _device_requirements(choice)
+
+    probe_before = _probe_device_setup(choice)
+    missing_packages_before = probe_before.get("apt_packages", {}).get("missing", [])
+    install_result = {
+        "attempted": False,
+        "success": True,
+        "error": None,
+        "method": None,
+        "steps": [],
+    }
+
+    should_install = bool(missing_packages_before)
+    if not dry_run and auto_install and should_install:
+        install_result = _run_linux_auto_install(choice, missing_packages=missing_packages_before)
+
+    probe_after = _probe_device_setup(choice)
+    matched = probe_after.get("matched_device")
+    profile = _device_profile(choice)
+    audio_probe = _probe_audio_setup()
+
+    configured = {
+        "applied": False,
+        "device_id": None,
+        "profile": profile,
+        "device_config": None,
+        "audio_config": audio_probe.get("suggested"),
+    }
+    if not dry_run and apply_config and matched:
+        settings = _db.get_settings()
+        settings["device_id"] = matched.get("id")
+        device_config = settings.get("device_config") or {}
+        device_config["device_class"] = choice if choice in {"rtl", "hackrf", "airspy"} else "auto"
+        device_config["ppm_correction"] = profile.get("ppm_correction", 0)
+        device_config["frequency_offset_hz"] = profile.get("frequency_offset_hz", 0)
+        device_config["gain_profile"] = profile.get("gain_profile", "auto")
+        settings["device_config"] = device_config
+        settings["audio_config"] = audio_probe.get("suggested")
+        _db.save_settings(settings)
+        configured = {
+            "applied": True,
+            "device_id": matched.get("id"),
+            "profile": profile,
+            "device_config": device_config,
+            "audio_config": audio_probe.get("suggested"),
+        }
+
+    return {
+        "status": "ok",
+        "device_type": choice,
+        "dry_run": dry_run,
+        "requirements": requirements,
+        "missing_packages_before": missing_packages_before,
+        "probe_before": probe_before,
+        "install": install_result,
+        "probe_after": probe_after,
+        "audio_probe": audio_probe,
+        "configured": configured,
+    }
+
+
+@app.post("/api/admin/config/test")
+def admin_config_test(payload: dict, request: Request):
+    _enforce_auth(request)
+    payload = payload or {}
+
+    selected_device_id = payload.get("device_id")
+    audio_config = payload.get("audio_config") or {}
+
+    devices = _controller.list_devices()
+    soapy_ok, soapy_error = soapy_import_status()
+    device_ok = bool(devices)
+    if selected_device_id:
+        device_ok = any(str(item.get("id")) == str(selected_device_id) for item in devices)
+
+    sample_rate = int(audio_config.get("sample_rate") or 0)
+    rx_gain = float(audio_config.get("rx_gain") or 0)
+    tx_gain = float(audio_config.get("tx_gain") or 0)
+    audio_checks = {
+        "arecord": _command_exists("arecord"),
+        "aplay": _command_exists("aplay"),
+        "pactl": _command_exists("pactl"),
+        "pw-cli": _command_exists("pw-cli"),
+        "sample_rate_valid": 8000 <= sample_rate <= 384000,
+        "rx_gain_valid": 0.0 <= rx_gain <= 10.0,
+        "tx_gain_valid": 0.0 <= tx_gain <= 10.0,
+    }
+    audio_ok = bool(
+        audio_checks["sample_rate_valid"]
+        and audio_checks["rx_gain_valid"]
+        and audio_checks["tx_gain_valid"]
+        and (audio_checks["arecord"] or audio_checks["pactl"] or audio_checks["pw-cli"])
+        and (audio_checks["aplay"] or audio_checks["pactl"] or audio_checks["pw-cli"])
+    )
+
+    return {
+        "status": "ok",
+        "device": {
+            "selected": selected_device_id,
+            "ok": device_ok and soapy_ok,
+            "detected_count": len(devices),
+            "soapy_import_ok": soapy_ok,
+            "soapy_import_error": soapy_error,
+        },
+        "audio": {
+            "ok": audio_ok,
+            "checks": audio_checks,
+        },
+    }
 
 
 @app.websocket("/ws/events")
