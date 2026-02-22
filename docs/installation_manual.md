@@ -126,6 +126,17 @@ The backend can listen to WSJT-X UDP broadcast packets (native protocol). Config
 - `WSJTX_UDP_HOST`: bind address (default `0.0.0.0`)
 - `WSJTX_UDP_PORT`: UDP port (default `2237`)
 
+WSJT-X GUI configuration (required for FT8/FT4 callsign ingest):
+
+1. Open WSJT-X and go to `File` -> `Settings` (or press `F2`).
+2. Open the `Reporting` tab.
+3. Set `UDP Server` to `127.0.0.1`.
+4. Set `UDP Server Port Number` to `2237`.
+5. Enable `Accept UDP requests`.
+6. Keep WSJT-X decoding on an active FT8/FT4 frequency.
+
+Without this WSJT-X Reporting configuration, the platform can still show RF occupancy in scan/waterfall, but callsigns from FT8/FT4 will not be ingested.
+
 ### Direwolf KISS TCP
 The backend can connect to Direwolf KISS TCP and ingest APRS frames automatically. Configure:
 
@@ -234,6 +245,7 @@ python backend/cli.py --stop
 - If Python cannot import SoapySDR, confirm `python3-soapysdr` is installed on Linux.
 - If no FFT frames appear, reduce sample rate or close other SDR applications.
 - For RTL-SDR permissions, confirm udev rules and reconnect the device.
+- If scan is running and RF is visible but no callsigns appear, confirm WSJT-X `Reporting` is set to `127.0.0.1:2237` and that `/api/decoders/status` updates `wsjtx_udp.last_packet_at`.
 
 ## Uninstall
 - Remove the virtual environment: `rm -rf .venv`

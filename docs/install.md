@@ -61,6 +61,7 @@ Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 
 ## Notes
 - Use a virtual audio cable for WSJT-X integration.
+- For FT8/FT4 callsign ingest via WSJT-X UDP, configure WSJT-X: `File` -> `Settings` -> `Reporting` -> `UDP Server=127.0.0.1`, `UDP Server Port=2237`, and enable `Accept UDP requests`.
 - For APRS, run Direwolf with KISS TCP enabled.
 - Optional: set decoder file paths (e.g., `WSJTX_ALLTXT_PATH`) for automatic ingest.
 - Optional: enable native WSJT-X UDP ingest with `WSJTX_UDP_ENABLE=1`.
