@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:34:50 UTC
+# Last update: 2026-02-22 00:44:26 UTC
 
 import asyncio
 import os
@@ -10,7 +10,7 @@ import base64
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -562,6 +562,132 @@ def _cpu_percent():
     return psutil.cpu_percent(interval=None)
 
 
+def _clamp(value, minimum, maximum):
+    return max(minimum, min(maximum, value))
+
+
+def _safe_float(value, default=None):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_event_timestamp(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _score_to_state(score):
+    if score >= 70:
+        return "Excellent"
+    if score >= 50:
+        return "Good"
+    if score >= 30:
+        return "Fair"
+    return "Poor"
+
+
+def _build_propagation_summary(window_minutes=30, limit=3000):
+    safe_window_minutes = max(1, int(window_minutes or 30))
+    safe_limit = max(100, min(int(limit or 3000), 10000))
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(minutes=safe_window_minutes)
+
+    events = _db.get_events(
+        limit=safe_limit,
+        start=start.isoformat(),
+        end=now.isoformat()
+    )
+
+    per_band = {}
+    weighted_score_sum = 0.0
+    weighted_sum = 0.0
+
+    for event in events:
+        band = str(event.get("band") or "Unknown")
+        bucket = per_band.setdefault(
+            band,
+            {
+                "band": band,
+                "events": 0,
+                "weighted_score_sum": 0.0,
+                "weighted_sum": 0.0,
+                "max_snr_db": None,
+            }
+        )
+
+        event_type = str(event.get("type") or "")
+        base_weight = 1.0 if event_type == "callsign" else 0.55
+
+        parsed_ts = _parse_event_timestamp(event.get("timestamp"))
+        recency_weight = 0.6
+        if parsed_ts is not None:
+            age_minutes = max(0.0, (now - parsed_ts).total_seconds() / 60.0)
+            recency_weight = _clamp(1.0 - (age_minutes / safe_window_minutes), 0.2, 1.0)
+
+        raw_snr = _safe_float(event.get("snr_db"), default=None)
+        snr_norm = 0.5
+        if raw_snr is not None:
+            snr_norm = _clamp((raw_snr + 20.0) / 40.0, 0.0, 1.0)
+            previous_max = bucket["max_snr_db"]
+            bucket["max_snr_db"] = raw_snr if previous_max is None else max(previous_max, raw_snr)
+
+        confidence_default = 0.6 if event_type == "callsign" else 0.5
+        confidence = _clamp(_safe_float(event.get("confidence"), default=confidence_default), 0.0, 1.0)
+        grid_bonus = 0.1 if event.get("grid") else 0.0
+        mode_bonus = 0.05 if str(event.get("mode") or "").strip() else 0.0
+
+        event_score = _clamp((0.55 * snr_norm) + (0.35 * confidence) + grid_bonus + mode_bonus, 0.0, 1.0)
+        weight = base_weight * recency_weight
+
+        bucket["events"] += 1
+        bucket["weighted_score_sum"] += event_score * weight
+        bucket["weighted_sum"] += weight
+
+        weighted_score_sum += event_score * weight
+        weighted_sum += weight
+
+    bands = []
+    for bucket in per_band.values():
+        denominator = bucket["weighted_sum"] or 1.0
+        score = round((bucket["weighted_score_sum"] / denominator) * 100.0, 1)
+        bands.append(
+            {
+                "band": bucket["band"],
+                "score": score,
+                "state": _score_to_state(score),
+                "events": int(bucket["events"]),
+                "max_snr_db": round(bucket["max_snr_db"], 1) if bucket["max_snr_db"] is not None else None,
+            }
+        )
+
+    bands.sort(key=lambda item: (item.get("score", 0.0), item.get("events", 0)), reverse=True)
+    overall_score = round((weighted_score_sum / (weighted_sum or 1.0)) * 100.0, 1) if events else 0.0
+
+    return {
+        "status": "ok",
+        "generated_at": now.isoformat(),
+        "window_minutes": safe_window_minutes,
+        "event_count": len(events),
+        "overall": {
+            "score": overall_score,
+            "state": _score_to_state(overall_score),
+        },
+        "bands": bands,
+    }
+
+
 def _log(message):
     timestamp = datetime.now(timezone.utc).isoformat()
     _logs.append(f"{timestamp} {message}")
@@ -834,6 +960,17 @@ def events_stats(request: Request = None):
     if request:
         _enforce_auth(request)
     return {"modes": _db.get_event_stats()}
+
+
+@app.get("/api/propagation/summary")
+def propagation_summary(
+    window_minutes: int = 30,
+    limit: int = 3000,
+    request: Request = None
+):
+    if request:
+        _enforce_auth(request)
+    return _build_propagation_summary(window_minutes=window_minutes, limit=limit)
 
 
 @app.get("/api/decoders/status")

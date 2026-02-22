@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 00:44:26 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -176,6 +176,8 @@ const qualityLabel = document.getElementById("qualityLabel");
 const summaryMatrixTable = document.getElementById("summaryMatrixTable");
 const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
 const eventsTotal = document.getElementById("eventsTotal");
+const propagationScore = document.getElementById("propagationScore");
+const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
 const decoderStatusEl = document.getElementById("decoderStatus");
@@ -1196,6 +1198,53 @@ async function fetchModeStats() {
     }
     const data = await resp.json();
     modeStatsCache = data.modes || {};
+  } catch (err) {
+    return;
+  }
+}
+
+function renderPropagationSummary(data) {
+  if (!propagationScore || !propagationBands) {
+    return;
+  }
+  const overallScore = Number(data?.overall?.score ?? 0).toFixed(1);
+  const overallState = String(data?.overall?.state || "Unknown");
+  const eventCount = Number(data?.event_count || 0);
+  const windowMinutes = Number(data?.window_minutes || 30);
+  propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min`;
+
+  const bands = Array.isArray(data?.bands) ? data.bands.slice(0, 5) : [];
+  propagationBands.innerHTML = "";
+  if (!bands.length) {
+    const li = document.createElement("li");
+    li.textContent = "No propagation data for current window.";
+    propagationBands.appendChild(li);
+    return;
+  }
+
+  bands.forEach((item) => {
+    const li = document.createElement("li");
+    const bandName = String(item?.band || "Unknown");
+    const score = Number(item?.score || 0).toFixed(1);
+    const state = String(item?.state || "Unknown");
+    const events = Number(item?.events || 0);
+    const maxSNR = item?.max_snr_db;
+    const snrLabel = maxSNR === null || maxSNR === undefined ? "-" : `${Number(maxSNR).toFixed(1)} dB`;
+    li.textContent = `${bandName}: ${score}/100 (${state}) | events=${events} | max SNR=${snrLabel}`;
+    propagationBands.appendChild(li);
+  });
+}
+
+async function fetchPropagationSummary() {
+  try {
+    const resp = await fetch("/api/propagation/summary?window_minutes=30&limit=3000", {
+      headers: { ...getAuthHeader() }
+    });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    renderPropagationSummary(data);
   } catch (err) {
     return;
   }
@@ -2483,6 +2532,8 @@ syncScanState();
 setInterval(syncScanState, 5000);
 fetchModeStats();
 setInterval(fetchModeStats, 10000);
+fetchPropagationSummary();
+setInterval(fetchPropagationSummary, 15000);
 fetchDecoderStatus();
 setInterval(fetchDecoderStatus, 10000);
 updateLoginStatus();
