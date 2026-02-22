@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 16:27:19 UTC
+- No modo FT8 o decoder funciona? 2026-02-22 16:27:19 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -539,12 +539,32 @@ function showWaterfallHoverTooltip(text, clientX, clientY) {
   tooltip.classList.remove("is-hidden");
 }
 
-function computeRulerStepHz(spanHz, bandName = "") {
-  const band = String(bandName || "").trim();
-  if (band === "12m" || band === "17m" || band === "160m") {
-    return 50_000;
+function computeRulerStepHz(spanHz, rulerWidthPx = 0) {
+  const span = Number(spanHz);
+  if (!Number.isFinite(span) || span <= 0) {
+    return 100_000;
   }
-  return 100_000;
+
+  const widthPx = Number.isFinite(rulerWidthPx) && rulerWidthPx > 0 ? rulerWidthPx : 960;
+  const targetTicks = Math.max(4, Math.min(16, Math.round(widthPx / 110)));
+  const rawStepHz = span / targetTicks;
+  if (!Number.isFinite(rawStepHz) || rawStepHz <= 0) {
+    return 100_000;
+  }
+
+  const magnitude = 10 ** Math.floor(Math.log10(rawStepHz));
+  const normalized = rawStepHz / magnitude;
+  let niceFactor = 10;
+  if (normalized <= 1) {
+    niceFactor = 1;
+  } else if (normalized <= 2) {
+    niceFactor = 2;
+  } else if (normalized <= 5) {
+    niceFactor = 5;
+  }
+
+  const stepHz = niceFactor * magnitude;
+  return Math.max(1_000, Math.round(stepHz));
 }
 
 function renderWaterfallRuler(startHz, endHz) {
@@ -559,7 +579,7 @@ function renderWaterfallRuler(startHz, endHz) {
     return;
   }
 
-  const stepHz = computeRulerStepHz(span, bandSelect?.value || "20m");
+  const stepHz = computeRulerStepHz(span, waterfallRuler.clientWidth);
   const selectedBandRange = getScanRangeForBand(bandSelect?.value || "20m");
   const gridOriginHz = Number(selectedBandRange?.start_hz || start);
   const firstTick = gridOriginHz + (Math.ceil((start - gridOriginHz) / stepHz) * stepHz);
