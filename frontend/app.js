@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:49:28 UTC
+Last update: 2026-02-22 00:57:34 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -66,6 +66,7 @@ const audioOutputDeviceInput = document.getElementById("audioOutputDevice");
 const audioSampleRateInput = document.getElementById("audioSampleRate");
 const audioRxGainInput = document.getElementById("audioRxGain");
 const audioTxGainInput = document.getElementById("audioTxGain");
+const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
 
 function updateAdminAudioStatus(audioProfile, options = {}) {
@@ -220,6 +221,23 @@ const DEFAULT_BAND_OPTIONS = [
   { name: "2m", label: "2 m" },
   { name: "70cm", label: "70 cm" },
 ];
+const bandRangesByName = new Map(
+  Object.entries(BAND_PRESETS).map(([name, range]) => [
+    name,
+    { start_hz: Number(range.start_hz), end_hz: Number(range.end_hz) },
+  ])
+);
+
+function getScanRangeForBand(bandName) {
+  const selectedBand = String(bandName || "").trim();
+  const range = bandRangesByName.get(selectedBand) || bandRangesByName.get("20m");
+  const startHz = Number(range?.start_hz || 0);
+  const endHz = Number(range?.end_hz || 0);
+  if (startHz > 0 && endHz > startHz) {
+    return { start_hz: startHz, end_hz: endHz };
+  }
+  return { start_hz: 14000000, end_hz: 14350000 };
+}
 
 function populateBandSelectOptions(sourceBands) {
   if (!bandSelect) {
@@ -237,6 +255,11 @@ function populateBandSelectOptions(sourceBands) {
     if (!byName.has(name)) {
       byName.set(name, name);
     }
+    const startHz = Number(item?.start_hz || 0);
+    const endHz = Number(item?.end_hz || 0);
+    if (startHz > 0 && endHz > startHz) {
+      bandRangesByName.set(name, { start_hz: startHz, end_hz: endHz });
+    }
   });
 
   const current = bandSelect.value;
@@ -253,6 +276,26 @@ function populateBandSelectOptions(sourceBands) {
   } else {
     bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
   }
+
+  refreshQuickBandButtons();
+}
+
+function refreshQuickBandButtons() {
+  if (!bandSelect || !quickBandButtons.length) {
+    return;
+  }
+
+  const availableBands = new Set(Array.from(bandSelect.options || []).map((option) => option.value));
+  const activeBand = bandSelect.value;
+
+  quickBandButtons.forEach((button) => {
+    const buttonBand = String(button.dataset.quickBand || "").trim();
+    const isAvailable = availableBands.has(buttonBand);
+    const isActive = isAvailable && buttonBand === activeBand;
+    button.disabled = !isAvailable || scanActionInFlight;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
 }
 const EVENTS_PANEL_PAGE_SIZE = 7;
 let eventOffset = 0;
@@ -1353,6 +1396,7 @@ function updateScanButtonState() {
   startBtn.disabled = false;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
+  refreshQuickBandButtons();
 }
 
 async function startScan() {
@@ -1361,15 +1405,17 @@ async function startScan() {
   const sampleRate = Number(sampleRateInput.value);
   const recordPath = recordPathInput.value || null;
   const selectedDeviceId = deviceSelect.value || null;
+  const selectedBand = bandSelect.value;
+  const range = getScanRangeForBand(selectedBand);
   const response = await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify({
       device: selectedDeviceId,
       scan: {
-        band: bandSelect.value,
-        start_hz: 14000000,
-        end_hz: 14350000,
+        band: selectedBand,
+        start_hz: range.start_hz,
+        end_hz: range.end_hz,
         step_hz: 2000,
         dwell_ms: 250,
         mode: "auto",
@@ -1432,6 +1478,46 @@ async function toggleScan() {
     }
   } catch (err) {
     showToastError(err?.message || (isScanRunning ? "Failed to stop scan" : "Failed to start scan"));
+  } finally {
+    scanActionInFlight = false;
+    updateScanButtonState();
+  }
+}
+
+async function switchBandLive(selectedBand) {
+  if (!bandSelect) {
+    return;
+  }
+  const nextBand = String(selectedBand || "").trim();
+  if (!nextBand) {
+    return;
+  }
+  const hasOption = Array.from(bandSelect.options || []).some((option) => option.value === nextBand);
+  if (!hasOption) {
+    return;
+  }
+
+  const previousBand = bandSelect.value;
+  if (previousBand === nextBand) {
+    refreshQuickBandButtons();
+    return;
+  }
+
+  bandSelect.value = nextBand;
+  bandSelect.dispatchEvent(new Event("change"));
+
+  if (!isScanRunning || scanActionInFlight) {
+    return;
+  }
+
+  scanActionInFlight = true;
+  updateScanButtonState();
+  try {
+    await stopScan();
+    await startScan();
+    showToast(`Band switched to ${nextBand}`);
+  } catch (err) {
+    showToastError(err?.message || "Failed to switch band live");
   } finally {
     scanActionInFlight = false;
     updateScanButtonState();
@@ -2525,6 +2611,19 @@ if (bandSelect && bandNameInput) {
     if (hasOption) {
       bandNameInput.value = bandSelect.value;
     }
+    refreshQuickBandButtons();
+  });
+}
+
+if (bandSelect && quickBandButtons.length) {
+  quickBandButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (scanActionInFlight) {
+        return;
+      }
+      const selectedBand = String(button.dataset.quickBand || "").trim();
+      await switchBandLive(selectedBand);
+    });
   });
 }
 
@@ -2551,6 +2650,7 @@ saveBandBtn.addEventListener("click", async () => {
 });
 
 loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
+refreshQuickBandButtons();
 syncScanState();
 setInterval(syncScanState, 5000);
 fetchModeStats();

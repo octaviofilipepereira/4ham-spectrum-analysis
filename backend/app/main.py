@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:44:26 UTC
+# Last update: 2026-02-22 00:57:34 UTC
 
 import asyncio
 import os
@@ -871,14 +871,25 @@ async def scan_start(payload: dict, request: Request):
                     if end_hz <= 0:
                         scan["end_hz"] = band.get("end_hz")
                     break
-    await _scan_engine.start_async(scan)
-    _scan_state["state"] = "running"
-    _scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
-    _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
-    _scan_state["scan"] = scan
-    _scan_state["scan_id"] = _db.start_scan(scan, _scan_state["started_at"])
-    _log("scan_start")
-    return _scan_state
+
+    start_hz = int(scan.get("start_hz", 0) or 0)
+    end_hz = int(scan.get("end_hz", 0) or 0)
+    if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
+        raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
+
+    try:
+        await _scan_engine.start_async(scan)
+        _scan_state["state"] = "running"
+        _scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
+        _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
+        _scan_state["scan"] = scan
+        _scan_state["scan_id"] = _db.start_scan(scan, _scan_state["started_at"])
+        _log("scan_start")
+        return _scan_state
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to start scan: {exc}") from exc
 
 
 @app.post("/api/scan/stop")

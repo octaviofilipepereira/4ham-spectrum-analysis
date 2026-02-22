@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 00:53:18 UTC
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Space+Grotesk:wght@400;600;700&display=swap");
@@ -193,6 +193,32 @@ h1,
 
 .btn-outline-info:hover {
   background: rgba(69, 214, 197, 0.12);
+  color: var(--accent-2);
+}
+
+.scan-controls-row {
+  row-gap: 0.5rem;
+}
+
+.scan-quick-bands {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.band-quick-btn {
+  min-height: 32px;
+  min-width: 58px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.band-quick-btn.is-active,
+.band-quick-btn.is-active:hover {
+  background: rgba(69, 214, 197, 0.18);
+  border-color: rgba(69, 214, 197, 0.78);
   color: var(--accent-2);
 }
 
@@ -581,6 +607,10 @@ h1,
 }
 
 @media (max-width: 575px) {
+  .scan-quick-bands {
+    width: 100%;
+  }
+
   .toast-stack {
     left: 16px;
     right: 16px;
