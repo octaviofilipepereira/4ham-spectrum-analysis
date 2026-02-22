@@ -29,6 +29,7 @@ from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text, parse_ssb_asr_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
 from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
+from app.decoders.ft_internal import InternalFtDecoder
 from app.decoders.launchers import env_flag, resolve_command, start_process, stop_process
 from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
 from app.dsp.pipeline import (
@@ -98,6 +99,7 @@ _wsjtx_transport = None
 _wsjtx_process = None
 _kiss_task = None
 _direwolf_process = None
+_ft_internal_decoder = None
 _threshold_state = {}
 
 
@@ -206,6 +208,18 @@ _decoder_status = {
         "cw_internal_enable": _cw_internal_enable,
         "ssb_internal_enable": _ssb_internal_enable,
         "psk_internal_enable": _psk_internal_enable,
+        "ft_internal_status": {
+            "enabled": False,
+            "running": False,
+            "modes": _ft_internal_modes,
+            "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
+            "min_confidence": _ft_internal_min_confidence,
+            "poll_s": 1.0,
+            "started_at": None,
+            "stopped_at": None,
+            "last_heartbeat_at": None,
+            "last_error": None,
+        },
     },
     "runtime": _decoder_runtime_metrics,
 }
@@ -1003,6 +1017,20 @@ async def on_startup():
         default_command="direwolf -t 0 -p",
         status_key="direwolf_kiss"
     )
+    global _ft_internal_decoder
+    if _ft_internal_enable:
+        _ft_internal_decoder = InternalFtDecoder(
+            modes=_ft_internal_modes,
+            compare_with_wsjtx=_ft_internal_compare_with_wsjtx,
+            min_confidence=_ft_internal_min_confidence,
+            poll_s=1.0,
+            logger=_log,
+        )
+        await _ft_internal_decoder.start()
+        _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
+    else:
+        _decoder_status["internal_native"]["ft_internal_status"]["enabled"] = False
+        _decoder_status["internal_native"]["ft_internal_status"]["running"] = False
 
 
 @app.on_event("shutdown")
@@ -1019,6 +1047,11 @@ async def on_shutdown():
         await stop_process(_wsjtx_process)
     if _direwolf_process:
         await stop_process(_direwolf_process)
+    global _ft_internal_decoder
+    if _ft_internal_decoder:
+        await _ft_internal_decoder.stop()
+        _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
+        _ft_internal_decoder = None
 
 
 @app.get("/api/health")
@@ -1224,13 +1257,14 @@ def propagation_summary(
 def decoder_status(request: Request = None):
     if request:
         _enforce_auth(request)
+    _refresh_decoder_process_status()
     return {
         "ingest": {
             "endpoint": "/api/decoders/events",
             "batch": True
         },
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
-        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp"],
+        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp", "internal_ft", "internal_cw", "internal_ssb", "internal_psk"],
         "status": _decoder_status
     }
 
@@ -1366,6 +1400,8 @@ def _refresh_decoder_process_status():
     if _direwolf_process:
         _decoder_status["direwolf_kiss"]["process_running"] = _direwolf_process.returncode is None
         _decoder_status["direwolf_kiss"]["process_pid"] = _direwolf_process.pid
+    if _ft_internal_decoder:
+        _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
 
 
 @app.get("/api/export")
