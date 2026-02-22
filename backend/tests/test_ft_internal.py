@@ -34,3 +34,41 @@ def test_ft_internal_decoder_lifecycle_snapshot():
         assert status_stopped["stopped_at"] is not None
 
     asyncio.run(scenario())
+
+
+def test_ft_internal_decoder_emits_mock_events_when_enabled():
+    async def scenario():
+        emitted_events = []
+
+        def on_event(payload):
+            emitted_events.append(dict(payload))
+
+        decoder = InternalFtDecoder(
+            modes=["FT8", "FT4"],
+            compare_with_wsjtx=False,
+            min_confidence=0.5,
+            poll_s=0.02,
+            emit_mock_events=True,
+            mock_interval_s=0.05,
+            mock_callsign="CT7BFV",
+            on_event=on_event,
+            frequency_provider=lambda: 14074000,
+        )
+
+        await decoder.start()
+        await asyncio.sleep(0.16)
+        await decoder.stop()
+
+        assert len(emitted_events) >= 2
+        first = emitted_events[0]
+        assert first["source"] == "internal_ft"
+        assert first["callsign"] == "CT7BFV"
+        assert first["frequency_hz"] == 14074000
+        assert first["mode"] in {"FT8", "FT4"}
+        assert first["confidence"] >= 0.5
+
+        status = decoder.snapshot()
+        assert status["events_emitted"] >= 2
+        assert status["last_event_at"] is not None
+
+    asyncio.run(scenario())

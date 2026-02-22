@@ -146,6 +146,9 @@ _ft_internal_enable = _env_bool("FT_INTERNAL_ENABLE", False)
 _ft_internal_modes = _env_csv("FT_INTERNAL_MODES", ["FT8", "FT4"])
 _ft_internal_compare_with_wsjtx = _env_bool("FT_INTERNAL_COMPARE_WITH_WSJTX", False)
 _ft_internal_min_confidence = _env_float("FT_INTERNAL_MIN_CONFIDENCE", 0.0)
+_ft_internal_emit_mock_events = _env_bool("FT_INTERNAL_EMIT_MOCK_EVENTS", False)
+_ft_internal_mock_interval_s = max(0.25, _env_float("FT_INTERNAL_MOCK_INTERVAL_S", 15.0))
+_ft_internal_mock_callsign = str(os.getenv("FT_INTERNAL_MOCK_CALLSIGN", "N0CALL")).strip().upper() or "N0CALL"
 _cw_internal_enable = _env_bool("CW_INTERNAL_ENABLE", False)
 _ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
 _psk_internal_enable = _env_bool("PSK_INTERNAL_ENABLE", False)
@@ -205,6 +208,9 @@ _decoder_status = {
         "ft_internal_modes": _ft_internal_modes,
         "ft_internal_compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
         "ft_internal_min_confidence": _ft_internal_min_confidence,
+        "ft_internal_emit_mock_events": _ft_internal_emit_mock_events,
+        "ft_internal_mock_interval_s": _ft_internal_mock_interval_s,
+        "ft_internal_mock_callsign": _ft_internal_mock_callsign,
         "cw_internal_enable": _cw_internal_enable,
         "ssb_internal_enable": _ssb_internal_enable,
         "psk_internal_enable": _psk_internal_enable,
@@ -215,9 +221,14 @@ _decoder_status = {
             "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
             "min_confidence": _ft_internal_min_confidence,
             "poll_s": 1.0,
+            "emit_mock_events": _ft_internal_emit_mock_events,
+            "mock_interval_s": _ft_internal_mock_interval_s,
+            "mock_callsign": _ft_internal_mock_callsign,
             "started_at": None,
             "stopped_at": None,
             "last_heartbeat_at": None,
+            "last_event_at": None,
+            "events_emitted": 0,
             "last_error": None,
         },
     },
@@ -926,9 +937,14 @@ def _default_ft_internal_status():
         "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
         "min_confidence": _ft_internal_min_confidence,
         "poll_s": 1.0,
+        "emit_mock_events": _ft_internal_emit_mock_events,
+        "mock_interval_s": _ft_internal_mock_interval_s,
+        "mock_callsign": _ft_internal_mock_callsign,
         "started_at": None,
         "stopped_at": None,
         "last_heartbeat_at": None,
+        "last_event_at": None,
+        "events_emitted": 0,
         "last_error": None,
     }
 
@@ -945,6 +961,11 @@ async def _start_ft_internal_decoder(force=False):
             compare_with_wsjtx=_ft_internal_compare_with_wsjtx,
             min_confidence=_ft_internal_min_confidence,
             poll_s=1.0,
+            emit_mock_events=_ft_internal_emit_mock_events,
+            mock_interval_s=_ft_internal_mock_interval_s,
+            mock_callsign=_ft_internal_mock_callsign,
+            on_event=_handle_ft_internal_event,
+            frequency_provider=_get_ft_internal_frequency_hz,
             logger=_log,
         )
 
@@ -1443,6 +1464,17 @@ def _ingest_callsign_payloads(items, defaults):
 def _handle_wsjtx_udp(payload):
     _decoder_status["wsjtx_udp"]["last_packet_at"] = datetime.now(timezone.utc).isoformat()
     return _ingest_callsign_payloads([payload], {})
+
+
+def _get_ft_internal_frequency_hz():
+    center_hz = _scan_engine.center_hz or _spectrum_cache.get("center_hz")
+    if center_hz:
+        return int(center_hz)
+    return None
+
+
+def _handle_ft_internal_event(payload):
+    return _ingest_callsign_payloads([payload], {"source": "internal_ft"})
 
 
 def _handle_kiss_event(payload):
