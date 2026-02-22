@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 01:21:48 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -58,6 +58,13 @@ For full platform-specific installation and decoder setup, see [docs/installatio
 
 ## Changelog (cumulative)
 
+### v0.2.4
+- Added quick band switching row near Start scanning for faster operator workflow.
+- Implemented live band switching with automatic stop/start while scan is running.
+- Improved scan startup resilience with sample-rate safeguards and clearer error behavior.
+- Added operational tooling with `run_dev.sh` (`start|stop|logs|status`).
+- Added production `systemd` packaging tooling and service management scripts.
+
 ### v0.2.3
 - Refined Administration UX for device/audio setup workflows.
 - Improved reliability when auto-detect fills and persists device configuration fields.
@@ -73,7 +80,7 @@ For full platform-specific installation and decoder setup, see [docs/installatio
 - Improved events rendering to better infer and present band/mode details.
 - Added richer SSB event enrichment and grid/report display consistency.
 
-Releases: [v0.2.1](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.1), [v0.2.2](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.2), [v0.2.3](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.3)
+Releases: [v0.2.1](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.1), [v0.2.2](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.2), [v0.2.3](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.3), [v0.2.4](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.4)
 
 ## Target bands
 - 2 m
