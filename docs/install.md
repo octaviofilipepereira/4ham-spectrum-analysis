@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # Installation Guide
 
 For a complete, step-by-step manual, see [docs/installation_manual.md](installation_manual.md).

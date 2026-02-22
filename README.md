@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # 4ham-spectrum-analysis
 Web platform for amateur radio spectrum analysis, with DSP, real-time events, and decoder integration.
 
@@ -48,6 +54,25 @@ curl -X POST http://127.0.0.1:8000/api/scan/stop
 ```
 
 For full platform-specific installation and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
+
+## Changelog (cumulative)
+
+### v0.2.3
+- Refined Administration UX for device/audio setup workflows.
+- Improved reliability when auto-detect fills and persists device configuration fields.
+- Added dedicated save actions in Administration for device and audio configuration blocks.
+- Removed duplicated audio status messaging in the Audio Configuration area.
+
+### v0.2.2
+- Added global fullscreen toggle for waterfall visualization.
+- Improved fullscreen button label behavior for clearer UI state.
+
+### v0.2.1
+- Added LIVE/FAKE waterfall mode badge and improved decoder status hints.
+- Improved events rendering to better infer and present band/mode details.
+- Added richer SSB event enrichment and grid/report display consistency.
+
+Releases: [v0.2.1](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.1), [v0.2.2](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.2), [v0.2.3](https://github.com/octaviofilipepereira/4ham-spectrum-analysis/releases/tag/v0.2.3)
 
 ## Target bands
 - 2 m

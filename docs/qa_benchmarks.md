@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # DSP performance benchmark
 
 Use this benchmark to compare DSP performance across platforms (Linux/Windows) with the same parameters.
