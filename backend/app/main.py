@@ -122,6 +122,14 @@ def _env_bool(name, default=False):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_csv(name, default_values):
+    raw = os.getenv(name)
+    if raw is None:
+        return list(default_values)
+    values = [str(item).strip().upper() for item in str(raw).split(",") if str(item).strip()]
+    return values or list(default_values)
+
+
 _agc_enabled = os.getenv("DSP_AGC_ENABLE", "0").lower() in {"1", "true", "yes", "on"}
 _agc_target_rms = _env_float("DSP_AGC_TARGET_RMS", 0.25)
 _agc_max_gain_db = _env_float("DSP_AGC_MAX_GAIN_DB", 30.0)
@@ -132,6 +140,13 @@ _ws_spectrum_fps = max(1.0, _env_float("WS_SPECTRUM_FPS", 5.0))
 _ws_send_timeout_s = max(0.01, _env_float("WS_SEND_TIMEOUT_S", 0.1))
 _ws_compress_spectrum = _env_bool("WS_COMPRESS_SPECTRUM", True)
 _ws_protocol_version = "1.1"
+_ft_internal_enable = _env_bool("FT_INTERNAL_ENABLE", False)
+_ft_internal_modes = _env_csv("FT_INTERNAL_MODES", ["FT8", "FT4"])
+_ft_internal_compare_with_wsjtx = _env_bool("FT_INTERNAL_COMPARE_WITH_WSJTX", False)
+_ft_internal_min_confidence = _env_float("FT_INTERNAL_MIN_CONFIDENCE", 0.0)
+_cw_internal_enable = _env_bool("CW_INTERNAL_ENABLE", False)
+_ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
+_psk_internal_enable = _env_bool("PSK_INTERNAL_ENABLE", False)
 _export_manager = ExportManager(
     export_dir="data/exports",
     db=_db,
@@ -141,6 +156,13 @@ _export_manager = ExportManager(
 _agc_state = {}
 _last_agc_gain_db = None
 _spectrum_send_stats = {"sent": 0, "dropped": 0}
+_decoder_runtime_metrics = {
+    "started_at": datetime.now(timezone.utc).isoformat(),
+    "callsign_saved": 0,
+    "invalid_events": 0,
+    "by_source": {},
+    "by_mode": {},
+}
 _decoder_status = {
     "sources": {},
     "wsjtx_udp": {
@@ -175,7 +197,17 @@ _decoder_status = {
         "agc_alpha": _agc_alpha,
         "snr_threshold_db": _snr_threshold_db,
         "min_bw_hz": _min_bw_hz
-    }
+    },
+    "internal_native": {
+        "ft_internal_enable": _ft_internal_enable,
+        "ft_internal_modes": _ft_internal_modes,
+        "ft_internal_compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
+        "ft_internal_min_confidence": _ft_internal_min_confidence,
+        "cw_internal_enable": _cw_internal_enable,
+        "ssb_internal_enable": _ssb_internal_enable,
+        "psk_internal_enable": _psk_internal_enable,
+    },
+    "runtime": _decoder_runtime_metrics,
 }
 
 _auth_user = os.getenv("BASIC_AUTH_USER")
@@ -854,6 +886,24 @@ def _touch_decoder_source(source):
     _decoder_status["sources"][source] = datetime.now(timezone.utc).isoformat()
 
 
+def _record_decoder_event_saved(event):
+    if not isinstance(event, dict):
+        return
+    _decoder_runtime_metrics["callsign_saved"] = int(_decoder_runtime_metrics.get("callsign_saved", 0)) + 1
+
+    source = str(event.get("source") or "unknown").strip().lower() or "unknown"
+    source_counts = _decoder_runtime_metrics["by_source"]
+    source_counts[source] = int(source_counts.get(source, 0)) + 1
+
+    mode = str(event.get("mode") or "Unknown").strip().upper() or "Unknown"
+    mode_counts = _decoder_runtime_metrics["by_mode"]
+    mode_counts[mode] = int(mode_counts.get(mode, 0)) + 1
+
+
+def _record_decoder_event_invalid():
+    _decoder_runtime_metrics["invalid_events"] = int(_decoder_runtime_metrics.get("invalid_events", 0)) + 1
+
+
 async def _maybe_autostart_decoder_process(kind, enabled, flag_env, cmd_env, default_command, status_key):
     if not enabled and not env_flag(flag_env, default=False):
         return None
@@ -891,9 +941,11 @@ def _start_decoder_watch(kind, path, parser, default_mode):
         payload = parsed or {"raw": str(line).strip(), "mode": default_mode}
         event = build_callsign_event(payload, _scan_state)
         if not event:
+            _record_decoder_event_invalid()
             return
         _touch_decoder_source(event.get("source"))
         _db.insert_callsign(event)
+        _record_decoder_event_saved(event)
 
     task = asyncio.create_task(
         tail_lines(path, handle_line, _decoder_stop, poll_s=1.0, from_end=from_end)
@@ -1150,7 +1202,11 @@ def events_count(
 def events_stats(request: Request = None):
     if request:
         _enforce_auth(request)
-    return {"modes": _db.get_event_stats()}
+    return {
+        "modes": _db.get_event_stats(),
+        "decoder_baseline": _db.get_decoder_baseline_stats(),
+        "decoder_runtime": _decoder_runtime_metrics,
+    }
 
 
 @app.get("/api/propagation/summary")
@@ -1263,6 +1319,7 @@ def _ingest_callsign_payloads(items, defaults):
     for idx, item in enumerate(items):
         if not isinstance(item, dict):
             errors.append({"index": idx, "error": "invalid_event"})
+            _record_decoder_event_invalid()
             continue
         payload = dict(defaults)
         payload.update(item)
@@ -1273,9 +1330,11 @@ def _ingest_callsign_payloads(items, defaults):
         event = build_callsign_event(payload, _scan_state)
         if not event:
             errors.append({"index": idx, "error": "invalid_event"})
+            _record_decoder_event_invalid()
             continue
         _touch_decoder_source(event.get("source"))
         _db.insert_callsign(event)
+        _record_decoder_event_saved(event)
         saved += 1
     return {"status": "ok", "saved": saved, "errors": errors}
 

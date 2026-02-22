@@ -22,6 +22,7 @@ Last update: 2026-02-22 16:27:19 UTC
 - [x] Direwolf integration (APRS)
 - [x] CW decoder pipeline
 - [x] SSB ASR pipeline with controlled vocabulary
+- [ ] Internal FT8/FT4 decoder migration (remove WSJT-X runtime dependency)
 
 ## API and Streaming
 - [x] REST endpoints (OpenAPI driven)

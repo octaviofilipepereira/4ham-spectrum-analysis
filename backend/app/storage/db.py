@@ -422,6 +422,52 @@ class Database:
 
         return stats
 
+    def get_decoder_baseline_stats(self):
+        baseline = {
+            "callsign_events_total": 0,
+            "callsign_unique_total": 0,
+            "by_source": {},
+            "callsign_modes": {},
+        }
+
+        total_row = self.conn.execute(
+            "SELECT COUNT(*) AS total, COUNT(DISTINCT callsign) AS unique_total FROM callsign_events"
+        ).fetchone()
+        baseline["callsign_events_total"] = int(total_row["total"] or 0) if total_row else 0
+        baseline["callsign_unique_total"] = int(total_row["unique_total"] or 0) if total_row else 0
+
+        for row in self.conn.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(CAST(source AS TEXT)), ''), 'unknown') AS source,
+                COUNT(*) AS total,
+                COUNT(DISTINCT callsign) AS unique_callsigns,
+                MAX(timestamp) AS last_seen_at
+            FROM callsign_events
+            GROUP BY source
+            ORDER BY total DESC
+            """
+        ):
+            source = str(row["source"] or "unknown")
+            baseline["by_source"][source] = {
+                "total": int(row["total"] or 0),
+                "unique_callsigns": int(row["unique_callsigns"] or 0),
+                "last_seen_at": row["last_seen_at"],
+            }
+
+        for row in self.conn.execute(
+            """
+            SELECT COALESCE(NULLIF(TRIM(CAST(mode AS TEXT)), ''), 'Unknown') AS mode, COUNT(*) AS total
+            FROM callsign_events
+            GROUP BY mode
+            ORDER BY total DESC
+            """
+        ):
+            mode = str(row["mode"] or "Unknown")
+            baseline["callsign_modes"][mode] = int(row["total"] or 0)
+
+        return baseline
+
     def purge_invalid_events(self):
         occupancy_where_clause = """
         (timestamp IS NULL OR TRIM(CAST(timestamp AS TEXT)) = '')
