@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:44:26 UTC
+Last update: 2026-02-22 00:49:28 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -1203,7 +1203,7 @@ async function fetchModeStats() {
   }
 }
 
-function renderPropagationSummary(data) {
+function renderPropagationSummary(data, options = {}) {
   if (!propagationScore || !propagationBands) {
     return;
   }
@@ -1211,13 +1211,14 @@ function renderPropagationSummary(data) {
   const overallState = String(data?.overall?.state || "Unknown");
   const eventCount = Number(data?.event_count || 0);
   const windowMinutes = Number(data?.window_minutes || 30);
-  propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min`;
+  const sourceNote = options?.sourceNote ? ` | ${options.sourceNote}` : "";
+  propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min${sourceNote}`;
 
   const bands = Array.isArray(data?.bands) ? data.bands.slice(0, 5) : [];
   propagationBands.innerHTML = "";
   if (!bands.length) {
     const li = document.createElement("li");
-    li.textContent = "No propagation data for current window.";
+    li.textContent = "No propagation data yet. Start/continue scan to build propagation statistics.";
     propagationBands.appendChild(li);
     return;
   }
@@ -1235,16 +1236,38 @@ function renderPropagationSummary(data) {
   });
 }
 
+async function requestPropagationSummary(windowMinutes, limit) {
+  const resp = await fetch(`/api/propagation/summary?window_minutes=${windowMinutes}&limit=${limit}`, {
+    headers: { ...getAuthHeader() }
+  });
+  if (!resp.ok) {
+    return null;
+  }
+  return resp.json();
+}
+
 async function fetchPropagationSummary() {
   try {
-    const resp = await fetch("/api/propagation/summary?window_minutes=30&limit=3000", {
-      headers: { ...getAuthHeader() }
-    });
-    if (!resp.ok) {
+    const primaryWindowMinutes = 30;
+    const fallbackWindowMinutes = 1440;
+    const limit = 3000;
+
+    const primary = await requestPropagationSummary(primaryWindowMinutes, limit);
+    if (!primary) {
       return;
     }
-    const data = await resp.json();
-    renderPropagationSummary(data);
+    if (Number(primary?.event_count || 0) > 0) {
+      renderPropagationSummary(primary);
+      return;
+    }
+
+    const fallback = await requestPropagationSummary(fallbackWindowMinutes, limit);
+    if (fallback && Number(fallback?.event_count || 0) > 0) {
+      renderPropagationSummary(fallback, { sourceNote: "fallback 24h" });
+      return;
+    }
+
+    renderPropagationSummary(primary);
   } catch (err) {
     return;
   }
