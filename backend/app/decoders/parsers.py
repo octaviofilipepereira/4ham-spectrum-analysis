@@ -115,6 +115,11 @@ def parse_wsjtx_line(line):
     parts = str(line).strip().split()
     if len(parts) < 5:
         return None
+    mode = "FT8"
+    if len(parts) > 4:
+        candidate_mode = parts[4].strip().upper()
+        if candidate_mode in {"FT8", "FT4"}:
+            mode = candidate_mode
     snr_db = None
     frequency_hz = None
     try:
@@ -149,7 +154,7 @@ def parse_wsjtx_line(line):
         "grid": grid,
         "report": report,
         "raw": str(line).strip(),
-        "mode": "FT8"
+        "mode": mode
     }
 
 

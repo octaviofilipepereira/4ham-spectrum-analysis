@@ -112,6 +112,13 @@ def test_parse_wsjtx_line_extracts_report():
     assert event["report"] == "-03"
 
 
+def test_parse_wsjtx_line_preserves_ft4_mode():
+    line = "200109  -07  0.2  14080000  FT4  CQ CT1ABC IN50"
+    event = parse_wsjtx_line(line)
+    assert event is not None
+    assert event["mode"] == "FT4"
+
+
 def test_build_callsign_event_infers_20m_band_from_frequency():
     event = build_callsign_event({"callsign": "CT1ABC", "frequency_hz": 14255000}, {})
     assert event is not None
