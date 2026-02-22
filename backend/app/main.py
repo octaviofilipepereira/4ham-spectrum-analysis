@@ -918,6 +918,53 @@ def _record_decoder_event_invalid():
     _decoder_runtime_metrics["invalid_events"] = int(_decoder_runtime_metrics.get("invalid_events", 0)) + 1
 
 
+def _default_ft_internal_status():
+    return {
+        "enabled": False,
+        "running": False,
+        "modes": list(_ft_internal_modes),
+        "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
+        "min_confidence": _ft_internal_min_confidence,
+        "poll_s": 1.0,
+        "started_at": None,
+        "stopped_at": None,
+        "last_heartbeat_at": None,
+        "last_error": None,
+    }
+
+
+async def _start_ft_internal_decoder(force=False):
+    global _ft_internal_decoder
+    if not force and not _ft_internal_enable:
+        _decoder_status["internal_native"]["ft_internal_status"] = _default_ft_internal_status()
+        return {"started": False, "reason": "ft_internal_disabled"}
+
+    if _ft_internal_decoder is None:
+        _ft_internal_decoder = InternalFtDecoder(
+            modes=_ft_internal_modes,
+            compare_with_wsjtx=_ft_internal_compare_with_wsjtx,
+            min_confidence=_ft_internal_min_confidence,
+            poll_s=1.0,
+            logger=_log,
+        )
+
+    started = await _ft_internal_decoder.start()
+    _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
+    return {"started": bool(started), "reason": None}
+
+
+async def _stop_ft_internal_decoder():
+    global _ft_internal_decoder
+    if _ft_internal_decoder is None:
+        _decoder_status["internal_native"]["ft_internal_status"] = _default_ft_internal_status()
+        return {"stopped": False, "reason": "ft_internal_not_running"}
+
+    await _ft_internal_decoder.stop()
+    _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
+    _ft_internal_decoder = None
+    return {"stopped": True, "reason": None}
+
+
 async def _maybe_autostart_decoder_process(kind, enabled, flag_env, cmd_env, default_command, status_key):
     if not enabled and not env_flag(flag_env, default=False):
         return None
@@ -1017,20 +1064,7 @@ async def on_startup():
         default_command="direwolf -t 0 -p",
         status_key="direwolf_kiss"
     )
-    global _ft_internal_decoder
-    if _ft_internal_enable:
-        _ft_internal_decoder = InternalFtDecoder(
-            modes=_ft_internal_modes,
-            compare_with_wsjtx=_ft_internal_compare_with_wsjtx,
-            min_confidence=_ft_internal_min_confidence,
-            poll_s=1.0,
-            logger=_log,
-        )
-        await _ft_internal_decoder.start()
-        _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
-    else:
-        _decoder_status["internal_native"]["ft_internal_status"]["enabled"] = False
-        _decoder_status["internal_native"]["ft_internal_status"]["running"] = False
+    await _start_ft_internal_decoder(force=False)
 
 
 @app.on_event("shutdown")
@@ -1047,11 +1081,7 @@ async def on_shutdown():
         await stop_process(_wsjtx_process)
     if _direwolf_process:
         await stop_process(_direwolf_process)
-    global _ft_internal_decoder
-    if _ft_internal_decoder:
-        await _ft_internal_decoder.stop()
-        _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
-        _ft_internal_decoder = None
+    await _stop_ft_internal_decoder()
 
 
 @app.get("/api/health")
@@ -1266,6 +1296,43 @@ def decoder_status(request: Request = None):
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
         "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp", "internal_ft", "internal_cw", "internal_ssb", "internal_psk"],
         "status": _decoder_status
+    }
+
+
+@app.get("/api/decoders/internal-ft/status")
+def decoder_internal_ft_status(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    _refresh_decoder_process_status()
+    return {
+        "status": "ok",
+        "decoder": _decoder_status["internal_native"]["ft_internal_status"],
+    }
+
+
+@app.post("/api/decoders/internal-ft/start")
+async def decoder_internal_ft_start(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    result = await _start_ft_internal_decoder(force=True)
+    return {
+        "status": "ok",
+        "started": bool(result.get("started")),
+        "reason": result.get("reason"),
+        "decoder": _decoder_status["internal_native"]["ft_internal_status"],
+    }
+
+
+@app.post("/api/decoders/internal-ft/stop")
+async def decoder_internal_ft_stop(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    result = await _stop_ft_internal_decoder()
+    return {
+        "status": "ok",
+        "stopped": bool(result.get("stopped")),
+        "reason": result.get("reason"),
+        "decoder": _decoder_status["internal_native"]["ft_internal_status"],
     }
 
 
