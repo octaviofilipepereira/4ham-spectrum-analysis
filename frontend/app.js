@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:57:34 UTC
+Last update: 2026-02-22 01:07:17 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -1399,12 +1399,42 @@ function updateScanButtonState() {
   refreshQuickBandButtons();
 }
 
+function inferDeviceFamily(deviceId) {
+  const value = String(deviceId || "").toLowerCase();
+  if (value.includes("rtl")) {
+    return "rtl";
+  }
+  if (value.includes("hack")) {
+    return "hackrf";
+  }
+  if (value.includes("air")) {
+    return "airspy";
+  }
+  return "other";
+}
+
+function normalizeScanSampleRate(deviceId, sampleRate) {
+  const family = inferDeviceFamily(deviceId);
+  if (!["rtl", "hackrf", "airspy"].includes(family)) {
+    return Number(sampleRate);
+  }
+  const parsedRate = Number(sampleRate);
+  if (Number.isFinite(parsedRate) && parsedRate >= 200000) {
+    return parsedRate;
+  }
+  return Number(DEVICE_AUTO_PROFILES[family]?.sample_rate || 2048000);
+}
+
 async function startScan() {
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
-  const sampleRate = Number(sampleRateInput.value);
-  const recordPath = recordPathInput.value || null;
   const selectedDeviceId = deviceSelect.value || null;
+  const sampleRate = normalizeScanSampleRate(selectedDeviceId, sampleRateInput.value);
+  if (Number(sampleRateInput.value) !== sampleRate) {
+    sampleRateInput.value = String(sampleRate);
+    showToast(`Sample rate ajustado automaticamente para ${sampleRate} Hz`);
+  }
+  const recordPath = recordPathInput.value || null;
   const selectedBand = bandSelect.value;
   const range = getScanRangeForBand(selectedBand);
   const response = await fetch("/api/scan/start", {

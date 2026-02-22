@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 00:57:34 UTC
+# Last update: 2026-02-22 01:06:09 UTC
 
 import asyncio
 import os
@@ -405,6 +405,15 @@ def _probe_device_setup(choice):
         "match_found": bool(matched),
         "matched_device": matched,
     }
+
+
+def _fallback_sample_rate_for_device(device_id, current_sample_rate):
+    choice = _normalize_device_choice(device_id)
+    fallback_rate = int(_device_profile(choice).get("sample_rate", 48000) or 48000)
+    current_rate = int(current_sample_rate or 0)
+    if current_rate > 0 and current_rate == fallback_rate:
+        return None
+    return fallback_rate
 
 
 def _run_linux_auto_install(choice, missing_packages=None):
@@ -878,7 +887,23 @@ async def scan_start(payload: dict, request: Request):
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
     try:
-        await _scan_engine.start_async(scan)
+        try:
+            await _scan_engine.start_async(scan)
+        except Exception as exc:
+            message = str(exc)
+            if "setSampleRate failed" not in message:
+                raise
+            fallback_rate = _fallback_sample_rate_for_device(
+                scan.get("device_id") or selected_device,
+                scan.get("sample_rate"),
+            )
+            if not fallback_rate:
+                raise
+            previous_rate = int(scan.get("sample_rate", 0) or 0)
+            scan["sample_rate"] = fallback_rate
+            _log(f"scan_start_retry_sample_rate:{previous_rate}->{fallback_rate}")
+            await _scan_engine.start_async(scan)
+
         _scan_state["state"] = "running"
         _scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
         _scan_state["started_at"] = datetime.now(timezone.utc).isoformat()

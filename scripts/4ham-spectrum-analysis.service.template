@@ -1,0 +1,24 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-22 01:15:27 UTC
+
+[Unit]
+Description=4ham Spectrum Analysis Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__ROOT_DIR__
+EnvironmentFile=-/etc/default/4ham-spectrum-analysis
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -lc 'cd "__ROOT_DIR__" && exec "__PYTHON_BIN__" -m uvicorn app.main:app --app-dir backend --host "${APP_HOST:-127.0.0.1}" --port "${APP_PORT:-8000}"'
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

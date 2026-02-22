@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 00:34:50 UTC
+Last update: 2026-02-22 01:19:16 UTC
 -->
 
 # Installation Guide
@@ -38,6 +38,26 @@ For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
 
 ## Time Sync
 - Enable NTP for FT8/FT4 decoding.
+
+## Production service (Linux/systemd)
+Use the service installer script for end-user production runs:
+
+```bash
+chmod +x scripts/install_systemd_service.sh
+./scripts/install_systemd_service.sh install
+```
+
+Service operations:
+
+```bash
+./scripts/install_systemd_service.sh status
+./scripts/install_systemd_service.sh stop
+./scripts/install_systemd_service.sh restart
+./scripts/install_systemd_service.sh logs
+./scripts/install_systemd_service.sh uninstall
+```
+
+Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 
 ## Notes
 - Use a virtual audio cable for WSJT-X integration.
