@@ -319,11 +319,16 @@ async def shutdown():
   - ✅ `api/exports.py` - 4 endpoints
   - ✅ `api/admin.py` - 3 endpoints
   - ✅ `api/decoders.py` - 13 endpoints
-- ⏳ Fase 2: Módulos WebSocket (0/4)
+- ✅ **Fase 2 COMPLETA: Todos os módulos WebSocket (4/4)**
+  - ✅ `websocket/logs.py` - /ws/logs (log streaming)
+  - ✅ `websocket/events.py` - /ws/events (occupancy detection pipeline)
+  - ✅ `websocket/spectrum.py` - /ws/spectrum (FFT waterfall + markers)
+  - ✅ `websocket/status.py` - /ws/status (system metrics)
 - ⏳ Fase 3: Refactoring do main.py
 - ⏳ Fase 4: Testes e validação
 
 **Total de Endpoints REST Refatorados: 37/37 ✅**
+**Total de WebSockets Refatorados: 4/4 ✅**
 
 ## Exemplo de Migração
 
