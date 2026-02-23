@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23
+# Last update: 2026-02-23 21:30 UTC
 # Events API endpoints
 
 """
@@ -255,7 +255,7 @@ def events_count(
         return {"count": state.count_cache["value"]}
     
     # Query database
-    count = state.db.get_events_count(
+    count = state.db.count_events(
         band=band,
         mode=mode,
         callsign=callsign,
