@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23
+# Last update: 2026-02-23 21:30 UTC
 
 """
 4ham Spectrum Analysis - Main Application Entry Point
@@ -16,6 +16,7 @@ FastAPI application with modular architecture:
 """
 
 import os
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -39,6 +40,18 @@ from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_s
 _log = logging.getLogger("uvicorn.error")
 
 
+async def _retention_loop():
+    """Background task: run retention once at startup (+10 s delay), then every 24 h."""
+    await asyncio.sleep(10)  # allow server to finish startup
+    while True:
+        try:
+            from app.core.retention import run_retention
+            await run_retention()
+        except Exception as exc:
+            _log.warning("Retention task error: %s", exc)
+        await asyncio.sleep(86400)  # 24 h
+
+
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """Auto-start enabled decoders on startup and stop them gracefully on shutdown."""
@@ -58,6 +71,9 @@ async def lifespan(app_instance: FastAPI):
             _log.info("FT internal decoder startup: %s", result)
         except Exception as exc:
             _log.warning("FT internal decoder startup failed: %s", exc)
+
+    # Start retention background task
+    asyncio.create_task(_retention_loop())
 
     yield
 

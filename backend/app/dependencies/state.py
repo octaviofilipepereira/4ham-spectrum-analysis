@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23 21:30 UTC
+# Last update: 2026-02-23 21:30 UTC 21:30 UTC
 # Global application state
 
 """
@@ -306,6 +306,24 @@ if auth_pass:
 # are configured in .env. Defaults to True when credentials are present.
 _auth_required_env = os.getenv("AUTH_REQUIRED", "1").strip().lower()
 auth_required = (_auth_required_env not in ("0", "false", "no")) and bool(auth_user and auth_pass)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Event Retention Configuration
+# ═══════════════════════════════════════════════════════════════════
+
+# Maximum event age in days; 0 disables age-based purge
+retention_days = int(os.getenv("RETENTION_DAYS", "30"))
+
+# Maximum total events across both tables; 0 disables count-based purge
+retention_max_events = int(os.getenv("MAX_EVENTS", "50000"))
+
+# Export events to CSV automatically before purging
+_retention_auto_env = os.getenv("RETENTION_AUTO_EXPORT", "1").strip().lower()
+retention_auto_export = _retention_auto_env not in ("0", "false", "no")
+
+# Populated by the retention background task; consumed once by ws_status broadcast
+retention_notification = None
 
 
 def verify_basic_auth_header(auth_header: str) -> bool:

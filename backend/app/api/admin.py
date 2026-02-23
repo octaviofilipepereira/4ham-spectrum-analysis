@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23
+# Last update: 2026-02-23 21:30 UTC
 # Admin API endpoints
 
 """
@@ -233,4 +233,29 @@ def admin_audio_detect(_: None = Depends(verify_basic_auth)) -> Dict:
         "status": "ok",
         "audio": audio_probe,
         "suggested_config": audio_probe.get("suggested"),
+    }
+
+
+@router.post("/retention/run")
+async def run_retention_now(_: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Manually trigger event retention.
+
+    Runs one retention cycle immediately: identifies purgeable events,
+    exports them to CSV (if RETENTION_AUTO_EXPORT=1), then deletes them.
+
+    Returns:
+        Result dict with purged count, export info, and download URL.
+    """
+    from app.core.retention import run_retention
+    notification = await run_retention()
+    return {
+        "status": "ok",
+        "result": notification if notification else {
+            "purged": 0,
+            "exported": False,
+            "export_id": None,
+            "export_rows": 0,
+            "download_url": None,
+        },
     }

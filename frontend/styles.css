@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 16:27:19 UTC
+Last update: 2026-02-23 21:30 UTC
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Space+Grotesk:wght@400;600;700&display=swap");
@@ -625,6 +625,29 @@ h1,
 
 .toast__close:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.toast-notice.retention {
+  border-color: rgba(255, 200, 80, 0.6);
+  color: #fff6d6;
+  flex-wrap: wrap;
+}
+
+.toast__download {
+  appearance: none;
+  border: 1px solid rgba(255, 200, 80, 0.5);
+  background: rgba(255, 200, 80, 0.12);
+  color: #ffd760;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.84rem;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toast__download:hover {
+  background: rgba(255, 200, 80, 0.25);
 }
 
 .onboarding {

@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 16:27:19 UTC
+# Last update: 2026-02-23 21:30 UTC
 
 import sqlite3
 import json
@@ -544,3 +544,155 @@ class Database:
         self.conn.execute("DELETE FROM settings")
         self.conn.execute("DELETE FROM bands")
         self.conn.commit()
+
+    def get_purgeable_events(self, days: int, max_events: int) -> dict:
+        """
+        Identify events to be purged based on age and/or count limits.
+
+        Returns event records (for export) and their IDs (for deletion).
+        Phase 1: events older than `days` days.
+        Phase 2: if total remaining still exceeds `max_events`, oldest excess events.
+
+        Args:
+            days: Maximum age in days; 0 disables age-based selection.
+            max_events: Maximum total events to keep; 0 disables count-based selection.
+
+        Returns:
+            dict with keys: events (list), occ_ids (list), call_ids (list), count (int)
+        """
+        from datetime import datetime, timedelta, timezone
+
+        occ_age_ids = []
+        call_age_ids = []
+
+        # --- Phase 1: age-based ---
+        if days > 0:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            occ_age_ids = [
+                r[0] for r in self.conn.execute(
+                    "SELECT id FROM occupancy_events WHERE timestamp < ? ORDER BY timestamp ASC",
+                    (cutoff,)
+                ).fetchall()
+            ]
+            call_age_ids = [
+                r[0] for r in self.conn.execute(
+                    "SELECT id FROM callsign_events WHERE timestamp < ? ORDER BY timestamp ASC",
+                    (cutoff,)
+                ).fetchall()
+            ]
+
+        # --- Phase 2: count-based ---
+        occ_count_ids = []
+        call_count_ids = []
+
+        if max_events > 0:
+            total_occ = self.conn.execute("SELECT COUNT(*) FROM occupancy_events").fetchone()[0]
+            total_call = self.conn.execute("SELECT COUNT(*) FROM callsign_events").fetchone()[0]
+            remaining = (total_occ - len(occ_age_ids)) + (total_call - len(call_age_ids))
+
+            if remaining > max_events:
+                excess = remaining - max_events
+
+                # Take oldest occupancy events first
+                if occ_age_ids:
+                    ph = ",".join("?" * len(occ_age_ids))
+                    rows = self.conn.execute(
+                        f"SELECT id FROM occupancy_events WHERE id NOT IN ({ph})"
+                        f" ORDER BY timestamp ASC LIMIT ?",
+                        occ_age_ids + [excess]
+                    ).fetchall()
+                else:
+                    rows = self.conn.execute(
+                        "SELECT id FROM occupancy_events ORDER BY timestamp ASC LIMIT ?",
+                        (excess,)
+                    ).fetchall()
+                occ_count_ids = [r[0] for r in rows]
+
+                still_excess = excess - len(occ_count_ids)
+                if still_excess > 0:
+                    if call_age_ids:
+                        ph = ",".join("?" * len(call_age_ids))
+                        rows = self.conn.execute(
+                            f"SELECT id FROM callsign_events WHERE id NOT IN ({ph})"
+                            f" ORDER BY timestamp ASC LIMIT ?",
+                            call_age_ids + [still_excess]
+                        ).fetchall()
+                    else:
+                        rows = self.conn.execute(
+                            "SELECT id FROM callsign_events ORDER BY timestamp ASC LIMIT ?",
+                            (still_excess,)
+                        ).fetchall()
+                    call_count_ids = [r[0] for r in rows]
+
+        occ_ids = list(set(occ_age_ids) | set(occ_count_ids))
+        call_ids = list(set(call_age_ids) | set(call_count_ids))
+
+        if not occ_ids and not call_ids:
+            return {"events": [], "occ_ids": [], "call_ids": [], "count": 0}
+
+        # Fetch event records for export
+        events = []
+
+        if occ_ids:
+            ph = ",".join("?" * len(occ_ids))
+            rows = self.conn.execute(
+                f"SELECT timestamp, band, frequency_hz, mode, snr_db, power_dbm,"
+                f" scan_id, confidence FROM occupancy_events WHERE id IN ({ph})",
+                occ_ids
+            ).fetchall()
+            for r in rows:
+                events.append({
+                    "type": "occupancy",
+                    "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
+                    "mode": r[3], "callsign": None, "snr_db": r[4],
+                    "power_dbm": r[5], "scan_id": r[6], "confidence": r[7],
+                })
+
+        if call_ids:
+            ph = ",".join("?" * len(call_ids))
+            rows = self.conn.execute(
+                f"SELECT timestamp, band, frequency_hz, mode, callsign, snr_db,"
+                f" scan_id, confidence FROM callsign_events WHERE id IN ({ph})",
+                call_ids
+            ).fetchall()
+            for r in rows:
+                events.append({
+                    "type": "callsign",
+                    "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
+                    "mode": r[3], "callsign": r[4], "snr_db": r[5],
+                    "power_dbm": None, "scan_id": r[6], "confidence": r[7],
+                })
+
+        return {
+            "events": events,
+            "occ_ids": occ_ids,
+            "call_ids": call_ids,
+            "count": len(events),
+        }
+
+    def delete_events_by_ids(self, occ_ids: list, call_ids: list) -> int:
+        """
+        Delete specific events by ID from both tables.
+
+        Args:
+            occ_ids: List of occupancy_events IDs to delete.
+            call_ids: List of callsign_events IDs to delete.
+
+        Returns:
+            Total number of rows deleted.
+        """
+        deleted = 0
+        if occ_ids:
+            ph = ",".join("?" * len(occ_ids))
+            cursor = self.conn.execute(
+                f"DELETE FROM occupancy_events WHERE id IN ({ph})", occ_ids
+            )
+            deleted += cursor.rowcount
+        if call_ids:
+            ph = ",".join("?" * len(call_ids))
+            cursor = self.conn.execute(
+                f"DELETE FROM callsign_events WHERE id IN ({ph})", call_ids
+            )
+            deleted += cursor.rowcount
+        self.conn.commit()
+        return deleted

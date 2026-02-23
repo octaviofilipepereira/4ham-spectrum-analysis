@@ -128,6 +128,11 @@ async def ws_status(websocket: WebSocket) -> None:
                     "scan": state.scan_engine.status()
                 }
             }
+
+            # Attach and consume the retention notification (fires once per event)
+            if state.retention_notification:
+                payload["retention_completed"] = state.retention_notification
+                state.retention_notification = None
             
             await websocket.send_json(payload)
             await asyncio.sleep(1.0)

@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-- No modo FT8 o decoder funciona? 2026-02-22 16:27:19 UTC
+Last update: 2026-02-23 21:30 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -1135,6 +1135,47 @@ function showToast(message) {
 function showToastError(message) {
   renderToast(message, true);
   logLine(message);
+}
+
+function showRetentionToast(info) {
+  if (!toast) return;
+
+  const MAX_TOAST_NOTICES = 5;
+  while (toast.childElementCount >= MAX_TOAST_NOTICES) {
+    const oldest = toast.firstElementChild;
+    if (!oldest) break;
+    oldest.remove();
+  }
+
+  const noticeEl = document.createElement("div");
+  noticeEl.className = "toast-notice retention";
+
+  const msgEl = document.createElement("span");
+  msgEl.className = "toast__message";
+  const rows = info.export_rows ?? info.purged ?? 0;
+  msgEl.textContent = `Base de dados: ${rows.toLocaleString()} eventos exportados e eliminados automaticamente.`;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "toast__close";
+  closeBtn.textContent = "×";
+  closeBtn.setAttribute("aria-label", "Fechar notificação");
+  closeBtn.addEventListener("click", () => noticeEl.remove());
+
+  noticeEl.appendChild(msgEl);
+
+  if (info.download_url) {
+    const dlBtn = document.createElement("a");
+    dlBtn.className = "toast__download";
+    dlBtn.href = info.download_url;
+    dlBtn.download = "";
+    dlBtn.textContent = "Descarregar CSV";
+    noticeEl.appendChild(dlBtn);
+  }
+
+  noticeEl.appendChild(closeBtn);
+  toast.appendChild(noticeEl);
+  logLine(`[Retention] ${rows} eventos exportados e eliminados.`);
 }
 
 function isValidCallsign(value) {
@@ -2843,6 +2884,9 @@ function connectStatus() {
             ? status.agc_gain_db.toFixed(1)
             : "?";
           statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB thr=${threshold}dB agc=${agc}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
+        }
+        if (data.retention_completed) {
+          showRetentionToast(data.retention_completed);
         }
       } catch (err) {
         setStatus("Status decode error");
