@@ -7,9 +7,15 @@
 WebSocket Module
 ================
 WebSocket handlers for real-time data streaming.
+
+Available Routers:
+- logs: Application logs streaming (/ws/logs)
+- events: Occupancy events streaming (/ws/events)
+- spectrum: Real-time spectrum waterfall (/ws/spectrum)
+- status: System status updates (/ws/status)
 """
 
-# TODO: Import WebSocket routers when implemented
-# from app.websocket import logs, events, spectrum, status
+from app.websocket import logs, events, spectrum, status
 
-__all__ = []
+__all__ = ["logs", "events", "spectrum", "status"]
+

@@ -291,3 +291,48 @@ auth_pass = os.getenv("BASIC_AUTH_PASS")
 auth_pass_is_hashed = None
 if auth_pass:
     auth_pass_is_hashed = is_bcrypt_hash(auth_pass)
+
+auth_required = bool(auth_user and auth_pass)
+
+
+def verify_basic_auth_header(auth_header: str) -> bool:
+    """
+    Verify HTTP Basic Authentication header.
+    
+    Supports both bcrypt-hashed and plaintext passwords (legacy).
+    
+    Args:
+        auth_header: Authorization header value (e.g., "Basic dXNlcjpwYXNz")
+        
+    Returns:
+        True if authentication succeeds, False otherwise
+    """
+    from app.core.auth import parse_basic_auth, verify_password
+    
+    if not auth_user or not auth_pass:
+        return False
+    
+    if not auth_header:
+        return False
+    
+    # Parse credentials from header
+    credentials = parse_basic_auth(auth_header)
+    if not credentials:
+        return False
+    
+    username, password = credentials
+    
+    # Check username
+    if username != auth_user:
+        return False
+    
+    # Verify password (supports both hashed and plaintext)
+    if auth_pass_is_hashed:
+        # Password is hashed - use bcrypt verification
+        return verify_password(password, auth_pass)
+    else:
+        # Password is plaintext - direct comparison (legacy)
+        # SECURITY WARNING: Plaintext passwords are not secure!
+        # Run 'python scripts/hash_password.py' to generate a hash
+        return password == auth_pass
+
