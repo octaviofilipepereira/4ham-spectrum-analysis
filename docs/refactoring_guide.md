@@ -310,11 +310,20 @@ async def shutdown():
 - ✅ `dependencies/auth.py` - Dependencies de autenticação
 - ✅ `dependencies/utils.py` - Utilitários de sistema
 - ✅ `dependencies/helpers.py` - Funções auxiliares de API
-- ✅ `api/health.py` - Módulo exemplar completo
-- ⏳ Restantes módulos API (seguir padrão do health.py)
-- ⏳ Módulos WebSocket
-- ⏳ Refactoring do main.py
-- ⏳ Testes e validação
+- ✅ **Fase 1 COMPLETA: Todos os módulos API (8/8)**
+  - ✅ `api/health.py` - 4 endpoints
+  - ✅ `api/events.py` - 5 endpoints  
+  - ✅ `api/scan.py` - 4 endpoints
+  - ✅ `api/settings.py` - 3 endpoints
+  - ✅ `api/logs.py` - 1 endpoint
+  - ✅ `api/exports.py` - 4 endpoints
+  - ✅ `api/admin.py` - 3 endpoints
+  - ✅ `api/decoders.py` - 13 endpoints
+- ⏳ Fase 2: Módulos WebSocket (0/4)
+- ⏳ Fase 3: Refactoring do main.py
+- ⏳ Fase 4: Testes e validação
+
+**Total de Endpoints REST Refatorados: 37/37 ✅**
 
 ## Exemplo de Migração
 
