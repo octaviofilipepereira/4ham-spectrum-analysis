@@ -655,7 +655,8 @@ function buildStableWaterfallMarkers(frame) {
   if (Array.isArray(frame?.mode_markers)) {
     frame.mode_markers.forEach((marker) => {
       const markerMode = normalizeModeLabel(marker?.mode);
-      if (markerMode === "UNKNOWN" || markerMode === "SIG") {
+      // Only show FT8 / FT4 markers — discard everything else
+      if (markerMode !== "FT8" && markerMode !== "FT4") {
         return;
       }
       const markerFreq = Number(marker?.frequency_hz);
@@ -687,6 +688,9 @@ function buildStableWaterfallMarkers(frame) {
   const markers = Array.from(waterfallMarkerCache.values())
     .filter((marker) => {
       const frequencyHz = Number(marker?.frequency_hz);
+      const m = String(marker?.mode || "").toUpperCase();
+      // Only keep FT8 / FT4 markers
+      if (m !== "FT8" && m !== "FT4") return false;
       return Number.isFinite(frequencyHz)
         && frequencyHz >= rangeStartHz
         && frequencyHz <= rangeEndHz;
@@ -879,6 +883,8 @@ function findLatestCallsignForFrequency(frequencyHz) {
   if (bestCallsign) {
     return { callsign: bestCallsign, seenAtMs: Number.isFinite(bestSeenAt) ? bestSeenAt : null };
   }
+  // No exact frequency match — fall back to the most recently decoded
+  // callsign so the tooltip still shows activity info.
   if (latestCallsign) {
     return {
       callsign: latestCallsign,
@@ -886,8 +892,8 @@ function findLatestCallsignForFrequency(frequencyHz) {
     };
   }
   return {
-    callsign: String(waterfallLatestCallsign?.callsign || ""),
-    seenAtMs: Number(waterfallLatestCallsign?.seenAtMs || 0) || null,
+    callsign: "",
+    seenAtMs: null,
   };
 }
 

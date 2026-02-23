@@ -27,6 +27,9 @@ class ScanEngine:
         self.pass_count = 0
         self._task = None
         self._record_fp = None
+        # Park/hold: when True the scan loop freezes on the current
+        # frequency so the FT decoder can capture a clean window.
+        self._parked = False
 
     async def start_async(self, config):
         self.config = config or {}
@@ -74,6 +77,22 @@ class ScanEngine:
         self.controller.close(self.device, self.stream)
         return True
 
+    def park(self, frequency_hz):
+        """Hold the scanner on *frequency_hz* until unpark() is called.
+
+        The scan loop will stop hopping and stay on this frequency,
+        allowing the FT decoder to capture a clean audio window.
+        """
+        self._parked = True
+        self._parked_event.clear()
+        self.center_hz = int(frequency_hz)
+        self.current_hz = int(frequency_hz)
+        self.controller.tune(self.device, int(frequency_hz))
+
+    def unpark(self):
+        """Resume normal scan sweeping."""
+        self._parked = False
+
     async def _scan_loop(self):
         start_hz = self.start_hz or self.center_hz
         end_hz = self.end_hz or start_hz
@@ -88,6 +107,10 @@ class ScanEngine:
             freq = start_hz
             self.step_index = 0
             while freq <= end_hz and self.running:
+                # If parked by the FT decoder, wait until unparked
+                if self._parked:
+                    await asyncio.sleep(0.1)
+                    continue
                 self.center_hz = freq
                 self.current_hz = freq
                 self.controller.tune(self.device, freq)

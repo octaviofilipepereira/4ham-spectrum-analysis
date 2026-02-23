@@ -136,6 +136,17 @@ _agc_max_gain_db = _env_float("DSP_AGC_MAX_GAIN_DB", 30.0)
 _agc_alpha = _env_float("DSP_AGC_ALPHA", 0.2)
 _snr_threshold_db = _env_float("DSP_SNR_THRESHOLD_DB", 6.0)
 _min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
+# ── Mode marker quality gate ──
+# Minimum SNR (dB) for a detected segment to qualify as a mode marker
+_marker_min_snr_db = _env_float("MARKER_MIN_SNR_DB", 10.0)
+# Minimum confidence from classify_mode_heuristic to show marker
+_marker_min_confidence = _env_float("MARKER_MIN_CONFIDENCE", 0.55)
+# Number of consecutive detections needed before showing a marker (persistence)
+_marker_min_hits = _env_int("MARKER_MIN_HITS", 2)
+# Maximum age in seconds before a tracked candidate is forgotten
+_marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 10.0)
+# Tracking dict: bucket_key -> {"hits": int, "last_seen": float, "marker": dict}
+_marker_candidates = {}
 _ws_spectrum_fps = max(1.0, _env_float("WS_SPECTRUM_FPS", 5.0))
 _ws_send_timeout_s = max(0.01, _env_float("WS_SEND_TIMEOUT_S", 0.1))
 _ws_compress_spectrum = _env_bool("WS_COMPRESS_SPECTRUM", True)
@@ -736,6 +747,9 @@ def _normalize_mode_for_band(mode_name, band_name, bandwidth_hz=None):
 
 
 def _hint_mode_by_frequency(frequency_hz, band_name=None, bandwidth_hz=None):
+    """Return a specific digital mode name (FT8/FT4/WSPR) if the frequency
+    falls within a known digital-mode window, or None otherwise.
+    This does NOT override the DSP classification — it only refines it."""
     freq = _safe_float(frequency_hz, default=None)
     if freq is None or freq <= 0:
         return None
@@ -745,19 +759,21 @@ def _hint_mode_by_frequency(frequency_hz, band_name=None, bandwidth_hz=None):
         "20m": [(14_074_000, 2500, "FT8"), (14_080_000, 2000, "FT4"), (14_095_600, 2000, "WSPR")],
         "40m": [(7_074_000, 2500, "FT8"), (7_047_500, 2000, "FT4"), (7_038_600, 2000, "WSPR")],
         "80m": [(3_573_000, 2500, "FT8"), (3_575_500, 2000, "FT4"), (3_568_600, 2000, "WSPR")],
-        "15m": [(21_074_000, 2500, "FT8"), (21_080_000, 2000, "FT4")],
+        "30m": [(10_136_000, 2000, "FT8"), (10_140_000, 2000, "FT4"), (10_138_700, 2000, "WSPR")],
+        "17m": [(18_100_000, 2500, "FT8"), (18_104_000, 2000, "FT4")],
+        "15m": [(21_074_000, 2500, "FT8"), (21_080_000, 2000, "FT4"), (21_094_600, 2000, "WSPR")],
+        "12m": [(24_915_000, 2500, "FT8"), (24_919_000, 2000, "FT4")],
         "10m": [(28_074_000, 2500, "FT8"), (28_180_000, 3000, "FT4")],
+        "6m":  [(50_313_000, 2500, "FT8"), (50_318_000, 2000, "FT4")],
+        "2m":  [(144_174_000, 2500, "FT8")],
+        "160m": [(1_840_000, 2500, "FT8"), (1_836_600, 2000, "WSPR")],
+        "60m": [(5_357_000, 2500, "FT8")],
     }
     for center_hz, tolerance_hz, mode in known_windows.get(band, []):
         if abs(freq - center_hz) <= tolerance_hz:
             return mode
 
-    bw = _safe_float(bandwidth_hz, default=0.0)
-    if bw >= 1200:
-        return "SSB"
-    if bw > 0:
-        return "FSK/PSK"
-    return "SSB"
+    return None
 
 
 def _is_plausible_occupancy_event(event):
@@ -1023,13 +1039,13 @@ def _ft_external_band_provider():
 def _ft_external_scan_park(dial_hz):
     """Hold the scanner on a specific frequency during a decode window."""
     if _scan_engine.running and _scan_engine.device:
-        _scan_engine.center_hz = int(dial_hz)
-        _scan_engine.controller.tune(_scan_engine.device, int(dial_hz))
+        _scan_engine.park(int(dial_hz))
 
 
 def _ft_external_scan_unpark():
     """Resume normal scanning after a decode window."""
-    pass  # auto-scan _step_loop will reclaim control on next iteration
+    if _scan_engine.running:
+        _scan_engine.unpark()
 
 
 async def _start_ft_external_decoder(force=False):
@@ -1970,6 +1986,10 @@ async def ws_events(websocket: WebSocket):
                 best.get("bandwidth_hz"),
                 best.get("snr_db")
             )
+            # Refine with specific digital mode if in known window
+            freq_hint = _hint_mode_by_frequency(frequency_hz, band_name=band, bandwidth_hz=best.get("bandwidth_hz"))
+            if freq_hint:
+                mode_name = freq_hint
             event = {
                 "type": "occupancy",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1986,11 +2006,6 @@ async def ws_events(websocket: WebSocket):
                 "device": _scan_state.get("device"),
                 "scan_id": _scan_state.get("scan_id")
             }
-            event["mode"] = _normalize_mode_for_band(
-                event.get("mode"),
-                event.get("band"),
-                bandwidth_hz=event.get("bandwidth_hz")
-            )
             if not _is_plausible_occupancy_event(event):
                 await asyncio.sleep(0.2)
                 continue
@@ -2047,29 +2062,71 @@ async def ws_spectrum(websocket: WebSocket):
         mode_markers = []
         band_name = _scan_engine.config.get("band") if _scan_engine.config else None
         center_hz = float(_scan_engine.center_hz or 0.0)
+        now_ts = time.time()
+        # Expire stale candidates from the persistence tracker
+        stale_keys = [k for k, v in _marker_candidates.items()
+                      if now_ts - v["last_seen"] > _marker_max_age_s]
+        for k in stale_keys:
+            _marker_candidates.pop(k, None)
+        seen_keys: set = set()
         for segment in occupancy_segments:
             offset_hz = float(segment.get("offset_hz") or 0.0)
             bandwidth_hz = int(segment.get("bandwidth_hz") or 0)
+            snr_db = float(segment.get("snr_db") or 0.0)
             frequency_hz = int(round(center_hz + offset_hz)) if center_hz > 0 else None
             mode_name, mode_confidence = classify_mode_heuristic(
                 bandwidth_hz,
                 segment.get("snr_db")
             )
-            mode_name = _normalize_mode_for_band(mode_name, band_name, bandwidth_hz=bandwidth_hz)
-            if str(mode_name).strip().lower() == "unknown":
-                mode_name = _hint_mode_by_frequency(frequency_hz, band_name=band_name, bandwidth_hz=bandwidth_hz) or "Unknown"
+            # Refine generic DSP mode with specific digital protocol name
+            # when the frequency falls in a known FT8/FT4/WSPR window
+            freq_hint = _hint_mode_by_frequency(frequency_hz, band_name=band_name, bandwidth_hz=bandwidth_hz)
+            if freq_hint:
+                mode_name = freq_hint
             if not _frequency_within_scan_band(frequency_hz, bandwidth_hz=bandwidth_hz):
                 continue
-            if str(mode_name).strip().lower() == "unknown":
+            # ── Only show FT8 / FT4 markers (all others discarded) ──
+            if mode_name not in ("FT8", "FT4"):
                 continue
-            mode_markers.append({
+            # ── Quality gate: filter weak / low-confidence detections ──
+            if snr_db < _marker_min_snr_db:
+                continue
+            if mode_confidence < _marker_min_confidence:
+                continue
+            # ── Temporal persistence: require repeated detections ──
+            # Bucket by 1 kHz-wide frequency slot to tolerate small drift
+            bucket_key = int(round((frequency_hz or 0) / 1000))
+            seen_keys.add(bucket_key)
+            cand = _marker_candidates.get(bucket_key)
+            if cand is None:
+                _marker_candidates[bucket_key] = {
+                    "hits": 1,
+                    "last_seen": now_ts,
+                    "marker": {
+                        "offset_hz": offset_hz,
+                        "frequency_hz": frequency_hz,
+                        "mode": mode_name,
+                        "snr_db": snr_db,
+                        "bandwidth_hz": bandwidth_hz,
+                        "confidence": float(mode_confidence),
+                    },
+                }
+                if _marker_min_hits <= 1:
+                    mode_markers.append(_marker_candidates[bucket_key]["marker"])
+                continue
+            # Update existing candidate
+            cand["hits"] += 1
+            cand["last_seen"] = now_ts
+            cand["marker"] = {
                 "offset_hz": offset_hz,
                 "frequency_hz": frequency_hz,
                 "mode": mode_name,
-                "snr_db": float(segment.get("snr_db") or 0.0),
+                "snr_db": snr_db,
                 "bandwidth_hz": bandwidth_hz,
-                "confidence": float(mode_confidence)
-            })
+                "confidence": float(mode_confidence),
+            }
+            if cand["hits"] >= _marker_min_hits:
+                mode_markers.append(cand["marker"])
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
         mode_markers = mode_markers[:24]
         scan_start_hz = None

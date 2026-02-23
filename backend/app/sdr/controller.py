@@ -48,6 +48,39 @@ def _kwargs_to_dict(args):
         return {}
 
 
+# RTL-SDR V3 direct-sampling threshold: frequencies below this
+# value (Hz) require direct sampling mode (Q-branch = 2) for HF.
+_DIRECT_SAMPLING_THRESHOLD_HZ = 24_000_000
+
+
+_last_direct_samp_mode: str = ""
+
+
+def _apply_direct_sampling(device, center_hz):
+    """Enable or disable RTL-SDR V3 direct sampling based on frequency.
+
+    For frequencies below 24 MHz, enables Q-branch direct sampling
+    (mode 2) which bypasses the R820T2 tuner and samples the ADC
+    directly — required for HF reception on RTL-SDR V3.
+    For frequencies >= 24 MHz, disables direct sampling so the
+    R820T2 tuner is used normally.
+
+    Caches the last mode to avoid redundant writes (the driver prints
+    a log line on every writeSetting call).
+    """
+    global _last_direct_samp_mode
+    try:
+        freq = int(center_hz or 0)
+        if freq <= 0:
+            return
+        mode = "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+        if mode != _last_direct_samp_mode:
+            device.writeSetting("direct_samp", mode)
+            _last_direct_samp_mode = mode
+    except Exception:
+        pass
+
+
 class SDRController:
     def list_devices(self):
         SoapySDR = _import_soapy_sdr()
@@ -86,6 +119,7 @@ class SDRController:
         device = SoapySDR.Device(device_args)
         device.setSampleRate(SOAPY_SDR_RX, 0, sample_rate)
         if center_hz:
+            _apply_direct_sampling(device, center_hz)
             device.setFrequency(SOAPY_SDR_RX, 0, center_hz)
         if gain is not None:
             device.setGain(SOAPY_SDR_RX, 0, gain)
@@ -112,6 +146,7 @@ class SDRController:
         if SoapySDR is None:
             return
         SOAPY_SDR_RX = SoapySDR.SOAPY_SDR_RX
+        _apply_direct_sampling(device, center_hz)
         device.setFrequency(SOAPY_SDR_RX, 0, int(center_hz))
 
     def close(self, device, stream):

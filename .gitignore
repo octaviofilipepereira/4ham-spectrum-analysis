@@ -9,3 +9,13 @@ __pycache__/
 .venv/
 data/
 logs/
+
+# jt9 / wsprd runtime artifacts
+ALL_WSPR.TXT
+decoded.txt
+hashtable.txt
+jt9_wisdom.dat
+wspr_spots.txt
+wspr_timer.out
+wspr_wisdom.dat
+timer.out
