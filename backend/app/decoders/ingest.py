@@ -34,7 +34,7 @@ def _normalize_mode(value):
 
 def _infer_source(mode):
     if mode in ("FT8", "FT4"):
-        return "wsjtx"
+        return "external_ft"
     if mode == "APRS":
         return "direwolf"
     if mode == "CW":

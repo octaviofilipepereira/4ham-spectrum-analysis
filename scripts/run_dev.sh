@@ -52,7 +52,7 @@ def iter_managed_pids():
                 cmdline = f.read().decode('utf-8', errors='ignore').replace('\x00', ' ')
         except (FileNotFoundError, ProcessLookupError, PermissionError):
             continue
-        if all(key in env for key in TARGET_KEYS) and ('wsjtx' in cmdline.lower() or 'direwolf' in cmdline.lower()):
+        if all(key in env for key in TARGET_KEYS) and ('direwolf' in cmdline.lower()):
             yield pid
 
 managed = sorted(set(iter_managed_pids()))
@@ -94,9 +94,8 @@ wait_for_shutdown() {
   done
 }
 
-export WSJTX_UDP_ENABLE="${WSJTX_UDP_ENABLE:-1}"
-export WSJTX_AUTOSTART="${WSJTX_AUTOSTART:-1}"
-export WSJTX_CMD="${WSJTX_CMD:-wsjtx}"
+export FT_EXTERNAL_ENABLE="${FT_EXTERNAL_ENABLE:-1}"
+export FT_EXTERNAL_MODES="${FT_EXTERNAL_MODES:-FT8,FT4}"
 export DIREWOLF_KISS_ENABLE="${DIREWOLF_KISS_ENABLE:-1}"
 export DIREWOLF_AUTOSTART="${DIREWOLF_AUTOSTART:-1}"
 export DIREWOLF_CMD="${DIREWOLF_CMD:-direwolf -t 0 -p}"

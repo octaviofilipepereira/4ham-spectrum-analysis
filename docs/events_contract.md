@@ -20,7 +20,7 @@ All events must also satisfy the base schema in [events.schema.json](../events.s
 - type: callsign
 - mode: FT8 or FT4
 - df_hz: integer
-- raw: decoded line from WSJT-X
+- raw: decoded line from jt9/wsprd
 - optional: grid, report, time_s, dt_s, is_new
 
 Example
@@ -36,7 +36,7 @@ Example
   "df_hz": 42,
   "raw": "CT1ABC EA1XYZ IO81",
   "confidence": 0.94,
-  "source": "wsjtx",
+  "source": "external_ft",
   "device": "rtl_sdr"
 }
 ```

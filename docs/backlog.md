@@ -18,11 +18,12 @@ Last update: 2026-02-22 16:27:19 UTC
 - [x] Mode heuristics (AM/FM/SSB/FSK/PSK)
 
 ## Decoders
-- [x] WSJT-X integration (FT8/FT4)
+- [x] FT8/FT4 decoding via jt9 (no WSJT-X dependency)
+- [x] WSPR decoding via wsprd
 - [x] Direwolf integration (APRS)
 - [x] CW decoder pipeline
 - [x] SSB ASR pipeline with controlled vocabulary
-- [ ] Internal FT8/FT4 decoder migration (remove WSJT-X runtime dependency)
+- [x] WSJT-X runtime dependency removed
 
 ## API and Streaming
 - [x] REST endpoints (OpenAPI driven)

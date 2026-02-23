@@ -7,21 +7,7 @@ import struct
 
 from app.decoders.direwolf_kiss import parse_kiss_frame
 from app.decoders.ingest import build_callsign_event
-from app.decoders.parsers import parse_ssb_asr_text, parse_wsjtx_line
-from app.decoders.wsjtx_udp import WsjtxState, parse_wsjtx_datagram
-
-
-MAGIC = b"WSJT-X"
-
-
-def _qstring(value):
-    encoded = value.encode("utf-16-be")
-    length = len(value)
-    return struct.pack(">I", length) + encoded
-
-
-def _wsjtx_header(message_type):
-    return MAGIC + struct.pack(">I", 2) + _qstring("test") + struct.pack(">I", message_type)
+from app.decoders.parsers import parse_ssb_asr_text
 
 
 def _encode_addr(call, last=False, ssid=0):
@@ -31,32 +17,6 @@ def _encode_addr(call, last=False, ssid=0):
     if last:
         ssid_byte |= 0x01
     return addr + bytes([ssid_byte])
-
-
-def test_wsjtx_udp_decode_with_dial():
-    state = WsjtxState()
-    dial = 14074000
-    status = _wsjtx_header(1) + struct.pack(">Q", dial)
-    assert parse_wsjtx_datagram(status, state) is None
-    assert state.dial_hz == dial
-
-    message = "CQ CT1ABC IN51"
-    df_hz = 50
-    packet = (
-        _wsjtx_header(2)
-        + struct.pack(">B", 0)
-        + struct.pack(">i", 0)
-        + struct.pack(">i", -12)
-        + struct.pack(">d", 0.0)
-        + struct.pack(">I", df_hz)
-        + _qstring("FT8")
-        + _qstring(message)
-    )
-    event = parse_wsjtx_datagram(packet, state)
-    assert event is not None
-    assert event["callsign"] == "CT1ABC"
-    assert event["frequency_hz"] == dial + df_hz
-    assert event["grid"] == "IN51"
 
 
 def test_direwolf_kiss_parser():
@@ -95,28 +55,6 @@ def test_ssb_asr_parser_extracts_grid_report_and_frequency():
     assert event["grid"] == "IN51"
     assert event["report"] == "59"
     assert event["frequency_hz"] == 14255000
-
-
-def test_parse_wsjtx_line_extracts_grid():
-    line = "200109  -12  0.2  14074000  FT8  CQ CT1ABC IN50"
-    event = parse_wsjtx_line(line)
-    assert event is not None
-    assert event["callsign"] == "CT1ABC"
-    assert event["grid"] == "IN50"
-
-
-def test_parse_wsjtx_line_extracts_report():
-    line = "200109  -07  0.2  14074000  FT8  CT1ABC EA1XYZ -03"
-    event = parse_wsjtx_line(line)
-    assert event is not None
-    assert event["report"] == "-03"
-
-
-def test_parse_wsjtx_line_preserves_ft4_mode():
-    line = "200109  -07  0.2  14080000  FT4  CQ CT1ABC IN50"
-    event = parse_wsjtx_line(line)
-    assert event is not None
-    assert event["mode"] == "FT4"
 
 
 def test_build_callsign_event_infers_20m_band_from_frequency():

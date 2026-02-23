@@ -187,7 +187,7 @@ const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
 const decoderStatusEl = document.getElementById("decoderStatus");
-const wsjtxUdpStatusEl = document.getElementById("wsjtxUdpStatus");
+const externalFtStatusEl = document.getElementById("externalFtStatus");
 const kissStatusEl = document.getElementById("kissStatus");
 const decoderLastEventEl = document.getElementById("decoderLastEvent");
 const agcStatusEl = document.getElementById("agcStatus");
@@ -2655,19 +2655,19 @@ async function fetchDecoderStatus() {
     }
     const data = await resp.json();
     const status = data.status || {};
-    const wsjtx = status.wsjtx_udp || {};
+    const extFt = status.external_ft || {};
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
-    const wsjtxListen = String(wsjtx.listen || "").trim();
-    if (wsjtx.enabled) {
-      wsjtxUdpStatusEl.textContent = `Listening ${wsjtxListen || "?"}`;
-    } else if (wsjtx.last_error) {
-      wsjtxUdpStatusEl.textContent = `Error (${wsjtx.last_error})`;
-    } else if (wsjtxListen) {
-      wsjtxUdpStatusEl.textContent = `Stopped (${wsjtxListen})`;
+    if (extFt.ft_external_status) {
+      const ftSt = extFt.ft_external_status;
+      if (ftSt.running) {
+        externalFtStatusEl.textContent = `Running (${(ftSt.modes || []).join(", ")})`;
+      } else {
+        externalFtStatusEl.textContent = "Stopped";
+      }
     } else {
-      wsjtxUdpStatusEl.textContent = "Not configured (set WSJTX_UDP_ENABLE=1 or WSJTX_UDP_PORT)";
+      externalFtStatusEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
     }
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
     const kissDisabledReason = kiss.last_error
@@ -2677,7 +2677,7 @@ async function fetchDecoderStatus() {
     decoderLastEventEl.textContent = lastEvent;
     agcStatusEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
-    wsjtxUdpStatusEl.textContent = "Unavailable";
+    externalFtStatusEl.textContent = "Unavailable";
     kissStatusEl.textContent = "Unavailable";
     decoderLastEventEl.textContent = "-";
     agcStatusEl.textContent = "-";

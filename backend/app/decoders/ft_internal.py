@@ -11,7 +11,6 @@ class InternalFtDecoder:
     def __init__(
         self,
         modes=None,
-        compare_with_wsjtx=False,
         min_confidence=0.0,
         poll_s=1.0,
         emit_mock_events=False,
@@ -22,7 +21,6 @@ class InternalFtDecoder:
         logger=None,
     ):
         self.modes = list(modes or ["FT8", "FT4"])
-        self.compare_with_wsjtx = bool(compare_with_wsjtx)
         self.min_confidence = float(min_confidence)
         self.poll_s = max(0.1, float(poll_s))
         self.emit_mock_events = bool(emit_mock_events)
@@ -137,7 +135,6 @@ class InternalFtDecoder:
             "enabled": running,
             "running": running,
             "modes": list(self.modes),
-            "compare_with_wsjtx": self.compare_with_wsjtx,
             "min_confidence": self.min_confidence,
             "poll_s": self.poll_s,
             "emit_mock_events": self.emit_mock_events,

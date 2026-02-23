@@ -65,7 +65,7 @@ Events use the schema in [events.schema.json](../events.schema.json).
     "mode": "FT8",
     "callsign": "CT1ABC",
     "confidence": 0.94,
-    "source": "wsjtx",
+    "source": "external_ft",
     "device": "rtl_sdr"
   }
 }

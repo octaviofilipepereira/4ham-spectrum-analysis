@@ -26,10 +26,10 @@ from app.config.loader import (
     load_scan_request,
 )
 from app.decoders.ingest import build_callsign_event
-from app.decoders.parsers import parse_wsjtx_line, parse_aprs_line, parse_cw_text, parse_ssb_asr_text
+from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
 from app.decoders.watchers import tail_lines, tail_from_end_default
-from app.decoders.wsjtx_udp import WsjtxState, create_wsjtx_udp_listener, describe_wsjtx_udp
 from app.decoders.ft_internal import InternalFtDecoder
+from app.decoders.ft_external import ExternalFtDecoder
 from app.decoders.launchers import env_flag, resolve_command, start_process, stop_process
 from app.decoders.direwolf_kiss import kiss_loop, describe_kiss
 from app.dsp.pipeline import (
@@ -94,12 +94,10 @@ _count_cache = {
 }
 _decoder_tasks = []
 _decoder_stop = asyncio.Event()
-_wsjtx_state = WsjtxState()
-_wsjtx_transport = None
-_wsjtx_process = None
 _kiss_task = None
 _direwolf_process = None
 _ft_internal_decoder = None
+_ft_external_decoder = None
 _threshold_state = {}
 
 
@@ -144,11 +142,24 @@ _ws_compress_spectrum = _env_bool("WS_COMPRESS_SPECTRUM", True)
 _ws_protocol_version = "1.1"
 _ft_internal_enable = _env_bool("FT_INTERNAL_ENABLE", False)
 _ft_internal_modes = _env_csv("FT_INTERNAL_MODES", ["FT8", "FT4"])
-_ft_internal_compare_with_wsjtx = _env_bool("FT_INTERNAL_COMPARE_WITH_WSJTX", False)
 _ft_internal_min_confidence = _env_float("FT_INTERNAL_MIN_CONFIDENCE", 0.0)
 _ft_internal_emit_mock_events = _env_bool("FT_INTERNAL_EMIT_MOCK_EVENTS", False)
 _ft_internal_mock_interval_s = max(0.25, _env_float("FT_INTERNAL_MOCK_INTERVAL_S", 15.0))
 _ft_internal_mock_callsign = str(os.getenv("FT_INTERNAL_MOCK_CALLSIGN", "N0CALL")).strip().upper() or "N0CALL"
+
+# ── External FT decoder (jt9 / wsprd) config ──
+_ft_external_enable = _env_bool("FT_EXTERNAL_ENABLE", False)
+_ft_external_modes = _env_csv("FT_EXTERNAL_MODES", ["FT8", "FT4"])
+_ft_external_command = str(os.getenv(
+    "FT_EXTERNAL_COMMAND",
+    "jt9 {mode_flag} -p {period_int} -d 3 -a . -t . {wav_path}"
+)).strip()
+_ft_external_command_wspr = str(os.getenv(
+    "FT_EXTERNAL_COMMAND_WSPR",
+    "wsprd -d -f {frequency_mhz} {wav_path}"
+)).strip()
+_ft_external_target_sr = _env_int("FT_EXTERNAL_TARGET_SAMPLE_RATE", 12000)
+_ft_external_wspr_every_n = _env_int("FT_EXTERNAL_WSPR_EVERY_N", 5)
 _cw_internal_enable = _env_bool("CW_INTERNAL_ENABLE", False)
 _ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
 _psk_internal_enable = _env_bool("PSK_INTERNAL_ENABLE", False)
@@ -170,15 +181,6 @@ _decoder_runtime_metrics = {
 }
 _decoder_status = {
     "sources": {},
-    "wsjtx_udp": {
-        "enabled": False,
-        "listen": None,
-        "last_packet_at": None,
-        "autostart": False,
-        "process_running": False,
-        "process_pid": None,
-        "last_error": None
-    },
     "direwolf_kiss": {
         "enabled": False,
         "address": None,
@@ -190,7 +192,6 @@ _decoder_status = {
         "process_pid": None
     },
     "files": {
-        "wsjtx": None,
         "aprs": None,
         "cw": None,
         "ssb": None
@@ -206,7 +207,6 @@ _decoder_status = {
     "internal_native": {
         "ft_internal_enable": _ft_internal_enable,
         "ft_internal_modes": _ft_internal_modes,
-        "ft_internal_compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
         "ft_internal_min_confidence": _ft_internal_min_confidence,
         "ft_internal_emit_mock_events": _ft_internal_emit_mock_events,
         "ft_internal_mock_interval_s": _ft_internal_mock_interval_s,
@@ -218,7 +218,6 @@ _decoder_status = {
             "enabled": False,
             "running": False,
             "modes": _ft_internal_modes,
-            "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
             "min_confidence": _ft_internal_min_confidence,
             "poll_s": 1.0,
             "emit_mock_events": _ft_internal_emit_mock_events,
@@ -231,6 +230,15 @@ _decoder_status = {
             "events_emitted": 0,
             "last_error": None,
         },
+    },
+    "external_ft": {
+        "ft_external_enable": _ft_external_enable,
+        "ft_external_modes": list(_ft_external_modes),
+        "ft_external_command": _ft_external_command,
+        "ft_external_command_wspr": _ft_external_command_wspr,
+        "ft_external_target_sample_rate": _ft_external_target_sr,
+        "ft_external_wspr_every_n": _ft_external_wspr_every_n,
+        "ft_external_status": None,
     },
     "runtime": _decoder_runtime_metrics,
 }
@@ -934,7 +942,6 @@ def _default_ft_internal_status():
         "enabled": False,
         "running": False,
         "modes": list(_ft_internal_modes),
-        "compare_with_wsjtx": _ft_internal_compare_with_wsjtx,
         "min_confidence": _ft_internal_min_confidence,
         "poll_s": 1.0,
         "emit_mock_events": _ft_internal_emit_mock_events,
@@ -958,7 +965,6 @@ async def _start_ft_internal_decoder(force=False):
     if _ft_internal_decoder is None:
         _ft_internal_decoder = InternalFtDecoder(
             modes=_ft_internal_modes,
-            compare_with_wsjtx=_ft_internal_compare_with_wsjtx,
             min_confidence=_ft_internal_min_confidence,
             poll_s=1.0,
             emit_mock_events=_ft_internal_emit_mock_events,
@@ -983,6 +989,101 @@ async def _stop_ft_internal_decoder():
     await _ft_internal_decoder.stop()
     _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
     _ft_internal_decoder = None
+    return {"stopped": True, "reason": None}
+
+
+# ── External FT decoder (jt9 / wsprd) lifecycle ──────────────────
+
+def _handle_ft_external_event(payload):
+    """Called by ExternalFtDecoder on each decoded line."""
+    return _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
+
+
+def _ft_external_iq_provider(num_samples):
+    """Provide IQ from the scan engine (blocking — called from to_thread)."""
+    if not _scan_engine.running:
+        return None
+    return _scan_engine.read_iq(num_samples)
+
+
+def _ft_external_sample_rate_provider():
+    return _scan_engine.sample_rate
+
+
+def _ft_external_frequency_provider():
+    return _scan_engine.center_hz or 0
+
+
+def _ft_external_band_provider():
+    if _scan_engine.config:
+        return str(_scan_engine.config.get("band", "")).strip().lower()
+    return ""
+
+
+def _ft_external_scan_park(dial_hz):
+    """Hold the scanner on a specific frequency during a decode window."""
+    if _scan_engine.running and _scan_engine.device:
+        _scan_engine.center_hz = int(dial_hz)
+        _scan_engine.controller.tune(_scan_engine.device, int(dial_hz))
+
+
+def _ft_external_scan_unpark():
+    """Resume normal scanning after a decode window."""
+    pass  # auto-scan _step_loop will reclaim control on next iteration
+
+
+async def _start_ft_external_decoder(force=False):
+    global _ft_external_decoder
+    if not force and not _ft_external_enable:
+        _decoder_status["external_ft"]["ft_external_status"] = None
+        return {"started": False, "reason": "ft_external_disabled"}
+
+    if _ft_external_decoder is None:
+        cmd_templates = {}
+        if _ft_external_command:
+            cmd_templates["FT8"] = _ft_external_command
+            cmd_templates["FT4"] = _ft_external_command
+        if _ft_external_command_wspr:
+            cmd_templates["WSPR"] = _ft_external_command_wspr
+
+        output_formats = {"FT8": "jt9", "FT4": "jt9", "WSPR": "wsprd"}
+
+        _ft_external_decoder = ExternalFtDecoder(
+            command_template=_ft_external_command,
+            command_templates=cmd_templates,
+            output_format="jt9",
+            output_formats=output_formats,
+            modes=list(_ft_external_modes),
+            window_seconds={"FT8": 15.0, "FT4": 7.5, "WSPR": 120.0},
+            poll_s=0.25,
+            decode_timeout_s=20.0,
+            iq_chunk_size=4096,
+            iq_provider=_ft_external_iq_provider,
+            sample_rate_provider=_ft_external_sample_rate_provider,
+            frequency_provider=_ft_external_frequency_provider,
+            band_provider=_ft_external_band_provider,
+            on_event=_handle_ft_external_event,
+            scan_park=_ft_external_scan_park,
+            scan_unpark=_ft_external_scan_unpark,
+            logger=_log,
+            target_sample_rate=_ft_external_target_sr,
+            wspr_every_n=_ft_external_wspr_every_n,
+        )
+
+    started = await _ft_external_decoder.start()
+    _decoder_status["external_ft"]["ft_external_status"] = _ft_external_decoder.snapshot()
+    return {"started": bool(started), "reason": None}
+
+
+async def _stop_ft_external_decoder():
+    global _ft_external_decoder
+    if _ft_external_decoder is None:
+        _decoder_status["external_ft"]["ft_external_status"] = None
+        return {"stopped": False, "reason": "ft_external_not_running"}
+
+    await _ft_external_decoder.stop()
+    _decoder_status["external_ft"]["ft_external_status"] = _ft_external_decoder.snapshot()
+    _ft_external_decoder = None
     return {"stopped": True, "reason": None}
 
 
@@ -1039,35 +1140,9 @@ def _start_decoder_watch(kind, path, parser, default_mode):
 @app.on_event("startup")
 async def on_startup():
     _decoder_stop.clear()
-    _start_decoder_watch("wsjtx", os.getenv("WSJTX_ALLTXT_PATH"), parse_wsjtx_line, "FT8")
     _start_decoder_watch("aprs", os.getenv("DIREWOLF_LOG_PATH"), parse_aprs_line, "APRS")
     _start_decoder_watch("cw", os.getenv("CW_DECODE_PATH"), parse_cw_text, "CW")
     _start_decoder_watch("ssb", os.getenv("SSB_ASR_PATH"), parse_ssb_asr_text, "SSB")
-    listener = create_wsjtx_udp_listener(_wsjtx_state, _handle_wsjtx_udp, logger=_log)
-    if listener:
-        try:
-            transport, _ = await listener
-            global _wsjtx_transport
-            _wsjtx_transport = transport
-            listen_addr = describe_wsjtx_udp()
-            _decoder_status["wsjtx_udp"].update({"enabled": True, "listen": listen_addr})
-            _log(f"wsjtx_udp_listen {listen_addr}")
-        except OSError as exc:
-            _decoder_status["wsjtx_udp"].update({
-                "enabled": False,
-                "listen": describe_wsjtx_udp(),
-                "last_error": f"wsjtx_udp_bind_failed {exc}"
-            })
-            _log(f"wsjtx_udp_bind_failed {exc}")
-    global _wsjtx_process
-    _wsjtx_process = await _maybe_autostart_decoder_process(
-        kind="wsjtx",
-        enabled=bool(describe_wsjtx_udp()),
-        flag_env="WSJTX_AUTOSTART",
-        cmd_env="WSJTX_CMD",
-        default_command="wsjtx",
-        status_key="wsjtx_udp"
-    )
     global _kiss_task
     _kiss_task = asyncio.create_task(
         kiss_loop(_handle_kiss_event, _decoder_stop, logger=_log, status_cb=_handle_kiss_status)
@@ -1086,6 +1161,7 @@ async def on_startup():
         status_key="direwolf_kiss"
     )
     await _start_ft_internal_decoder(force=False)
+    await _start_ft_external_decoder(force=False)
 
 
 @app.on_event("shutdown")
@@ -1094,15 +1170,12 @@ async def on_shutdown():
     for task in _decoder_tasks:
         task.cancel()
     _decoder_tasks.clear()
-    if _wsjtx_transport:
-        _wsjtx_transport.close()
     if _kiss_task:
         _kiss_task.cancel()
-    if _wsjtx_process:
-        await stop_process(_wsjtx_process)
     if _direwolf_process:
         await stop_process(_direwolf_process)
     await _stop_ft_internal_decoder()
+    await _stop_ft_external_decoder()
 
 
 @app.get("/api/health")
@@ -1315,7 +1388,7 @@ def decoder_status(request: Request = None):
             "batch": True
         },
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
-        "sources": ["wsjtx", "direwolf", "cw", "asr", "dsp", "internal_ft", "internal_cw", "internal_ssb", "internal_psk"],
+        "sources": ["direwolf", "cw", "asr", "dsp", "internal_ft", "external_ft", "internal_cw", "internal_ssb", "internal_psk"],
         "status": _decoder_status
     }
 
@@ -1357,6 +1430,60 @@ async def decoder_internal_ft_stop(request: Request = None):
     }
 
 
+# ── External FT decoder (jt9 / wsprd) endpoints ─────────────────
+
+@app.get("/api/decoders/external-ft/status")
+def decoder_external_ft_status(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    snap = _ft_external_decoder.snapshot() if _ft_external_decoder else None
+    _decoder_status["external_ft"]["ft_external_status"] = snap
+    return {
+        "status": "ok",
+        "decoder": snap,
+    }
+
+
+@app.post("/api/decoders/external-ft/start")
+async def decoder_external_ft_start(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    result = await _start_ft_external_decoder(force=True)
+    return {
+        "status": "ok",
+        "started": bool(result.get("started")),
+        "reason": result.get("reason"),
+        "decoder": _decoder_status["external_ft"]["ft_external_status"],
+    }
+
+
+@app.post("/api/decoders/external-ft/stop")
+async def decoder_external_ft_stop(request: Request = None):
+    if request:
+        _enforce_auth(request)
+    result = await _stop_ft_external_decoder()
+    return {
+        "status": "ok",
+        "stopped": bool(result.get("stopped")),
+        "reason": result.get("reason"),
+        "decoder": _decoder_status["external_ft"]["ft_external_status"],
+    }
+
+
+@app.post("/api/decoders/external-ft/modes")
+async def decoder_external_ft_modes(payload: dict, request: Request = None):
+    if request:
+        _enforce_auth(request)
+    modes = payload.get("modes")
+    if not modes or not isinstance(modes, list):
+        raise HTTPException(status_code=400, detail="modes must be a non-empty list")
+    if _ft_external_decoder:
+        updated = _ft_external_decoder.set_modes(modes)
+        _decoder_status["external_ft"]["ft_external_status"] = _ft_external_decoder.snapshot()
+        return {"status": "ok", "modes": updated}
+    return {"status": "ok", "modes": [], "reason": "ft_external_not_running"}
+
+
 @app.post("/api/decoders/events")
 def decoder_events(payload: dict, request: Request = None):
     if request:
@@ -1365,23 +1492,6 @@ def decoder_events(payload: dict, request: Request = None):
     if items is None:
         items = [payload.get("event", payload)]
     return _ingest_callsign_payloads(items, payload)
-
-
-@app.post("/api/decoders/wsjtx")
-def decoder_wsjtx(payload: dict, request: Request = None):
-    if request:
-        _enforce_auth(request)
-    lines = payload.get("lines")
-    if lines is None:
-        lines = [payload.get("line", "")]
-    events = []
-    for line in lines:
-        parsed = parse_wsjtx_line(line)
-        if parsed:
-            events.append(parsed)
-        else:
-            events.append({"raw": str(line).strip(), "mode": "FT8"})
-    return _ingest_callsign_payloads(events, payload)
 
 
 @app.post("/api/decoders/aprs")
@@ -1461,11 +1571,6 @@ def _ingest_callsign_payloads(items, defaults):
     return {"status": "ok", "saved": saved, "errors": errors}
 
 
-def _handle_wsjtx_udp(payload):
-    _decoder_status["wsjtx_udp"]["last_packet_at"] = datetime.now(timezone.utc).isoformat()
-    return _ingest_callsign_payloads([payload], {})
-
-
 def _get_ft_internal_frequency_hz():
     center_hz = _scan_engine.center_hz or _spectrum_cache.get("center_hz")
     if center_hz:
@@ -1493,14 +1598,13 @@ def _handle_kiss_status(event, detail):
 
 
 def _refresh_decoder_process_status():
-    if _wsjtx_process:
-        _decoder_status["wsjtx_udp"]["process_running"] = _wsjtx_process.returncode is None
-        _decoder_status["wsjtx_udp"]["process_pid"] = _wsjtx_process.pid
     if _direwolf_process:
         _decoder_status["direwolf_kiss"]["process_running"] = _direwolf_process.returncode is None
         _decoder_status["direwolf_kiss"]["process_pid"] = _direwolf_process.pid
     if _ft_internal_decoder:
         _decoder_status["internal_native"]["ft_internal_status"] = _ft_internal_decoder.snapshot()
+    if _ft_external_decoder:
+        _decoder_status["external_ft"]["ft_external_status"] = _ft_external_decoder.snapshot()
 
 
 @app.get("/api/export")

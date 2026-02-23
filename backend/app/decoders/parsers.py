@@ -109,55 +109,6 @@ def extract_callsign(text):
     return match.group(0)
 
 
-def parse_wsjtx_line(line):
-    if not line:
-        return None
-    parts = str(line).strip().split()
-    if len(parts) < 5:
-        return None
-    mode = "FT8"
-    if len(parts) > 4:
-        candidate_mode = parts[4].strip().upper()
-        if candidate_mode in {"FT8", "FT4"}:
-            mode = candidate_mode
-    snr_db = None
-    frequency_hz = None
-    try:
-        snr_db = float(parts[1])
-    except ValueError:
-        snr_db = None
-    try:
-        frequency_hz = int(float(parts[3]))
-    except ValueError:
-        frequency_hz = None
-    message_tokens = parts[5:] if len(parts) > 5 else parts
-    message_text = " ".join(message_tokens).strip()
-
-    callsign = extract_callsign(message_text)
-    if not callsign:
-        return None
-
-    grid = None
-    report = None
-    for token in message_tokens:
-        token = token.strip()
-        if grid is None and _GRID_RE.match(token):
-            grid = token.upper()
-            continue
-        if report is None and _REPORT_RE.match(token):
-            report = token.upper()
-
-    return {
-        "callsign": callsign,
-        "snr_db": snr_db,
-        "frequency_hz": frequency_hz,
-        "grid": grid,
-        "report": report,
-        "raw": str(line).strip(),
-        "mode": mode
-    }
-
-
 def parse_aprs_line(line):
     if not line:
         return None

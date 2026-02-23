@@ -32,8 +32,7 @@ bash deploy/systemd/install-systemd.sh /opt/4ham-spectrum-analysis octavio 4ham-
 Default runtime behavior in service template:
 
 - Backend binds `0.0.0.0:8000`
-- WSJT-X UDP ingest enabled (`WSJTX_UDP_ENABLE=1`)
-- WSJT-X autostart disabled (`WSJTX_AUTOSTART=0`) for headless/server mode
+- External FT decoder enabled (`FT_EXTERNAL_ENABLE=1`)
 - Direwolf KISS enabled + autostart
 
 ## Windows service

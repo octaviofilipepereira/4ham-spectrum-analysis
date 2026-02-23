@@ -7,6 +7,11 @@ Last update: 2026-02-22 17:40:00 UTC
 
 # Internal Native Decoder Migration Plan
 
+> **Status: WSJT-X dependency fully removed.**
+> FT8/FT4 decoding now uses `jt9` directly via `ExternalFtDecoder`.
+> WSPR decoding uses `wsprd` directly.
+> The WSJT-X GUI application is no longer required.
+
 ## Goal
 Remove external runtime dependencies for digital/voice callsign extraction by implementing internal native RF decoders, while preserving event quality and system stability.
 
@@ -19,11 +24,11 @@ Remove external runtime dependencies for digital/voice callsign extraction by im
   - event ingest integration, observability, rollout strategy.
 - Out of scope (first pass): TX features, full WSJT-X feature parity UI, rig CAT control.
 
-## Target Architecture
-- Add an internal decoder service layer under `backend/app/decoders/`.
-- Keep current ingest contract (`/api/decoders/events`) and event schema unchanged.
-- Run native decoders as internal sources (`source=internal_ft`, `source=internal_cw`, `source=internal_ssb`, `source=internal_psk`) in parallel with existing external paths during migration.
-- Keep WSJT-X and external pipelines as fallback until quality gates pass.
+## Current Architecture
+- FT8/FT4: `ExternalFtDecoder` (`ft_external.py`) → `jt9` subprocess → event ingest
+- WSPR: `ExternalFtDecoder` → `wsprd` subprocess → event ingest
+- Internal decoder (`ft_internal.py`) available as parallel path behind `FT_INTERNAL_ENABLE`
+- No WSJT-X GUI or UDP protocol dependency
 
 ## Proposed Modules
 - `backend/app/decoders/ft_internal.py`
@@ -44,9 +49,10 @@ Remove external runtime dependencies for digital/voice callsign extraction by im
   - health/status exposure and runtime selection.
 
 ## Rollout Flags
+- `FT_EXTERNAL_ENABLE=0|1` (enable jt9/wsprd decoding)
+- `FT_EXTERNAL_MODES=FT8,FT4`
 - `FT_INTERNAL_ENABLE=0|1` (default `0` initially)
 - `FT_INTERNAL_MODES=FT8,FT4`
-- `FT_INTERNAL_COMPARE_WITH_WSJTX=0|1`
 - `FT_INTERNAL_MIN_CONFIDENCE=<float>`
 - `CW_INTERNAL_ENABLE=0|1`
 - `SSB_INTERNAL_ENABLE=0|1`
@@ -54,8 +60,8 @@ Remove external runtime dependencies for digital/voice callsign extraction by im
 
 ## Migration Phases
 
-### Phase 0 — Baseline & Telemetry
-- Freeze current WSJT-X baseline metrics (decode rate/hour, unique callsigns/hour, invalid events/day).
+### Phase 0 — Baseline & Telemetry ✅
+- Freeze current baseline metrics (decode rate/hour, unique callsigns/hour, invalid events/day).
 - Add comparison metrics endpoints to support A/B evaluation.
 - Acceptance:
   - Baseline report captured for at least 24h of real RF operation.
@@ -82,19 +88,19 @@ Remove external runtime dependencies for digital/voice callsign extraction by im
   - No regression on FT8 path.
 
 ### Phase 4 — Parallel Run (A/B)
-- Run internal decoder and WSJT-X in parallel (`FT_INTERNAL_COMPARE_WITH_WSJTX=1`).
+- Run internal decoder and external jt9 decoder in parallel.
 - Compare:
   - unique callsigns overlap,
   - decode count delta,
   - false positives.
 - Acceptance gates (suggested):
-  - internal decode count >= 90% of WSJT-X baseline,
+  - internal decode count >= 90% of jt9 baseline,
   - false-positive rate <= baseline + 5%,
   - no backend stability regressions.
 
-### Phase 5 — Production Default Switch
-- Set internal decoder as default for FT8/FT4.
-- Keep WSJT-X fallback toggle for one release cycle.
+### Phase 5 — Production Default Switch ✅
+- Set external jt9 decoder as default for FT8/FT4.
+- WSJT-X dependency fully removed.
 - Update docs/install and ops guides.
 - Acceptance:
   - production runs without WSJT-X installed,
@@ -141,7 +147,7 @@ Mode-specific validation additions:
 - PSK: dedicated fixture set validating symbol decode and callsign extraction.
 
 ## Risk & Mitigation
-- Decode quality below WSJT-X:
+- Decode quality below jt9:
   - mitigate with A/B parallel run and fallback flag.
 - CPU increase on low-end hardware:
   - add decoder duty-cycle controls and per-band tuning.
@@ -153,13 +159,13 @@ Mode-specific validation additions:
   - phase by protocol profile with per-profile gates.
 
 ## Deliverables Checklist
-- [ ] Internal decoder modules added
-- [ ] Feature flags documented
-- [ ] Telemetry and comparison metrics exposed
+- [x] Internal decoder modules added
+- [x] Feature flags documented
+- [x] Telemetry and comparison metrics exposed
 - [ ] FT8 functional in live RF
 - [ ] FT4 functional in live RF
 - [ ] A/B report documented
 - [ ] CW native (IQ) functional in live RF
 - [ ] SSB native (IQ to callsign) functional in live RF
 - [ ] PSK dedicated decoder functional in live RF
-- [ ] WSJT-X no longer required in production
+- [x] WSJT-X no longer required in production

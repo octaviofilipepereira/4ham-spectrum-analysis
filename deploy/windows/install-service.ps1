@@ -49,8 +49,8 @@ sc.exe create $ServiceName binPath= $binPath start= auto DisplayName= $displayNa
 sc.exe description $ServiceName "4ham backend API and websocket service"
 
 Write-Host "Setting required environment variables in machine scope..."
-[Environment]::SetEnvironmentVariable("WSJTX_UDP_ENABLE", "1", "Machine")
-[Environment]::SetEnvironmentVariable("WSJTX_AUTOSTART", "0", "Machine")
+[Environment]::SetEnvironmentVariable("FT_EXTERNAL_ENABLE", "1", "Machine")
+[Environment]::SetEnvironmentVariable("FT_EXTERNAL_MODES", "FT8,FT4", "Machine")
 [Environment]::SetEnvironmentVariable("DIREWOLF_KISS_ENABLE", "1", "Machine")
 [Environment]::SetEnvironmentVariable("DIREWOLF_AUTOSTART", "1", "Machine")
 [Environment]::SetEnvironmentVariable("DIREWOLF_CMD", "direwolf -t 0 -p", "Machine")

@@ -60,14 +60,12 @@ Service operations:
 Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 
 ## Notes
-- Use a virtual audio cable for WSJT-X integration.
-- For FT8/FT4 callsign ingest via WSJT-X UDP, configure WSJT-X: `File` -> `Settings` -> `Reporting` -> `UDP Server=127.0.0.1`, `UDP Server Port=2237`, and enable `Accept UDP requests`.
+- FT8/FT4 decoding uses `jt9` (from WSJT source) directly — no WSJT-X GUI required.
+- WSPR decoding uses `wsprd` directly.
 - For APRS, run Direwolf with KISS TCP enabled.
-- Optional: set decoder file paths (e.g., `WSJTX_ALLTXT_PATH`) for automatic ingest.
-- Optional: enable native WSJT-X UDP ingest with `WSJTX_UDP_ENABLE=1`.
+- Optional: enable external FT decoder with `FT_EXTERNAL_ENABLE=1`.
 - Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
-- To auto-start decoder processes at backend startup, install binaries and set:
-	- `WSJTX_AUTOSTART=1`, `WSJTX_CMD="wsjtx"`
+- To auto-start Direwolf at backend startup, install the binary and set:
 	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
 
 ## Waterfall tooltip
@@ -80,8 +78,9 @@ Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 ### Decoder binaries (Mint/Ubuntu)
 ```
 sudo apt update
-sudo apt install -y wsjtx direwolf
+sudo apt install -y direwolf
 ```
+Ensure `jt9` and `wsprd` are available in `$PATH` (build from WSJT source or install from package).
 
 ## Troubleshooting
 - If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.

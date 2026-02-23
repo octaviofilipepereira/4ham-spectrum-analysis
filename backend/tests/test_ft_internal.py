@@ -10,7 +10,7 @@ from app.decoders.ft_internal import InternalFtDecoder
 
 def test_ft_internal_decoder_lifecycle_snapshot():
     async def scenario():
-        decoder = InternalFtDecoder(modes=["FT8", "FT4"], compare_with_wsjtx=True, min_confidence=0.4, poll_s=0.1)
+        decoder = InternalFtDecoder(modes=["FT8", "FT4"], min_confidence=0.4, poll_s=0.1)
 
         started = await decoder.start()
         assert started is True
@@ -20,7 +20,6 @@ def test_ft_internal_decoder_lifecycle_snapshot():
         assert status_running["running"] is True
         assert status_running["enabled"] is True
         assert status_running["modes"] == ["FT8", "FT4"]
-        assert status_running["compare_with_wsjtx"] is True
         assert status_running["min_confidence"] == 0.4
         assert status_running["started_at"] is not None
         assert status_running["last_heartbeat_at"] is not None
@@ -45,7 +44,6 @@ def test_ft_internal_decoder_emits_mock_events_when_enabled():
 
         decoder = InternalFtDecoder(
             modes=["FT8", "FT4"],
-            compare_with_wsjtx=False,
             min_confidence=0.5,
             poll_s=0.02,
             emit_mock_events=True,
