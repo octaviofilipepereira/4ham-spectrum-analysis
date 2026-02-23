@@ -318,13 +318,51 @@ const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR dev
 const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;
 const waterfallMarkerCache = new Map();
-// Synthetic markers injected from jt9 decoded callsigns (FT8/FT4 work below
-// the noise floor so DSP quality gates never pass — we inject markers directly
-// from decoder output instead).
+// Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
+// 15-20 dB below the noise floor so DSP quality gates never fire for them.
+// Instead we inject ONE marker per known dial frequency per mode, carrying
+// the most-recently decoded callsign.  This avoids flooding the waterfall
+// with one marker per decoded station (can be 50-100 per cycle on busy bands).
 const WATERFALL_DECODED_MARKER_TTL_MS = 15 * 60 * 1000;
+// One decoded-marker entry per "<dialHz>_<MODE>" key.
 const waterfallDecodedMarkerCache = new Map();
 const WATERFALL_CALLSIGN_TTL_MS = 15 * 60 * 1000;
+// Used for DSP-marker to callsign proximity matching (non-decoded modes).
 const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
+
+// Standard dial frequencies for FT8 / FT4, mirrored from the backend.
+// Used to snap decoded callsigns to a single marker position per band/mode.
+const WATERFALL_DIAL_FREQUENCIES = {
+  "160m": { FT8: 1_840_000, FT4: 1_840_000 },
+  "80m":  { FT8: 3_573_000, FT4: 3_575_500 },
+  "40m":  { FT8: 7_074_000, FT4: 7_047_500 },
+  "20m":  { FT8: 14_074_000, FT4: 14_080_000 },
+  "17m":  { FT8: 18_100_000, FT4: 18_104_000 },
+  "15m":  { FT8: 21_074_000, FT4: 21_140_000 },
+  "12m":  { FT8: 24_915_000, FT4: 24_919_000 },
+  "10m":  { FT8: 28_074_000, FT4: 28_180_000 },
+  "2m":   { FT8: 144_174_000, FT4: 144_170_000 },
+};
+// Maximum distance from a decoded freq to a known dial freq for the signal
+// to be considered "on that dial".  FT8 audio range is 0-3000 Hz; add 1 kHz
+// margin for direct-sampling frequency offset.
+const WATERFALL_DIAL_SNAP_HZ = 4000;
+
+function findDialFrequency(frequencyHz, mode) {
+  const normMode = String(mode || "").toUpperCase();
+  let best = null;
+  let bestDelta = Infinity;
+  for (const bandFreqs of Object.values(WATERFALL_DIAL_FREQUENCIES)) {
+    const dialHz = bandFreqs[normMode];
+    if (!dialHz) continue;
+    const delta = Math.abs(Number(frequencyHz) - dialHz);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = dialHz;
+    }
+  }
+  return bestDelta <= WATERFALL_DIAL_SNAP_HZ ? best : null;
+}
 const waterfallCallsignCache = new Map();
 let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
 let waterfallHoverTooltip = null;
@@ -739,9 +777,15 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
 
   waterfallModeOverlay.innerHTML = "";
   hideWaterfallHoverTooltip();
+  // Sort by frequency_hz (decoded markers) or offset_hz (DSP markers)
   const sortedMarkers = modeMarkers
     .slice()
-    .sort((left, right) => Number(left?.offset_hz || 0) - Number(right?.offset_hz || 0));
+    .sort((left, right) => {
+      const aFreq = Number(left?.frequency_hz || 0);
+      const bFreq = Number(right?.frequency_hz || 0);
+      if (aFreq && bFreq) return aFreq - bFreq;
+      return Number(left?.offset_hz || 0) - Number(right?.offset_hz || 0);
+    });
   const lanes = [[], [], []];
 
   const hasRange = Number.isFinite(rangeStartHz)
@@ -750,8 +794,11 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
   const safeRangeStartHz = hasRange ? Number(rangeStartHz) : null;
   const safeRangeEndHz = hasRange ? Number(rangeEndHz) : null;
 
-  // Pre-compute 1:1 callsign-to-marker assignment (no duplicates)
-  const callsignMap = assignCallsignsToMarkers(sortedMarkers);
+  // For DSP markers (no embedded callsign) fall back to proximity-based lookup.
+  // Decoded markers already have .callsign embedded — no lookup needed.
+  const callsignMap = assignCallsignsToMarkers(
+    sortedMarkers.filter((m) => !m?.decoded)
+  );
 
   sortedMarkers.forEach((marker) => {
     const offsetHz = Number(marker?.offset_hz ?? 0);
@@ -782,9 +829,13 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     label.textContent = normalizeModeLabel(marker?.mode);
     const snr = Number(marker?.snr_db);
     const markerKey = String(Math.round(markerFreq / 50) * 50);
-    const callsignMatch = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
-    const markerCallsign = callsignMatch?.callsign || "";
-    const markerSeenAtText = formatLastSeenTime(callsignMatch?.seenAtMs);
+    // Decoded markers (FT8/FT4 from jt9) have the callsign embedded directly.
+    // DSP markers fall back to a proximity-based cache lookup.
+    const embeddedCallsign = String(marker?.callsign || "");
+    const embeddedSeenAtMs = marker?.seenAtMs || null;
+    const proximityMatch = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
+    const markerCallsign = embeddedCallsign || proximityMatch?.callsign || "";
+    const markerSeenAtText = formatLastSeenTime(embeddedSeenAtMs || proximityMatch?.seenAtMs);
     const freqText = Number.isFinite(markerFreq) && markerFreq > 0
       ? ` | ${(markerFreq / 1_000_000).toFixed(3)} MHz`
       : "";
@@ -825,22 +876,33 @@ function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), 
     seen_at: seenAtMs,
     mode: normalizedMode
   });
-  // FT8 / FT4 signals are decoded well below the noise floor so the DSP
-  // quality gate (SNR ≥ 10 dB) will never trigger for them.  Inject a
-  // synthetic waterfall marker directly from the jt9 decoder output so the
-  // frequency appears as a visible marker even without DSP detection.
-  if (normalizedMode === "FT8" || normalizedMode === "FT4") {
-    const now = Date.now();
-    const age = now - Number(seenAtMs || 0);
-    if (age >= 0 && age < WATERFALL_DECODED_MARKER_TTL_MS) {
-      waterfallDecodedMarkerCache.set(String(bucketHz), {
-        frequency_hz: numericFrequency,
-        mode: normalizedMode,
-        snr_db: null,
-        seen_at: Number(seenAtMs),
-        decoded: true,
-      });
-    }
+
+  // FT8 / FT4 signals are decoded 15-20 dB below the noise floor, so the DSP
+  // quality gate (SNR ≥ 10 dB, min_hits ≥ 2) never fires for them.  Instead,
+  // inject ONE synthetic marker per known dial frequency per mode, keeping the
+  // MOST RECENT decoded callsign.  This gives a single, stable FT8 and FT4
+  // marker on the waterfall (not one per station on a busy band).
+  if (normalizedMode !== "FT8" && normalizedMode !== "FT4") {
+    return;
+  }
+  const dialHz = findDialFrequency(numericFrequency, normalizedMode);
+  if (!dialHz) {
+    return;
+  }
+  const markerKey = `${dialHz}_${normalizedMode}`;
+  const existing = waterfallDecodedMarkerCache.get(markerKey);
+  const ts = Number(seenAtMs);
+  // Update when: no existing entry, or this decode is the same age or newer
+  if (!existing || ts >= Number(existing.seen_at || 0)) {
+    waterfallDecodedMarkerCache.set(markerKey, {
+      frequency_hz: dialHz,    // anchor at dial freq (band centre), not audio offset
+      mode: normalizedMode,
+      snr_db: null,
+      seen_at: ts,
+      callsign: normalizedCallsign,   // *** embedded directly in the marker ***
+      seenAtMs: ts,
+      decoded: true,
+    });
   }
 }
 
@@ -2325,47 +2387,46 @@ setInterval(fetchCallsignCacheUpdate, 5000);
  * to inspect both waterfall caches and diagnose tooltip issues.
  */
 window._debugWaterfall = function () {
-  console.group("=== waterfall callsign cache ===");
+  console.group("=== waterfall callsign cache (exact-freq buckets) ===");
   if (waterfallCallsignCache.size === 0) {
-    console.warn("  (empty — no callsigns cached yet)");
+    console.warn("  (empty)");
   } else {
     for (const [k, v] of waterfallCallsignCache.entries()) {
-      console.log(`  bucket ${k}: ${v.callsign} @ ${v.frequency_hz} Hz  mode=${v.mode}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
+      console.log(`  ${k}: ${v.callsign}  mode=${v.mode}  freq=${v.frequency_hz}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
+    }
+  }
+  console.groupEnd();
+  console.group("=== waterfall decoded marker cache (one per dial-freq/mode) ===");
+  if (waterfallDecodedMarkerCache.size === 0) {
+    console.warn("  (empty — no jt9 decodes yet, or all expired)");
+  } else {
+    for (const [k, v] of waterfallDecodedMarkerCache.entries()) {
+      console.log(`  ${k}: callsign=${v.callsign}  dialFreq=${v.frequency_hz} Hz  mode=${v.mode}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
     }
   }
   console.groupEnd();
   console.group("=== waterfall DSP marker cache ===");
   if (waterfallMarkerCache.size === 0) {
-    console.warn("  (empty — no DSP markers received yet)");
+    console.warn("  (empty — DSP quality gate has not fired yet)");
   } else {
     for (const [k, v] of waterfallMarkerCache.entries()) {
-      console.log(`  bucket ${k}: mode=${v.mode}  freq=${v.frequency_hz} Hz  snr=${v.snr_db}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
+      console.log(`  ${k}: mode=${v.mode}  freq=${v.frequency_hz}  snr=${v.snr_db}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
     }
   }
   console.groupEnd();
-  console.group("=== waterfall decoded (synthetic) marker cache ===");
-  if (waterfallDecodedMarkerCache.size === 0) {
-    console.warn("  (empty — no jt9 decoded markers injected yet)");
+  console.log("WATERFALL_CALLSIGN_MAX_DELTA_HZ (DSP fallback) =", WATERFALL_CALLSIGN_MAX_DELTA_HZ);
+  // Show what markers would be rendered right now
+  const last = window._lastSpectrumFrame || lastSpectrumFrame;
+  if (last) {
+    const built = buildStableWaterfallMarkers(last);
+    console.group(`=== built markers (${built.markers.length}) for range ${built.rangeStartHz}-${built.rangeEndHz} Hz ===`);
+    for (const m of built.markers) {
+      console.log(`  ${m.mode}  ${m.frequency_hz} Hz  callsign=${m.callsign || "(DSP, no callsign)"}  decoded=${!!m.decoded}`);
+    }
+    console.groupEnd();
   } else {
-    for (const [k, v] of waterfallDecodedMarkerCache.entries()) {
-      console.log(`  bucket ${k}: mode=${v.mode}  freq=${v.frequency_hz} Hz  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
-    }
+    console.warn("No spectrum frame received yet — cannot compute built markers.");
   }
-  console.groupEnd();
-  console.log("WATERFALL_CALLSIGN_MAX_DELTA_HZ =", WATERFALL_CALLSIGN_MAX_DELTA_HZ);
-  const markers = Array.from(waterfallMarkerCache.values());
-  const decodedMarkers = Array.from(waterfallDecodedMarkerCache.values());
-  const allMarkersForDebug = [...decodedMarkers, ...markers];
-  const assignment = assignCallsignsToMarkers(allMarkersForDebug);
-  console.group("=== assignment result ===");
-  if (assignment.size === 0) {
-    console.warn("  (no assignments produced)");
-  } else {
-    for (const [k, v] of assignment.entries()) {
-      console.log(`  marker ${k} → ${v.callsign}  seenAt=${new Date(v.seenAtMs).toISOString()}`);
-    }
-  }
-  console.groupEnd();
 };
 
 bandFilter.addEventListener("change", fetchEvents);
