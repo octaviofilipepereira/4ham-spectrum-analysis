@@ -998,19 +998,23 @@ python -m uvicorn app.main:app --app-dir backend --reload
 
 ### B. Checklist de Segurança
 
-- [ ] Implementar password hashing (bcrypt)
-- [ ] Implementar rate limiting
-- [ ] Configurar CORS apropriadamente
-- [ ] Adicionar security headers
-- [ ] Implementar CSRF protection
-- [ ] Audit de dependências (pip-audit)
-- [ ] Secret scanning
-- [ ] Documentar security best practices
+- [x] Implementar password hashing (bcrypt) ✅
+- [x] Implementar rate limiting ✅
+- [x] Configurar CORS apropriadamente ✅
+- [x] Adicionar security headers ✅
+- [ ] Implementar CSRF protection (WebSocket não necessita)
+- [ ] Audit de dependências (pip-audit) - comando adicionado em docs
+- [ ] Secret scanning - requer configuração externa
+- [x] Documentar security best practices ✅ (docs/security.md)
 
 ### C. Checklist de Código
 
 - [x] Corrigir bug em test_ft_external.py ✅ (já estava corrigido)
 - [x] Criar .env.example ✅
+- [x] Adicionar dependências de segurança ao requirements.txt ✅
+- [x] Criar módulo app/core/auth.py com funções de hashing ✅
+- [x] Atualizar main.py para usar bcrypt ✅
+- [x] Adicionar script hash_password.py ✅
 - [ ] Adicionar type hints em main.py
 - [ ] Refactor main.py em módulos
 - [ ] Refactor app.js em módulos

@@ -1,0 +1,8 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23 16:00:00 UTC
+
+"""
+Core utilities package.
+"""

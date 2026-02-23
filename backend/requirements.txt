@@ -1,13 +1,32 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 16:27:19 UTC
+# Last update: 2026-02-23 16:00:00 UTC
 
+# Core framework
 fastapi
 uvicorn
+uvicorn[standard]
+
+# DSP and scientific computing
 numpy
 scipy
-pytest
-psutil
+
+# Database
+aiosqlite
+
+# Configuration
 pyyaml
 jsonschema
+python-dotenv
+
+# Security
+bcrypt
+slowapi
+
+# System utilities
+psutil
+
+# Testing
+pytest
+pytest-asyncio

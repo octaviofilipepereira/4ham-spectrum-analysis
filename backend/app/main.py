@@ -17,7 +17,11 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, Request, HTTPException, status
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config.loader import (
     ConfigError,
@@ -46,8 +50,52 @@ from app.sdr.controller import SDRController, soapy_import_status
 from app.streaming import encode_delta_int8
 from app.storage.db import Database
 from app.storage.exporter import ExportManager
+from app.core.auth import (
+    verify_password,
+    is_bcrypt_hash,
+    parse_basic_auth,
+    verify_basic_auth_plaintext
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# FastAPI Application Setup
+# ═══════════════════════════════════════════════════════════════════
 
 app = FastAPI(title="4ham Spectrum Analysis")
+
+# Rate limiting configuration
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS configuration
+# Configure allowed origins based on environment
+_cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+_cors_enabled = os.getenv("CORS_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
+
+if _cors_enabled:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Remove server header
+    if "server" in response.headers:
+        del response.headers["server"]
+    return response
+
 
 _controller = SDRController()
 _scan_engine = ScanEngine(_controller)
@@ -254,8 +302,16 @@ _decoder_status = {
     "runtime": _decoder_runtime_metrics,
 }
 
+# Authentication configuration
+# BASIC_AUTH_PASS can be either:
+#   - A plaintext password (legacy, not recommended)
+#   - A bcrypt hash (recommended, starts with $2b$)
+# To generate a hash, run: python scripts/hash_password.py
 _auth_user = os.getenv("BASIC_AUTH_USER")
 _auth_pass = os.getenv("BASIC_AUTH_PASS")
+_auth_pass_is_hashed = None
+if _auth_pass:
+    _auth_pass_is_hashed = is_bcrypt_hash(_auth_pass)
 
 
 def _command_exists(command):
@@ -594,19 +650,32 @@ def _auth_required():
 
 
 def _verify_basic_auth(auth_header):
+    """Verify HTTP Basic Authentication with support for both hashed and plaintext passwords."""
+    if not _auth_user or not _auth_pass:
+        return False
     if not auth_header:
         return False
-    if not auth_header.lower().startswith("basic "):
+    
+    # Parse credentials
+    credentials = parse_basic_auth(auth_header)
+    if not credentials:
         return False
-    try:
-        encoded = auth_header.split(" ", 1)[1].strip()
-        decoded = base64.b64decode(encoded).decode("utf-8")
-    except Exception:
+    
+    username, password = credentials
+    
+    # Check username
+    if username != _auth_user:
         return False
-    if ":" not in decoded:
-        return False
-    username, password = decoded.split(":", 1)
-    return username == _auth_user and password == _auth_pass
+    
+    # Verify password (supports both hashed and plaintext)
+    if _auth_pass_is_hashed:
+        # Password is hashed - use bcrypt verification
+        return verify_password(password, _auth_pass)
+    else:
+        # Password is plaintext - direct comparison (legacy)
+        # SECURITY WARNING: Plaintext passwords are not secure!
+        # Run 'python scripts/hash_password.py' to generate a hash
+        return password == _auth_pass
 
 
 def _enforce_auth(request: Request):
@@ -1229,6 +1298,7 @@ def save_band(payload: dict, request: Request):
 
 
 @app.post("/api/scan/start")
+@limiter.limit("10/minute")  # Rate limit: 10 scan starts per minute
 async def scan_start(payload: dict, request: Request):
     _enforce_auth(request)
     try:
@@ -1307,7 +1377,9 @@ async def scan_stop(request: Request):
 
 
 @app.get("/api/events")
+@limiter.limit("30/minute")  # Rate limit: 30 requests per minute
 def events(
+    request: Request,
     limit: int = 1000,
     offset: int = 0,
     band: str | None = None,
