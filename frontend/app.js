@@ -2255,6 +2255,31 @@ connectEvents();
 fetchEvents();
 setInterval(fetchEvents, 5000);
 
+/**
+ * Dedicated unfiltered fetch to populate the waterfall callsign cache.
+ * Runs independently of the events panel so filters (band / mode / callsign
+ * dropdowns) never starve the waterfall tooltips of decoded callsigns.
+ */
+async function fetchCallsignCacheUpdate() {
+  try {
+    const resp = await fetch("/api/events?limit=100", {
+      headers: { ...getAuthHeader() }
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : [];
+    // Only feed callsign-type events (jt9/wsprd decodes) into the cache
+    const callsignEvents = items.filter((e) =>
+      e && e.type === "callsign" && e.callsign && e.frequency_hz
+    );
+    updateCallsignCacheFromEvents(callsignEvents);
+  } catch (_) {
+    // silently ignore — waterfall cache is best-effort
+  }
+}
+fetchCallsignCacheUpdate();
+setInterval(fetchCallsignCacheUpdate, 5000);
+
 bandFilter.addEventListener("change", fetchEvents);
 modeFilter.addEventListener("change", fetchEvents);
 callsignFilter.addEventListener("change", fetchEvents);
