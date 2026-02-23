@@ -728,6 +728,9 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
   const safeRangeStartHz = hasRange ? Number(rangeStartHz) : null;
   const safeRangeEndHz = hasRange ? Number(rangeEndHz) : null;
 
+  // Pre-compute 1:1 callsign-to-marker assignment (no duplicates)
+  const callsignMap = assignCallsignsToMarkers(sortedMarkers);
+
   sortedMarkers.forEach((marker) => {
     const offsetHz = Number(marker?.offset_hz ?? 0);
     const markerFreq = Number(marker?.frequency_hz);
@@ -756,7 +759,8 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
     label.textContent = normalizeModeLabel(marker?.mode);
     const snr = Number(marker?.snr_db);
-    const callsignMatch = findLatestCallsignForFrequency(markerFreq, marker?.mode);
+    const markerKey = String(Math.round(markerFreq / 50) * 50);
+    const callsignMatch = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
     const markerCallsign = callsignMatch?.callsign || "";
     const markerSeenAtText = formatLastSeenTime(callsignMatch?.seenAtMs);
     const freqText = Number.isFinite(markerFreq) && markerFreq > 0
@@ -845,55 +849,68 @@ function updateCallsignCacheFromEvents(items) {
   items.forEach((eventItem) => updateCallsignCacheFromEvent(eventItem));
 }
 
-function findLatestCallsignForFrequency(frequencyHz, markerMode = "") {
-  const targetFrequency = Number(frequencyHz);
-  const targetMode = String(markerMode || "").toUpperCase();
+/**
+ * Build a 1:1 mapping from marker frequency to callsign so that each
+ * decoded callsign appears on at most ONE marker tooltip.
+ *
+ * Algorithm:
+ *  1. Collect all (callsign-cache entry, marker) pairs within
+ *     WATERFALL_CALLSIGN_MAX_DELTA_HZ and matching mode.
+ *  2. Sort pairs by frequency delta (closest first).
+ *  3. Greedily assign: if neither the cache entry nor the marker
+ *     has been used yet, link them.
+ *
+ * Returns a Map<roundedMarkerFreq, {callsign, seenAtMs}>.
+ */
+function assignCallsignsToMarkers(markers) {
   cleanupWaterfallCallsignCache();
-
-  let bestCallsign = "";
-  let bestDeltaHz = Infinity;
-  let bestSeenAt = -Infinity;
-
-  for (const entry of waterfallCallsignCache.values()) {
-    const entryFrequency = Number(entry?.frequency_hz);
-    if (!Number.isFinite(entryFrequency) || entryFrequency <= 0) {
-      continue;
-    }
-    // Mode-aware: skip entries whose mode doesn't match the marker
-    const entryMode = String(entry?.mode || "").toUpperCase();
-    if (targetMode && entryMode && entryMode !== targetMode) {
-      continue;
-    }
-    if (!Number.isFinite(targetFrequency) || targetFrequency <= 0) {
-      continue;
-    }
-    const deltaHz = Math.abs(entryFrequency - targetFrequency);
-    if (deltaHz > WATERFALL_CALLSIGN_MAX_DELTA_HZ) {
-      continue;
-    }
-    const seenAt = Number(entry?.seen_at || 0);
-    const callsign = String(entry?.callsign || "");
-    // Among matches within the frequency window, prefer the most
-    // recently decoded one (not the closest in frequency) so that
-    // the tooltip cycles through active stations.
-    const isBetter = seenAt > bestSeenAt || (seenAt === bestSeenAt && deltaHz < bestDeltaHz);
-    if (!isBetter) {
-      continue;
-    }
-    bestDeltaHz = deltaHz;
-    bestSeenAt = seenAt;
-    bestCallsign = callsign;
+  const result = new Map();
+  if (!Array.isArray(markers) || !markers.length) {
+    return result;
   }
 
-  if (bestCallsign) {
-    return { callsign: bestCallsign, seenAtMs: Number.isFinite(bestSeenAt) ? bestSeenAt : null };
+  // Build candidate pairs
+  const pairs = [];
+  const cacheEntries = Array.from(waterfallCallsignCache.values());
+  for (const marker of markers) {
+    const mFreq = Number(marker?.frequency_hz);
+    const mMode = String(marker?.mode || "").toUpperCase();
+    if (!Number.isFinite(mFreq) || mFreq <= 0) continue;
+    for (const entry of cacheEntries) {
+      const eFreq = Number(entry?.frequency_hz);
+      const eMode = String(entry?.mode || "").toUpperCase();
+      const eCall = String(entry?.callsign || "");
+      if (!eCall) continue;
+      if (!Number.isFinite(eFreq) || eFreq <= 0) continue;
+      if (mMode && eMode && eMode !== mMode) continue;
+      const delta = Math.abs(eFreq - mFreq);
+      if (delta > WATERFALL_CALLSIGN_MAX_DELTA_HZ) continue;
+      pairs.push({
+        markerKey: String(Math.round(mFreq / 50) * 50),
+        callsign: eCall,
+        seenAt: Number(entry?.seen_at || 0),
+        delta,
+        entryKey: String(Math.round(eFreq / 50) * 50),
+      });
+    }
   }
-  // No frequency match within the delta window — return empty
-  // rather than a misleading global fallback.
-  return {
-    callsign: "",
-    seenAtMs: null,
-  };
+
+  // Sort: smallest delta first; break ties by newest decode
+  pairs.sort((a, b) => a.delta - b.delta || b.seenAt - a.seenAt);
+
+  const usedMarkers = new Set();
+  const usedCallsigns = new Set();
+  for (const p of pairs) {
+    if (usedMarkers.has(p.markerKey)) continue;
+    if (usedCallsigns.has(p.callsign)) continue;
+    usedMarkers.add(p.markerKey);
+    usedCallsigns.add(p.callsign);
+    result.set(p.markerKey, {
+      callsign: p.callsign,
+      seenAtMs: Number.isFinite(p.seenAt) ? p.seenAt : null,
+    });
+  }
+  return result;
 }
 
 function buildSimulatedModeMarkers(spanHz, rangeStartHz = null, rangeEndHz = null) {
