@@ -1,0 +1,190 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Scan API endpoints
+
+"""
+Scan API
+========
+Spectrum scan control and status endpoints.
+"""
+
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.config.loader import (
+    ConfigError,
+    apply_region_profile_to_scan,
+    load_region_profile,
+    load_scan_request,
+)
+from app.dependencies import state
+from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
+from app.dependencies.helpers import log, fallback_sample_rate_for_device
+
+
+router = APIRouter(prefix="/api/scan", tags=["scan"])
+limiter = Limiter(key_func=get_remote_address)
+
+
+@router.post("/start")
+@limiter.limit("10/minute")  # Rate limit: 10 scan starts per minute
+async def scan_start(payload: dict, request: Request, _: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Start a spectrum scan.
+    
+    Validates scan configuration, applies region profile if provided,
+    resolves band frequencies from database, and starts the scan engine.
+    
+    Includes automatic sample rate fallback on device errors.
+    
+    Args:
+        payload: Scan configuration dict with keys:
+            - scan: Scan parameters (device_id, start_hz, end_hz, sample_rate, etc.)
+            - device: Device type selection
+            - region_profile_path: Optional region profile path
+            
+    Returns:
+        Scan state dict with scan_id and status
+        
+    Raises:
+        HTTPException: 400 if config invalid, 500 if scan fails to start
+    """
+    # Validate and normalize payload
+    try:
+        normalized_payload = load_scan_request(payload)
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    scan = normalized_payload.get("scan", {})
+    selected_device = normalized_payload.get("device")
+    
+    # Set device_id if not provided
+    if selected_device and not scan.get("device_id"):
+        scan["device_id"] = selected_device
+    
+    # Apply region profile if provided
+    region_profile_path = normalized_payload.get("region_profile_path")
+    if region_profile_path:
+        try:
+            region_profile = load_region_profile(region_profile_path)
+            apply_region_profile_to_scan(scan, region_profile)
+        except ConfigError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Resolve band frequencies from database if band name provided
+    if scan.get("band"):
+        start_hz = int(scan.get("start_hz", 0) or 0)
+        end_hz = int(scan.get("end_hz", 0) or 0)
+        
+        if start_hz <= 0 or end_hz <= 0:
+            for band in state.db.get_bands():
+                if str(band.get("name", "")).lower() == str(scan.get("band", "")).lower():
+                    if start_hz <= 0:
+                        scan["start_hz"] = band.get("start_hz")
+                    if end_hz <= 0:
+                        scan["end_hz"] = band.get("end_hz")
+                    break
+
+    # Validate frequency range
+    start_hz = int(scan.get("start_hz", 0) or 0)
+    end_hz = int(scan.get("end_hz", 0) or 0)
+    if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
+        raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
+
+    # Start scan with automatic sample rate fallback
+    try:
+        try:
+            await state.scan_engine.start_async(scan)
+        except Exception as exc:
+            message = str(exc)
+            # Retry with fallback sample rate if setSampleRate failed
+            if "setSampleRate failed" not in message:
+                raise
+            
+            fallback_rate = fallback_sample_rate_for_device(
+                scan.get("device_id") or selected_device,
+                scan.get("sample_rate"),
+            )
+            if not fallback_rate:
+                raise
+            
+            previous_rate = int(scan.get("sample_rate", 0) or 0)
+            scan["sample_rate"] = fallback_rate
+            log(f"scan_start_retry_sample_rate:{previous_rate}->{fallback_rate}")
+            await state.scan_engine.start_async(scan)
+
+        # Update scan state
+        state.scan_state["state"] = "running"
+        state.scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
+        state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
+        state.scan_state["scan"] = scan
+        state.scan_state["scan_id"] = state.db.start_scan(scan, state.scan_state["started_at"])
+        
+        log("scan_start")
+        return state.scan_state
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to start scan: {exc}") from exc
+
+
+@router.post("/stop")
+async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Stop the currently running scan.
+    
+    Stops the scan engine and updates scan state in database.
+    
+    Returns:
+        Updated scan state dict
+    """
+    await state.scan_engine.stop_async()
+    state.scan_state["state"] = "stopped"
+    state.db.end_scan(
+        state.scan_state.get("scan_id"),
+        datetime.now(timezone.utc).isoformat()
+    )
+    log("scan_stop")
+    return state.scan_state
+
+
+@router.get("/status")
+def scan_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
+    """
+    Get current scan status.
+    
+    Returns scan state combined with engine status.
+    Authentication is optional for this endpoint.
+    
+    Returns:
+        Dict with scan state and engine status
+    """
+    payload = dict(state.scan_state)
+    payload["engine"] = state.scan_engine.status()
+    return payload
+
+
+# Scans history endpoint (outside /scan prefix)
+scans_router = APIRouter(prefix="/api", tags=["scan"])
+
+@scans_router.get("/scans")
+def scans(limit: int = 100, _: bool = Depends(optional_verify_basic_auth)) -> List[Dict]:
+    """
+    Get scan history.
+    
+    Returns list of past scans with metadata.
+    Authentication is optional for this endpoint.
+    
+    Args:
+        limit: Maximum number of scans to return (default: 100)
+        
+    Returns:
+        List of scan records
+    """
+    return state.db.get_scans(limit=limit)
