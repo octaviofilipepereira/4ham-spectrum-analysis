@@ -994,7 +994,7 @@ python -m uvicorn app.main:app --app-dir backend --reload
 - [x] Remover scripts/data/ ✅ (liberados 3.4GB)
 - [x] Mover data/events.sqlite.bak-* para data/backups/ ✅
 - [x] Verificar .gitignore está correto ✅
-- [ ] Commit e push das alterações
+- [x] Commit e push das alterações ✅ (commit 5d15b23)
 
 ### B. Checklist de Segurança
 
