@@ -319,7 +319,7 @@ const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;
 const waterfallMarkerCache = new Map();
 const WATERFALL_CALLSIGN_TTL_MS = 15 * 60 * 1000;
-const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 25000;
+const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
 const waterfallCallsignCache = new Map();
 let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
 let waterfallHoverTooltip = null;
@@ -756,7 +756,7 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
     label.textContent = normalizeModeLabel(marker?.mode);
     const snr = Number(marker?.snr_db);
-    const callsignMatch = findLatestCallsignForFrequency(markerFreq);
+    const callsignMatch = findLatestCallsignForFrequency(markerFreq, marker?.mode);
     const markerCallsign = callsignMatch?.callsign || "";
     const markerSeenAtText = formatLastSeenTime(callsignMatch?.seenAtMs);
     const freqText = Number.isFinite(markerFreq) && markerFreq > 0
@@ -782,7 +782,7 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
   });
 }
 
-function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now()) {
+function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), mode = "") {
   const normalizedCallsign = String(callsign || "").trim().toUpperCase();
   const numericFrequency = Number(frequencyHz);
   if (!normalizedCallsign || !isValidCallsign(normalizedCallsign)) {
@@ -795,7 +795,8 @@ function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now()) 
   waterfallCallsignCache.set(String(bucketHz), {
     callsign: normalizedCallsign,
     frequency_hz: numericFrequency,
-    seen_at: seenAtMs
+    seen_at: seenAtMs,
+    mode: String(mode || "").toUpperCase()
   });
 }
 
@@ -829,10 +830,11 @@ function updateCallsignCacheFromEvent(eventItem) {
   }
   const callsign = String(eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "").trim().toUpperCase();
   const frequencyHz = Number(eventItem.frequency_hz);
+  const mode = String(eventItem.mode || "").toUpperCase();
   const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
   const seenAtMs = Number.isFinite(timestampMs) ? timestampMs : Date.now();
   cacheLatestCallsign(callsign, seenAtMs);
-  cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs);
+  cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs, mode);
   cleanupWaterfallCallsignCache();
 }
 
@@ -843,26 +845,24 @@ function updateCallsignCacheFromEvents(items) {
   items.forEach((eventItem) => updateCallsignCacheFromEvent(eventItem));
 }
 
-function findLatestCallsignForFrequency(frequencyHz) {
+function findLatestCallsignForFrequency(frequencyHz, markerMode = "") {
   const targetFrequency = Number(frequencyHz);
+  const targetMode = String(markerMode || "").toUpperCase();
   cleanupWaterfallCallsignCache();
 
   let bestCallsign = "";
   let bestDeltaHz = Infinity;
   let bestSeenAt = -Infinity;
-  let latestCallsign = "";
-  let latestSeenAt = -Infinity;
 
   for (const entry of waterfallCallsignCache.values()) {
     const entryFrequency = Number(entry?.frequency_hz);
     if (!Number.isFinite(entryFrequency) || entryFrequency <= 0) {
       continue;
     }
-    const seenAt = Number(entry?.seen_at || 0);
-    const callsign = String(entry?.callsign || "");
-    if (callsign && seenAt > latestSeenAt) {
-      latestSeenAt = seenAt;
-      latestCallsign = callsign;
+    // Mode-aware: skip entries whose mode doesn't match the marker
+    const entryMode = String(entry?.mode || "").toUpperCase();
+    if (targetMode && entryMode && entryMode !== targetMode) {
+      continue;
     }
     if (!Number.isFinite(targetFrequency) || targetFrequency <= 0) {
       continue;
@@ -871,7 +871,12 @@ function findLatestCallsignForFrequency(frequencyHz) {
     if (deltaHz > WATERFALL_CALLSIGN_MAX_DELTA_HZ) {
       continue;
     }
-    const isBetter = deltaHz < bestDeltaHz || (deltaHz === bestDeltaHz && seenAt > bestSeenAt);
+    const seenAt = Number(entry?.seen_at || 0);
+    const callsign = String(entry?.callsign || "");
+    // Among matches within the frequency window, prefer the most
+    // recently decoded one (not the closest in frequency) so that
+    // the tooltip cycles through active stations.
+    const isBetter = seenAt > bestSeenAt || (seenAt === bestSeenAt && deltaHz < bestDeltaHz);
     if (!isBetter) {
       continue;
     }
@@ -883,14 +888,8 @@ function findLatestCallsignForFrequency(frequencyHz) {
   if (bestCallsign) {
     return { callsign: bestCallsign, seenAtMs: Number.isFinite(bestSeenAt) ? bestSeenAt : null };
   }
-  // No exact frequency match — fall back to the most recently decoded
-  // callsign so the tooltip still shows activity info.
-  if (latestCallsign) {
-    return {
-      callsign: latestCallsign,
-      seenAtMs: Number.isFinite(latestSeenAt) && latestSeenAt > 0 ? latestSeenAt : null,
-    };
-  }
+  // No frequency match within the delta window — return empty
+  // rather than a misleading global fallback.
   return {
     callsign: "",
     seenAtMs: null,
