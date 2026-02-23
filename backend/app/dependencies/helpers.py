@@ -277,6 +277,13 @@ def record_decoder_event_saved(event: Dict) -> None:
         state.decoder_runtime_metrics["by_mode"][mode] += 1
 
 
+def record_decoder_event_invalid() -> None:
+    """Record metrics for invalid decoder event."""
+    state.decoder_runtime_metrics["invalid_events"] = int(
+        state.decoder_runtime_metrics.get("invalid_events", 0)
+    ) + 1
+
+
 def fallback_sample_rate_for_device(device_id: str, current_sample_rate: int) -> Optional[int]:
     """
     Get fallback sample rate for device if current rate fails.

@@ -10,6 +10,6 @@ REST API routers for 4ham Spectrum Analysis.
 """
 
 # Import routers for easy access
-from app.api import health, events, scan
+from app.api import health, events, scan, decoders, exports, settings, admin, logs
 
-__all__ = ["health", "events", "scan"]
+__all__ = ["health", "events", "scan", "decoders", "exports", "settings", "admin", "logs"]

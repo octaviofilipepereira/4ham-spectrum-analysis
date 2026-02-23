@@ -9,6 +9,7 @@ Utility Functions
 Common utility functions for system operations, device detection, etc.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -281,4 +282,130 @@ def probe_device_setup(choice: str) -> Dict:
         "devices_detected": devices,
         "match_found": bool(matched),
         "matched_device": matched,
+    }
+
+
+def run_linux_auto_install(choice: str, missing_packages: Optional[List[str]] = None) -> Dict:
+    """
+    Attempt automatic installation of missing packages on Linux.
+    
+    Tries multiple privilege escalation strategies:
+    1. Direct root (if running as root)
+    2. sudo without password
+    3. pkexec with GUI prompt
+    
+    Args:
+        choice: Device type choice
+        missing_packages: List of missing package names
+        
+    Returns:
+        Dict with installation results:
+            - attempted: Whether installation was attempted
+            - success: Whether all packages installed successfully
+            - error: Error code if failed
+            - method: Privilege escalation method used
+            - steps: List of command execution results
+    """
+    attempted = False
+    steps = []
+
+    if not sys.platform.startswith("linux"):
+        return {
+            "attempted": False,
+            "success": False,
+            "error": "auto_install_only_supported_on_linux",
+            "method": None,
+            "steps": steps,
+        }
+
+    base_packages = list(missing_packages or [])
+    if not base_packages:
+        return {
+            "attempted": False,
+            "success": True,
+            "error": None,
+            "method": None,
+            "steps": steps,
+        }
+
+    # Try different privilege escalation strategies
+    strategies = []
+    
+    # Strategy 1: Direct root access
+    if command_exists("apt-get") and hasattr(os, "geteuid") and os.geteuid() == 0:
+        strategies.append({
+            "name": "root_direct",
+            "commands": [
+                ["apt-get", "update"],
+                ["apt-get", "install", "-y", *base_packages],
+            ],
+        })
+    
+    # Strategy 2: sudo without password
+    if command_exists("sudo"):
+        strategies.append({
+            "name": "sudo_nopasswd",
+            "commands": [
+                ["sudo", "-n", "apt-get", "update"],
+                ["sudo", "-n", "apt-get", "install", "-y", *base_packages],
+            ],
+        })
+    
+    # Strategy 3: pkexec with GUI
+    if command_exists("pkexec"):
+        strategies.append({
+            "name": "pkexec_gui",
+            "commands": [
+                ["pkexec", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "update"],
+                ["pkexec", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", *base_packages],
+            ],
+        })
+
+    if not strategies:
+        return {
+            "attempted": False,
+            "success": False,
+            "error": "no_privilege_escalation_tool",
+            "method": None,
+            "steps": steps,
+        }
+
+    # Try each strategy until one succeeds
+    for strategy in strategies:
+        strategy_ok = True
+        for command in strategy["commands"]:
+            attempted = True
+            result = run_command(command, timeout=900)
+            result["strategy"] = strategy["name"]
+            steps.append(result)
+            if result.get("returncode") != 0:
+                strategy_ok = False
+                break
+        
+        if strategy_ok:
+            return {
+                "attempted": attempted,
+                "success": True,
+                "error": None,
+                "method": strategy["name"],
+                "steps": steps,
+            }
+
+    # Check if failure was due to authentication
+    combined_stderr = "\n".join((item.get("stderr") or "") for item in steps).lower()
+    needs_elevation = any(token in combined_stderr for token in [
+        "password is required",
+        "authentication",
+        "polkit",
+        "not authorized",
+        "not allowed",
+        "permission denied",
+    ])
+
+    return {
+        "attempted": attempted,
+        "success": False,
+        "error": "elevation_required" if needs_elevation else "apt_install_failed",
+        "method": None,
+        "steps": steps,
     }
