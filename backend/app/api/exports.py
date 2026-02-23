@@ -12,18 +12,19 @@ Event data export management endpoints.
 import os
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from app.dependencies import state
 from app.dependencies.auth import optional_verify_basic_auth
 
 
-router = APIRouter(prefix="/api", tags=["exports"])
+router = APIRouter()
 
 
 @router.get("/export")
 def export_events(
+    request: Request,
     limit: int = 1000,
     offset: int = 0,
     band: Optional[str] = None,
@@ -40,6 +41,7 @@ def export_events(
     Provides backward compatibility for older API clients.
     
     Args:
+        request: FastAPI request object
         limit: Maximum events to export
         offset: Pagination offset
         band: Filter by band
@@ -54,12 +56,10 @@ def export_events(
     """
     # Import here to avoid circular dependency
     from app.api.events import events
-    from fastapi import Request
     
-    # Create a mock request for the events endpoint
-    # This is a workaround for the legacy API
+    # Forward request to events endpoint
     return events(
-        request=None,
+        request=request,
         limit=limit,
         offset=offset,
         band=band,

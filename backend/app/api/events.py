@@ -21,7 +21,7 @@ from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import sanitize_events_for_api, build_propagation_summary
 
 
-router = APIRouter(prefix="/api", tags=["events"])
+router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
@@ -163,7 +163,7 @@ def events_stats(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
     Returns:
         Dict with stats grouped by band and mode
     """
-    return state.db.get_events_stats()
+    return state.db.get_event_stats()
 
 
 @router.get("/propagation/summary")

@@ -26,9 +26,9 @@ from app.dsp.pipeline import (
     detect_peaks,
     estimate_noise_floor,
     estimate_occupancy,
-    classify_mode_heuristic,
-    encode_delta_int8
+    classify_mode_heuristic
 )
+from app.streaming import encode_delta_int8
 
 router = APIRouter()
 

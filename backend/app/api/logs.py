@@ -17,7 +17,7 @@ from app.dependencies import state
 from app.dependencies.auth import optional_verify_basic_auth
 
 
-router = APIRouter(prefix="/api", tags=["logs"])
+router = APIRouter()
 
 
 @router.get("/logs")

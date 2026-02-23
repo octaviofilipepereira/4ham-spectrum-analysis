@@ -27,7 +27,7 @@ from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
 
 
-router = APIRouter(prefix="/api/scan", tags=["scan"])
+router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 

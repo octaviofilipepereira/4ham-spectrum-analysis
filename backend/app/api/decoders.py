@@ -26,7 +26,7 @@ from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
 
 
-router = APIRouter(prefix="/api/decoders", tags=["decoders"])
+router = APIRouter()
 
 
 def _refresh_decoder_process_status():

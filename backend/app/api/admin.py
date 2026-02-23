@@ -27,7 +27,7 @@ from app.dependencies.utils import (
 from app.sdr.controller import soapy_import_status
 
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter()
 
 
 @router.post("/reset-all-config")
