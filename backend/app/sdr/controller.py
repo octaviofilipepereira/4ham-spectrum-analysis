@@ -99,6 +99,11 @@ class SDRController:
         return devices
 
     def open(self, device_id=None, sample_rate=48000, center_hz=0, gain=None):
+        global _last_direct_samp_mode
+        # Reset cache: hardware reverts to mode "0" every time the device is
+        # closed, so the next open() MUST re-apply the correct mode even when
+        # the frequency (and therefore the desired mode) hasn't changed.
+        _last_direct_samp_mode = ""
         SoapySDR = _import_soapy_sdr()
         if SoapySDR is None:
             return None, None

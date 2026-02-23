@@ -1,6 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23
 # Decoders API endpoints
 
 """
@@ -500,3 +501,100 @@ def decoder_ssb(payload: dict, _: bool = Depends(optional_verify_basic_auth)) ->
             events.append({"raw": str(text).strip(), "mode": "SSB"})
     
     return _ingest_callsign_payloads(events, payload)
+
+
+@router.post("/start/{decoder_type}")
+async def decoder_start(
+    decoder_type: str,
+    _: bool = Depends(optional_verify_basic_auth)
+) -> Dict:
+    """
+    Start a specific decoder by type.
+    
+    Unified start endpoint that routes to appropriate decoder.
+    
+    Args:
+        decoder_type: Decoder type ('internal-ft', 'external-ft', 'direwolf')
+        
+    Returns:
+        Dict with start status and decoder info
+        
+    Raises:
+        HTTPException: 400 if decoder type unknown
+    """
+    decoder_type = decoder_type.lower().strip()
+    
+    if decoder_type in ("internal-ft", "internal_ft", "ft-internal", "ft_internal"):
+        result = await _start_ft_internal_decoder(force=True)
+        return {
+            "status": "ok",
+            "decoder_type": "internal-ft",
+            "started": bool(result.get("started")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["internal_native"]["ft_internal_status"],
+        }
+    
+    elif decoder_type in ("external-ft", "external_ft", "ft-external", "ft_external"):
+        result = await _start_ft_external_decoder(force=True)
+        return {
+            "status": "ok",
+            "decoder_type": "external-ft",
+            "started": bool(result.get("started")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["external_ft"]["ft_external_status"],
+        }
+    
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft"
+        )
+
+
+@router.post("/stop/{decoder_type}")
+async def decoder_stop(
+    decoder_type: str,
+    _: bool = Depends(optional_verify_basic_auth)
+) -> Dict:
+    """
+    Stop a specific decoder by type.
+    
+    Unified stop endpoint that routes to appropriate decoder.
+    
+    Args:
+        decoder_type: Decoder type ('internal-ft', 'external-ft', 'direwolf')
+        
+    Returns:
+        Dict with stop status and decoder info
+        
+    Raises:
+        HTTPException: 400 if decoder type unknown
+    """
+    decoder_type = decoder_type.lower().strip()
+    
+    if decoder_type in ("internal-ft", "internal_ft", "ft-internal", "ft_internal"):
+        result = await _stop_ft_internal_decoder()
+        return {
+            "status": "ok",
+            "decoder_type": "internal-ft",
+            "stopped": bool(result.get("stopped")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["internal_native"]["ft_internal_status"],
+        }
+    
+    elif decoder_type in ("external-ft", "external_ft", "ft-external", "ft_external"):
+        result = await _stop_ft_external_decoder()
+        return {
+            "status": "ok",
+            "decoder_type": "external-ft",
+            "stopped": bool(result.get("stopped")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["external_ft"]["ft_external_status"],
+        }
+    
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft"
+        )
+

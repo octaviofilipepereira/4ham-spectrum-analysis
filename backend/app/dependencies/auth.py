@@ -1,6 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23 21:30 UTC
 # Authentication dependencies
 
 """
@@ -28,8 +29,8 @@ def verify_basic_auth(request: Request) -> None:
     Raises:
         HTTPException: 401 if auth fails, 403 if credentials invalid
     """
-    # If no auth configured, allow access
-    if not state.auth_user or not state.auth_pass:
+    # If auth is not required (AUTH_REQUIRED=0 or no credentials configured), allow access
+    if not state.auth_required:
         return
     
     # Get Authorization header

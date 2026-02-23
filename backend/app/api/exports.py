@@ -124,6 +124,7 @@ def create_export(payload: dict, _: bool = Depends(optional_verify_basic_auth)) 
 
 
 @router.get("/exports")
+@router.get("/export/list")  # Alias for compatibility
 def list_exports(limit: int = 100, _: bool = Depends(optional_verify_basic_auth)) -> Dict:
     """
     List available export files.

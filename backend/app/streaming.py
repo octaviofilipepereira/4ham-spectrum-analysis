@@ -3,10 +3,15 @@
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 # Last update: 2026-02-22 16:27:19 UTC
 
+from typing import List, Dict, Any, Union
 import numpy as np
+import numpy.typing as npt
 
 
-def encode_delta_int8(fft_db, step_db=0.5):
+def encode_delta_int8(
+    fft_db: Union[List[float], npt.NDArray[np.float32]], 
+    step_db: float = 0.5
+) -> Dict[str, Any]:
     if not fft_db:
         return {
             "encoding": "delta_int8",
@@ -29,7 +34,11 @@ def encode_delta_int8(fft_db, step_db=0.5):
     }
 
 
-def decode_delta_int8(fft_ref_db, fft_step_db, fft_delta):
+def decode_delta_int8(
+    fft_ref_db: float, 
+    fft_step_db: float, 
+    fft_delta: List[int]
+) -> List[float]:
     if not fft_delta:
         return []
     ref = float(fft_ref_db)

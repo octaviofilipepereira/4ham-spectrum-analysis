@@ -101,6 +101,20 @@ def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
     return {"status": "ok"}
 
 
+@router.get("/defaults")
+def get_settings_defaults(_: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Get default settings values.
+    
+    Returns the application's default settings without modifying current settings.
+    
+    Returns:
+        Default settings dict
+    """
+    defaults = state.default_settings_payload()
+    return defaults
+
+
 @router.post("/reset-defaults")
 def reset_settings_defaults(_: None = Depends(verify_basic_auth)) -> Dict:
     """

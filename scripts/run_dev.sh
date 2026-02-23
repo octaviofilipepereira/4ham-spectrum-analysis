@@ -2,7 +2,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 16:27:19 UTC
+# Last update: 2026-02-23 21:30 UTC
 
 set -euo pipefail
 
@@ -107,6 +107,10 @@ ensure_environment() {
 }
 
 start_backend() {
+  # Change to root directory so all relative paths (data/, config/, etc.)
+  # resolve correctly regardless of where run_dev.sh was invoked from.
+  cd "$ROOT_DIR"
+
   ensure_environment
   stop_backend >/dev/null 2>&1 || true
   sleep 0.5
@@ -114,7 +118,14 @@ start_backend() {
   if [[ "${RUN_DEV_RELOAD:-0}" == "1" ]]; then
     reload_args=(--reload --reload-dir "$BACKEND_DIR")
   fi
-  nohup "$PYTHON_BIN" -m uvicorn app.main:app --app-dir "$BACKEND_DIR" --host 127.0.0.1 --port 8000 "${reload_args[@]}" >>"$LOG_FILE" 2>&1 &
+  # Pass .env via uvicorn --env-file (safe: handles values with spaces/special chars).
+  # bash `source` is NOT used because .env contains unquoted values with spaces
+  # (e.g. FT_EXTERNAL_COMMAND=jt9 ... {wav_path}) which would be misinterpreted.
+  local env_args=()
+  if [[ -f "$ROOT_DIR/.env" ]]; then
+    env_args=(--env-file "$ROOT_DIR/.env")
+  fi
+  nohup "$PYTHON_BIN" -m uvicorn app.main:app --app-dir "$BACKEND_DIR" --host 127.0.0.1 --port 8000 "${env_args[@]}" "${reload_args[@]}" >>"$LOG_FILE" 2>&1 &
   local pid="$!"
   echo "$pid" > "$PID_FILE"
   echo "Backend started (PID: $pid)"

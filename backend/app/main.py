@@ -16,6 +16,8 @@ FastAPI application with modular architecture:
 """
 
 import os
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -31,6 +33,49 @@ from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_s
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Application Lifespan: auto-start configured decoders
+# ═══════════════════════════════════════════════════════════════════
+
+_log = logging.getLogger("uvicorn.error")
+
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """Auto-start enabled decoders on startup and stop them gracefully on shutdown."""
+    from app.dependencies import state as _state
+    from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder
+
+    if _state.ft_external_enable:
+        try:
+            result = await _start_ft_external_decoder(force=False)
+            _log.info("FT external decoder startup: %s", result)
+        except Exception as exc:
+            _log.warning("FT external decoder startup failed: %s", exc)
+
+    if _state.ft_internal_enable:
+        try:
+            result = await _start_ft_internal_decoder(force=False)
+            _log.info("FT internal decoder startup: %s", result)
+        except Exception as exc:
+            _log.warning("FT internal decoder startup failed: %s", exc)
+
+    yield
+
+    # Graceful shutdown
+    from app.api.decoders import _stop_ft_external_decoder, _stop_ft_internal_decoder
+    if _state.ft_external_decoder:
+        try:
+            await _stop_ft_external_decoder()
+        except Exception:
+            pass
+    if _state.ft_internal_decoder:
+        try:
+            await _stop_ft_internal_decoder()
+        except Exception:
+            pass
+
+
+# ═══════════════════════════════════════════════════════════════════
 # FastAPI Application Setup
 # ═══════════════════════════════════════════════════════════════════
 
@@ -39,7 +84,8 @@ app = FastAPI(
     description="Real-time spectrum monitoring and digital mode decoding for amateur radio",
     version="2.0.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan,
 )
 
 # ═══════════════════════════════════════════════════════════════════
@@ -100,7 +146,7 @@ app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(logs.router, prefix="/api", tags=["Logs"])
 app.include_router(exports.router, prefix="/api", tags=["Exports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(decoders.router, prefix="/api", tags=["Decoders"])
+app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers

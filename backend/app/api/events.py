@@ -1,6 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23
 # Events API endpoints
 
 """
@@ -88,6 +89,121 @@ def events(
     return data
 
 
+@router.get("/events/export/csv")
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute for exports
+def export_events_csv(
+    request: Request,
+    limit: int = 1000,
+    offset: int = 0,
+    band: Optional[str] = None,
+    mode: Optional[str] = None,
+    callsign: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    _: bool = Depends(optional_verify_basic_auth)
+):
+    """
+    Export events as CSV.
+    
+    Optimized CSV export endpoint with rate limiting.
+    
+    Args:
+        limit: Maximum number of events to export (default: 1000, max: 10000)
+        offset: Offset for pagination (default: 0)
+        band: Filter by band name
+        mode: Filter by mode (FT8, APRS, etc.)
+        callsign: Filter by callsign
+        start: Start timestamp (ISO format)
+        end: End timestamp (ISO format)
+        
+    Returns:
+        CSV text response with event data
+    """
+    if limit > 10000:
+        limit = 10000
+    
+    data = state.db.get_events(
+        limit=limit,
+        offset=offset,
+        band=band,
+        mode=mode,
+        callsign=callsign,
+        start=start,
+        end=end
+    )
+    data = sanitize_events_for_api(data)
+    
+    lines = ["Type,Timestamp,Band,FrequencyHz,Mode,Callsign,Confidence,SNR,PowerDbm,ScanId"]
+    for item in data:
+        lines.append(",".join([
+            str(item.get("type", "")),
+            str(item.get("timestamp", "")),
+            str(item.get("band", "")),
+            str(item.get("frequency_hz", "")),
+            str(item.get("mode", "")),
+            str(item.get("callsign", "")),
+            str(item.get("confidence", "")),
+            str(item.get("snr_db", "")),
+            str(item.get("power_dbm", "")),
+            str(item.get("scan_id", ""))
+        ]))
+    
+    return PlainTextResponse("\n".join(lines), media_type="text/csv")
+
+
+@router.get("/events/export/json")
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute for exports
+def export_events_json(
+    request: Request,
+    limit: int = 1000,
+    offset: int = 0,
+    band: Optional[str] = None,
+    mode: Optional[str] = None,
+    callsign: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    _: bool = Depends(optional_verify_basic_auth)
+) -> Dict:
+    """
+    Export events as JSON.
+    
+    Optimized JSON export endpoint with rate limiting.
+    
+    Args:
+        limit: Maximum number of events to export (default: 1000, max: 10000)
+        offset: Offset for pagination (default: 0)
+        band: Filter by band name
+        mode: Filter by mode (FT8, APRS, etc.)
+        callsign: Filter by callsign
+        start: Start timestamp (ISO format)
+        end: End timestamp (ISO format)
+        
+    Returns:
+        JSON dict with events array and metadata
+    """
+    if limit > 10000:
+        limit = 10000
+    
+    data = state.db.get_events(
+        limit=limit,
+        offset=offset,
+        band=band,
+        mode=mode,
+        callsign=callsign,
+        start=start,
+        end=end
+    )
+    data = sanitize_events_for_api(data)
+    
+    return {
+        "status": "ok",
+        "count": len(data),
+        "limit": limit,
+        "offset": offset,
+        "events": data
+    }
+
+
 @router.post("/admin/events/purge-invalid")
 def admin_purge_invalid_events(_: None = Depends(verify_basic_auth)) -> Dict:
     """
@@ -167,6 +283,7 @@ def events_stats(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
 
 
 @router.get("/propagation/summary")
+@router.get("/events/propagation_summary")  # Alias for compatibility
 def propagation_summary(
     window_minutes: int = 30,
     _: bool = Depends(optional_verify_basic_auth)

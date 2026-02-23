@@ -1,6 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23 21:30 UTC
 # Global application state
 
 """
@@ -217,12 +218,12 @@ decoder_runtime_metrics = {
 decoder_status = {
     "sources": {},
     "direwolf_kiss": {
-        "enabled": False,
+        "enabled": _env_bool("DIREWOLF_KISS_ENABLE", False),
         "address": None,
         "connected": False,
         "last_packet_at": None,
         "last_error": None,
-        "autostart": False,
+        "autostart": _env_bool("DIREWOLF_AUTOSTART", False),
         "process_running": False,
         "process_pid": None
     },
@@ -256,6 +257,14 @@ decoder_status = {
             "min_confidence": ft_internal_min_confidence,
         },
         "ft_external_status": None,
+    },
+    "external_ft": {
+        "enabled": ft_external_enable,
+        "modes": ft_external_modes,
+        "command": ft_external_command,
+        "command_wspr": ft_external_command_wspr,
+        "target_sample_rate": ft_external_target_sr,
+        "status": None
     },
     "runtime": decoder_runtime_metrics,
 }
@@ -292,7 +301,11 @@ auth_pass_is_hashed = None
 if auth_pass:
     auth_pass_is_hashed = is_bcrypt_hash(auth_pass)
 
-auth_required = bool(auth_user and auth_pass)
+# AUTH_REQUIRED env var acts as a global on/off switch.
+# When set to 0, false or no, authentication is disabled even if credentials
+# are configured in .env. Defaults to True when credentials are present.
+_auth_required_env = os.getenv("AUTH_REQUIRED", "1").strip().lower()
+auth_required = (_auth_required_env not in ("0", "false", "no")) and bool(auth_user and auth_pass)
 
 
 def verify_basic_auth_header(auth_header: str) -> bool:

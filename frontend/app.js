@@ -366,6 +366,11 @@ function findDialFrequency(frequencyHz, mode) {
 const waterfallCallsignCache = new Map();
 let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
 let waterfallHoverTooltip = null;
+// Track active hover so the tooltip survives the per-frame overlay redraw.
+let _waterfallHoverActive = false;
+let _waterfallLastTooltipText = "";
+let _waterfallLastTooltipX = 0;
+let _waterfallLastTooltipY = 0;
 const WATERFALL_EXPLORER_KEY = "waterfallExplorerEnabled";
 const WATERFALL_EXPLORER_ZOOM_KEY = "waterfallExplorerZoom";
 const WATERFALL_SEGMENT_COUNT = 12;
@@ -566,6 +571,7 @@ function hideWaterfallHoverTooltip() {
     return;
   }
   tooltip.classList.add("is-hidden");
+  _waterfallHoverActive = false;
 }
 
 function showWaterfallHoverTooltip(text, clientX, clientY) {
@@ -580,6 +586,10 @@ function showWaterfallHoverTooltip(text, clientX, clientY) {
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;
   tooltip.classList.remove("is-hidden");
+  _waterfallHoverActive = true;
+  _waterfallLastTooltipText = text;
+  _waterfallLastTooltipX = clientX;
+  _waterfallLastTooltipY = clientY;
 }
 
 function computeRulerStepHz(spanHz, rulerWidthPx = 0) {
@@ -776,7 +786,6 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
   }
 
   waterfallModeOverlay.innerHTML = "";
-  hideWaterfallHoverTooltip();
   // Sort by frequency_hz (decoded markers) or offset_hz (DSP markers)
   const sortedMarkers = modeMarkers
     .slice()
@@ -857,6 +866,12 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     });
     waterfallModeOverlay.appendChild(label);
   });
+  // Restore tooltip if the user was actively hovering before the per-frame redraw.
+  // innerHTML = "" destroys the label elements without firing mouseleave, so
+  // _waterfallHoverActive stays true and we can re-show with the saved state.
+  if (_waterfallHoverActive && _waterfallLastTooltipText) {
+    showWaterfallHoverTooltip(_waterfallLastTooltipText, _waterfallLastTooltipX, _waterfallLastTooltipY);
+  }
 }
 
 function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), mode = "") {
@@ -2855,13 +2870,9 @@ async function fetchDecoderStatus() {
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
-    if (extFt.ft_external_status) {
-      const ftSt = extFt.ft_external_status;
-      if (ftSt.running) {
-        externalFtStatusEl.textContent = `Running (${(ftSt.modes || []).join(", ")})`;
-      } else {
-        externalFtStatusEl.textContent = "Stopped";
-      }
+    if (extFt.enabled) {
+      const modes = (extFt.modes || []).join(", ");
+      externalFtStatusEl.textContent = `Configured (${modes})`;
     } else {
       externalFtStatusEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
     }

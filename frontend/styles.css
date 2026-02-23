@@ -369,15 +369,16 @@ h1,
   position: absolute;
   z-index: 4;
   transform: translate(10px, -110%);
-  max-width: min(360px, calc(100% - 24px));
-  padding: 6px 10px;
+  max-width: min(560px, calc(100% - 24px));
+  min-width: 260px;
+  padding: 10px 16px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(6, 10, 20, 0.95);
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.4;
   white-space: nowrap;
   pointer-events: none;
 }

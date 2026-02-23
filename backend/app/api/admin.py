@@ -1,6 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-23
 # Admin API endpoints
 
 """
@@ -208,4 +209,28 @@ def admin_config_test(payload: dict, _: None = Depends(verify_basic_auth)) -> Di
             "ok": audio_ok,
             "checks": audio_checks,
         },
+    }
+
+
+@router.get("/audio/detect")
+def admin_audio_detect(_: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Detect audio devices and configuration.
+    
+    Probes audio system for available devices, capabilities, and
+    recommends optimal configuration.
+    
+    Returns:
+        Audio detection report with:
+            - devices: List of detected audio devices
+            - recommended: Suggested audio configuration
+            - capabilities: Supported sample rates, channels
+            - system: Audio system info (ALSA, PulseAudio, PipeWire)
+    """
+    audio_probe = probe_audio_setup()
+    
+    return {
+        "status": "ok",
+        "audio": audio_probe,
+        "suggested_config": audio_probe.get("suggested"),
     }
