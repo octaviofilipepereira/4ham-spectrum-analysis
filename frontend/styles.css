@@ -390,38 +390,6 @@ h1,
   flex-wrap: wrap;
 }
 
-.vfo-apply-btn {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.775rem;
-  line-height: 1.5;
-  background: #090f18;
-  border: 1px solid #1a2e3a;
-  border-radius: 0.2rem;
-  color: #3a7a54;
-  font-family: 'Courier New', monospace;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-
-.vfo-apply-btn:hover {
-  background: #0a2418;
-  border-color: #2a7848;
-  color: #3aee78;
-}
-
-.vfo-goto-group input {
-  background: #090f18;
-  border: 1px solid #1a2e3a;
-  border-radius: 0.2rem;
-  color: #3aee78;
-  font-family: 'Courier New', monospace;
-  font-size: 0.775rem;
-  line-height: 1.5;
-  padding: 0.25rem 0.5rem;
-  width: 110px;
-  outline: none;
-}
-
 .vfo-goto-group input:focus { border-color: #2a7848; }
 .vfo-goto-group input::placeholder { color: #1a4030; }
 
