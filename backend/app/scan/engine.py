@@ -1,12 +1,18 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-22 16:27:19 UTC
+# Last update: 2026-02-24 12:00:00 UTC
 
 import asyncio
+import os
 from typing import Optional, Dict, Any, BinaryIO
 import numpy as np
 import numpy.typing as npt
+
+# Default IQ recording size limit: 512 MB.
+# Prevents unbounded disk growth at 16 MB/s (2048 kHz × 8 bytes/sample).
+# Override via RECORD_MAX_BYTES in .env (0 = no limit).
+_DEFAULT_RECORD_MAX_BYTES = 512 * 1024 * 1024
 
 
 class ScanEngine:
@@ -30,6 +36,15 @@ class ScanEngine:
         self.pass_count: int = 0
         self._task: Optional[asyncio.Task] = None
         self._record_fp: Optional[BinaryIO] = None
+        self._record_bytes: int = 0
+        # Maximum bytes to write to the IQ recording file (0 = unlimited).
+        # Read from RECORD_MAX_BYTES env var; can be overridden per-config.
+        try:
+            self._record_max_bytes: int = int(
+                os.getenv("RECORD_MAX_BYTES", str(_DEFAULT_RECORD_MAX_BYTES))
+            )
+        except (ValueError, TypeError):
+            self._record_max_bytes = _DEFAULT_RECORD_MAX_BYTES
         # Park/hold: when True the scan loop freezes on the current
         # frequency so the FT decoder can capture a clean window.
         self._parked = False
@@ -38,6 +53,13 @@ class ScanEngine:
 
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
+        # Allow per-scan override of the recording size limit
+        if "record_max_bytes" in self.config:
+            try:
+                self._record_max_bytes = int(self.config["record_max_bytes"])
+            except (ValueError, TypeError):
+                pass
+        self._record_bytes = 0
         self.sample_rate = int(self.config.get("sample_rate", 48000))
         self.start_hz = int(self.config.get("start_hz", 0))
         self.end_hz = int(self.config.get("end_hz", 0))
@@ -145,7 +167,26 @@ class ScanEngine:
             return None
         samples = self.controller.read_samples(self.device, self.stream, num_samples)
         if samples is not None and self._record_fp:
-            self._record_fp.write(samples.tobytes())
+            data = samples.tobytes()
+            # Enforce recording size limit
+            if self._record_max_bytes > 0 and self._record_bytes + len(data) > self._record_max_bytes:
+                # Close and discard the file pointer — recording is full
+                try:
+                    self._record_fp.close()
+                except Exception:
+                    pass
+                self._record_fp = None
+                self._record_bytes = 0
+                # Log once so the operator knows recording stopped
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "IQ recording stopped: size limit reached "
+                    "(%d MB). Set RECORD_MAX_BYTES=0 to disable limit.",
+                    self._record_max_bytes // (1024 * 1024),
+                )
+            else:
+                self._record_fp.write(data)
+                self._record_bytes += len(data)
         return samples
 
     def status(self) -> Dict[str, Any]:

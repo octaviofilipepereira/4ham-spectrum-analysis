@@ -24,8 +24,7 @@ def log(message: str) -> None:
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     state.logs.append(f"{timestamp} {message}")
-    if len(state.logs) > 500:
-        state.logs.pop(0)
+    # No manual trim needed: state.logs is a deque(maxlen=500)
 
 
 def safe_float(value: Any, default: Optional[float] = None) -> Optional[float]:

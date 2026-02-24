@@ -33,4 +33,5 @@ def logs(limit: int = 200, _: bool = Depends(optional_verify_basic_auth)) -> Lis
     Returns:
         List of log entry strings
     """
-    return state.logs[-limit:]
+    # state.logs is a deque — convert to list for slicing
+    return list(state.logs)[-limit:]

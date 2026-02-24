@@ -51,18 +51,19 @@ async def ws_logs(websocket: WebSocket) -> None:
     
     await websocket.accept()
     last_idx = 0
-    
+
     try:
         while True:
-            # Send new logs if available
-            if last_idx < len(state.logs):
-                batch = state.logs[last_idx:]
-                last_idx = len(state.logs)
+            # Snapshot deque to a list — required for slicing (deque has no slice)
+            logs_snap = list(state.logs)
+            if last_idx < len(logs_snap):
+                batch = logs_snap[last_idx:]
+                last_idx = len(logs_snap)
                 await websocket.send_json({"logs": batch})
-            
+
             # Poll every second
             await asyncio.sleep(1.0)
-            
+
     except WebSocketDisconnect:
         # Client disconnected, clean exit
         return

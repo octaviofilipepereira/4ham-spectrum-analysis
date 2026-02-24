@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23 21:30 UTC 21:30 UTC
+# Last update: 2026-02-24 12:00:00 UTC
 # Global application state
 
 """
@@ -11,6 +11,7 @@ Central repository for all global application state variables.
 """
 
 import asyncio
+import collections
 import os
 from datetime import datetime, timezone
 
@@ -282,7 +283,9 @@ ft_external_decoder = None
 # Logs and Cache
 # ═══════════════════════════════════════════════════════════════════
 
-logs = []
+# deque(maxlen=500): O(1) append+discard vs list.pop(0) O(n).
+# Supports len() and iteration; use list(logs) for slicing.
+logs: collections.deque = collections.deque(maxlen=500)
 
 count_cache = {
     "timestamp": 0.0,
