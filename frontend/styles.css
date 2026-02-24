@@ -377,11 +377,11 @@ h1,
 }
 
 .vfo-group-label {
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.10em;
-  color: #2a5040;
-  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
 }
 
 .vfo-goto-row {
@@ -390,8 +390,20 @@ h1,
   flex-wrap: wrap;
 }
 
-.vfo-goto-group input:focus { border-color: #2a7848; }
-.vfo-goto-group input::placeholder { color: #1a4030; }
+#vfoGotoInput {
+  background: #0d1520;
+  border-color: #1a2e3a;
+  color: #ffffff;
+}
+
+#vfoGotoInput:focus {
+  background: #0d1520;
+  border-color: #2a7848;
+  color: #ffffff;
+  box-shadow: 0 0 0 0.2rem rgba(42, 120, 72, 0.25);
+}
+
+#vfoGotoInput::placeholder { color: rgba(255, 255, 255, 0.35); }
 
 .waterfall-ruler {
   position: absolute;
