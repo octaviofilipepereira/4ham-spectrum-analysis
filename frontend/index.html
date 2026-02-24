@@ -46,31 +46,11 @@ Last update: 2026-02-22 16:27:19 UTC
 
       <header class="app__header mb-4">
         <div class="row g-3 align-items-center">
-          <div class="col-lg-5">
+          <div class="col-12">
             <h1>4ham Spectrum Analysis</h1>
             <p class="kicker">Coded &amp; Powered by CT7BFV</p>
             <p class="header-meta">&copy; <span id="copyrightYear"></span> Octávio Filipe Gonçalves</p>
             <p class="header-meta">License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a></p>
-          </div>
-          <div class="col-lg-7">
-            <div class="card panel shadow-sm">
-              <div class="card-body">
-                <div class="row g-2 align-items-end">
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">Gain</label>
-                    <input type="number" id="gain" value="20" class="form-control form-control-sm" />
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">Sample rate</label>
-                    <input type="number" id="sampleRate" value="48000" class="form-control form-control-sm" />
-                  </div>
-                  <div class="col-12 col-md-6">
-                    <label class="form-label">Record path</label>
-                    <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </header>
@@ -283,6 +263,20 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-6">
                 <label class="form-label">Auth pass</label>
                 <input type="password" id="authPass" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12"><h3 class="h6 mb-1">Scan parameters</h3></div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Gain</label>
+                <input type="number" id="gain" value="20" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label">Sample rate</label>
+                <input type="number" id="sampleRate" value="48000" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Record path</label>
+                <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">Login</h3></div>
