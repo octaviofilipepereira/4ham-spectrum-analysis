@@ -80,6 +80,11 @@ h1,
   color: var(--muted);
 }
 
+.menu-toolbar {
+  width: fit-content;
+  margin-left: auto;
+}
+
 .menu-toolbar .card-body {
   padding: 0.75rem;
 }
