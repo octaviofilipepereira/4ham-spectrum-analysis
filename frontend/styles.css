@@ -391,11 +391,12 @@ h1,
 }
 
 .vfo-apply-btn {
-  padding: 3px 8px;
-  font-size: 0.70rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.775rem;
+  line-height: 1.5;
   background: #090f18;
   border: 1px solid #1a2e3a;
-  border-radius: 4px;
+  border-radius: 0.2rem;
   color: #3a7a54;
   font-family: 'Courier New', monospace;
   cursor: pointer;
@@ -411,12 +412,13 @@ h1,
 .vfo-goto-group input {
   background: #090f18;
   border: 1px solid #1a2e3a;
-  border-radius: 4px;
+  border-radius: 0.2rem;
   color: #3aee78;
   font-family: 'Courier New', monospace;
-  font-size: 0.80rem;
-  padding: 3px 8px;
-  width: 108px;
+  font-size: 0.775rem;
+  line-height: 1.5;
+  padding: 0.25rem 0.5rem;
+  width: 110px;
   outline: none;
 }
 
