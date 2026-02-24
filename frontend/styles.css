@@ -344,11 +344,11 @@ h1,
 }
 
 .vfo-display__label {
-  font-size: 0.60rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #2a5a3a;
-  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
 }
 
 .vfo-display__freq {
@@ -365,9 +365,10 @@ h1,
 .vfo-display__freq .vfo-sep { color: #1a5a2a; }
 
 .vfo-display__unit {
-  font-size: 0.63rem;
-  color: #2a6a3a;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
   font-family: 'Courier New', monospace;
+  font-weight: 600;
 }
 
 .vfo-goto-group {
