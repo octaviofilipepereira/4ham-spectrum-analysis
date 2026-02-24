@@ -386,9 +386,14 @@ h1,
 
 .vfo-goto-row {
   display: flex;
-  gap: 3px;
+  gap: 0;
   flex-wrap: nowrap;
   align-items: center;
+}
+
+.vfo-goto-row #vfoApplyBtn {
+  margin-left: 3px;
+  flex-shrink: 0;
 }
 
 #vfoGotoInput {
