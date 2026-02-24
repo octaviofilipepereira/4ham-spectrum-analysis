@@ -68,23 +68,6 @@ Last update: 2026-02-22 16:27:19 UTC
                     <label class="form-label">Record path</label>
                     <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
                   </div>
-                  <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center scan-controls-row">
-                    <button class="btn btn-primary" id="startScan">Start scanning</button>
-                    <div class="scan-quick-bands" aria-label="Quick band switch">
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="160m">160m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="80m">80m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="40m">40m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="20m">20m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="17m">17m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="15m">15m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="12m">12m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="10m">10m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="2m">2m</button>
-                      <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="70cm">70cm</button>
-                    </div>
-                    <span class="login-status status-chip" id="loginStatus">Auth: guest</span>
-                    <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -123,23 +106,24 @@ Last update: 2026-02-22 16:27:19 UTC
                     <button class="vfo-apply-btn" id="vfoApplyBtn">APPLY</button>
                   </div>
                 </div>
-                <div class="vfo-band-group">
-                  <span class="vfo-group-label">Band</span>
-                  <div class="vfo-band-btns" id="vfoBandBtns">
-                    <button data-band="160m">160m</button>
-                    <button data-band="80m">80m</button>
-                    <button data-band="40m">40m</button>
-                    <button data-band="30m">30m</button>
-                    <button data-band="20m">20m</button>
-                    <button data-band="17m">17m</button>
-                    <button data-band="15m">15m</button>
-                    <button data-band="12m">12m</button>
-                    <button data-band="10m">10m</button>
-                    <button data-band="6m">6m</button>
-                    <button data-band="2m">2m</button>
-                    <button data-band="70cm">70cm</button>
-                  </div>
+              </div>
+              <!-- Scan controls -->
+              <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center scan-controls-row">
+                <button class="btn btn-primary" id="startScan">Start scanning</button>
+                <div class="scan-quick-bands" aria-label="Quick band switch">
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="160m">160m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="80m">80m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="40m">40m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="20m">20m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="17m">17m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="15m">15m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="12m">12m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="10m">10m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="2m">2m</button>
+                  <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="70cm">70cm</button>
                 </div>
+                <span class="login-status status-chip" id="loginStatus">Auth: guest</span>
+                <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
               </div>
               <!-- Spectrum graph -->
               <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>

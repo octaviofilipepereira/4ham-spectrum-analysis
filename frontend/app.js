@@ -3906,10 +3906,7 @@ function updateVFODisplay(startHz, endHz) {
   if (centre === _vfoDisplayHz) return;
   _vfoDisplayHz = centre;
   _vfoFreqEl.innerHTML = _formatVFOFreq(centre);
-  const activeBand = bandSelect ? bandSelect.value : "";
-  document.querySelectorAll("#vfoBandBtns button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.band === activeBand);
-  });
+  refreshQuickBandButtons();
 }
 
 (function initVFOControls() {
@@ -3956,17 +3953,4 @@ function updateVFODisplay(startHz, endHz) {
   }
   document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
-
-  document.querySelectorAll("#vfoBandBtns button").forEach(btn => {
-    btn.addEventListener("click", function () {
-      const band = this.dataset.band;
-      if (bandSelect) {
-        bandSelect.value = band;
-        showToast(`Band set to ${band} — press Start to scan`);
-      }
-      document.querySelectorAll("#vfoBandBtns button").forEach(b => b.classList.remove("active"));
-      this.classList.add("active");
-    });
-  });
-
 })();
