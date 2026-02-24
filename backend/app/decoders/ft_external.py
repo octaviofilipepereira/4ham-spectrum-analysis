@@ -1,3 +1,8 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+# Last update: 2026-02-24 12:00:00 UTC
+
 import asyncio
 import gc
 import json
@@ -10,7 +15,88 @@ import wave
 from datetime import datetime, timezone
 
 import numpy as np
-from scipy.signal import resample_poly
+
+
+def _resample_poly_np(x: np.ndarray, up: int, down: int) -> np.ndarray:
+    """Polyphase resampler using numpy only — replaces scipy.signal.resample_poly.
+
+    Uses the same Kaiser-windowed FIR design as scipy (half_len=10*max(up,down),
+    beta=5.0) and a chunked polyphase filter bank to avoid O(N*up) memory spikes
+    on large WSPR windows (>=30 M samples).
+
+    Parameters
+    ----------
+    x    : 1-D float array (real-valued)
+    up   : integer upsample factor
+    down : integer downsample factor
+
+    Returns
+    -------
+    Resampled 1-D float64 array, length ceil(len(x)*up/down).
+    """
+    from math import gcd as _gcd
+    g = _gcd(int(up), int(down))
+    up, down = int(up) // g, int(down) // g
+    if up == down == 1:
+        return x.astype(np.float64, copy=False)
+
+    # ── FIR design (identical to scipy defaults) ──────────────────────────────
+    half_len = 10 * max(up, down)
+    n_taps = 2 * half_len + 1
+    win = np.kaiser(n_taps, 5.0)
+    t = np.arange(-half_len, half_len + 1, dtype=np.float64)
+    f_c = 1.0 / max(up, down)
+    h = f_c * np.sinc(f_c * t) * win
+    h *= up / h.sum()                      # unity passband gain after decimation
+
+    # ── Polyphase decomposition ──────────────────────────────────────────────
+    # Pad h so its length is divisible by up; h_poly[p, j] = h_pad[p + j*up]
+    pad_len = (-n_taps) % up
+    h_pad = np.append(h, np.zeros(pad_len))
+    n_per_phase = len(h_pad) // up         # taps per polyphase branch
+    h_poly = h_pad.reshape(n_per_phase, up).T.copy()  # (up, n_per_phase)
+    # Pre-reverse: h_poly_rev[p, j] = h_poly[p, P-1-j] so that
+    # dot(seg, h_poly_rev[p]) == dot(seg[::-1], h_poly[p])
+    h_poly_rev = h_poly[:, ::-1].copy()    # (up, n_per_phase)
+
+    # ── Input — left-pad with P-1 zeros (filter delay) and right-pad for safety
+    x_f = x.astype(np.float64, copy=False)
+    n_in = len(x_f)
+    # Right-pad: the centre index for the last output sample reaches
+    # ((n_out-1)*down + half_len) // up which may exceed n_in by ~half_len//up.
+    right_pad = n_per_phase + half_len // up + 1
+    x_pad = np.concatenate([
+        np.zeros(n_per_phase - 1, dtype=np.float64),
+        x_f,
+        np.zeros(right_pad, dtype=np.float64),
+    ])
+
+    # ── Output allocation ──────────────────────────────────────────────────────
+    n_out = int(np.ceil(n_in * up / down))
+    out = np.empty(n_out, dtype=np.float64)
+
+    # ── Chunked polyphase filtering ────────────────────────────────────────────
+    # For output k: phase = (k*down + half_len) % up
+    #               center = (k*down + half_len) // up   (in x-coordinates)
+    # out[k] = dot(x_pad[center : center+P], h_poly_rev[phase])
+    # Processing CHUNK_OUT samples at a time caps peak memory at
+    # ~CHUNK_OUT * n_per_phase * 8 bytes (~14 MB for typical FT8/WSPR ratios).
+    _CHUNK_OUT = 4096
+    j = np.arange(n_per_phase, dtype=np.int64)  # (P,) — reused each chunk
+    for c_start in range(0, n_out, _CHUNK_OUT):
+        c_end = min(c_start + _CHUNK_OUT, n_out)
+        k = np.arange(c_start, c_end, dtype=np.int64)           # (C,)
+        # Polyphase alignment: include filter-delay offset (half_len)
+        aligned = k * down + half_len                            # (C,)
+        phases = aligned % up                                    # (C,) in [0, up)
+        centers = aligned // up                                  # (C,) in x-coords
+        # Gather input windows: x_pad[centers[i] + j] for j in 0..P-1
+        idx = centers[:, None] + j[None, :]                      # (C, P)
+        segs = x_pad[idx]                                        # (C, P)
+        h_sel = h_poly_rev[phases]                               # (C, P)
+        out[c_start:c_end] = np.einsum('cp,cp->c', segs, h_sel)
+
+    return out
 
 
 _CALLSIGN_RE = re.compile(r"\b[A-Z]{1,3}\d[A-Z0-9]{0,4}(?:/[A-Z0-9]+)?\b")
@@ -570,12 +656,12 @@ class ExternalFtDecoder:
                 real_part = signal.real.copy()
                 del signal
                 gc.collect()
-                i_dec = resample_poly(real_part, up=up, down=down)
+                i_dec = _resample_poly_np(real_part, up=up, down=down)
                 del real_part
                 audio = i_dec.astype(np.float32, copy=False)
                 del i_dec
             else:
-                audio = resample_poly(signal, up=up, down=down).astype(
+                audio = _resample_poly_np(signal, up=up, down=down).astype(
                     np.float32, copy=False
                 )
                 del signal
@@ -647,14 +733,14 @@ class ExternalFtDecoder:
                 real_part = signal.real.copy()
                 del signal  # free ~N×8 bytes before resampling
                 gc.collect()
-                i_dec = resample_poly(real_part, up=up, down=down)
+                i_dec = _resample_poly_np(real_part, up=up, down=down)
                 del real_part
                 # USB = Re(analytic signal)  — the positive-frequency
                 # content (FT8 tones at +200…+3000 Hz) is preserved in I.
                 audio = i_dec.astype(np.float32, copy=False)
                 del i_dec
             else:
-                audio = resample_poly(signal, up=up, down=down).astype(
+                audio = _resample_poly_np(signal, up=up, down=down).astype(
                     np.float32, copy=False
                 )
                 del signal

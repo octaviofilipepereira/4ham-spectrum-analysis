@@ -1,7 +1,7 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23 16:00:00 UTC
+# Last update: 2026-02-24 12:00:00 UTC
 
 # Core framework
 fastapi
@@ -10,10 +10,11 @@ uvicorn[standard]
 
 # DSP and scientific computing
 numpy
-scipy
+# scipy removed 2026-02-24: resample_poly replaced with pure-numpy polyphase
+# resampler (_resample_poly_np) in backend/app/decoders/ft_external.py
 
 # Database
-aiosqlite
+# aiosqlite removed 2026-02-24: never imported anywhere in the codebase
 
 # Configuration
 pyyaml
