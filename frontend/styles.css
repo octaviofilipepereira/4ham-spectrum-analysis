@@ -370,8 +370,6 @@ h1,
   font-family: 'Courier New', monospace;
 }
 
-.vfo-step-group,
-.vfo-tune-group,
 .vfo-goto-group,
 .vfo-band-group {
   display: flex;
@@ -387,8 +385,6 @@ h1,
   font-weight: 700;
 }
 
-.vfo-step-btns,
-.vfo-tune-btns,
 .vfo-goto-row,
 .vfo-band-btns {
   display: flex;
@@ -396,8 +392,6 @@ h1,
   flex-wrap: wrap;
 }
 
-.vfo-step-btns button,
-.vfo-tune-btns button,
 .vfo-apply-btn,
 .vfo-band-btns button {
   padding: 3px 8px;
@@ -411,21 +405,12 @@ h1,
   transition: background 0.12s, color 0.12s;
 }
 
-.vfo-step-btns button:hover,
-.vfo-step-btns button.active,
-.vfo-tune-btns button:hover,
 .vfo-apply-btn:hover,
 .vfo-band-btns button:hover,
 .vfo-band-btns button.active {
   background: #0a2418;
   border-color: #2a7848;
   color: #3aee78;
-}
-
-.vfo-tune-btns button {
-  font-size: 0.88rem;
-  font-weight: 700;
-  padding: 3px 11px;
 }
 
 .vfo-goto-group input {

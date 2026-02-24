@@ -3891,7 +3891,6 @@ function colorMap(value) {
 // VFO DISPLAY + CONTROLS (visual only — no scan state altered)
 // ─────────────────────────────────────────────
 let _vfoDisplayHz = 0;
-let _vfoTuneStep  = 1000;
 const _vfoFreqEl  = document.getElementById("vfoFreqEl");
 
 function _formatVFOFreq(hz) {
@@ -3914,35 +3913,46 @@ function updateVFODisplay(startHz, endHz) {
 }
 
 (function initVFOControls() {
-  const stepBtns = document.querySelectorAll("#vfoStepBtns button");
-  stepBtns.forEach(btn => {
-    btn.addEventListener("click", function () {
-      _vfoTuneStep = parseInt(this.dataset.step, 10);
-      stepBtns.forEach(b => b.classList.remove("active"));
-      this.classList.add("active");
-    });
-  });
-
-  function shiftVFO(delta) {
-    _vfoDisplayHz = Math.max(1_000_000, _vfoDisplayHz + delta);
-    if (_vfoFreqEl) _vfoFreqEl.innerHTML = _formatVFOFreq(_vfoDisplayHz);
-  }
-
-  document.getElementById("vfoTuneUp")?.addEventListener("click",   () => shiftVFO(+_vfoTuneStep));
-  document.getElementById("vfoTuneDown")?.addEventListener("click", () => shiftVFO(-_vfoTuneStep));
-
   const gotoInput = document.getElementById("vfoGotoInput");
   function applyGoto() {
     const raw = (gotoInput?.value || "").trim().replace(",", ".");
     const mhz = parseFloat(raw);
-    if (!isNaN(mhz) && mhz > 0) {
-      _vfoDisplayHz = Math.round(mhz * 1_000_000);
-      if (_vfoFreqEl) _vfoFreqEl.innerHTML = _formatVFOFreq(_vfoDisplayHz);
-      if (gotoInput) gotoInput.value = "";
-    } else if (gotoInput) {
-      gotoInput.style.borderColor = "rgba(180,40,40,0.8)";
-      setTimeout(() => { gotoInput.style.borderColor = ""; }, 700);
+    if (isNaN(mhz) || mhz <= 0) {
+      if (gotoInput) {
+        gotoInput.style.borderColor = "rgba(180,40,40,0.8)";
+        setTimeout(() => { gotoInput.style.borderColor = ""; }, 700);
+      }
+      return;
     }
+    const targetHz = Math.round(mhz * 1_000_000);
+    const frame = lastSpectrumFrame;
+    const scanStartHz = Number(frame?.scan_start_hz || 0);
+    const scanEndHz   = Number(frame?.scan_end_hz   || 0);
+    const centerHz    = Number(frame?.center_hz     || 0);
+    const spanHz      = Number(frame?.span_hz       || 0);
+    const hasScanRange = scanStartHz > 0 && scanEndHz > scanStartHz;
+    const fullStartHz  = hasScanRange ? scanStartHz : (centerHz - (spanHz * WATERFALL_SEGMENT_COUNT / 2));
+    const fullSpanHz   = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
+    if (!fullSpanHz || targetHz < fullStartHz || targetHz > fullStartHz + fullSpanHz) {
+      showToast(`${mhz.toFixed(3)} MHz fora da banda actual`);
+      return;
+    }
+    if (!waterfallExplorerEnabled) {
+      waterfallExplorerEnabled = true;
+      localStorage.setItem(WATERFALL_EXPLORER_KEY, "1");
+    }
+    if (waterfallExplorerZoom <= 1) {
+      waterfallExplorerZoom = 4;
+      localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, "4");
+    }
+    const zoom = waterfallExplorerZoom;
+    const visibleSpanHz  = fullSpanHz / zoom;
+    const desiredStartHz = targetHz - visibleSpanHz / 2;
+    const maxPan = Math.max(0, 1 - 1 / zoom);
+    waterfallExplorerPan = Math.max(0, Math.min(maxPan, (desiredStartHz - fullStartHz) / fullSpanHz));
+    applyWaterfallExplorerUi();
+    if (gotoInput) gotoInput.value = "";
+    showToast(`Centrado em ${mhz.toFixed(3)} MHz`);
   }
   document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
@@ -3959,11 +3969,4 @@ function updateVFODisplay(startHz, endHz) {
     });
   });
 
-  // Arrow key tuning (when not in an input)
-  document.addEventListener("keydown", e => {
-    const tag = document.activeElement?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (e.key === "ArrowUp")   { shiftVFO(+_vfoTuneStep); e.preventDefault(); }
-    if (e.key === "ArrowDown") { shiftVFO(-_vfoTuneStep); e.preventDefault(); }
-  });
 })();
