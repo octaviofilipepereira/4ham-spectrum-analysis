@@ -80,9 +80,21 @@ h1,
   color: var(--muted);
 }
 
+.app-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-topbar .app__header {
+  margin-bottom: 0;
+}
+
 .menu-toolbar {
   width: fit-content;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .menu-toolbar .card-body {
