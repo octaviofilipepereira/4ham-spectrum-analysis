@@ -387,13 +387,17 @@ h1,
 .vfo-goto-row {
   display: flex;
   gap: 3px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 #vfoGotoInput {
   background: #0d1520;
   border-color: #1a2e3a;
   color: #ffffff;
+  width: 100px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 #vfoGotoInput:focus {
