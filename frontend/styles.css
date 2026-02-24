@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-23 21:30 UTC
+Last update: 2026-02-24 18:30 UTC
 */
 
 @import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Space+Grotesk:wght@400;600;700&display=swap");
@@ -223,9 +223,9 @@ h1,
 }
 
 .waterfall {
-  margin-top: 12px;
+  margin-top: 0;
   padding: 44px 16px 16px;
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   background: linear-gradient(180deg, rgba(12, 18, 34, 0.9), rgba(10, 14, 26, 0.95));
   min-height: 220px;
   color: var(--muted);
@@ -305,11 +305,143 @@ h1,
   cursor: grabbing;
 }
 
-.waterfall canvas {
+#waterfallCanvas {
   width: 100%;
-  height: 230px;
-  border-radius: 10px;
+  height: 260px;
+  border-radius: 0 0 10px 10px;
 }
+
+/* ── Spectrum graph above waterfall ── */
+#spectrumCanvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  border-radius: 10px 10px 0 0;
+  background: #080c14;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: none;
+  margin-top: 12px;
+}
+
+/* ── VFO display bar ── */
+.vfo-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #060a12;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  margin-top: 12px;
+}
+
+.vfo-display {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+}
+
+.vfo-display__label {
+  font-size: 0.60rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #2a5a3a;
+  font-weight: 700;
+}
+
+.vfo-display__freq {
+  font-family: 'Courier New', 'Lucida Console', monospace;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #3aee78;
+  text-shadow: 0 0 10px rgba(40, 200, 90, 0.28);
+  line-height: 1;
+  user-select: none;
+}
+
+.vfo-display__freq .vfo-sep { color: #1a5a2a; }
+
+.vfo-display__unit {
+  font-size: 0.63rem;
+  color: #2a6a3a;
+  font-family: 'Courier New', monospace;
+}
+
+.vfo-step-group,
+.vfo-tune-group,
+.vfo-goto-group,
+.vfo-band-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vfo-group-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: #2a5040;
+  font-weight: 700;
+}
+
+.vfo-step-btns,
+.vfo-tune-btns,
+.vfo-goto-row,
+.vfo-band-btns {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.vfo-step-btns button,
+.vfo-tune-btns button,
+.vfo-apply-btn,
+.vfo-band-btns button {
+  padding: 3px 8px;
+  font-size: 0.70rem;
+  background: #090f18;
+  border: 1px solid #1a2e3a;
+  border-radius: 4px;
+  color: #3a7a54;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.vfo-step-btns button:hover,
+.vfo-step-btns button.active,
+.vfo-tune-btns button:hover,
+.vfo-apply-btn:hover,
+.vfo-band-btns button:hover,
+.vfo-band-btns button.active {
+  background: #0a2418;
+  border-color: #2a7848;
+  color: #3aee78;
+}
+
+.vfo-tune-btns button {
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 3px 11px;
+}
+
+.vfo-goto-group input {
+  background: #090f18;
+  border: 1px solid #1a2e3a;
+  border-radius: 4px;
+  color: #3aee78;
+  font-family: 'Courier New', monospace;
+  font-size: 0.80rem;
+  padding: 3px 8px;
+  width: 108px;
+  outline: none;
+}
+
+.vfo-goto-group input:focus { border-color: #2a7848; }
+.vfo-goto-group input::placeholder { color: #1a4030; }
 
 .waterfall-ruler {
   position: absolute;
@@ -750,8 +882,12 @@ h1,
     border-radius: 14px;
   }
 
-  .waterfall canvas {
-    height: 180px;
+  #waterfallCanvas {
+    height: 150px;
+  }
+
+  #spectrumCanvas {
+    height: 55px;
   }
 
   .event-item__body {

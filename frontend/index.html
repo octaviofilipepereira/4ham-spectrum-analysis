@@ -109,6 +109,57 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-info btn-sm" id="waterfallFullscreenBtn" type="button">Fullscreen</button>
                 </div>
               </div>
+              <!-- VFO display bar -->
+              <div class="vfo-bar" id="vfoBar">
+                <div class="vfo-display">
+                  <span class="vfo-display__label">VFO</span>
+                  <span class="vfo-display__freq" id="vfoFreqEl">—</span>
+                  <span class="vfo-display__unit">MHz</span>
+                </div>
+                <div class="vfo-step-group">
+                  <span class="vfo-group-label">Step</span>
+                  <div class="vfo-step-btns" id="vfoStepBtns">
+                    <button data-step="100">100 Hz</button>
+                    <button data-step="500">500 Hz</button>
+                    <button data-step="1000" class="active">1 kHz</button>
+                    <button data-step="5000">5 kHz</button>
+                    <button data-step="10000">10 kHz</button>
+                  </div>
+                </div>
+                <div class="vfo-tune-group">
+                  <span class="vfo-group-label">Tune</span>
+                  <div class="vfo-tune-btns">
+                    <button id="vfoTuneDown">▼</button>
+                    <button id="vfoTuneUp">▲</button>
+                  </div>
+                </div>
+                <div class="vfo-goto-group">
+                  <span class="vfo-group-label">Go to (MHz)</span>
+                  <div class="vfo-goto-row">
+                    <input id="vfoGotoInput" type="text" placeholder="e.g. 14.074" maxlength="12" />
+                    <button class="vfo-apply-btn" id="vfoApplyBtn">APPLY</button>
+                  </div>
+                </div>
+                <div class="vfo-band-group">
+                  <span class="vfo-group-label">Band</span>
+                  <div class="vfo-band-btns" id="vfoBandBtns">
+                    <button data-band="160m">160m</button>
+                    <button data-band="80m">80m</button>
+                    <button data-band="40m">40m</button>
+                    <button data-band="30m">30m</button>
+                    <button data-band="20m">20m</button>
+                    <button data-band="17m">17m</button>
+                    <button data-band="15m">15m</button>
+                    <button data-band="12m">12m</button>
+                    <button data-band="10m">10m</button>
+                    <button data-band="6m">6m</button>
+                    <button data-band="2m">2m</button>
+                    <button data-band="70cm">70cm</button>
+                  </div>
+                </div>
+              </div>
+              <!-- Spectrum graph -->
+              <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>
               <div class="waterfall" id="waterfall">
                 <div class="waterfall-ruler" id="waterfallRuler" aria-hidden="true"></div>
                 <canvas id="waterfallCanvas" width="640" height="240"></canvas>

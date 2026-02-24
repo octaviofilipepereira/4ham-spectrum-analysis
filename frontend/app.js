@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-24 18:00 UTC
+Last update: 2026-02-24 18:30 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -28,6 +28,10 @@ const waterfallResetViewBtn = document.getElementById("waterfallResetViewBtn");
 const waterfallModeOverlay = document.getElementById("waterfallModeOverlay");
 const waterfallRuler = document.getElementById("waterfallRuler");
 const canvas = document.getElementById("waterfallCanvas");
+const spectrumCanvas = document.getElementById("spectrumCanvas");
+const spectrumCtx = spectrumCanvas ? spectrumCanvas.getContext("2d") : null;
+let _specSmooth = null;
+const _SPEC_SMOOTH_ALPHA = 0.2;
 let ctx = null;
 let webglWaterfall = null;
 let waterfallRenderer = "2d";
@@ -2653,6 +2657,7 @@ function connectSpectrum() {
           lastSpectrumFrameTs = Date.now();
           const viewport = getWaterfallViewport(frame);
           drawWaterfall(frame, viewport);
+          drawSpectrum(viewport.fftDb);
           const stableMarkers = buildStableWaterfallMarkers(frame);
           const rulerRange = resolveWaterfallRulerRange(
             frame,
@@ -2661,6 +2666,7 @@ function connectSpectrum() {
             stableMarkers.rangeEndHz
           );
           renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
+          updateVFODisplay(rulerRange.startHz, rulerRange.endHz);
           const simulatedMarkers = buildSimulatedModeMarkers(
             viewport.visibleSpanHz,
             rulerRange.startHz,
@@ -3734,6 +3740,66 @@ if (!localStorage.getItem("onboardingDone")) {
   renderOnboarding();
 }
 
+// ── Spectrum graph renderer (above waterfall) ──
+function drawSpectrum(fftDb) {
+  if (!spectrumCtx || !Array.isArray(fftDb) || !fftDb.length) return;
+  const sc = spectrumCanvas;
+  const W = sc.offsetWidth > 0 ? sc.offsetWidth : (sc.width || 640);
+  const H = sc.height || 80;
+  if (sc.width !== W) sc.width = W;
+  let minDb = Infinity, maxDb = -Infinity;
+  for (let i = 0; i < fftDb.length; i++) {
+    if (fftDb[i] < minDb) minDb = fftDb[i];
+    if (fftDb[i] > maxDb) maxDb = fftDb[i];
+  }
+  const scale = maxDb - minDb || 1;
+  if (!_specSmooth || _specSmooth.length !== W) {
+    _specSmooth = new Float32Array(W);
+    for (let x = 0; x < W; x++) {
+      const idx = Math.min(fftDb.length - 1, Math.floor((x / (W - 1)) * (fftDb.length - 1)));
+      _specSmooth[x] = (fftDb[idx] - minDb) / scale;
+    }
+  }
+  for (let x = 0; x < W; x++) {
+    const idx = Math.min(fftDb.length - 1, Math.floor((x / (W - 1)) * (fftDb.length - 1)));
+    const v = (fftDb[idx] - minDb) / scale;
+    _specSmooth[x] = _specSmooth[x] * (1 - _SPEC_SMOOTH_ALPHA) + v * _SPEC_SMOOTH_ALPHA;
+  }
+  // Background
+  spectrumCtx.fillStyle = "#080c14";
+  spectrumCtx.fillRect(0, 0, W, H);
+  // Grid
+  spectrumCtx.strokeStyle = "rgba(255,255,255,0.04)";
+  spectrumCtx.lineWidth = 1;
+  for (let g = 1; g <= 3; g++) {
+    const y = Math.round(H * g / 4) + 0.5;
+    spectrumCtx.beginPath(); spectrumCtx.moveTo(0, y); spectrumCtx.lineTo(W, y); spectrumCtx.stroke();
+  }
+  // Filled gradient
+  const grad = spectrumCtx.createLinearGradient(0, 0, 0, H);
+  for (let s = 0; s <= 8; s++) {
+    const [r, g, b] = colorMap(1 - s / 8);
+    grad.addColorStop(s / 8, `rgba(${r},${g},${b},${Math.max(0, 0.48 - s * 0.05)})`);
+  }
+  spectrumCtx.beginPath();
+  spectrumCtx.moveTo(0, H);
+  for (let x = 0; x < W; x++) spectrumCtx.lineTo(x, H - _specSmooth[x] * (H - 3));
+  spectrumCtx.lineTo(W - 1, H);
+  spectrumCtx.closePath();
+  spectrumCtx.fillStyle = grad;
+  spectrumCtx.fill();
+  // Line
+  spectrumCtx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const y = H - _specSmooth[x] * (H - 3);
+    x === 0 ? spectrumCtx.moveTo(x, y) : spectrumCtx.lineTo(x, y);
+  }
+  const [lr, lg, lb] = colorMap(0.85);
+  spectrumCtx.strokeStyle = `rgba(${lr},${lg},${lb},0.88)`;
+  spectrumCtx.lineWidth = 1.5;
+  spectrumCtx.stroke();
+}
+
 function drawWaterfall(frame, viewport = null) {
   const resolvedViewport = viewport || getWaterfallViewport(frame);
   const fftDb = resolvedViewport.fftDb || [];
@@ -3820,3 +3886,84 @@ function colorMap(value) {
   }
   return [200, 0, 0];
 }
+
+// ─────────────────────────────────────────────
+// VFO DISPLAY + CONTROLS (visual only — no scan state altered)
+// ─────────────────────────────────────────────
+let _vfoDisplayHz = 0;
+let _vfoTuneStep  = 1000;
+const _vfoFreqEl  = document.getElementById("vfoFreqEl");
+
+function _formatVFOFreq(hz) {
+  const mhz = Math.floor(hz / 1_000_000);
+  const khz = Math.floor((hz % 1_000_000) / 1000).toString().padStart(3, "0");
+  const hz3 = (hz % 1000).toString().padStart(3, "0");
+  return `${mhz}<span class="vfo-sep">.</span>${khz}<span class="vfo-sep">.</span>${hz3}`;
+}
+
+function updateVFODisplay(startHz, endHz) {
+  if (!_vfoFreqEl || !Number.isFinite(startHz) || !Number.isFinite(endHz)) return;
+  const centre = Math.round((startHz + endHz) / 2);
+  if (centre === _vfoDisplayHz) return;
+  _vfoDisplayHz = centre;
+  _vfoFreqEl.innerHTML = _formatVFOFreq(centre);
+  const activeBand = bandSelect ? bandSelect.value : "";
+  document.querySelectorAll("#vfoBandBtns button").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.band === activeBand);
+  });
+}
+
+(function initVFOControls() {
+  const stepBtns = document.querySelectorAll("#vfoStepBtns button");
+  stepBtns.forEach(btn => {
+    btn.addEventListener("click", function () {
+      _vfoTuneStep = parseInt(this.dataset.step, 10);
+      stepBtns.forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+
+  function shiftVFO(delta) {
+    _vfoDisplayHz = Math.max(1_000_000, _vfoDisplayHz + delta);
+    if (_vfoFreqEl) _vfoFreqEl.innerHTML = _formatVFOFreq(_vfoDisplayHz);
+  }
+
+  document.getElementById("vfoTuneUp")?.addEventListener("click",   () => shiftVFO(+_vfoTuneStep));
+  document.getElementById("vfoTuneDown")?.addEventListener("click", () => shiftVFO(-_vfoTuneStep));
+
+  const gotoInput = document.getElementById("vfoGotoInput");
+  function applyGoto() {
+    const raw = (gotoInput?.value || "").trim().replace(",", ".");
+    const mhz = parseFloat(raw);
+    if (!isNaN(mhz) && mhz > 0) {
+      _vfoDisplayHz = Math.round(mhz * 1_000_000);
+      if (_vfoFreqEl) _vfoFreqEl.innerHTML = _formatVFOFreq(_vfoDisplayHz);
+      if (gotoInput) gotoInput.value = "";
+    } else if (gotoInput) {
+      gotoInput.style.borderColor = "rgba(180,40,40,0.8)";
+      setTimeout(() => { gotoInput.style.borderColor = ""; }, 700);
+    }
+  }
+  document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
+  gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
+
+  document.querySelectorAll("#vfoBandBtns button").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const band = this.dataset.band;
+      if (bandSelect) {
+        bandSelect.value = band;
+        showToast(`Band set to ${band} — press Start to scan`);
+      }
+      document.querySelectorAll("#vfoBandBtns button").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+
+  // Arrow key tuning (when not in an input)
+  document.addEventListener("keydown", e => {
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (e.key === "ArrowUp")   { shiftVFO(+_vfoTuneStep); e.preventDefault(); }
+    if (e.key === "ArrowDown") { shiftVFO(-_vfoTuneStep); e.preventDefault(); }
+  });
+})();
