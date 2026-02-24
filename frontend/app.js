@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-23 21:30 UTC
+Last update: 2026-02-24 18:00 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
@@ -3790,9 +3790,33 @@ function drawWaterfall(frame, viewport = null) {
   }
 }
 
+// FT-DX10 "jet" palette — black → electric-blue → cyan → green → yellow → orange → red
+// Colour stops match Yaesu FT-DX10 waterfall display.
+// Pure visual change: zero functional, API or memory impact.
+const _FTDX10_STOPS = [
+  { t: 0.00, r:   0, g:   0, b:   0 },
+  { t: 0.12, r:   0, g:  10, b: 160 },
+  { t: 0.32, r:  20, g:  80, b: 255 },
+  { t: 0.48, r:   0, g: 235, b: 255 },
+  { t: 0.63, r:  30, g: 220, b:   0 },
+  { t: 0.76, r: 255, g: 242, b:   0 },
+  { t: 0.88, r: 255, g: 115, b:   0 },
+  { t: 0.93, r: 255, g:  38, b:   0 },
+  { t: 1.00, r: 200, g:   0, b:   0 },
+];
 function colorMap(value) {
-  const r = Math.floor(255 * value);
-  const g = Math.floor(140 + 80 * (1 - value));
-  const b = Math.floor(255 * (1 - value));
-  return [r, g, b];
+  const v = value < 0 ? 0 : value > 1 ? 1 : value;
+  const stops = _FTDX10_STOPS;
+  for (let i = 1; i < stops.length; i++) {
+    if (v <= stops[i].t) {
+      const a = stops[i - 1], b = stops[i];
+      const f = (v - a.t) / (b.t - a.t);
+      return [
+        Math.round(a.r + f * (b.r - a.r)),
+        Math.round(a.g + f * (b.g - a.g)),
+        Math.round(a.b + f * (b.b - a.b)),
+      ];
+    }
+  }
+  return [200, 0, 0];
 }
