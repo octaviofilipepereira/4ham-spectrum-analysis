@@ -2727,6 +2727,7 @@ function ensureWaterfallFallback() {
     const staleMs = Date.now() - lastSpectrumFrameTs;
     if (lastSpectrumFrameTs === 0 || staleMs > 2500) {
       setWaterfallGenericStatus();
+      drawSpectrumIdle();
     }
   }, 400);
 }
@@ -2854,6 +2855,24 @@ document.addEventListener("pointerup", () => {
 
 connectSpectrum();
 ensureWaterfallFallback();
+
+// On page load: check if any SDR device is detected
+(async () => {
+  try {
+    const res = await fetch("/api/health");
+    if (res.ok) {
+      const data = await res.json();
+      const deviceCount = Number(data?.devices ?? -1);
+      if (deviceCount === 0) {
+        setWaterfallGenericStatus("No SDR device detected. Connect your device and start a scan.");
+        drawSpectrumIdle("No SDR device detected. Connect your device and start a scan.");
+        showToastError("No SDR device detected. Connect your device and start a scan.");
+      }
+    }
+  } catch (_) {
+    // health check is best-effort; ignore network errors
+  }
+})();
 
 function decodeSpectrumFrame(frame) {
   if (!frame) {
@@ -3798,6 +3817,23 @@ function drawSpectrum(fftDb) {
   spectrumCtx.strokeStyle = `rgba(${lr},${lg},${lb},0.88)`;
   spectrumCtx.lineWidth = 1.5;
   spectrumCtx.stroke();
+}
+
+function drawSpectrumIdle(message) {
+  if (!spectrumCtx || !spectrumCanvas) return;
+  const sc = spectrumCanvas;
+  const W = sc.offsetWidth > 0 ? sc.offsetWidth : (sc.width || 640);
+  const H = sc.height || 80;
+  if (sc.width !== W) sc.width = W;
+  spectrumCtx.fillStyle = "#080c14";
+  spectrumCtx.fillRect(0, 0, W, H);
+  spectrumCtx.save();
+  spectrumCtx.font = "13px 'Courier New', monospace";
+  spectrumCtx.fillStyle = "rgba(255,255,255,0.35)";
+  spectrumCtx.textAlign = "center";
+  spectrumCtx.textBaseline = "middle";
+  spectrumCtx.fillText(message || "No live spectrum available. Check SDR device connection and scan status.", W / 2, H / 2);
+  spectrumCtx.restore();
 }
 
 function drawWaterfall(frame, viewport = null) {

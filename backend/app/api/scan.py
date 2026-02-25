@@ -96,6 +96,17 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
+    # Pre-check: ensure at least one SDR device is connected
+    try:
+        available_devices = state.controller.list_devices()
+    except Exception:
+        available_devices = []
+    if not available_devices:
+        raise HTTPException(
+            status_code=422,
+            detail="No SDR device detected. Connect your device and try again."
+        )
+
     # Start scan with automatic sample rate fallback
     try:
         try:
