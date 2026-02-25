@@ -122,10 +122,14 @@ async def ws_spectrum(websocket: WebSocket) -> None:
     while True:
         frame_start = time.time()
         
-        # Read IQ samples (use synthetic noise if unavailable)
+        # Read IQ samples — skip frame if no device is active.
+        # Synthetic noise is intentionally NOT generated: when no real
+        # SDR device is open the WebSocket simply goes silent so the
+        # frontend fallback timer activates the idle/no-device overlay.
         iq = state.scan_engine.read_iq(2048)
         if iq is None:
-            iq = (np.random.randn(2048) + 1j * np.random.randn(2048)) * 0.02
+            await asyncio.sleep(1.0)
+            continue
         
         agc_gain_db = None
         
