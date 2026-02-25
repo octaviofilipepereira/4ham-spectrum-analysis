@@ -583,7 +583,14 @@ h1,
 #eventsSearchMode,
 #eventsSearchGrid,
 #eventsSearchReport {
-  color: #000;
+  color: var(--text);
+}
+
+#eventsSearchCallsign::placeholder,
+#eventsSearchMode::placeholder,
+#eventsSearchGrid::placeholder,
+#eventsSearchReport::placeholder {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .events-pager {
@@ -839,6 +846,27 @@ h1,
 }
 
 .app-modal .form-check-label {
+  color: var(--muted);
+}
+
+.app-modal .form-control,
+.app-modal .form-select {
+  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.app-modal .form-control:focus,
+.app-modal .form-select:focus {
+  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 179, 71, 0.6);
+  box-shadow: 0 0 0 0.2rem rgba(255, 179, 71, 0.2);
+  color: var(--text);
+}
+
+.app-modal .form-label {
   color: var(--muted);
 }
 
