@@ -130,39 +130,6 @@ Last update: 2026-02-22 16:27:19 UTC
         </div>
       </section>
 
-    <div class="modal fade app-modal" id="eventsSearchModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 class="modal-title h5">Events Search</h2>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="filters row g-2 align-items-end">
-              <div class="col-6">
-                <label class="form-label">Callsign</label>
-                <input type="text" id="eventsSearchCallsign" placeholder="CT1ABC" class="form-control form-control-sm" />
-              </div>
-              <div class="col-6">
-                <label class="form-label">Mode</label>
-                <input type="text" id="eventsSearchMode" placeholder="FT8/SSB/APRS" class="form-control form-control-sm" />
-              </div>
-              <div class="col-6">
-                <label class="form-label">Grid</label>
-                <input type="text" id="eventsSearchGrid" placeholder="IN51" class="form-control form-control-sm" />
-              </div>
-              <div class="col-6">
-                <label class="form-label">Report</label>
-                <input type="text" id="eventsSearchReport" placeholder="-03 / 59" class="form-control form-control-sm" />
-              </div>
-            </div>
-            <ul class="events events--search" id="eventsSearchResults"></ul>
-          </div>
-        </div>
-      </div>
-    </div>
-
-      <div class="onboarding" id="onboarding">
         <div class="onboarding__card">
           <h2 id="onboardingTitle">Welcome</h2>
           <p id="onboardingText">Configure device, band, and credentials. Use the Start button or press <strong>s</strong>.</p>
@@ -232,6 +199,38 @@ Last update: 2026-02-22 16:27:19 UTC
 
       <div class="toast-stack" id="toast"></div>
     </main>
+
+    <div class="modal fade app-modal" id="eventsSearchModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Events Search</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="filters row g-2 align-items-end">
+              <div class="col-6">
+                <label class="form-label">Callsign</label>
+                <input type="text" id="eventsSearchCallsign" placeholder="CT1ABC" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Mode</label>
+                <input type="text" id="eventsSearchMode" placeholder="FT8/SSB/APRS" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Grid</label>
+                <input type="text" id="eventsSearchGrid" placeholder="IN51" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Report</label>
+                <input type="text" id="eventsSearchReport" placeholder="-03 / 59" class="form-control form-control-sm" />
+              </div>
+            </div>
+            <ul class="events events--search" id="eventsSearchResults"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="modal fade app-modal" id="adminModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
