@@ -302,7 +302,19 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             ):
                 scan_start_hz = None
                 scan_end_hz = None
-        
+
+        # In preview mode there is no scan config, so derive explicit bounds from
+        # center_hz ± sample_rate/2.  Without these the frontend has no scan range,
+        # falls back to the 12-segment explorer simulation (WATERFALL_SEGMENT_COUNT),
+        # and renders the frequency ruler over a ~24 MHz window instead of the
+        # actual 2 MHz span — causing the ruler to display far outside the band.
+        if scan_start_hz is None and state.scan_engine.preview:
+            _preview_center = float(state.scan_engine.center_hz or 0.0)
+            _preview_span = float(state.scan_engine.sample_rate or 0.0)
+            if _preview_center > 0 and _preview_span > 0:
+                scan_start_hz = int(_preview_center - _preview_span / 2.0)
+                scan_end_hz = int(_preview_center + _preview_span / 2.0)
+
         # Update frame timestamp
         state.last_frame_ts = time.time()
         
