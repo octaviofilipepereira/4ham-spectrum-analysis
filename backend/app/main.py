@@ -81,10 +81,17 @@ async def lifespan(app_instance: FastAPI):
         if sdr_devices:
             preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
             preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            # Band boundaries for the startup preview band (default: 20m).
+            # These must be passed so spectrum.py uses exact band limits on the
+            # ruler instead of falling back to center_hz ± sample_rate/2.
+            preview_start = int(os.getenv("PREVIEW_START_HZ", "14000000"))
+            preview_end = int(os.getenv("PREVIEW_END_HZ", "14350000"))
             opened = await _state.scan_engine.preview_open(
                 device_id=sdr_devices[0]["id"],
                 sample_rate=preview_sr,
                 center_hz=preview_hz,
+                start_hz=preview_start,
+                end_hz=preview_end,
             )
             if opened:
                 _state.scan_state["state"] = "preview"
