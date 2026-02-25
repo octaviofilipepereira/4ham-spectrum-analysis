@@ -1697,6 +1697,57 @@ function hasEventsSearchCriteria() {
   );
 }
 
+let _eventsSearchTimer = null;
+function scheduleEventsSearch() {
+  clearTimeout(_eventsSearchTimer);
+  _eventsSearchTimer = setTimeout(fetchAndRenderSearchResults, 400);
+}
+
+async function fetchAndRenderSearchResults() {
+  if (!eventsSearchResultsEl) return;
+  const callsign = (eventsSearchCallsignInput?.value || "").trim();
+  const mode     = (eventsSearchModeInput?.value     || "").trim();
+  const grid     = (eventsSearchGridInput?.value     || "").trim();
+  const report   = (eventsSearchReportInput?.value   || "").trim();
+
+  if (!callsign && !mode && !grid && !report) {
+    renderEventList(eventsSearchResultsEl, [], "Use search fields to display results.");
+    return;
+  }
+
+  renderEventList(eventsSearchResultsEl, [], "Searching\u2026");
+
+  const params = new URLSearchParams({ limit: "500" });
+  if (callsign) params.set("callsign", callsign);
+  if (mode)     params.set("mode", mode);
+
+  try {
+    const resp = await fetch(`/api/events?${params.toString()}`, {
+      headers: { ...getAuthHeader() }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    let data = await resp.json();
+
+    // grid and report not supported by API — filter client-side
+    if (grid) {
+      const g = grid.toLowerCase();
+      data = data.filter(e => String(e.grid || "").toLowerCase().includes(g));
+    }
+    if (report) {
+      const r = report.toLowerCase();
+      data = data.filter(e => String(e.report ?? "").toLowerCase().includes(r));
+    }
+
+    renderEventList(
+      eventsSearchResultsEl,
+      data,
+      "No events match the current Events search."
+    );
+  } catch (err) {
+    renderEventList(eventsSearchResultsEl, [], "Search error. Try again.");
+  }
+}
+
 function updateEventsPager(totalItems) {
   const totalPages = Math.max(1, Math.ceil(totalItems / EVENTS_PANEL_PAGE_SIZE));
   if (eventsPageInfo) {
@@ -1878,15 +1929,6 @@ function renderEvents(items) {
   );
 
   const filteredItems = applyEventsPanelFilters(orderedEvents);
-
-  const shouldShowSearchResults = hasEventsSearchCriteria();
-  renderEventList(
-    eventsSearchResultsEl,
-    shouldShowSearchResults ? filteredItems : [],
-    shouldShowSearchResults
-      ? (latestEvents.length ? "No events match the current Events search." : "No events yet.")
-      : "Use search fields to display results."
-  );
 
   eventsTotal.textContent = String(totalEvents);
   updateEventsPager(totalEvents);
@@ -4083,4 +4125,10 @@ function updateVFODisplay(startHz, endHz) {
   }
   document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
+
+  // Events Search modal — live API search
+  [eventsSearchCallsignInput, eventsSearchModeInput, eventsSearchGridInput, eventsSearchReportInput]
+    .forEach(el => el?.addEventListener("input", scheduleEventsSearch));
+  document.getElementById("eventsSearchModal")
+    ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
 })();

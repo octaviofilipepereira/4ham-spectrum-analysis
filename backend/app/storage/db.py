@@ -342,10 +342,10 @@ class Database:
             band_filter = "AND band = ?"
             params.insert(0, band)
         if mode:
-            mode_filter = "AND mode = ?"
+            mode_filter = "AND UPPER(mode) = UPPER(?)"
             params.insert(0, mode)
         if callsign:
-            callsign_filter = "AND callsign = ?"
+            callsign_filter = "AND UPPER(callsign) = UPPER(?)"
             params.insert(0, callsign)
         if start and end:
             time_filter = "AND timestamp BETWEEN ? AND ?"
