@@ -72,6 +72,30 @@ async def lifespan(app_instance: FastAPI):
         except Exception as exc:
             _log.warning("FT internal decoder startup failed: %s", exc)
 
+    # Auto-open preview if a real SDR device is available
+    try:
+        sdr_devices = [
+            d for d in _state.controller.list_devices()
+            if str(d.get("type", "")).lower() not in ("audio",)
+        ]
+        if sdr_devices:
+            preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+            preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            opened = await _state.scan_engine.preview_open(
+                device_id=sdr_devices[0]["id"],
+                sample_rate=preview_sr,
+                center_hz=preview_hz,
+            )
+            if opened:
+                _state.scan_state["state"] = "preview"
+                _log.info(
+                    "SDR preview started: %s @ %.3f MHz",
+                    sdr_devices[0]["id"],
+                    preview_hz / 1e6,
+                )
+    except Exception as exc:
+        _log.warning("SDR preview startup skipped: %s", exc)
+
     # Start retention background task
     asyncio.create_task(_retention_loop())
 

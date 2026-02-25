@@ -2312,9 +2312,10 @@ async function syncScanState() {
     }
     const data = await response.json();
     const nextRunning = data?.state === "running";
+    const isPreview = data?.state === "preview";
     if (!scanActionInFlight) {
       isScanRunning = nextRunning;
-      setStatus(nextRunning ? "Scan running" : "Scan stopped");
+      setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
     }
   } catch (err) {

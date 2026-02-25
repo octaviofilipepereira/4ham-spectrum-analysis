@@ -9,6 +9,7 @@ Scan API
 Spectrum scan control and status endpoints.
 """
 
+import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -96,6 +97,9 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
+    # If device is open in preview mode, close it so the scan can take over.
+    state.scan_engine.preview_close()
+
     # Pre-check: ensure at least one real SDR device is connected.
     # Audio devices (SoapySDR audio plugin) are excluded — they are
     # host sound cards, not SDR receivers.
@@ -168,6 +172,24 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
         datetime.now(timezone.utc).isoformat()
     )
     log("scan_stop")
+    # Reopen preview mode after scan stops if a real SDR device is available
+    try:
+        sdr_devices = [
+            d for d in state.controller.list_devices()
+            if str(d.get("type", "")).lower() not in ("audio",)
+        ]
+        if sdr_devices:
+            preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+            preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            opened = await state.scan_engine.preview_open(
+                device_id=sdr_devices[0]["id"],
+                sample_rate=preview_sr,
+                center_hz=preview_hz,
+            )
+            if opened:
+                state.scan_state["state"] = "preview"
+    except Exception:
+        pass
     return state.scan_state
 
 

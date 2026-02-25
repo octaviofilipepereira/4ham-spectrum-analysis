@@ -34,6 +34,7 @@ class ScanEngine:
         self.step_index: int = 0
         self.total_steps: int = 0
         self.pass_count: int = 0
+        self.preview: bool = False  # True when device open for passive monitoring
         self._task: Optional[asyncio.Task] = None
         self._record_fp: Optional[BinaryIO] = None
         self._record_bytes: int = 0
@@ -113,7 +114,61 @@ class ScanEngine:
             self.controller.close(self.device, self.stream)
         except Exception:
             pass
+        self.device = None
+        self.stream = None
+        self.preview = False
         return True
+
+    async def preview_open(
+        self,
+        device_id: Optional[str] = None,
+        sample_rate: int = 2048000,
+        center_hz: int = 14175000,
+        gain: Optional[float] = None,
+    ) -> bool:
+        """Open device for passive spectrum monitoring without starting a scan.
+
+        Only effective when no scan is running. Replaces an existing preview
+        session if one is already open.
+        """
+        if self.running:
+            return False  # scan owns the device — do not interfere
+        # Close existing preview device if open
+        if self.preview:
+            try:
+                self.controller.close(self.device, self.stream)
+            except Exception:
+                pass
+            self.device = None
+            self.stream = None
+            self.preview = False
+        self.sample_rate = int(sample_rate or 2048000)
+        self.center_hz = int(center_hz or 14175000)
+        self.device, self.stream = self.controller.open(
+            device_id=device_id,
+            sample_rate=self.sample_rate,
+            center_hz=self.center_hz,
+            gain=gain,
+        )
+        if self.device is None:
+            return False
+        self.preview = True
+        return True
+
+    def preview_close(self) -> None:
+        """Close the preview device session.
+
+        No-op when a scan is running (the scan owns the device).
+        """
+        if not self.preview or self.running:
+            return
+        try:
+            self.controller.close(self.device, self.stream)
+        except Exception:
+            pass
+        self.device = None
+        self.stream = None
+        self.preview = False
 
     def park(self, frequency_hz: int) -> None:
         """Hold the scanner on *frequency_hz* until unpark() is called.
@@ -163,10 +218,10 @@ class ScanEngine:
             self.pass_count += 1
 
     def read_iq(self, num_samples: int) -> Optional[npt.NDArray[np.complex64]]:
-        if not self.running:
+        if not self.running and not self.preview:
             return None
         samples = self.controller.read_samples(self.device, self.stream, num_samples)
-        if samples is not None and self._record_fp:
+        if samples is not None and self._record_fp and self.running:
             data = samples.tobytes()
             # Enforce recording size limit
             if self._record_max_bytes > 0 and self._record_bytes + len(data) > self._record_max_bytes:
