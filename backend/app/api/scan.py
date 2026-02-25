@@ -228,10 +228,16 @@ async def preview_tune(payload: dict, _: None = Depends(verify_basic_auth)) -> D
     state.scan_engine.preview_close()
 
     preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+    # Accept explicit band boundaries so the WS frames carry the correct
+    # scan_start_hz / scan_end_hz — identical to what scan mode sends.
+    band_start_hz = int(payload.get("start_hz") or 0)
+    band_end_hz = int(payload.get("end_hz") or 0)
     opened = await state.scan_engine.preview_open(
         device_id=sdr_devices[0]["id"],
         sample_rate=preview_sr,
         center_hz=center_hz,
+        start_hz=band_start_hz,
+        end_hz=band_end_hz,
     )
     if not opened:
         raise HTTPException(status_code=500, detail="Failed to retune SDR device")

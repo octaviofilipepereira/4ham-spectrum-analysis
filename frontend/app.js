@@ -2373,19 +2373,23 @@ async function switchBandLive(selectedBand) {
     // Preview mode: retune the SDR to the centre of the new band and
     // update the ruler immediately — don't wait for the next WS frame.
     const bandRange = getScanRangeForBand(nextBand);
-    const newCenterHz = Math.round((Number(bandRange.start_hz) + Number(bandRange.end_hz)) / 2);
-    // Update ruler straight away so the UI responds instantly
-    renderWaterfallRuler(Number(bandRange.start_hz), Number(bandRange.end_hz));
-    updateVFODisplay(Number(bandRange.start_hz), Number(bandRange.end_hz));
+    const bandStartHz = Number(bandRange.start_hz);
+    const bandEndHz = Number(bandRange.end_hz);
+    const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
+    // Update ruler straight away so the UI responds instantly.
+    // Use the exact band limits (same as scan mode) not center±span/2.
+    renderWaterfallRuler(bandStartHz, bandEndHz);
+    updateVFODisplay(bandStartHz, bandEndHz);
     // Clear stale waterfall data from the previous band
     lastSpectrumFrame = null;
     clearWaterfallFrame();
-    // Ask the backend to retune the SDR device
+    // Ask the backend to retune the SDR device, passing band boundaries
+    // so the WS frames use the same scan_start/end_hz as scan mode.
     try {
       const resp = await fetch("/api/scan/preview/tune", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeader() },
-        body: JSON.stringify({ center_hz: newCenterHz, band: nextBand })
+        body: JSON.stringify({ center_hz: newCenterHz, band: nextBand, start_hz: bandStartHz, end_hz: bandEndHz })
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));

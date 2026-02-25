@@ -35,6 +35,8 @@ class ScanEngine:
         self.total_steps: int = 0
         self.pass_count: int = 0
         self.preview: bool = False  # True when device open for passive monitoring
+        self.preview_start_hz: int = 0  # Band start Hz used during preview (0 = unknown)
+        self.preview_end_hz: int = 0    # Band end Hz used during preview (0 = unknown)
         self._task: Optional[asyncio.Task] = None
         self._record_fp: Optional[BinaryIO] = None
         self._record_bytes: int = 0
@@ -125,11 +127,19 @@ class ScanEngine:
         sample_rate: int = 2048000,
         center_hz: int = 14175000,
         gain: Optional[float] = None,
+        start_hz: int = 0,
+        end_hz: int = 0,
     ) -> bool:
         """Open device for passive spectrum monitoring without starting a scan.
 
         Only effective when no scan is running. Replaces an existing preview
         session if one is already open.
+
+        Args:
+            start_hz: Optional band start frequency (Hz). When provided the
+                WebSocket frames will carry this as scan_start_hz so the
+                frontend ruler matches scan mode exactly.
+            end_hz: Optional band end frequency (Hz). Same purpose.
         """
         if self.running:
             return False  # scan owns the device — do not interfere
@@ -144,6 +154,8 @@ class ScanEngine:
             self.preview = False
         self.sample_rate = int(sample_rate or 2048000)
         self.center_hz = int(center_hz or 14175000)
+        self.preview_start_hz = int(start_hz or 0)
+        self.preview_end_hz = int(end_hz or 0)
         self.device, self.stream = self.controller.open(
             device_id=device_id,
             sample_rate=self.sample_rate,
@@ -151,6 +163,8 @@ class ScanEngine:
             gain=gain,
         )
         if self.device is None:
+            self.preview_start_hz = 0
+            self.preview_end_hz = 0
             return False
         self.preview = True
         return True
@@ -169,6 +183,8 @@ class ScanEngine:
         self.device = None
         self.stream = None
         self.preview = False
+        self.preview_start_hz = 0
+        self.preview_end_hz = 0
 
     def park(self, frequency_hz: int) -> None:
         """Hold the scanner on *frequency_hz* until unpark() is called.
