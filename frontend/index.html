@@ -112,10 +112,13 @@ Last update: 2026-02-22 16:27:19 UTC
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-7">
+        <div class="col-12">
           <div class="card panel">
             <div class="card-body">
-              <h2 class="h5">Events</h2>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h2 class="h5 mb-0">Events</h2>
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#eventsSearchModal">&#128269; Search Events</button>
+              </div>
               <div class="d-flex align-items-center gap-2 events-pager">
                 <button class="btn btn-outline-info btn-sm" id="eventsPrev">Prev</button>
                 <button class="btn btn-outline-info btn-sm" id="eventsNext">Next</button>
@@ -125,33 +128,43 @@ Last update: 2026-02-22 16:27:19 UTC
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-5">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Events Search</h2>
-              <div class="filters row g-2 align-items-end">
-                <div class="col-6">
+      </section>
+
+      <!-- Events Search Modal -->
+      <div class="modal fade" id="eventsSearchModal" tabindex="-1" aria-labelledby="eventsSearchModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="eventsSearchModalLabel">Events Search</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="filters row g-2 align-items-end mb-3">
+                <div class="col-6 col-md-3">
                   <label class="form-label">Callsign</label>
                   <input type="text" id="eventsSearchCallsign" placeholder="CT1ABC" class="form-control form-control-sm" />
                 </div>
-                <div class="col-6">
+                <div class="col-6 col-md-3">
                   <label class="form-label">Mode</label>
                   <input type="text" id="eventsSearchMode" placeholder="FT8/SSB/APRS" class="form-control form-control-sm" />
                 </div>
-                <div class="col-6">
+                <div class="col-6 col-md-3">
                   <label class="form-label">Grid</label>
                   <input type="text" id="eventsSearchGrid" placeholder="IN51" class="form-control form-control-sm" />
                 </div>
-                <div class="col-6">
+                <div class="col-6 col-md-3">
                   <label class="form-label">Report</label>
                   <input type="text" id="eventsSearchReport" placeholder="-03 / 59" class="form-control form-control-sm" />
                 </div>
               </div>
               <ul class="events events--search" id="eventsSearchResults"></ul>
             </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       <div class="onboarding" id="onboarding">
         <div class="onboarding__card">
