@@ -313,6 +313,11 @@ let latestEvents = [];
 let row = 0;
 let lastSpectrumFrameTs = 0;
 let spectrumFallbackTimer = null;
+// Circular history buffer — stores raw WS frames so pan/zoom/goto can
+// replay the full waterfall instead of resetting to a blank canvas.
+const FFT_HISTORY_MAX = 300;
+const fftHistoryFrames = [];
+let waterfallDragRafPending = false; // rAF gate for drag replay
 let spectrumWs = null;
 let isScanRunning = false;
 let scanActionInFlight = false;
@@ -516,6 +521,8 @@ function getWaterfallViewport(frame) {
 
 function clearWaterfallFrame() {
   row = 0;
+  // Intentional reset (band change, etc.) — discard accumulated history too
+  fftHistoryFrames.length = 0;
   if (webglWaterfall) {
     resizeCanvas();
     return;
@@ -2787,7 +2794,7 @@ function redrawWaterfallFromLastFrame() {
     return;
   }
   const viewport = getWaterfallViewport(lastSpectrumFrame);
-  drawWaterfall(lastSpectrumFrame, viewport);
+  drawWaterfall(lastSpectrumFrame, viewport, true);
   const stableMarkers = buildStableWaterfallMarkers(lastSpectrumFrame);
   const rulerRange = resolveWaterfallRulerRange(
     lastSpectrumFrame,
@@ -2807,12 +2814,51 @@ function redrawWaterfallFromLastFrame() {
   renderWaterfallModeOverlay(modeMarkers, viewport.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
 }
 
+// Replay the full history buffer with the current pan/zoom viewport.
+// Does NOT clear fftHistoryFrames — only used for pan/zoom/goto changes.
+function redrawWaterfallFromHistory() {
+  if (webglWaterfall) {
+    // WebGL manages its own internal accumulation buffer
+    redrawWaterfallFromLastFrame();
+    return;
+  }
+  if (!fftHistoryFrames.length) {
+    return;
+  }
+  // Clear canvas pixels without touching the history buffer
+  row = 0;
+  if (ctx) {
+    const w = canvas.width / window.devicePixelRatio;
+    const h = canvas.height / window.devicePixelRatio;
+    ctx.clearRect(0, 0, w, h);
+  }
+  for (const hFrame of fftHistoryFrames) {
+    const vp = getWaterfallViewport(hFrame);
+    drawWaterfall(hFrame, vp, true); // _historyReplay=true: don't re-push
+  }
+  // Update ruler and overlays from the most recent frame
+  const lastFrame = fftHistoryFrames[fftHistoryFrames.length - 1];
+  const lastVp = getWaterfallViewport(lastFrame);
+  const stableMarkers = buildStableWaterfallMarkers(lastFrame);
+  const rulerRange = resolveWaterfallRulerRange(
+    lastFrame, lastVp, stableMarkers.rangeStartHz, stableMarkers.rangeEndHz
+  );
+  renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
+  const simulatedMarkers = buildSimulatedModeMarkers(
+    lastVp.visibleSpanHz, rulerRange.startHz, rulerRange.endHz
+  );
+  const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
+    ? [...stableMarkers.markers, ...simulatedMarkers]
+    : stableMarkers.markers;
+  renderWaterfallModeOverlay(modeMarkers, lastVp.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
+}
+
 function resetWaterfallExplorerView() {
   waterfallExplorerZoom = 1;
   waterfallExplorerPan = 0;
   localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
   applyWaterfallExplorerUi();
-  redrawWaterfallFromLastFrame();
+  redrawWaterfallFromHistory();
 }
 
 if (waterfallExplorerToggle) {
@@ -2838,14 +2884,13 @@ if (waterfallZoomInput) {
     waterfallExplorerPan = Math.max(0, Math.min(maxPan, currentCenter - (0.5 / waterfallExplorerZoom)));
     localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
     applyWaterfallExplorerUi();
-    clearWaterfallFrame();
-    redrawWaterfallFromLastFrame();
+    redrawWaterfallFromHistory();
   });
 }
 
 if (waterfallResetViewBtn) {
   waterfallResetViewBtn.addEventListener("click", () => {
-    clearWaterfallFrame();
+    // Keep history — reset only pan/zoom so the full waterfall reappears at zoom=1
     resetWaterfallExplorerView();
   });
 }
@@ -2873,8 +2918,14 @@ document.addEventListener("pointermove", (event) => {
   const deltaNorm = ((event.clientX - waterfallDragStartX) / rect.width) * (1 / waterfallExplorerZoom);
   const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
   waterfallExplorerPan = Math.max(0, Math.min(maxPan, waterfallDragStartPan - deltaNorm));
-  clearWaterfallFrame();
-  redrawWaterfallFromLastFrame();
+  // Gate replay to one rAF per drag tick to keep dragging smooth
+  if (!waterfallDragRafPending) {
+    waterfallDragRafPending = true;
+    requestAnimationFrame(() => {
+      waterfallDragRafPending = false;
+      redrawWaterfallFromHistory();
+    });
+  }
 });
 
 document.addEventListener("pointerup", () => {
@@ -3870,7 +3921,15 @@ function drawSpectrumIdle(message) {
   spectrumCtx.restore();
 }
 
-function drawWaterfall(frame, viewport = null) {
+function drawWaterfall(frame, viewport = null, _historyReplay = false) {
+  // Accumulate raw frames for history replay (pan/zoom/goto).
+  // Skip when called recursively during redrawWaterfallFromHistory.
+  if (!_historyReplay && frame && frame.fft_db) {
+    fftHistoryFrames.push(frame);
+    if (fftHistoryFrames.length > FFT_HISTORY_MAX) {
+      fftHistoryFrames.shift();
+    }
+  }
   const resolvedViewport = viewport || getWaterfallViewport(frame);
   const fftDb = resolvedViewport.fftDb || [];
   if (webglWaterfall) {
@@ -4018,6 +4077,7 @@ function updateVFODisplay(startHz, endHz) {
     const maxPan = Math.max(0, 1 - 1 / zoom);
     waterfallExplorerPan = Math.max(0, Math.min(maxPan, (desiredStartHz - fullStartHz) / fullSpanHz));
     applyWaterfallExplorerUi();
+    redrawWaterfallFromHistory();
     if (gotoInput) gotoInput.value = "";
     showToast(`Centrado em ${mhz.toFixed(3)} MHz`);
   }
