@@ -11,7 +11,8 @@ Mode decoder control and event ingestion endpoints.
 """
 
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -28,6 +29,10 @@ from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_t
 
 
 router = APIRouter()
+
+# Queue that receives IQ chunks from the engine's pump loop.
+# Created/registered in _start_ft_external_decoder, cleared in _stop.
+_ft_external_iq_queue: Optional[asyncio.Queue] = None
 
 
 def _refresh_decoder_process_status():
@@ -179,11 +184,36 @@ def _handle_ft_external_event(payload: Dict) -> Dict:
     return _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
 
 
+def _ft_external_flush_iq() -> None:
+    """Drain stale IQ samples at the start of each decode window.
+
+    Called by ExternalFtDecoder via on_window_start so that each window
+    starts with fresh IQ instead of processing samples that accumulated
+    during the previous decode phase.
+    """
+    if _ft_external_iq_queue is None:
+        return
+    drained = 0
+    while True:
+        try:
+            _ft_external_iq_queue.get_nowait()
+            drained += 1
+        except asyncio.QueueEmpty:
+            break
+
+
 def _ft_external_iq_provider(num_samples: int):
-    """Provide IQ samples from scan engine (blocking)."""
-    if not state.scan_engine.running:
+    """Provide IQ samples from the engine's fan-out queue (non-blocking).
+
+    Returns None when no chunk is available; the caller sleeps briefly
+    and retries, yielding control to the event loop.
+    """
+    if _ft_external_iq_queue is None:
         return None
-    return state.scan_engine.read_iq(num_samples)
+    try:
+        return _ft_external_iq_queue.get_nowait()
+    except asyncio.QueueEmpty:
+        return None
 
 
 def _ft_external_sample_rate_provider() -> int:
@@ -225,9 +255,18 @@ async def _start_ft_external_decoder(force: bool = False) -> Dict:
     Returns:
         Dict with started status and reason
     """
+    global _ft_external_iq_queue
+
     if not force and not state.ft_external_enable:
         state.decoder_status["external_ft"]["ft_external_status"] = None
         return {"started": False, "reason": "ft_external_disabled"}
+
+    # Create the IQ queue and register it with the engine's pump loop.
+    # maxsize=2048 ≈ 8 s of IQ at 4096 chunks / 2048 kHz sample rate;
+    # large enough to bridge a 15 s FT8 window, small enough to not OOM.
+    if _ft_external_iq_queue is None:
+        _ft_external_iq_queue = asyncio.Queue(maxsize=2048)
+        state.scan_engine.register_iq_listener(_ft_external_iq_queue)
 
     # Initialize decoder if needed
     if state.ft_external_decoder is None:
@@ -257,6 +296,7 @@ async def _start_ft_external_decoder(force: bool = False) -> Dict:
             frequency_provider=_ft_external_frequency_provider,
             band_provider=_ft_external_band_provider,
             on_event=_handle_ft_external_event,
+            on_window_start=_ft_external_flush_iq,
             scan_park=_ft_external_scan_park,
             scan_unpark=_ft_external_scan_unpark,
             logger=log,
@@ -276,6 +316,12 @@ async def _stop_ft_external_decoder() -> Dict:
     Returns:
         Dict with stopped status and reason
     """
+    global _ft_external_iq_queue
+
+    if _ft_external_iq_queue is not None:
+        state.scan_engine.unregister_iq_listener(_ft_external_iq_queue)
+        _ft_external_iq_queue = None
+
     if state.ft_external_decoder is None:
         state.decoder_status["external_ft"]["ft_external_status"] = None
         return {"stopped": False, "reason": "ft_external_not_running"}

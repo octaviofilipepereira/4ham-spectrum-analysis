@@ -53,6 +53,11 @@ class ScanEngine:
         self._parked = False
         self._parked_event = asyncio.Event()
         self._parked_event.set()  # Initially not parked
+        # IQ fan-out pump — single hardware reader, multiple consumers.
+        # _spectrum_queue feeds spectrum.py (FFT), _iq_listeners feeds decoders.
+        self._spectrum_queue: Optional[asyncio.Queue] = None
+        self._iq_listeners: list = []
+        self._pump_task: Optional[asyncio.Task] = None
 
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
@@ -90,6 +95,8 @@ class ScanEngine:
         if record_path:
             self._record_fp = open(record_path, "wb")
         self.running = True
+        self._spectrum_queue = asyncio.Queue(maxsize=8)
+        self._pump_task = asyncio.create_task(self._iq_pump_loop())
         if self.mode == "auto" and self.step_hz > 0 and self.end_hz > self.start_hz:
             self._task = asyncio.create_task(self._scan_loop())
         else:
@@ -98,6 +105,14 @@ class ScanEngine:
 
     async def stop_async(self) -> bool:
         self.running = False
+        if self._pump_task:
+            self._pump_task.cancel()
+            try:
+                await self._pump_task
+            except asyncio.CancelledError:
+                pass
+            self._pump_task = None
+        self._spectrum_queue = None
         if self._task:
             self._task.cancel()
             try:
@@ -167,6 +182,8 @@ class ScanEngine:
             self.preview_end_hz = 0
             return False
         self.preview = True
+        self._spectrum_queue = asyncio.Queue(maxsize=8)
+        self._pump_task = asyncio.create_task(self._iq_pump_loop())
         return True
 
     def preview_close(self) -> None:
@@ -176,13 +193,17 @@ class ScanEngine:
         """
         if not self.preview or self.running:
             return
+        if self._pump_task:
+            self._pump_task.cancel()
+            self._pump_task = None
+        self._spectrum_queue = None
+        self.preview = False  # clear flag BEFORE closing device
         try:
             self.controller.close(self.device, self.stream)
         except Exception:
             pass
         self.device = None
         self.stream = None
-        self.preview = False
         self.preview_start_hz = 0
         self.preview_end_hz = 0
 
@@ -233,32 +254,100 @@ class ScanEngine:
                 self.step_index += 1
             self.pass_count += 1
 
+    def register_iq_listener(self, queue: asyncio.Queue) -> None:
+        """Register a decoder queue to receive IQ sample chunks from the pump."""
+        if queue not in self._iq_listeners:
+            self._iq_listeners.append(queue)
+
+    def unregister_iq_listener(self, queue: asyncio.Queue) -> None:
+        """Remove a previously registered decoder queue."""
+        try:
+            self._iq_listeners.remove(queue)
+        except ValueError:
+            pass
+
     def read_iq(self, num_samples: int) -> Optional[npt.NDArray[np.complex64]]:
-        if not self.running and not self.preview:
+        """Non-blocking read from the spectrum queue (fed by _iq_pump_loop).
+
+        Returns None immediately when no chunk is available — the caller
+        (spectrum.py) is expected to yield and retry.
+        """
+        if self._spectrum_queue is None:
             return None
-        samples = self.controller.read_samples(self.device, self.stream, num_samples)
-        if samples is not None and self._record_fp and self.running:
-            data = samples.tobytes()
-            # Enforce recording size limit
-            if self._record_max_bytes > 0 and self._record_bytes + len(data) > self._record_max_bytes:
-                # Close and discard the file pointer — recording is full
-                try:
-                    self._record_fp.close()
-                except Exception:
-                    pass
-                self._record_fp = None
-                self._record_bytes = 0
-                # Log once so the operator knows recording stopped
-                import logging as _logging
-                _logging.getLogger(__name__).warning(
-                    "IQ recording stopped: size limit reached "
-                    "(%d MB). Set RECORD_MAX_BYTES=0 to disable limit.",
-                    self._record_max_bytes // (1024 * 1024),
+        try:
+            return self._spectrum_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    async def _iq_pump_loop(self) -> None:
+        """Single hardware reader that fans IQ chunks out to all consumers.
+
+        Reads 4096-sample chunks from the SDR and distributes them to:
+        - _spectrum_queue  → spectrum.py FFT loop
+        - each queue in _iq_listeners → FT / other decoders
+
+        Both destinations use put_nowait so a slow consumer never blocks
+        the hardware read or the other consumer.
+        """
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+        chunk_size = 4096
+        while self.running or self.preview:
+            try:
+                samples = self.controller.read_samples(
+                    self.device, self.stream, chunk_size
                 )
-            else:
-                self._record_fp.write(data)
-                self._record_bytes += len(data)
-        return samples
+            except Exception as exc:
+                _log.debug("IQ pump read error: %s", exc)
+                await asyncio.sleep(0.01)
+                continue
+
+            if samples is None:
+                await asyncio.sleep(0.005)
+                continue
+
+            # Recording (scan mode only)
+            if self._record_fp and self.running:
+                data = samples.tobytes()
+                if self._record_max_bytes > 0 and self._record_bytes + len(data) > self._record_max_bytes:
+                    try:
+                        self._record_fp.close()
+                    except Exception:
+                        pass
+                    self._record_fp = None
+                    self._record_bytes = 0
+                    _log.warning(
+                        "IQ recording stopped: size limit reached "
+                        "(%d MB). Set RECORD_MAX_BYTES=0 to disable limit.",
+                        self._record_max_bytes // (1024 * 1024),
+                    )
+                else:
+                    self._record_fp.write(data)
+                    self._record_bytes += len(data)
+
+            # Fan-out: spectrum queue (drop oldest if full — FFT can skip)
+            if self._spectrum_queue is not None:
+                try:
+                    self._spectrum_queue.put_nowait(samples)
+                except asyncio.QueueFull:
+                    try:
+                        self._spectrum_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                    try:
+                        self._spectrum_queue.put_nowait(samples)
+                    except asyncio.QueueFull:
+                        pass
+
+            # Fan-out: each registered decoder listener (copy per consumer)
+            for q in list(self._iq_listeners):
+                chunk_copy = samples.copy()
+                try:
+                    q.put_nowait(chunk_copy)
+                except asyncio.QueueFull:
+                    pass  # decoder is too slow — drop; it will flush stale IQ
+
+            await asyncio.sleep(0)
 
     def status(self) -> Dict[str, Any]:
         return {
