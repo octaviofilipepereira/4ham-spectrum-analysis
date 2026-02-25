@@ -138,10 +138,37 @@ class SDRController:
             return None
 
         import numpy as np
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+
+        SoapySDR = _import_soapy_sdr()
+        OVERFLOW = getattr(SoapySDR, "SOAPY_SDR_OVERFLOW", -4) if SoapySDR else -4
+        TIMEOUT  = getattr(SoapySDR, "SOAPY_SDR_TIMEOUT",   -1) if SoapySDR else -1
+
+        # Use a generous timeout (300 ms) to tolerate USB latency spikes on
+        # RTL-SDR devices.  The default of 100 ms triggers spurious TIMEOUT
+        # errors under modest CPU load.
+        timeout_us = 300_000
+
         buff = np.empty(num_samples, np.complex64)
-        sr = device.readStream(stream, [buff], num_samples)
+        sr = device.readStream(stream, [buff], num_samples, timeoutUs=timeout_us)
+
+        if sr.ret == OVERFLOW:
+            # Buffer overflow: host couldn't drain fast enough.  Discard the
+            # stale data by performing a non-blocking drain, then do one more
+            # real read so the caller gets fresh samples instead of None.
+            _log.debug("SoapySDR readStream overflow — draining buffer")
+            _drain = np.empty(num_samples * 4, np.complex64)
+            device.readStream(stream, [_drain], len(_drain), timeoutUs=0)
+            sr = device.readStream(stream, [buff], num_samples, timeoutUs=timeout_us)
+
         if sr.ret <= 0:
+            if sr.ret == TIMEOUT:
+                _log.debug("SoapySDR readStream timeout (ret=%d)", sr.ret)
+            else:
+                _log.debug("SoapySDR readStream error ret=%d", sr.ret)
             return None
+
         return buff[: sr.ret]
 
     def tune(self, device, center_hz):

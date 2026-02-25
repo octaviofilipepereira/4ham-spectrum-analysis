@@ -128,7 +128,15 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         # frontend fallback timer activates the idle/no-device overlay.
         iq = state.scan_engine.read_iq(2048)
         if iq is None:
-            await asyncio.sleep(1.0)
+            # Distinguish between two cases:
+            # a) No SDR device open at all  → back off 1 s to avoid busy-loop
+            # b) Device active (preview/scan) but readStream returned a transient
+            #    error (overflow, timeout) → retry quickly so the waterfall does
+            #    not stall long enough to trigger the 2.5 s frontend fallback.
+            if state.scan_engine.running or state.scan_engine.preview:
+                await asyncio.sleep(0.05)  # brief pause — device glitch, retry
+            else:
+                await asyncio.sleep(1.0)   # no device — reduce busy-loop load
             continue
         
         agc_gain_db = None
