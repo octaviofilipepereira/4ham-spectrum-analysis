@@ -96,9 +96,15 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
-    # Pre-check: ensure at least one SDR device is connected
+    # Pre-check: ensure at least one real SDR device is connected.
+    # Audio devices (SoapySDR audio plugin) are excluded — they are
+    # host sound cards, not SDR receivers.
     try:
-        available_devices = state.controller.list_devices()
+        all_devices = state.controller.list_devices()
+        available_devices = [
+            d for d in all_devices
+            if str(d.get("type", "")).lower() not in ("audio",)
+        ]
     except Exception:
         available_devices = []
     if not available_devices:

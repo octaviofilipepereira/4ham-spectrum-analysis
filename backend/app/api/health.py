@@ -27,10 +27,14 @@ def health(_: None = Depends(verify_basic_auth)) -> Dict:
     
     Returns system status and detected device count.
     """
+    sdr_devices = [
+        d for d in state.controller.list_devices()
+        if str(d.get("type", "")).lower() not in ("audio",)
+    ]
     return {
         "status": "ok",
         "version": "0.2.0",
-        "devices": len(state.controller.list_devices())
+        "devices": len(sdr_devices)
     }
 
 
