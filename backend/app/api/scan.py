@@ -193,6 +193,55 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     return state.scan_state
 
 
+@router.post("/preview/tune")
+async def preview_tune(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Retune the SDR device while in preview (monitor) mode.
+
+    Closes the current preview stream and reopens it at the requested
+    centre frequency, allowing the user to switch bands without starting
+    a full scan.
+
+    Args:
+        payload: Dict with keys:
+            - center_hz (int, required): New centre frequency in Hz
+            - band      (str, optional): Band name for logging
+
+    Returns:
+        Updated scan state dict
+
+    Raises:
+        HTTPException: 422 if no SDR device available or not in preview mode
+    """
+    center_hz = int(payload.get("center_hz") or 0)
+    if center_hz <= 0:
+        raise HTTPException(status_code=422, detail="center_hz must be a positive integer")
+
+    sdr_devices = [
+        d for d in state.controller.list_devices()
+        if str(d.get("type", "")).lower() not in ("audio",)
+    ]
+    if not sdr_devices:
+        raise HTTPException(status_code=422, detail="No SDR device detected")
+
+    # Close existing preview (no-op if already closed)
+    state.scan_engine.preview_close()
+
+    preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+    opened = await state.scan_engine.preview_open(
+        device_id=sdr_devices[0]["id"],
+        sample_rate=preview_sr,
+        center_hz=center_hz,
+    )
+    if not opened:
+        raise HTTPException(status_code=500, detail="Failed to retune SDR device")
+
+    state.scan_state["state"] = "preview"
+    band = str(payload.get("band") or "")
+    log(f"preview_tune center_hz={center_hz}" + (f" band={band}" if band else ""))
+    return state.scan_state
+
+
 @router.get("/status")
 def scan_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
     """

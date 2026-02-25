@@ -2365,10 +2365,39 @@ async function switchBandLive(selectedBand) {
   bandSelect.value = nextBand;
   bandSelect.dispatchEvent(new Event("change"));
 
-  if (!isScanRunning || scanActionInFlight) {
+  if (scanActionInFlight) {
     return;
   }
 
+  if (!isScanRunning) {
+    // Preview mode: retune the SDR to the centre of the new band and
+    // update the ruler immediately — don't wait for the next WS frame.
+    const bandRange = getScanRangeForBand(nextBand);
+    const newCenterHz = Math.round((Number(bandRange.start_hz) + Number(bandRange.end_hz)) / 2);
+    // Update ruler straight away so the UI responds instantly
+    renderWaterfallRuler(Number(bandRange.start_hz), Number(bandRange.end_hz));
+    updateVFODisplay(Number(bandRange.start_hz), Number(bandRange.end_hz));
+    // Clear stale waterfall data from the previous band
+    lastSpectrumFrame = null;
+    clearWaterfallFrame();
+    // Ask the backend to retune the SDR device
+    try {
+      const resp = await fetch("/api/scan/preview/tune", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ center_hz: newCenterHz, band: nextBand })
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        showToastError(err?.detail || `Failed to tune to ${nextBand}`);
+      }
+    } catch (err) {
+      showToastError(err?.message || `Failed to tune to ${nextBand}`);
+    }
+    return;
+  }
+
+  // Scan running: stop and restart on the new band
   scanActionInFlight = true;
   updateScanButtonState();
   try {
