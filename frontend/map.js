@@ -1,7 +1,7 @@
 // © 2026 Octávio Filipe Gonçalves – CT7BFV
 // License: GNU AGPL-3.0
-// Propagation World Map — requires d3.min.js + topojson.min.js loaded first.
-// Features: D3 zoom/pan, zoom buttons (+/−/reset), fullscreen modal.
+// Propagation 3D Globe — requires d3.min.js + topojson.min.js loaded first.
+// Features: orthographic projection, drag-to-rotate, scroll/button zoom, fullscreen modal.
 
 (function () {
   "use strict";
@@ -16,37 +16,27 @@
   const DEFAULT_COLOR = "#9ca3af";
   const bandColor = (b) => BAND_COLORS[(b || "").toLowerCase()] || DEFAULT_COLOR;
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
+  // ── Auth ─────────────────────────────────────────────────────────────────
   const authHeader = () => {
     const u = localStorage.getItem("authUser");
     const p = localStorage.getItem("authPass");
     return u && p ? { Authorization: "Basic " + btoa(u + ":" + p) } : {};
   };
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  let _worldData   = null;
+  // ── State ────────────────────────────────────────────────────────────────
+  let _worldData    = null;
   let _refreshTimer = null;
-  let _lastData    = null;  // cached API response for modal reuse
+  let _lastData     = null;
 
-  // ── World atlas (lazy loaded once) ───────────────────────────────────────
+  // ── World atlas ──────────────────────────────────────────────────────────
   async function loadWorld() {
     if (_worldData) return _worldData;
-    try {
-      const r = await fetch("/lib/countries-110m.json");
-      _worldData = await r.json();
-    } catch (e) { _worldData = null; }
+    try { const r = await fetch("/lib/countries-110m.json"); _worldData = await r.json(); }
+    catch (e) { _worldData = null; }
     return _worldData;
   }
 
-  // ── Great-circle arc ──────────────────────────────────────────────────────
-  function gcArc(proj, lon1, lat1, lon2, lat2) {
-    const interp = d3.geoInterpolate([lon1, lat1], [lon2, lat2]);
-    return d3.range(0, 1.01, 0.025).map((t) => proj(interp(t))).filter(Boolean);
-  }
-  const pts2path = (pts) =>
-    pts.length < 2 ? "" : "M" + pts[0] + pts.slice(1).map((p) => "L" + p).join("");
-
-  // ── Shared tooltip ────────────────────────────────────────────────────────
+  // ── Tooltip ──────────────────────────────────────────────────────────────
   let _tip = null;
   function getTooltip() {
     if (_tip) return _tip;
@@ -60,9 +50,9 @@
     return _tip;
   }
 
-  // ── Core draw ─────────────────────────────────────────────────────────────
-  // Returns {svg (d3 selection), zoom (d3 zoom behaviour)}
-  function drawMap(container, W, H, data, world) {
+  // ── 3-D Globe ────────────────────────────────────────────────────────────
+  // Returns { controls: {zoomIn, zoomOut, reset} }
+  function drawGlobe(container, W, H, data, world) {
     const station  = data.station  || {};
     const contacts = data.contacts || [];
     const sLat = station.lat ?? 39.5;
@@ -70,121 +60,190 @@
 
     container.innerHTML = "";
 
-    const svg = d3.select(container)
-      .append("svg")
+    // Per-container gradient id so inline + modal can coexist
+    const gradId = "oceanGrad_" + container.id;
+    const baseScale = Math.min(W, H) * 0.44;
+    let kScale = 1;                          // current zoom multiplier
+
+    const proj = d3.geoOrthographic()
+      .rotate([-sLon, -sLat])
+      .scale(baseScale)
+      .translate([W / 2, H / 2])
+      .clipAngle(90);                        // only visible hemisphere
+
+    const path = d3.geoPath().projection(proj);
+    const graticule = d3.geoGraticule()();
+
+    // ── SVG scaffold ─────────────────────────────────────────────────────
+    const svg = d3.select(container).append("svg")
       .attr("width", W).attr("height", H)
       .attr("viewBox", `0 0 ${W} ${H}`)
       .style("background", "#0d1117").style("border-radius", "6px")
       .style("cursor", "grab").style("display", "block");
 
-    const g = svg.append("g").attr("class", "map-root");
+    // Radial gradient for ocean depth effect
+    const defs = svg.append("defs");
+    const grad = defs.append("radialGradient")
+      .attr("id", gradId)
+      .attr("gradientUnits", "userSpaceOnUse")
+      .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale);
+    grad.append("stop").attr("offset", "0%").attr("stop-color", "#0e3266");
+    grad.append("stop").attr("offset", "70%").attr("stop-color", "#0a1e3d");
+    grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
 
-    const proj = d3.geoAzimuthalEquidistant()
-      .rotate([-sLon, -sLat])
-      .scale(Math.min(W, H) * 0.42)
-      .translate([W / 2, H / 2])
-      .clipAngle(180);
-    const path = d3.geoPath().projection(proj);
+    // Atmosphere glow (slightly larger circle behind sphere)
+    svg.append("circle")
+      .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale + 6)
+      .attr("fill", "none")
+      .attr("stroke", "#1e4fa0").attr("stroke-width", 8).attr("stroke-opacity", 0.18);
 
-    g.append("path").datum({ type: "Sphere" })
-      .attr("d", path).attr("fill", "#0d2137").attr("stroke", "#1e3a5f").attr("stroke-width", 0.8);
-    g.append("path").datum(d3.geoGraticule()())
-      .attr("d", path).attr("fill", "none").attr("stroke", "#1e3a5f").attr("stroke-width", 0.4);
+    const spherePath = svg.append("path").datum({ type: "Sphere" })
+      .attr("fill", `url(#${gradId})`).attr("stroke", "#1e3a5f").attr("stroke-width", 0.6);
+    const gratPath  = svg.append("path").datum(graticule)
+      .attr("fill", "none").attr("stroke", "#1a3a5c").attr("stroke-width", 0.3);
+
+    let countryPaths;
     if (world) {
-      g.append("g").selectAll("path")
+      countryPaths = svg.append("g").selectAll("path")
         .data(topojson.feature(world, world.objects.countries).features)
-        .join("path").attr("d", path)
-        .attr("fill", "#1c3048").attr("stroke", "#2d5278").attr("stroke-width", 0.4);
+        .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
     }
 
-    // Arcs
-    const arcG = g.append("g").attr("class", "arcs");
-    contacts.forEach((c) => {
-      if (c.lat == null || c.lon == null) return;
-      const pts = gcArc(proj, sLon, sLat, c.lon, c.lat);
-      if (pts.length < 2) return;
-      arcG.append("path").attr("d", pts2path(pts))
-        .attr("fill", "none").attr("stroke", bandColor(c.band))
-        .attr("stroke-width", 1.4).attr("stroke-opacity", 0.5);
-    });
+    const arcG  = svg.append("g").attr("class", "arcs");
+    const dotG  = svg.append("g").attr("class", "dots");
+    const homeG = svg.append("g").attr("class", "home");
 
-    // Dots
-    const tip = getTooltip();
-    const dotG = g.append("g").attr("class", "dots");
-    contacts.forEach((c) => {
-      if (c.lat == null || c.lon == null) return;
-      const pp = proj([c.lon, c.lat]);
-      if (!pp) return;
-      const snrStr  = c.snr_db      != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
-      const distStr = c.distance_km != null ? `${c.distance_km.toLocaleString()} km` : "—";
-      dotG.append("circle")
-        .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4)
-        .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.6)
-        .attr("opacity", 0.9).style("cursor", "pointer")
-        .on("mousemove", (evt) => {
-          tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country}<br>`
-            + `${c.band} · ${c.mode} · SNR ${snrStr} · ${distStr}`;
-          tip.style.display = "block";
-          tip.style.left = evt.clientX + 14 + "px";
-          tip.style.top  = evt.clientY - 34 + "px";
-        })
-        .on("mouseleave", () => { tip.style.display = "none"; });
-    });
-
-    // Home marker
-    const home = proj([sLon, sLat]);
-    if (home) {
-      g.append("circle").attr("cx", home[0]).attr("cy", home[1]).attr("r", 6)
-        .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.5);
-      g.append("text").attr("x", home[0] + 9).attr("y", home[1] + 5)
-        .attr("fill", "#facc15").attr("font-size", "11px").attr("font-family", "monospace")
-        .text(station.callsign || "QTH");
-    }
-
-    // Legend (fixed — outside the pannable group)
+    // ── Legend (fixed overlay, inside SVG but pointer-events:none) ────────
     const bandsPresent = [...new Set(contacts.map((c) => c.band).filter(Boolean))].sort();
     const legG = svg.append("g").attr("class", "legend").attr("pointer-events", "none");
     bandsPresent.slice(0, 8).forEach((band, i) => {
-      const x = 8, y = H - 12 - i * 15;
-      legG.append("rect").attr("x", x).attr("y", y - 8).attr("width", 12).attr("height", 9)
+      const x = 8, y = H - 14 - i * 16;
+      legG.append("rect").attr("x", x).attr("y", y - 9).attr("width", 12).attr("height", 10)
         .attr("fill", bandColor(band)).attr("rx", 2);
       legG.append("text").attr("x", x + 16).attr("y", y)
         .attr("fill", "#cbd5e1").attr("font-size", "10px").attr("font-family", "monospace").text(band);
     });
-
     const win = data.window_minutes || 60;
-    svg.append("text").attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
+    const countLabel = svg.append("text")
+      .attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
       .attr("fill", "#64748b").attr("font-size", "9px").attr("font-family", "monospace")
       .attr("pointer-events", "none")
       .text(`${contacts.length} contacts · ${win >= 1440 ? Math.round(win / 1440) + "d" : win + "min"}`);
 
-    // ── D3 zoom + pan ────────────────────────────────────────────────────────
-    const zoom = d3.zoom()
-      .scaleExtent([0.35, 24])
-      .on("zoom", (event) => {
-        g.attr("transform", event.transform);
-        svg.style("cursor", event.transform.k > 1 ? "move" : "grab");
+    const tip = getTooltip();
+
+    // ── redraw: called on every rotate/zoom interaction ───────────────────
+    function redraw() {
+      spherePath.attr("d", path);
+      gratPath.attr("d", path);
+      if (countryPaths) countryPaths.attr("d", path);
+
+      // Great-circle arcs as GeoJSON LineString — D3+orthographic clips automatically
+      arcG.selectAll("path").remove();
+      contacts.forEach((c) => {
+        if (c.lat == null || c.lon == null) return;
+        arcG.append("path")
+          .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke", bandColor(c.band))
+          .attr("stroke-width", 1.3)
+          .attr("stroke-opacity", 0.65);
       });
 
-    svg.call(zoom);
-    svg.on("dblclick.zoom", null);  // disable default dblclick
-    svg.on("dblclick", () =>
-      svg.transition().duration(420).call(zoom.transform, d3.zoomIdentity)
+      // Dots — only on visible hemisphere (geoDistance < 90°)
+      dotG.selectAll("*").remove();
+      const center = proj.invert([W / 2, H / 2]);
+      contacts.forEach((c) => {
+        if (c.lat == null || c.lon == null) return;
+        if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
+        const pp = proj([c.lon, c.lat]);
+        if (!pp) return;
+        const snrStr  = c.snr_db      != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
+        const distStr = c.distance_km != null ? `${c.distance_km.toLocaleString()} km` : "—";
+        dotG.append("circle")
+          .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
+          .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
+          .attr("opacity", 0.92).style("cursor", "pointer")
+          .on("mousemove", (evt) => {
+            tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country}<br>`
+              + `${c.band} · ${c.mode} · SNR ${snrStr} · ${distStr}`;
+            tip.style.display = "block";
+            tip.style.left = evt.clientX + 14 + "px";
+            tip.style.top  = evt.clientY - 34 + "px";
+          })
+          .on("mouseleave", () => { tip.style.display = "none"; });
+      });
+
+      // Home marker
+      homeG.selectAll("*").remove();
+      if (d3.geoDistance([sLon, sLat], center) < Math.PI / 2) {
+        const home = proj([sLon, sLat]);
+        if (home) {
+          homeG.append("circle").attr("cx", home[0]).attr("cy", home[1]).attr("r", 7)
+            .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
+          homeG.append("text").attr("x", home[0] + 10).attr("y", home[1] + 5)
+            .attr("fill", "#facc15").attr("font-size", "11px").attr("font-family", "monospace")
+            .attr("pointer-events", "none")
+            .text(station.callsign || "QTH");
+        }
+      }
+
+      // Update gradient radius to match current scale
+      grad.attr("r", proj.scale());
+    }
+
+    redraw();
+
+    // ── Drag = rotate globe ───────────────────────────────────────────────
+    svg.call(
+      d3.drag()
+        .on("start", () => svg.style("cursor", "grabbing"))
+        .on("drag", (event) => {
+          const [rx, ry, rz] = proj.rotate();
+          proj.rotate([rx + event.dx * 0.5, ry - event.dy * 0.5, rz]);
+          redraw();
+        })
+        .on("end", () => svg.style("cursor", "grab"))
     );
 
-    return { svg, zoom };
+    // ── Scroll wheel = zoom (scale only) ─────────────────────────────────
+    svg.node().addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+      kScale = Math.max(0.25, Math.min(12, kScale * factor));
+      proj.scale(baseScale * kScale);
+      redraw();
+    }, { passive: false });
+
+    // ── Double-click = reset view ─────────────────────────────────────────
+    svg.on("dblclick", () => {
+      proj.rotate([-sLon, -sLat]).scale(baseScale);
+      kScale = 1;
+      redraw();
+    });
+
+    // ── Programmatic controls ─────────────────────────────────────────────
+    const controls = {
+      zoomIn:  () => { kScale = Math.min(kScale * 1.6, 12);   proj.scale(baseScale * kScale); redraw(); },
+      zoomOut: () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); },
+      reset:   () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); },
+    };
+
+    return { controls };
   }
 
-  // ── Overlay control buttons ───────────────────────────────────────────────
-  function addControls(wrapper, svgSel, zoom, showFullscreen) {
+  // ── Overlay button bar ────────────────────────────────────────────────────
+  function addControls(wrapper, controls, showFullscreen) {
     const btnCss =
       "width:30px;height:30px;border:none;border-radius:5px;"
-      + "background:rgba(30,41,59,0.88);color:#e2e8f0;font-size:17px;cursor:pointer;"
+      + "background:rgba(20,30,50,0.88);color:#e2e8f0;font-size:17px;cursor:pointer;"
       + "display:flex;align-items:center;justify-content:center;margin-bottom:4px;"
-      + "border:1px solid #334155;";
+      + "border:1px solid #2a4a6a;";
 
     const bar = document.createElement("div");
-    bar.style.cssText = "position:absolute;top:8px;right:8px;display:flex;flex-direction:column;z-index:10;";
+    bar.style.cssText =
+      "position:absolute;top:8px;right:8px;display:flex;flex-direction:column;z-index:10;";
 
     const btn = (html, title, fn) => {
       const b = document.createElement("button");
@@ -193,10 +252,9 @@
       return b;
     };
 
-    bar.appendChild(btn("+",  "Zoom in",    () => svgSel.transition().duration(240).call(zoom.scaleBy, 1.6)));
-    bar.appendChild(btn("−",  "Zoom out",   () => svgSel.transition().duration(240).call(zoom.scaleBy, 1 / 1.6)));
-    bar.appendChild(btn("⌂",  "Reset view", () => svgSel.transition().duration(380).call(zoom.transform, d3.zoomIdentity)));
-
+    bar.appendChild(btn("+",  "Zoom in",    controls.zoomIn));
+    bar.appendChild(btn("−",  "Zoom out",   controls.zoomOut));
+    bar.appendChild(btn("⌂",  "Reset view", controls.reset));
     if (showFullscreen) {
       bar.appendChild(btn("⛶", "Open fullscreen", () => {
         const el = document.getElementById("mapFullscreenModal");
@@ -208,7 +266,7 @@
     wrapper.appendChild(bar);
   }
 
-  // ── Fetch ─────────────────────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchData(windowMinutes) {
     const r = await fetch(
       `/api/map/contacts?window_minutes=${windowMinutes}&limit=500`,
@@ -218,7 +276,7 @@
     return r.json();
   }
 
-  // ── Render into a container ────────────────────────────────────────────────
+  // ── Render into a container ───────────────────────────────────────────────
   async function render(containerId, windowMinutes, isModal) {
     if (!window.d3 || !window.topojson) return;
     const container = document.getElementById(containerId);
@@ -234,11 +292,11 @@
     } catch (e) { console.warn("[map] fetch:", e); return; }
 
     const world = await loadWorld();
-    const { svg, zoom } = drawMap(container, W, H, data, world);
-    addControls(container, svg, zoom, !isModal);
+    const { controls } = drawGlobe(container, W, H, data, world);
+    addControls(container, controls, !isModal);
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────
   const PropMap = {
     init(containerId, windowMinutes) {
       windowMinutes = windowMinutes || 60;
@@ -258,18 +316,15 @@
       const H = Math.max(window.innerHeight - 150, 300);
       const world = await loadWorld();
 
-      // Instant render with cached data
       if (_lastData) {
-        const { svg, zoom } = drawMap(c, W, H, _lastData, world);
-        addControls(c, svg, zoom, false);
+        const { controls } = drawGlobe(c, W, H, _lastData, world);
+        addControls(c, controls, false);
       }
-
-      // Then refresh in background
       try {
         const fresh = await fetchData(60);
         _lastData = fresh;
-        const { svg, zoom } = drawMap(c, W, H, fresh, world);
-        addControls(c, svg, zoom, false);
+        const { controls } = drawGlobe(c, W, H, fresh, world);
+        addControls(c, controls, false);
       } catch (_) {}
     },
   };
