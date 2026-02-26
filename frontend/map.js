@@ -283,7 +283,9 @@
     if (!container) return;
 
     const W = container.clientWidth  || (isModal ? window.innerWidth  - 48 : 420);
-    const H = isModal ? Math.max(window.innerHeight - 150, 300) : Math.min(W * 0.6, 320);
+    const H = isModal
+      ? Math.max(window.innerHeight - 150, 300)
+      : (container.clientHeight > 80 ? container.clientHeight : Math.min(W * 0.7, 420));
 
     let data;
     try {
@@ -332,7 +334,10 @@
   window.PropMap = PropMap;
 
   document.addEventListener("DOMContentLoaded", () => {
-    if (document.getElementById("propagationMap")) PropMap.init("propagationMap", 60);
+    if (document.getElementById("propagationMap")) {
+      // rAF ensures flex layout has resolved before we measure clientHeight
+      requestAnimationFrame(() => PropMap.init("propagationMap", 60));
+    }
 
     const modalEl = document.getElementById("mapFullscreenModal");
     if (modalEl) {
