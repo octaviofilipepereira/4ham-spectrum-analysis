@@ -310,10 +310,14 @@ class Database:
         events = []
         params = [limit, offset]
         band_filter = ""
+        mode_filter_occ = ""
         time_filter = ""
         if band:
             band_filter = "AND band = ?"
             params.insert(0, band)
+        if mode:
+            mode_filter_occ = "AND UPPER(mode) = UPPER(?)"
+            params.insert(0, mode)
         if start and end:
             time_filter = "AND timestamp BETWEEN ? AND ?"
             params.insert(0, end)
@@ -325,10 +329,10 @@ class Database:
                  bandwidth_hz, mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
                    device
             FROM occupancy_events
-            WHERE 1=1 {band_filter} {time_filter}
+            WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
             ORDER BY timestamp DESC
             LIMIT ? OFFSET ?
-            """.format(band_filter=band_filter, time_filter=time_filter),
+            """.format(band_filter=band_filter, mode_filter_occ=mode_filter_occ, time_filter=time_filter),
             tuple(params)
         ):
             events.append(dict(row))
