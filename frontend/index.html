@@ -131,8 +131,9 @@ Last update: 2026-02-22 16:27:19 UTC
         <div class="col-12 col-lg-6">
           <div class="card panel">
             <div class="card-body">
-              <h2 class="h5">Propagation (MVP)</h2>
-              <p id="propagationScore">Score: --</p>
+              <h2 class="h5">Propagation Map</h2>
+              <div id="propagationMap" style="width:100%;min-height:200px;"></div>
+              <p id="propagationScore" class="mt-2 mb-1" style="font-size:.8rem;">Score: --</p>
               <ul class="summary" id="propagationBands">
                 <li>No propagation data yet.</li>
               </ul>
@@ -712,6 +713,9 @@ Last update: 2026-02-22 16:27:19 UTC
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
+    <script src="lib/d3.min.js"></script>
+    <script src="lib/topojson.min.js"></script>
+    <script src="map.js?v=20260226-01"></script>
     <script type="module" src="app.js?v=20260226-02"></script>
   </body>
 </html>

@@ -9,10 +9,101 @@ Helper Functions
 Shared helper functions for API endpoints.
 """
 
+import json
+import math
+import re
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Dict, Any
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional, List, Dict, Any, Tuple
 
 from app.dependencies import state
+
+# ─── DXCC coords index (lazy-loaded once) ───────────────────────────────────
+
+_DXCC_PATH = Path(__file__).resolve().parents[3] / "prefixes" / "dxcc_coords.json"
+_dxcc_index: Optional[Dict[str, Dict]] = None
+
+
+def _load_dxcc_index() -> Dict[str, Dict]:
+    """Load and cache the DXCC prefix→coords index from dxcc_coords.json."""
+    global _dxcc_index
+    if _dxcc_index is None:
+        try:
+            with open(_DXCC_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            _dxcc_index = data.get("index", {})
+        except Exception:
+            _dxcc_index = {}
+    return _dxcc_index
+
+
+def callsign_to_dxcc(callsign: str) -> Optional[Dict]:
+    """
+    Resolve a callsign to its DXCC entity using longest-prefix-match.
+
+    Args:
+        callsign: Amateur radio callsign (e.g. 'DL1ABC', 'CT7BFV')
+
+    Returns:
+        Dict with country, lat, lon, continent, cq_zone or None if not found
+    """
+    if not callsign:
+        return None
+    cs = callsign.upper().strip()
+    # Strip portable suffixes (/P /M /QRP etc.)
+    cs = re.sub(r"/(P|M|MM|QRP|QRPP|A|B)$", "", cs)
+    index = _load_dxcc_index()
+    # Try longest prefix first (up to 5 chars)
+    for length in range(min(len(cs), 5), 0, -1):
+        candidate = cs[:length]
+        if candidate in index:
+            return dict(index[candidate])
+    return None
+
+
+def maidenhead_to_latlon(grid: str) -> Optional[Tuple[float, float]]:
+    """
+    Convert a Maidenhead grid square locator to (lat, lon) centre coordinates.
+
+    Supports 4-character (e.g. IN60) and 6-character (e.g. IN60aa) locators.
+
+    Args:
+        grid: Maidenhead locator string
+
+    Returns:
+        (lat, lon) tuple in decimal degrees, or None if invalid
+    """
+    if not grid or len(grid) < 4:
+        return None
+    g = grid.strip().upper()
+    if not re.match(r"^[A-R]{2}[0-9]{2}([A-X]{2})?$", g):
+        return None
+    lon = (ord(g[0]) - ord("A")) * 20.0 - 180.0
+    lat = (ord(g[1]) - ord("A")) * 10.0 - 90.0
+    lon += int(g[2]) * 2.0
+    lat += int(g[3]) * 1.0
+    if len(g) >= 6:
+        lon += (ord(g[4]) - ord("A")) * (2.0 / 24.0)
+        lat += (ord(g[5]) - ord("A")) * (1.0 / 24.0)
+        lon += 1.0 / 24.0   # centre of subsquare
+        lat += 0.5 / 24.0
+    else:
+        lon += 1.0          # centre of square
+        lat += 0.5
+    return (round(lat, 5), round(lon, 5))
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in km between two lat/lon points."""
+    r = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lon = math.radians(lon2 - lon1)
+    a = (math.sin(d_lat / 2) ** 2
+         + math.cos(math.radians(lat1))
+         * math.cos(math.radians(lat2))
+         * math.sin(d_lon / 2) ** 2)
+    return round(r * 2 * math.asin(math.sqrt(a)), 1)
 
 
 def log(message: str) -> None:

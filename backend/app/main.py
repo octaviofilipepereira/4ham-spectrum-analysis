@@ -29,7 +29,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
 
 
@@ -194,6 +194,7 @@ app.include_router(logs.router, prefix="/api", tags=["Logs"])
 app.include_router(exports.router, prefix="/api", tags=["Exports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
+app.include_router(map_api.router, prefix="/api", tags=["Map"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers
