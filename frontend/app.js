@@ -1719,9 +1719,10 @@ async function fetchAndRenderSearchResults() {
   // Cancel any in-flight request to avoid stale results overwriting newer ones
   if (_eventsSearchAbort) {
     _eventsSearchAbort.abort();
+    _eventsSearchAbort = null;
   }
-  _eventsSearchAbort = new AbortController();
-  const signal = _eventsSearchAbort.signal;
+  const controller = new AbortController();
+  _eventsSearchAbort = controller;
 
   renderEventList(eventsSearchResultsEl, [], "Searching\u2026");
 
@@ -1732,8 +1733,12 @@ async function fetchAndRenderSearchResults() {
   try {
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },
-      signal
+      signal: controller.signal
     });
+    // If superseded by a newer search, discard silently
+    if (_eventsSearchAbort !== controller) return;
+    _eventsSearchAbort = null;
+
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     let data = await resp.json();
 
@@ -1757,6 +1762,7 @@ async function fetchAndRenderSearchResults() {
     );
   } catch (err) {
     if (err.name === "AbortError") return; // superseded by newer search
+    _eventsSearchAbort = null; // reset so next search starts clean
     renderEventList(eventsSearchResultsEl, [], "Search error. Try again.");
   }
 }
