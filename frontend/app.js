@@ -1737,6 +1737,9 @@ async function fetchAndRenderSearchResults() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     let data = await resp.json();
 
+    // Search only shows callsign events
+    data = data.filter(e => e.type === "callsign");
+
     // grid and report not supported by API — filter client-side
     if (grid) {
       const g = grid.toLowerCase();
