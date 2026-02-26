@@ -40,4 +40,3 @@ test_integration.sh
 test_new_endpoints.sh
 validate_api_endpoints.sh
 validate_final.sh
-docs/session_report_*.md

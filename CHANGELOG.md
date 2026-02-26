@@ -2,10 +2,81 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-23 UTC
+Last update: 2026-02-26 UTC
 -->
 
 # Changelog
+
+## v0.4.0 - 2026-02-26
+
+### Added
+
+#### 3D Propagation Globe
+- **`frontend/map.js`** (347 linhas) — globo 3D interativo com `d3.geoOrthographic`:
+  - Drag-to-rotate: arrastar roda o globo em qualquer direção
+  - Scroll-to-zoom: roda do rato aumenta/diminui `proj.scale`
+  - Botões overlay: `+` zoom in, `−` zoom out, `⌂` reset, `⛶` fullscreen
+  - Double-click: repõe rotação centrada na estação
+  - Arcos de grande-círculo via GeoJSON `LineString` (clipping automático pelo D3)
+  - `d3.geoDistance` oculta dots no hemisfério oposto
+  - Gradiente radial SVG para efeito de profundidade oceânica
+  - Halo de atmosfera (círculo translúcido à volta do globo)
+  - Legenda de bandas (cores por banda — paleta HF/VHF standard)
+  - Tooltip `position:fixed` com callsign, país, banda, SNR, distância
+  - Modal fullscreen Bootstrap (`modal-fullscreen`) com re-render ao abrir
+  - Auto-refresh a cada 60 segundos
+  - Todos os assets servidos localmente — funciona offline
+- **`backend/app/api/map.py`** — `GET /api/map/contacts?window_minutes=60&limit=500`
+  - Lê config da estação (callsign, locator Maidenhead)
+  - Resolve cada callsign para entidade DXCC via longest-prefix-match
+  - Calcula distância estação↔contacto via haversine
+- **`backend/app/dependencies/helpers.py`** — novas funções:
+  - `callsign_to_dxcc(callsign)` — longest-prefix-match contra 4528 prefixos DXCC
+  - `maidenhead_to_latlon(grid)` — converte locator Maidenhead 4/6 chars para (lat, lon)
+  - `haversine_km(lat1, lon1, lat2, lon2)` — distância em km entre dois pontos
+- **`prefixes/dxcc_coords.json`** — base de dados DXCC gerada de cty.dat (AD1C):
+  - 346 entidades DXCC com nome, continente, zona CQ, lat/lon
+  - 4528 prefixos no índice de lookup
+- **`prefixes/cty.dat`** — ficheiro fonte DXCC (AD1C, versão 25 Feb 2026, 99 KB)
+- **`scripts/build_dxcc_coords.py`** — script de geração de `dxcc_coords.json` a partir de `cty.dat`
+- **Assets frontend locais** (sem CDN):
+  - `frontend/lib/d3.min.js` — D3.js v7.9.0 UMD (274 KB)
+  - `frontend/lib/topojson.min.js` — TopoJSON Client 3.0.2 (21 KB)
+  - `frontend/lib/countries-110m.json` — Natural Earth 110m em formato TopoJSON (106 KB)
+
+#### Search Events Modal
+- Modal Bootstrap dark com campos: Callsign (LIKE parcial), Mode, Band, Min SNR
+- `AbortController` cancela fetches anteriores em voo (evita race conditions)
+- Occupancy events filtrados — resultados mostram apenas eventos com callsign
+- SNR colorido por valor em cada resultado
+
+#### Propagation Card
+- Card movido para `col-12 col-lg-6` ao lado do card Events
+- Score colorido dinamicamente: `Poor`=red / `Fair`=yellow / `Good|Excellent`=green
+
+### Fixed
+- `build_propagation_summary()` — resposta reestruturada de dict plano para dict aninhado
+  (`data.overall.score`, `data.event_count`) para compatibilidade com o frontend
+- Rate limit da API de events: 30 → 300 req/min (evitava timeout em pesquisa rápida)
+- Search modal z-index: modal movido para fora de `</main>`
+
+### Libraries Added
+| Biblioteca | Versão | Uso |
+|------------|--------|-----|
+| D3.js UMD | 7.9.0 | Projeção ortográfica, drag, gradientes SVG, geodésica |
+| TopoJSON Client | 3.0.2 | Deserialização de topologia vectorial (países) |
+| Natural Earth 110m | — | Geometria dos países em TopoJSON |
+
+### Technical Notes
+- A projeção `geoOrthographic` com `clipAngle(90)` garante que apenas o hemisfério
+  frontal é renderizado — D3 recorta automaticamente arcos e países no limbo.
+- O globo não usa `d3.zoom()` (que faz transform CSS); em vez disso manipula
+  diretamente `proj.rotate()` e `proj.scale()` e chama `redraw()` a cada evento,
+  para garantir que os arcos geo e a clipAngle são sempre recalculados corretamente.
+- O endpoint `/api/map/contacts` resolve callsigns em tempo real sem cache —
+  o lookup DXCC é O(n·k) onde k ≤ 6 (comprimento máximo do prefixo).
+
+---
 
 ## v0.3.1 - 2026-02-23
 
