@@ -308,34 +308,37 @@ class Database:
 
     def get_events(self, limit=1000, offset=0, band=None, mode=None, callsign=None, start=None, end=None):
         events = []
-        params = [limit, offset]
-        band_filter = ""
-        mode_filter_occ = ""
-        time_filter = ""
-        if band:
-            band_filter = "AND band = ?"
-            params.insert(0, band)
-        if mode:
-            mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
-            params.insert(0, f"%{mode}%")
-        if start and end:
-            time_filter = "AND timestamp BETWEEN ? AND ?"
-            params.insert(0, end)
-            params.insert(0, start)
 
-        for row in self.conn.execute(
-            """
-            SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
-                 bandwidth_hz, mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
-                   device
-            FROM occupancy_events
-            WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """.format(band_filter=band_filter, mode_filter_occ=mode_filter_occ, time_filter=time_filter),
-            tuple(params)
-        ):
-            events.append(dict(row))
+        # occupancy_events has no callsign column — skip entirely when filtering by callsign
+        if not callsign:
+            params = [limit, offset]
+            band_filter = ""
+            mode_filter_occ = ""
+            time_filter = ""
+            if band:
+                band_filter = "AND band = ?"
+                params.insert(0, band)
+            if mode:
+                mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
+                params.insert(0, f"%{mode}%")
+            if start and end:
+                time_filter = "AND timestamp BETWEEN ? AND ?"
+                params.insert(0, end)
+                params.insert(0, start)
+
+            for row in self.conn.execute(
+                """
+                SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
+                     bandwidth_hz, mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
+                       device
+                FROM occupancy_events
+                WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                """.format(band_filter=band_filter, mode_filter_occ=mode_filter_occ, time_filter=time_filter),
+                tuple(params)
+            ):
+                events.append(dict(row))
 
         params = [limit, offset]
         band_filter = ""
