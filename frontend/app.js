@@ -2142,6 +2142,9 @@ function renderPropagationSummary(data, options = {}) {
   const windowMinutes = Number(data?.window_minutes || 30);
   const sourceNote = options?.sourceNote ? ` | ${options.sourceNote}` : "";
   propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min${sourceNote}`;
+  propagationScore.className = "";
+  const stateColorClass = { "Excellent": "text-success", "Good": "text-success", "Fair": "text-warning", "Poor": "text-danger" }[overallState] || "text-secondary";
+  propagationScore.classList.add("fw-semibold", stateColorClass);
 
   const bands = Array.isArray(data?.bands) ? data.bands.slice(0, 5) : [];
   propagationBands.innerHTML = "";
