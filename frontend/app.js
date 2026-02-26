@@ -4135,11 +4135,9 @@ function updateVFODisplay(startHz, endHz) {
   document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
 
-  // Events Search modal — live API search
-  [eventsSearchCallsignInput, eventsSearchModeInput, eventsSearchBandInput, eventsSearchSnrMinInput]
-    .forEach(el => el?.addEventListener("input", scheduleEventsSearch));
-  [eventsSearchModeInput, eventsSearchBandInput]
-    .forEach(el => el?.addEventListener("change", scheduleEventsSearch));
+  // Events Search modal — callsign input also triggers API search
+  // (mode/band/snrMin already have change/input listeners above)
+  eventsSearchCallsignInput?.addEventListener("input", scheduleEventsSearch);
   document.getElementById("eventsSearchModal")
     ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
 })();

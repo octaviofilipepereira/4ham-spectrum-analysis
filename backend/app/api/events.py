@@ -27,7 +27,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/events")
-@limiter.limit("30/minute")  # Rate limit: 30 requests per minute
+@limiter.limit("300/minute")  # Rate limit: 300 requests per minute (shared with auto-refresh)
 def events(
     request: Request,
     limit: int = 1000,
