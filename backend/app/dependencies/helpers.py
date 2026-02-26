@@ -217,22 +217,43 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         weighted_sum += combined_weight
 
     # Calculate final scores
+    def _score_to_state(score: float) -> str:
+        if score >= 70:
+            return "Excellent"
+        if score >= 50:
+            return "Good"
+        if score >= 30:
+            return "Fair"
+        return "Poor"
+
     bands = []
     for bucket in per_band.values():
         denom = bucket["weighted_sum"]
-        bucket["score"] = (bucket["weighted_score_sum"] / denom * 100.0) if denom > 0 else 0.0
-        del bucket["weighted_score_sum"]
-        del bucket["weighted_sum"]
-        bands.append(bucket)
+        raw_score = (bucket["weighted_score_sum"] / denom * 100.0) if denom > 0 else 0.0
+        score_rounded = round(raw_score, 1)
+        max_snr = bucket["max_snr_db"]
+        bands.append({
+            "band": bucket["band"],
+            "score": score_rounded,
+            "state": _score_to_state(score_rounded),
+            "events": int(bucket["events"]),
+            "max_snr_db": round(max_snr, 1) if max_snr is not None else None,
+        })
 
-    overall_score = (weighted_score_sum / weighted_sum * 100.0) if weighted_sum > 0 else 0.0
+    overall_score = round(
+        (weighted_score_sum / weighted_sum * 100.0) if weighted_sum > 0 else 0.0, 1
+    )
 
-    bands.sort(key=lambda x: x["score"], reverse=True)
+    bands.sort(key=lambda x: (x["score"], x["events"]), reverse=True)
 
     return {
-        "overall_score": round(overall_score, 1),
+        "status": "ok",
         "window_minutes": safe_window_minutes,
-        "total_events": len(events),
+        "event_count": len(events),
+        "overall": {
+            "score": overall_score,
+            "state": _score_to_state(overall_score),
+        },
         "bands": bands,
     }
 
