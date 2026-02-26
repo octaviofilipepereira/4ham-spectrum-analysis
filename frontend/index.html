@@ -208,14 +208,14 @@ Last update: 2026-02-22 16:27:19 UTC
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="filters row g-2 align-items-end">
-              <div class="col-sm-6 col-lg-3">
-                <label class="form-label">Callsign</label>
-                <input type="text" id="eventsSearchCallsign" placeholder="ex: CT7BFV" class="form-control form-control-sm" autocomplete="off" />
+            <div class="filters row g-3 align-items-end">
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">Callsign</label>
+                <input type="text" id="eventsSearchCallsign" placeholder="ex: CT7BFV" class="form-control" autocomplete="off" />
               </div>
-              <div class="col-sm-6 col-lg-3">
-                <label class="form-label">Mode</label>
-                <select id="eventsSearchMode" class="form-select form-select-sm">
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">Mode</label>
+                <select id="eventsSearchMode" class="form-select">
                   <option value="">All modes</option>
                   <option value="FT8">FT8</option>
                   <option value="FT4">FT4</option>
@@ -225,9 +225,9 @@ Last update: 2026-02-22 16:27:19 UTC
                   <option value="SSB">SSB</option>
                 </select>
               </div>
-              <div class="col-sm-6 col-lg-3">
-                <label class="form-label">Band</label>
-                <select id="eventsSearchBand" class="form-select form-select-sm">
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">Band</label>
+                <select id="eventsSearchBand" class="form-select">
                   <option value="">All bands</option>
                   <option value="160m">160 m</option>
                   <option value="80m">80 m</option>
@@ -241,9 +241,9 @@ Last update: 2026-02-22 16:27:19 UTC
                   <option value="70cm">70 cm</option>
                 </select>
               </div>
-              <div class="col-sm-6 col-lg-3">
-                <label class="form-label">SNR mín. (dB)</label>
-                <input type="number" id="eventsSearchSnrMin" placeholder="ex: -10" min="-30" max="30" step="1" class="form-control form-control-sm" />
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">SNR mín. (dB)</label>
+                <input type="number" id="eventsSearchSnrMin" placeholder="ex: -10" min="-30" max="30" step="1" class="form-control" />
               </div>
             </div>
             <div id="eventsSearchCount" class="text-muted small mt-2"></div>
