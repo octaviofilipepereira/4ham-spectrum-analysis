@@ -76,8 +76,9 @@
 
     // ── SVG scaffold ─────────────────────────────────────────────────────
     const svg = d3.select(container).append("svg")
-      .attr("width", W).attr("height", H)
+      .attr("width", "100%").attr("height", "100%")
       .attr("viewBox", `0 0 ${W} ${H}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
       .style("background", "#0d1117").style("border-radius", "6px")
       .style("cursor", "grab").style("display", "block");
 
@@ -282,10 +283,11 @@
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const W = container.clientWidth  || (isModal ? window.innerWidth  - 48 : 420);
+    const rect = container.getBoundingClientRect();
+    const W = rect.width  || (isModal ? window.innerWidth  - 48 : 420);
     const H = isModal
       ? Math.max(window.innerHeight - 150, 300)
-      : (container.clientHeight > 80 ? container.clientHeight : Math.min(W * 0.7, 420));
+      : (rect.height > 80 ? rect.height : Math.min(W * 0.9, 520));
 
     let data;
     try {
