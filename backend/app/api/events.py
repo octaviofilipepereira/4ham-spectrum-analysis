@@ -35,6 +35,7 @@ def events(
     band: Optional[str] = None,
     mode: Optional[str] = None,
     callsign: Optional[str] = None,
+    snr_min: Optional[float] = None,
     start: Optional[str] = None,
     end: Optional[str] = None,
     format: Optional[str] = None,
@@ -64,6 +65,7 @@ def events(
         band=band,
         mode=mode,
         callsign=callsign,
+        snr_min=snr_min,
         start=start,
         end=end
     )

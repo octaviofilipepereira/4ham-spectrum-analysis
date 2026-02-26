@@ -11,8 +11,9 @@ const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
 const eventsSearchCallsignInput = document.getElementById("eventsSearchCallsign");
 const eventsSearchModeInput = document.getElementById("eventsSearchMode");
-const eventsSearchGridInput = document.getElementById("eventsSearchGrid");
-const eventsSearchReportInput = document.getElementById("eventsSearchReport");
+const eventsSearchBandInput = document.getElementById("eventsSearchBand");
+const eventsSearchSnrMinInput = document.getElementById("eventsSearchSnrMin");
+const eventsSearchCountEl = document.getElementById("eventsSearchCount");
 const eventsPrevBtn = document.getElementById("eventsPrev");
 const eventsNextBtn = document.getElementById("eventsNext");
 const eventsPageInfo = document.getElementById("eventsPageInfo");
@@ -1665,23 +1666,18 @@ function pushLiveEventToPanel(eventPayload) {
 function applyEventsPanelFilters(items) {
   const callsignTerm = (eventsSearchCallsignInput?.value || "").trim().toLowerCase();
   const modeTerm = (eventsSearchModeInput?.value || "").trim().toLowerCase();
-  const gridTerm = (eventsSearchGridInput?.value || "").trim().toLowerCase();
-  const reportTerm = (eventsSearchReportInput?.value || "").trim().toLowerCase();
+  const bandTerm = (eventsSearchBandInput?.value || "").trim().toLowerCase();
   return items.filter((eventItem) => {
     const callsignText = String(eventItem.callsign || "").toLowerCase();
     const modeText = String(eventItem.mode || "").toLowerCase();
-    const gridText = String(eventItem.grid || "").toLowerCase();
-    const reportText = String(eventItem.report ?? "").toLowerCase();
+    const bandText = String(eventItem.band || "").toLowerCase();
     if (callsignTerm && !callsignText.includes(callsignTerm)) {
       return false;
     }
     if (modeTerm && !modeText.includes(modeTerm)) {
       return false;
     }
-    if (gridTerm && !gridText.includes(gridTerm)) {
-      return false;
-    }
-    if (reportTerm && !reportText.includes(reportTerm)) {
+    if (bandTerm && !bandText.includes(bandTerm)) {
       return false;
     }
     return true;
@@ -1692,8 +1688,8 @@ function hasEventsSearchCriteria() {
   return Boolean(
     (eventsSearchCallsignInput?.value || "").trim()
     || (eventsSearchModeInput?.value || "").trim()
-    || (eventsSearchGridInput?.value || "").trim()
-    || (eventsSearchReportInput?.value || "").trim()
+    || (eventsSearchBandInput?.value || "").trim()
+    || (eventsSearchSnrMinInput?.value || "").trim()
   );
 }
 
@@ -1708,10 +1704,11 @@ async function fetchAndRenderSearchResults() {
   if (!eventsSearchResultsEl) return;
   const callsign = (eventsSearchCallsignInput?.value || "").trim();
   const mode     = (eventsSearchModeInput?.value     || "").trim();
-  const grid     = (eventsSearchGridInput?.value     || "").trim();
-  const report   = (eventsSearchReportInput?.value   || "").trim();
+  const band     = (eventsSearchBandInput?.value     || "").trim();
+  const snrMin   = (eventsSearchSnrMinInput?.value   || "").trim();
 
-  if (!callsign && !mode && !grid && !report) {
+  if (!callsign && !mode && !band && !snrMin) {
+    if (eventsSearchCountEl) eventsSearchCountEl.textContent = "";
     renderEventList(eventsSearchResultsEl, [], "Use search fields to display results.");
     return;
   }
@@ -1724,11 +1721,14 @@ async function fetchAndRenderSearchResults() {
   const controller = new AbortController();
   _eventsSearchAbort = controller;
 
+  if (eventsSearchCountEl) eventsSearchCountEl.textContent = "";
   renderEventList(eventsSearchResultsEl, [], "Searching\u2026");
 
   const params = new URLSearchParams({ limit: "500" });
   if (callsign) params.set("callsign", callsign);
   if (mode)     params.set("mode", mode);
+  if (band)     params.set("band", band);
+  if (snrMin !== "") params.set("snr_min", snrMin);
 
   try {
     const resp = await fetch(`/api/events?${params.toString()}`, {
@@ -1745,14 +1745,8 @@ async function fetchAndRenderSearchResults() {
     // Search only shows callsign events
     data = data.filter(e => e.type === "callsign");
 
-    // grid and report not supported by API — filter client-side
-    if (grid) {
-      const g = grid.toLowerCase();
-      data = data.filter(e => String(e.grid || "").toLowerCase().includes(g));
-    }
-    if (report) {
-      const r = report.toLowerCase();
-      data = data.filter(e => String(e.report ?? "").toLowerCase().includes(r));
+    if (eventsSearchCountEl) {
+      eventsSearchCountEl.textContent = data.length === 0 ? "" : `${data.length} result${data.length === 1 ? "" : "s"}`;
     }
 
     renderEventList(
@@ -1886,13 +1880,9 @@ function renderEventList(targetEl, items, emptyMessage) {
       const lon = Number.isFinite(lonValue) ? lonValue.toFixed(3) : "--";
       detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
     } else if (eventItem.type === "callsign") {
-      const hasGrid = eventItem.grid !== null && eventItem.grid !== undefined && eventItem.grid !== "";
-      const hasReport = eventItem.report !== null && eventItem.report !== undefined && eventItem.report !== "";
-      if (hasGrid || hasReport) {
-        const grid = hasGrid ? eventItem.grid : "-";
-        const report = hasReport ? eventItem.report : "-";
-        detail.textContent = `grid=${grid} report=${report}`;
-      }
+      const snrValue = Number(eventItem.snr_db);
+      const snrText = Number.isFinite(snrValue) ? `SNR ${snrValue >= 0 ? "+" : ""}${snrValue.toFixed(0)} dB` : null;
+      if (snrText) detail.textContent = snrText;
     } else if (eventItem.type === "occupancy") {
       const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
       const snrValue = Number(eventItem.snr_db);
@@ -2610,23 +2600,23 @@ if (eventsSearchCallsignInput) {
 }
 
 if (eventsSearchModeInput) {
-  eventsSearchModeInput.addEventListener("input", () => {
+  eventsSearchModeInput.addEventListener("change", () => {
     eventsPanelPage = 0;
-    renderEventsPanelFromCache();
+    scheduleEventsSearch();
   });
 }
 
-if (eventsSearchGridInput) {
-  eventsSearchGridInput.addEventListener("input", () => {
+if (eventsSearchBandInput) {
+  eventsSearchBandInput.addEventListener("change", () => {
     eventsPanelPage = 0;
-    renderEventsPanelFromCache();
+    scheduleEventsSearch();
   });
 }
 
-if (eventsSearchReportInput) {
-  eventsSearchReportInput.addEventListener("input", () => {
+if (eventsSearchSnrMinInput) {
+  eventsSearchSnrMinInput.addEventListener("input", () => {
     eventsPanelPage = 0;
-    renderEventsPanelFromCache();
+    scheduleEventsSearch();
   });
 }
 
@@ -4146,8 +4136,10 @@ function updateVFODisplay(startHz, endHz) {
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
 
   // Events Search modal — live API search
-  [eventsSearchCallsignInput, eventsSearchModeInput, eventsSearchGridInput, eventsSearchReportInput]
+  [eventsSearchCallsignInput, eventsSearchModeInput, eventsSearchBandInput, eventsSearchSnrMinInput]
     .forEach(el => el?.addEventListener("input", scheduleEventsSearch));
+  [eventsSearchModeInput, eventsSearchBandInput]
+    .forEach(el => el?.addEventListener("change", scheduleEventsSearch));
   document.getElementById("eventsSearchModal")
     ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
 })();

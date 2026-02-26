@@ -580,16 +580,12 @@ h1,
 }
 
 #eventsSearchCallsign,
-#eventsSearchMode,
-#eventsSearchGrid,
-#eventsSearchReport {
+#eventsSearchSnrMin {
   color: var(--text);
 }
 
 #eventsSearchCallsign::placeholder,
-#eventsSearchMode::placeholder,
-#eventsSearchGrid::placeholder,
-#eventsSearchReport::placeholder {
+#eventsSearchSnrMin::placeholder {
   color: rgba(255, 255, 255, 0.35);
 }
 

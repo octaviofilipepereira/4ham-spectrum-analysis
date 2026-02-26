@@ -306,25 +306,26 @@ class Database:
         )
         self.conn.commit()
 
-    def get_events(self, limit=1000, offset=0, band=None, mode=None, callsign=None, start=None, end=None):
+    def get_events(self, limit=1000, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
         events = []
 
         # occupancy_events has no callsign column — skip entirely when filtering by callsign
         if not callsign:
-            params = [limit, offset]
+            params = []
             band_filter = ""
             mode_filter_occ = ""
             time_filter = ""
             if band:
-                band_filter = "AND band = ?"
-                params.insert(0, band)
+                band_filter = "AND UPPER(band) = UPPER(?)"
+                params.append(band)
             if mode:
                 mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
-                params.insert(0, f"%{mode}%")
+                params.append(f"%{mode}%")
             if start and end:
                 time_filter = "AND timestamp BETWEEN ? AND ?"
-                params.insert(0, end)
-                params.insert(0, start)
+                params.append(start)
+                params.append(end)
+            params.extend([limit, offset])
 
             for row in self.conn.execute(
                 """
@@ -340,24 +341,29 @@ class Database:
             ):
                 events.append(dict(row))
 
-        params = [limit, offset]
+        params = []
         band_filter = ""
         mode_filter = ""
         callsign_filter = ""
+        snr_filter = ""
         time_filter = ""
         if band:
-            band_filter = "AND band = ?"
-            params.insert(0, band)
+            band_filter = "AND UPPER(band) = UPPER(?)"
+            params.append(band)
         if mode:
             mode_filter = "AND UPPER(mode) LIKE UPPER(?)"
-            params.insert(0, f"%{mode}%")
+            params.append(f"%{mode}%")
         if callsign:
             callsign_filter = "AND UPPER(callsign) LIKE UPPER(?)"
-            params.insert(0, f"%{callsign}%")
+            params.append(f"%{callsign}%")
+        if snr_min is not None:
+            snr_filter = "AND snr_db >= ?"
+            params.append(float(snr_min))
         if start and end:
             time_filter = "AND timestamp BETWEEN ? AND ?"
-            params.insert(0, end)
-            params.insert(0, start)
+            params.append(start)
+            params.append(end)
+        params.extend([limit, offset])
 
         for row in self.conn.execute(
             """
@@ -365,13 +371,14 @@ class Database:
                  mode, callsign, snr_db, df_hz, confidence, raw, grid, report,
                  time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device
             FROM callsign_events
-            WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {time_filter}
+            WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
             ORDER BY timestamp DESC
             LIMIT ? OFFSET ?
             """.format(
                 band_filter=band_filter,
                 mode_filter=mode_filter,
                 callsign_filter=callsign_filter,
+                snr_filter=snr_filter,
                 time_filter=time_filter
             ),
             tuple(params)

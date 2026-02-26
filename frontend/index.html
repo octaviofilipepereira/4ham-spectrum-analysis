@@ -209,23 +209,44 @@ Last update: 2026-02-22 16:27:19 UTC
           </div>
           <div class="modal-body">
             <div class="filters row g-2 align-items-end">
-              <div class="col-6">
+              <div class="col-sm-6 col-lg-3">
                 <label class="form-label">Callsign</label>
-                <input type="text" id="eventsSearchCallsign" placeholder="CT1ABC" class="form-control form-control-sm" />
+                <input type="text" id="eventsSearchCallsign" placeholder="ex: CT7BFV" class="form-control form-control-sm" autocomplete="off" />
               </div>
-              <div class="col-6">
+              <div class="col-sm-6 col-lg-3">
                 <label class="form-label">Mode</label>
-                <input type="text" id="eventsSearchMode" placeholder="FT8/SSB/APRS" class="form-control form-control-sm" />
+                <select id="eventsSearchMode" class="form-select form-select-sm">
+                  <option value="">All modes</option>
+                  <option value="FT8">FT8</option>
+                  <option value="FT4">FT4</option>
+                  <option value="APRS">APRS</option>
+                  <option value="WSPR">WSPR</option>
+                  <option value="CW">CW</option>
+                  <option value="SSB">SSB</option>
+                </select>
               </div>
-              <div class="col-6">
-                <label class="form-label">Grid</label>
-                <input type="text" id="eventsSearchGrid" placeholder="IN51" class="form-control form-control-sm" />
+              <div class="col-sm-6 col-lg-3">
+                <label class="form-label">Band</label>
+                <select id="eventsSearchBand" class="form-select form-select-sm">
+                  <option value="">All bands</option>
+                  <option value="160m">160 m</option>
+                  <option value="80m">80 m</option>
+                  <option value="40m">40 m</option>
+                  <option value="20m">20 m</option>
+                  <option value="17m">17 m</option>
+                  <option value="15m">15 m</option>
+                  <option value="12m">12 m</option>
+                  <option value="10m">10 m</option>
+                  <option value="2m">2 m</option>
+                  <option value="70cm">70 cm</option>
+                </select>
               </div>
-              <div class="col-6">
-                <label class="form-label">Report</label>
-                <input type="text" id="eventsSearchReport" placeholder="-03 / 59" class="form-control form-control-sm" />
+              <div class="col-sm-6 col-lg-3">
+                <label class="form-label">SNR mín. (dB)</label>
+                <input type="number" id="eventsSearchSnrMin" placeholder="ex: -10" min="-30" max="30" step="1" class="form-control form-control-sm" />
               </div>
             </div>
+            <div id="eventsSearchCount" class="text-muted small mt-2"></div>
             <ul class="events events--search" id="eventsSearchResults"></ul>
           </div>
         </div>
