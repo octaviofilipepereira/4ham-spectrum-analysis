@@ -1698,6 +1698,7 @@ function hasEventsSearchCriteria() {
 }
 
 let _eventsSearchTimer = null;
+let _eventsSearchAbort = null;
 function scheduleEventsSearch() {
   clearTimeout(_eventsSearchTimer);
   _eventsSearchTimer = setTimeout(fetchAndRenderSearchResults, 400);
@@ -1715,6 +1716,13 @@ async function fetchAndRenderSearchResults() {
     return;
   }
 
+  // Cancel any in-flight request to avoid stale results overwriting newer ones
+  if (_eventsSearchAbort) {
+    _eventsSearchAbort.abort();
+  }
+  _eventsSearchAbort = new AbortController();
+  const signal = _eventsSearchAbort.signal;
+
   renderEventList(eventsSearchResultsEl, [], "Searching\u2026");
 
   const params = new URLSearchParams({ limit: "500" });
@@ -1723,7 +1731,8 @@ async function fetchAndRenderSearchResults() {
 
   try {
     const resp = await fetch(`/api/events?${params.toString()}`, {
-      headers: { ...getAuthHeader() }
+      headers: { ...getAuthHeader() },
+      signal
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     let data = await resp.json();
@@ -1744,6 +1753,7 @@ async function fetchAndRenderSearchResults() {
       "No events match the current Events search."
     );
   } catch (err) {
+    if (err.name === "AbortError") return; // superseded by newer search
     renderEventList(eventsSearchResultsEl, [], "Search error. Try again.");
   }
 }
