@@ -201,7 +201,7 @@
         .on("start", () => svg.style("cursor", "grabbing"))
         .on("drag", (event) => {
           const [rx, ry, rz] = proj.rotate();
-          proj.rotate([rx + event.dx * 0.5, ry - event.dy * 0.5, rz]);
+          proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
           redraw();
         })
         .on("end", () => svg.style("cursor", "grab"))
