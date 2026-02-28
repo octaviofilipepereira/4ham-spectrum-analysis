@@ -17,7 +17,7 @@ Last update: 2026-02-22 16:27:19 UTC
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="styles.css?v=20260222-12" />
+    <link rel="stylesheet" href="styles.css?v=20260228-05" />
   </head>
   <body>
     <main class="app container-fluid py-4">
@@ -80,6 +80,10 @@ Last update: 2026-02-22 16:27:19 UTC
                   <div class="vfo-goto-row">
                     <input id="vfoGotoInput" type="text" placeholder="e.g. 14.074" maxlength="12" class="form-control form-control-sm" />
                     <button class="btn btn-primary" id="vfoApplyBtn">GO</button>
+                  </div>
+                  <div class="quality quality--inline">
+                    <span id="qualityLabel">SNR: --</span>
+                    <div class="quality__bar" id="qualityBar"></div>
                   </div>
                 </div>
               </div>
@@ -172,18 +176,6 @@ Last update: 2026-02-22 16:27:19 UTC
                 <li>Last decoder event: <span id="decoderLastEvent">-</span></li>
                 <li>AGC: <span id="agcStatus">-</span></li>
               </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Signal Quality</h2>
-              <div class="quality">
-                <div class="quality__bar" id="qualityBar"></div>
-                <span id="qualityLabel">SNR: --</span>
-              </div>
             </div>
           </div>
         </div>

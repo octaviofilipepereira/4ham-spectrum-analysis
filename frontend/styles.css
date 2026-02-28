@@ -391,7 +391,7 @@ h1,
 .vfo-goto-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .vfo-group-label {
@@ -676,6 +676,17 @@ h1,
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.quality--inline {
+  font-size: 0.8rem;
+  gap: 8px;
+}
+
+.quality--inline #qualityLabel {
+  min-width: 65px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .quality__bar {
