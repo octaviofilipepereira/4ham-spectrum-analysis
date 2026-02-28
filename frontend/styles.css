@@ -392,6 +392,8 @@ h1,
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 520px;
+  max-width: 520px;
 }
 
 .vfo-group-label {
@@ -694,6 +696,7 @@ h1,
   padding: 6px 8px;
   font-size: 0.7rem;
   line-height: 1.3;
+  width: 100%;
   min-height: 28px;
   height: 28px;
   background: rgba(0, 0, 0, 0.25);
@@ -702,6 +705,7 @@ h1,
   color: rgba(255, 255, 255, 0.85);
   overflow-x: auto;
   white-space: pre;
+  box-sizing: border-box;
 }
 
 .quality__bar {
