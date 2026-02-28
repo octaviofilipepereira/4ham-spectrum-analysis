@@ -93,7 +93,7 @@
     grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
 
     // Atmosphere glow (slightly larger circle behind sphere)
-    svg.append("circle")
+    const atmosphereGlow = svg.append("circle")
       .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale + 6)
       .attr("fill", "none")
       .attr("stroke", "#1e4fa0").attr("stroke-width", 8).attr("stroke-opacity", 0.18);
@@ -192,6 +192,7 @@
 
       // Update gradient radius to match current scale
       grad.attr("r", proj.scale());
+      atmosphereGlow.attr("r", proj.scale() + 6);
     }
 
     redraw();
