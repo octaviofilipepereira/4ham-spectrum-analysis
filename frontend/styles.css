@@ -356,12 +356,12 @@ h1,
 .vfo-display {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 160px;
+  gap: 2px;
+  min-width: 220px;
 }
 
 .vfo-display__label {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.10em;
   color: rgba(255, 255, 255, 0.85);
@@ -370,11 +370,11 @@ h1,
 
 .vfo-display__freq {
   font-family: 'Courier New', 'Lucida Console', monospace;
-  font-size: 1.65rem;
+  font-size: 2.4rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   color: #3aee78;
-  text-shadow: 0 0 10px rgba(40, 200, 90, 0.28);
+  text-shadow: 0 0 12px rgba(40, 200, 90, 0.32);
   line-height: 1;
   user-select: none;
 }
@@ -382,7 +382,7 @@ h1,
 .vfo-display__freq .vfo-sep { color: #1a5a2a; }
 
 .vfo-display__unit {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.85);
   font-family: 'Courier New', monospace;
   font-weight: 600;
