@@ -385,9 +385,9 @@ const WATERFALL_EXPLORER_KEY = "waterfallExplorerEnabled";
 const WATERFALL_EXPLORER_ZOOM_KEY = "waterfallExplorerZoom";
 const WATERFALL_SEGMENT_COUNT = 12;
 let waterfallExplorerEnabled = localStorage.getItem(WATERFALL_EXPLORER_KEY) !== "0";
-let waterfallExplorerZoom = Number(localStorage.getItem(WATERFALL_EXPLORER_ZOOM_KEY) || 4);
+let waterfallExplorerZoom = Number(localStorage.getItem(WATERFALL_EXPLORER_ZOOM_KEY) || 1);
 if (!Number.isFinite(waterfallExplorerZoom)) {
-  waterfallExplorerZoom = 4;
+  waterfallExplorerZoom = 1;
 }
 waterfallExplorerZoom = Math.max(1, Math.min(16, Math.round(waterfallExplorerZoom)));
 let waterfallExplorerPan = 0;
@@ -2912,9 +2912,8 @@ function redrawWaterfallFromHistory() {
 }
 
 function resetWaterfallExplorerView() {
-  waterfallExplorerZoom = 4;
-  const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
-  waterfallExplorerPan = maxPan / 2;
+  waterfallExplorerZoom = 1;
+  waterfallExplorerPan = 0;
   localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
   applyWaterfallExplorerUi();
   redrawWaterfallFromHistory();
@@ -2925,9 +2924,8 @@ if (waterfallExplorerToggle) {
     waterfallExplorerEnabled = !waterfallExplorerEnabled;
     localStorage.setItem(WATERFALL_EXPLORER_KEY, waterfallExplorerEnabled ? "1" : "0");
     if (!waterfallExplorerEnabled) {
-      waterfallExplorerZoom = 4;
-      const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
-      waterfallExplorerPan = maxPan / 2;
+      waterfallExplorerZoom = 1;
+      waterfallExplorerPan = 0;
       localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
     }
     applyWaterfallExplorerUi();
