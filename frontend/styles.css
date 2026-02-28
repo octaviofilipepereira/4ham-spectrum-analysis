@@ -689,6 +689,19 @@ h1,
   color: rgba(255, 255, 255, 0.9);
 }
 
+.status-inline {
+  margin: 4px 0 0 0;
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  overflow-x: auto;
+  white-space: pre;
+}
+
 .quality__bar {
   flex: 1;
   height: 10px;

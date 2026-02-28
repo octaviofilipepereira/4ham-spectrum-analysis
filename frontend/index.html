@@ -17,7 +17,7 @@ Last update: 2026-02-22 16:27:19 UTC
       integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="styles.css?v=20260228-05" />
+    <link rel="stylesheet" href="styles.css?v=20260228-06" />
   </head>
   <body>
     <main class="app container-fluid py-4">
@@ -85,6 +85,7 @@ Last update: 2026-02-22 16:27:19 UTC
                     <span id="qualityLabel">SNR: --</span>
                     <div class="quality__bar" id="qualityBar"></div>
                   </div>
+                  <pre id="status" class="status-inline">Disconnected</pre>
                 </div>
               </div>
               <!-- Scan controls -->
@@ -158,14 +159,6 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
 
       <section class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card panel status">
-            <div class="card-body">
-              <h2 class="h5">Status</h2>
-              <pre id="status">Disconnected</pre>
-            </div>
-          </div>
-        </div>
         <div class="col-12 col-lg-6">
           <div class="card panel">
             <div class="card-body">
