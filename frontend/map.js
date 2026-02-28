@@ -231,10 +231,10 @@
   // ── Overlay button bar ────────────────────────────────────────────────────
   function addControls(wrapper, controls, showFullscreen) {
     const btnCss =
-      "width:30px;height:30px;border:none;border-radius:5px;"
-      + "background:rgba(20,30,50,0.88);color:#e2e8f0;font-size:17px;cursor:pointer;"
-      + "display:flex;align-items:center;justify-content:center;margin-bottom:4px;"
-      + "border:1px solid #2a4a6a;";
+      "width:40px;height:40px;border:none;border-radius:6px;"
+      + "background:rgba(20,30,50,0.92);color:#e2e8f0;font-size:20px;cursor:pointer;"
+      + "display:flex;align-items:center;justify-content:center;margin-bottom:5px;"
+      + "border:1px solid #2a4a6a;font-weight:600;";
 
     const bar = document.createElement("div");
     bar.style.cssText =
@@ -249,9 +249,9 @@
 
     bar.appendChild(btn("+",  "Zoom in",    controls.zoomIn));
     bar.appendChild(btn("−",  "Zoom out",   controls.zoomOut));
-    bar.appendChild(btn("⌂",  "Reset view", controls.reset));
+    bar.appendChild(btn("↻",  "Reset view", controls.reset));
     if (showFullscreen) {
-      bar.appendChild(btn("⛶", "Open fullscreen", () => {
+      bar.appendChild(btn("⤢", "Open fullscreen", () => {
         const el = document.getElementById("mapFullscreenModal");
         if (el && window.bootstrap) bootstrap.Modal.getOrCreateInstance(el).show();
       }));
