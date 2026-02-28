@@ -8,10 +8,10 @@
 
   // ── Band colour palette ────────────────────────────────────────────────────
   const BAND_COLORS = {
-    "160m": "#cc2200", "80m": "#e0507a", "40m": "#f5a623",
-    "20m": "#3b82f6",  "17m": "#22c55e", "15m": "#a855f7",
-    "12m": "#06b6d4",  "10m": "#ef4444", "6m":  "#f97316",
-    "2m":  "#84cc16",  "70cm": "#ec4899",
+    "160m": "#ff0000", "80m": "#ff1493", "40m": "#ffa500",
+    "20m": "#00bfff",  "17m": "#00ff00", "15m": "#9400ff",
+    "12m": "#00ffff",  "10m": "#ff4500", "6m":  "#ffff00",
+    "2m":  "#7fff00",  "70cm": "#ff69b4",
   };
   const DEFAULT_COLOR = "#9ca3af";
   const bandColor = (b) => BAND_COLORS[(b || "").toLowerCase()] || DEFAULT_COLOR;
@@ -142,8 +142,8 @@
           .attr("d", path)
           .attr("fill", "none")
           .attr("stroke", bandColor(c.band))
-          .attr("stroke-width", 1.3)
-          .attr("stroke-opacity", 0.65);
+          .attr("stroke-width", 1.8)
+          .attr("stroke-opacity", 0.85);
       });
 
       // Dots — only on visible hemisphere (geoDistance < 90°)
