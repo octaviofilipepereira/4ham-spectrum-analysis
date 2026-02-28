@@ -92,12 +92,6 @@
     grad.append("stop").attr("offset", "70%").attr("stop-color", "#0a1e3d");
     grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
 
-    // Atmosphere glow (slightly larger circle behind sphere)
-    const atmosphereGlow = svg.append("circle")
-      .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale + 6)
-      .attr("fill", "none")
-      .attr("stroke", "#1e4fa0").attr("stroke-width", 8).attr("stroke-opacity", 0.18);
-
     const spherePath = svg.append("path").datum({ type: "Sphere" })
       .attr("fill", `url(#${gradId})`).attr("stroke", "#1e3a5f").attr("stroke-width", 0.6);
     const gratPath  = svg.append("path").datum(graticule)
@@ -192,7 +186,6 @@
 
       // Update gradient radius to match current scale
       grad.attr("r", proj.scale());
-      atmosphereGlow.attr("r", proj.scale() + 6);
     }
 
     redraw();
