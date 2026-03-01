@@ -118,6 +118,39 @@ def dominant_frequency(audio: np.ndarray, sample_rate: int) -> float:
     return float(freqs[mask][idx])
 
 
+def estimate_snr(audio: np.ndarray, sample_rate: int, tone_hz: float) -> float:
+    """
+    Estimate Signal-to-Noise Ratio (SNR) in dB.
+    
+    Compares power in a narrow band around the detected tone
+    versus power in noise bands away from the tone.
+    
+    Returns:
+        SNR in dB (positive = signal above noise floor)
+        Returns 0.0 if no clear tone detected
+    """
+    if len(audio) < sample_rate // 10:  # Need at least 100ms
+        return 0.0
+    
+    fft = np.abs(np.fft.rfft(audio))
+    freqs = np.fft.rfftfreq(len(audio), d=1.0 / sample_rate)
+    
+    # Signal band: ±50 Hz around detected tone
+    signal_mask = (freqs >= tone_hz - 50) & (freqs <= tone_hz + 50)
+    signal_power = float(np.mean(fft[signal_mask] ** 2)) if signal_mask.any() else 0.0
+    
+    # Noise bands: 200-400 Hz and 1000-1200 Hz (away from typical CW)
+    noise_mask = ((freqs >= 200) & (freqs <= 400)) | ((freqs >= 1000) & (freqs <= 1200))
+    noise_power = float(np.mean(fft[noise_mask] ** 2)) if noise_mask.any() else 1e-10
+    
+    if noise_power < 1e-10 or signal_power < 1e-10:
+        return 0.0
+    
+    snr_linear = signal_power / noise_power
+    snr_db = 10.0 * np.log10(snr_linear)
+    return float(snr_db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Full preprocessing chain
 # ─────────────────────────────────────────────────────────────────────────────

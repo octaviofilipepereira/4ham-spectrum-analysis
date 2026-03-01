@@ -20,7 +20,7 @@ from typing import Iterator
 
 import numpy as np
 
-from .dsp import preprocess, dominant_frequency
+from .dsp import preprocess, dominant_frequency, estimate_snr
 from .timing import analyse_timing, TimingResult
 from .morse_table import decode_symbol
 
@@ -181,12 +181,18 @@ class CWDecoder:
         high_hz: float = 900.0,
         smooth_ms: float = 5.0,
         threshold: float | None = None,
+        min_snr_db: float = 0.0,          # SNR threshold (0 = disabled)
+        max_wpm: float = 100.0,           # Maximum credible WPM
+        min_audio_duration: float = 2.0,  # Min duration (s) to apply SNR check
     ) -> None:
         self.sample_rate = sample_rate
         self.low_hz = low_hz
         self.high_hz = high_hz
         self.smooth_ms = smooth_ms
         self.threshold = threshold
+        self.min_snr_db = min_snr_db
+        self.max_wpm = max_wpm
+        self.min_audio_duration = min_audio_duration
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -207,6 +213,18 @@ class CWDecoder:
 
         # Detect dominant frequency for reporting
         dom_freq = dominant_frequency(audio, self.sample_rate)
+        
+        # Optional SNR validation (for real-world signals, disabled by default)
+        if self.min_snr_db > 0:
+            audio_duration = len(audio) / self.sample_rate
+            if audio_duration >= self.min_audio_duration:
+                snr_db = estimate_snr(audio, self.sample_rate, dom_freq)
+                if snr_db < self.min_snr_db:
+                    return DecodeResult(
+                        text="", wpm=0.0, confidence=0.0,
+                        dominant_freq_hz=dom_freq,
+                        morse_raw="",
+                    )
 
         # Auto-tune bandpass around detected tone
         tone_low  = max(100.0, dom_freq - 400.0)
@@ -231,9 +249,18 @@ class CWDecoder:
                 dominant_freq_hz=dom_freq,
                 morse_raw="",
             )
-
+        
         # Morse symbols → text
         text, morse_raw, unknown_count = morse_sequence_to_text(timing.morse_symbols)
+        
+        # Optional WPM validation (only with sufficient symbols for reliable estimate)
+        if self.max_wpm > 0 and len(timing.morse_symbols) > 10:
+            if timing.estimated_wpm < 3.0 or timing.estimated_wpm > self.max_wpm:
+                return DecodeResult(
+                    text="", wpm=0.0, confidence=0.0,
+                    dominant_freq_hz=dom_freq,
+                    morse_raw="",
+                )
 
         # Confidence score
         confidence = compute_confidence(text, unknown_count, timing)

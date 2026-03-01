@@ -76,8 +76,14 @@ class CWDecoderSession:
         self.poll_interval_s = max(0.05, float(poll_interval_s))
         self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
         
-        # CW decoder instance
-        self.decoder = CWDecoder(sample_rate=self.target_sample_rate)
+        # CW decoder instance with quality validations enabled
+        # Real-world signals are always 5+ seconds, so we can apply strict filtering
+        self.decoder = CWDecoder(
+            sample_rate=self.target_sample_rate,
+            min_snr_db=3.0,      # Reject if SNR < 3 dB (pure noise)
+            max_wpm=100.0,       # Reject if WPM > 100 (unrealistic)
+            min_audio_duration=2.0,  # Only apply SNR check to signals >= 2s
+        )
         
         # State
         self._running = False
