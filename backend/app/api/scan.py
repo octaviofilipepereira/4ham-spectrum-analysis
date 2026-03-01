@@ -26,6 +26,7 @@ from app.config.loader import (
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
+from app.api.decoders import _start_cw_decoder, _stop_cw_decoder
 
 
 router = APIRouter()
@@ -283,6 +284,18 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
     if decoder_mode not in valid_modes:
         raise HTTPException(status_code=400, detail=f"Invalid decoder_mode. Must be one of: {', '.join(valid_modes)}")
     
+    # Get previous mode to manage decoder lifecycle
+    previous_mode = state.scan_state.get("decoder_mode", "").lower()
+    
+    # Stop CW decoder if switching away from CW mode
+    if previous_mode == "cw" and decoder_mode != "cw":
+        if state.cw_decoder is not None:
+            try:
+                await _stop_cw_decoder()
+                log("scan_cw_decoder_stopped")
+            except Exception as exc:
+                log(f"scan_cw_decoder_stop_failed:{exc}")
+    
     # Update scan state with new decoder mode
     state.scan_state["decoder_mode"] = decoder_mode
     log(f"scan_decoder_mode_changed:{decoder_mode}")
@@ -293,6 +306,14 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
         state.ft_external_decoder.set_modes([decoder_mode_upper])
         state.ft_external_modes[:] = [decoder_mode_upper]
         log(f"scan_decoder_external_modes_updated:{decoder_mode_upper}")
+    
+    # Start CW decoder if switching to CW mode
+    if decoder_mode == "cw" and previous_mode != "cw":
+        try:
+            result = await _start_cw_decoder(force=True)
+            log(f"scan_cw_decoder_started:{result}")
+        except Exception as exc:
+            log(f"scan_cw_decoder_start_failed:{exc}")
 
     return {"status": "ok", "decoder_mode": decoder_mode}
 
