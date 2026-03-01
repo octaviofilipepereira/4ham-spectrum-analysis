@@ -60,14 +60,12 @@ MORSE_TO_CHAR: dict[str, str] = {
     ".-..-.": '"',
     "...-..-": "$",
     ".--.-.": "@",
-    # Prosigns
+    # Prosigns (note: -...- = BT = same code as "="; -.--.= KN = same code as "(")
     "...---...": "SOS",
     ".-.-":   "AA",   # new line
     "-.-.-":  "CT",   # start
     "...-.-": "SK",   # end of contact
-    "...-.":  "SN",   # understood
-    "-...-":  "BT",   # break
-    "-.--." :  "KN",  # go only
+    "...-.": "SN",   # understood
 }
 
 # Reverse: char → morse (for encoding / test generation)

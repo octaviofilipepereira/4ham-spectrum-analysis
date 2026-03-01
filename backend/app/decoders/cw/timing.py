@@ -9,6 +9,7 @@ character gaps, and word gaps.
 
 from __future__ import annotations
 
+import numpy as np
 from dataclasses import dataclass, field
 
 
@@ -44,8 +45,6 @@ def run_length_encode(binary: "np.ndarray", sample_rate: int) -> list[Pulse]:
 
     Each run of identical samples becomes one Pulse.
     """
-    import numpy as np
-
     if len(binary) == 0:
         return []
 

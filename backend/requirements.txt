@@ -10,8 +10,8 @@ uvicorn[standard]
 
 # DSP and scientific computing
 numpy
-# scipy removed 2026-02-24: resample_poly replaced with pure-numpy polyphase
-# resampler (_resample_poly_np) in backend/app/decoders/ft_external.py
+# scipy required by CW decoder (bandpass filter, Hilbert transform)
+scipy
 
 # Database
 # aiosqlite removed 2026-02-24: never imported anywhere in the codebase
