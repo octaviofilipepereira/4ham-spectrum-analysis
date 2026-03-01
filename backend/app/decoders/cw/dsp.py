@@ -106,12 +106,16 @@ def binarise(
 
 def dominant_frequency(audio: np.ndarray, sample_rate: int) -> float:
     """
-    Return the frequency bin with the highest power in 200–1200 Hz range.
-    Useful for auto-centering the bandpass filter.
+    Return the frequency bin with the highest power in 100 Hz – (Nyquist-200 Hz).
+
+    Extended range vs the old 200-1200 Hz window so that CW tones are found
+    regardless of the SDR-to-carrier offset (up to ±(Nyquist-200) Hz from center).
+    A typical 48 kHz SDR resampled to 8 kHz gives a usable range of 100-3800 Hz.
     """
     fft = np.abs(np.fft.rfft(audio))
     freqs = np.fft.rfftfreq(len(audio), d=1.0 / sample_rate)
-    mask = (freqs >= 200) & (freqs <= 1200)
+    nyquist = sample_rate / 2.0
+    mask = (freqs >= 100) & (freqs <= nyquist - 200)
     if not mask.any():
         return 700.0  # default CW tone
     idx = np.argmax(fft[mask])

@@ -83,9 +83,9 @@ class CWDecoderSession:
         # Speeds > 80 WPM require advanced algorithms (matched filters, correlation)
         self.decoder = CWDecoder(
             sample_rate=self.target_sample_rate,
-            min_snr_db=3.0,      # Reject if SNR < 3 dB (pure noise)
+            min_snr_db=0.0,      # Disabled: SNR check too aggressive for HF CW
             max_wpm=120.0,       # Allow contest speeds, but accuracy degrades > 60 WPM
-            min_audio_duration=2.0,  # Only apply SNR check to signals >= 2s
+            min_audio_duration=2.0,
         )
         
         # State
@@ -185,13 +185,12 @@ class CWDecoderSession:
                 # Calculate samples needed for window
                 target_samples = int(self.window_seconds * self.target_sample_rate)
                 
-                # Collect IQ samples in chunks until we have enough for processing
-                # (scan_engine returns chunks of ~4096 samples each)
-                max_attempts = 100  # Prevent infinite loop
-                attempts = 0
-                while len(self._audio_buffer) < target_samples and attempts < max_attempts:
-                    attempts += 1
-                    
+                # Collect IQ chunks until buffer has a full window.
+                # IQ → audio via real-part (USB/SSB demodulation):
+                #   SDR center at F_c, CW carrier at F_c + f_offset Hz
+                #   → np.real(IQ) gives a sinusoid at f_offset Hz, on/off keyed
+                #   This preserves the audio tone frequency needed by the decoder.
+                while len(self._audio_buffer) < target_samples and self._running:
                     # Try to get next chunk
                     iq_samples = await asyncio.to_thread(
                         self.iq_provider,
@@ -199,11 +198,13 @@ class CWDecoderSession:
                     )
                     
                     if iq_samples is None or len(iq_samples) == 0:
-                        await asyncio.sleep(0.01)  # Brief wait before retry
+                        await asyncio.sleep(0.02)  # Brief wait before retry
                         continue
                     
-                    # Convert IQ to audio (magnitude)
-                    audio = np.abs(iq_samples).astype(np.float32)
+                    # USB/SSB demodulation: take real (I) component.
+                    # This converts IQ → audio with CW tone at (CW_freq - center_freq) Hz.
+                    # np.abs() would give only amplitude (loses frequency info).
+                    audio = np.real(iq_samples).astype(np.float32)
                     
                     # Resample to target rate if needed
                     if source_sample_rate != self.target_sample_rate:
@@ -229,6 +230,12 @@ class CWDecoderSession:
                     self._last_decode_text = result.text
                     self._last_wpm = result.wpm
                     self._last_confidence = result.confidence
+                    self._log(
+                        f"cw_decode attempt={self._decode_attempts} "
+                        f"tone={result.dominant_freq_hz:.0f}Hz "
+                        f"wpm={result.wpm:.1f} conf={result.confidence:.2f} "
+                        f"text={repr(result.text[:40])}"
+                    )
                     
                     # Emit events if callsigns detected and confidence sufficient
                     if result.callsigns and result.confidence >= self.min_confidence:

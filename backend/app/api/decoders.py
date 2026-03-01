@@ -359,10 +359,17 @@ def _handle_cw_event(payload: Dict) -> Dict:
 
 
 def _cw_iq_provider(num_samples: int) -> Optional[np.ndarray]:
-    """Provide IQ samples from the scan engine to CW decoder."""
-    if not state.scan_engine.running:
+    """Provide IQ samples from the CW fan-out queue (non-blocking).
+
+    Returns None when no chunk is available; the caller sleeps briefly
+    and retries, yielding control to the event loop.
+    """
+    if _cw_iq_queue is None:
         return None
-    return state.scan_engine.read_iq(num_samples)
+    try:
+        return _cw_iq_queue.get_nowait()
+    except asyncio.QueueEmpty:
+        return None
 
 
 def _cw_sample_rate_provider() -> int:
