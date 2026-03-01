@@ -348,6 +348,10 @@ class ExternalFtDecoder:
         self._last_error = None
         self._last_command = None
         self._last_output_preview = []
+        # Set to True by set_modes() when the mode changes mid-scan, so that
+        # the current window (which may be a long WSPR 120 s capture) aborts
+        # immediately and the new mode starts on the next loop iteration.
+        self._abort_window = False
 
     def _log(self, message):
         if not self.logger:
@@ -390,7 +394,10 @@ class ExternalFtDecoder:
         """Update the active decode modes at runtime.
 
         The running _run() loop picks up the new list on the next
-        iteration, so no restart is needed.
+        iteration.  If the current window is a long WSPR capture and the new
+        mode list no longer includes WSPR, the window abort flag is set so
+        _wait_for_slot_boundary() and _collect_audio_window() return early,
+        letting the loop restart with the new mode immediately.
         """
         new_modes = [
             str(m).strip().upper()
@@ -399,7 +406,12 @@ class ExternalFtDecoder:
         ]
         if not new_modes:
             new_modes = ["FT8", "FT4"]
+        old_modes = list(self.modes)
         self.modes = new_modes
+        # If we are switching away from a mode (e.g. WSPR → FT8), signal the
+        # current window to abort so the new mode is picked up quickly.
+        if set(old_modes) != set(new_modes):
+            self._abort_window = True
         self._log(f"ft_external_modes_updated modes={self.modes}")
         return list(self.modes)
 
@@ -418,6 +430,9 @@ class ExternalFtDecoder:
 
                 mode = self.modes[mode_index % len(self.modes)]
                 mode_index += 1
+                # Clear any leftover abort flag from the previous iteration
+                # so a fresh window can run.
+                self._abort_window = False
 
                 window_s = float(self.window_seconds.get(mode, 15.0) or 15.0)
                 source_sample_rate = _to_int(self.sample_rate_provider(), default=0)
@@ -463,7 +478,12 @@ class ExternalFtDecoder:
                         continue
 
                 # ── Wait for the next FT8/FT4 slot boundary ──
-                await self._wait_for_slot_boundary(window_s)
+                slot_ok = await self._wait_for_slot_boundary(window_s)
+                if not slot_ok:
+                    # Mode changed while waiting — skip this window entirely
+                    # and pick up the new mode on the next iteration.
+                    self._log(f"ft_external_slot_aborted mode={mode}")
+                    continue
 
                 # ── Park the scanner on the dial frequency ──────
                 # In auto-scan mode the SDR hops across the band.
@@ -512,6 +532,11 @@ class ExternalFtDecoder:
                         freq_shift_hz=freq_shift_hz,
                         collection_stride=collection_stride,
                     )
+                    if self._abort_window:
+                        # Mode changed during audio collection — discard
+                        # the partial buffer and start fresh.
+                        self._log(f"ft_external_window_aborted mode={mode}")
+                        continue
                     if audio is None or audio.size == 0:
                         self._log(f"ft_external_empty_audio mode={mode}")
                         await asyncio.sleep(self.poll_s)
@@ -552,12 +577,15 @@ class ExternalFtDecoder:
         FT8 slots start at UTC seconds divisible by *period_s*
         (15.0 for FT8, 7.5 for FT4).  Starting the IQ capture at the
         boundary ensures jt9 receives a complete, time-aligned window.
+
+        Returns True if the wait completed normally, False if aborted early
+        due to a mode change (self._abort_window was set).
         """
         import time as _time
         now = _time.time()
         period = float(period_s)
         if period <= 0:
-            return
+            return True
         # Next boundary: ceil(now / period) * period
         next_boundary = (int(now / period) + 1) * period
         wait = next_boundary - now
@@ -565,14 +593,17 @@ class ExternalFtDecoder:
             # Flush stale IQ from the broadcast buffer while we wait,
             # so _collect_audio_window starts with fresh samples.
             deadline = _time.time() + wait - 0.05
-            while _time.time() < deadline and self._running:
+            while _time.time() < deadline and self._running and not self._abort_window:
                 step = min(0.25, deadline - _time.time())
                 if step > 0:
                     await asyncio.sleep(step)
+            if self._abort_window:
+                return False
             # Final tiny wait to hit the boundary precisely
             remaining = next_boundary - _time.time()
             if remaining > 0:
                 await asyncio.sleep(remaining)
+        return True
 
     # Maximum number of samples to process in one frequency-shift
     # chunk.  Keeps peak memory under ~16 MB per chunk instead of
@@ -593,7 +624,7 @@ class ExternalFtDecoder:
         buffer = np.empty(source_target_samples, dtype=np.complex64)
         total = 0
         reads_since_yield = 0
-        while self._running and total < source_target_samples:
+        while self._running and not self._abort_window and total < source_target_samples:
             iq = self.iq_provider(self.iq_chunk_size)
             if iq is None:
                 await asyncio.sleep(0.01)
@@ -621,7 +652,7 @@ class ExternalFtDecoder:
                 await asyncio.sleep(0)
                 reads_since_yield = 0
 
-        if total == 0:
+        if total == 0 or self._abort_window:
             del buffer
             return None, int(effective_source_rate)
 
