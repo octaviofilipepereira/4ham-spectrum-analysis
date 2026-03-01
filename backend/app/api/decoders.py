@@ -416,46 +416,52 @@ def _cw_flush_iq() -> None:
             break
 
 
-async def _start_cw_decoder(force: bool = False) -> Dict:
+async def _start_cw_decoder(
+    force: bool = False,
+    band_start_hz: int = 0,
+    band_end_hz: int = 0,
+) -> Dict:
     """
     Start CW decoder.
-    
+
     Args:
         force: Force start even if disabled in config
-        
+        band_start_hz: Band start frequency (Hz). If 0, reads from scan engine.
+        band_end_hz:   Band end frequency (Hz).   If 0, reads from scan engine.
+
     Returns:
         Dict with started status and reason
     """
     global _cw_iq_queue
-    
+
     if not force and not state.cw_internal_enable:
         state.decoder_status["cw"]["status"] = None
         return {"started": False, "reason": "cw_disabled"}
-    
+
     # Create the IQ queue and register it with the engine's pump loop
     if _cw_iq_queue is None:
         _cw_iq_queue = asyncio.Queue(maxsize=512)
         state.scan_engine.register_iq_listener(_cw_iq_queue)
-    
+
     # Initialize decoder if needed
     if state.cw_decoder is None:
-        # Choose sweep mode when the scan band covers more than one step width.
-        # Otherwise fall back to the existing fixed-frequency CWDecoderSession.
+        # Prefer the explicitly-provided band bounds (passed by scan.py before
+        # the engine is configured).  Fall back to engine attrs if not given.
         engine = state.scan_engine
-        band_start = getattr(engine, "start_hz", 0)
-        band_end = getattr(engine, "end_hz", 0)
+        b_start = band_start_hz or getattr(engine, "start_hz", 0)
+        b_end   = band_end_hz   or getattr(engine, "end_hz",   0)
         sweep_available = (
-            band_start > 0
-            and band_end > band_start
-            and (band_end - band_start) > state.cw_sweep_step_hz
+            b_start > 0
+            and b_end > b_start
+            and (b_end - b_start) > state.cw_sweep_step_hz
         )
 
         if sweep_available:
             from app.decoders.cw_sweep import CWSweepDecoder
 
             state.cw_decoder = CWSweepDecoder(
-                band_start_hz=band_start,
-                band_end_hz=band_end,
+                band_start_hz=b_start,
+                band_end_hz=b_end,
                 step_hz=state.cw_sweep_step_hz,
                 dwell_s=state.cw_sweep_dwell_s,
                 settle_ms=state.cw_sweep_settle_ms,

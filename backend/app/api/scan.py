@@ -119,7 +119,11 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 await _stop_ft_external_decoder()
                 log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
             if not state.cw_decoder:
-                result = await _start_cw_decoder(force=True)
+                result = await _start_cw_decoder(
+                    force=True,
+                    band_start_hz=start_hz,
+                    band_end_hz=end_hz,
+                )
                 log(f"scan_cw_decoder_started:{result}")
         elif decoder_mode in ft_modes:
             # FT mode: stop CW decoder, start/configure FT decoder

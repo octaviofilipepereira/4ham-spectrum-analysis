@@ -30,11 +30,13 @@ Position geometry (example: 20m CW, step=6500 Hz, settle=100 ms, dwell=5 s):
 """
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Callable, List, Optional
 
 import numpy as np
 
+_logger = logging.getLogger(__name__)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -221,12 +223,15 @@ class CWSweepDecoder:
     # Internal helpers
     # ──────────────────────────────────────────────────────────────
 
-    def _log(self, msg: str) -> None:
+    def _log(self, msg: str, level: str = "info") -> None:
+        # Always publish to in-memory log (accessible via /api/logs)
         if self.logger:
             try:
                 self.logger(msg)
             except Exception:
                 pass
+        # Also write to the Python file logger
+        getattr(_logger, level, _logger.info)(msg)
 
     def _build_positions(self) -> List[int]:
         """Generate the ordered list of centre frequencies to sweep."""
@@ -333,6 +338,20 @@ class CWSweepDecoder:
 
                 # ── 6. Decode ─────────────────────────────────────────────
                 self._decode_attempts += 1
+                # Diagnostic: log audio statistics before decode
+                audio_rms = float(np.sqrt(np.mean(audio ** 2))) if len(audio) > 0 else 0.0
+                audio_peak = float(np.max(np.abs(audio))) if len(audio) > 0 else 0.0
+                # Quick FFT for dominant frequency diagnostic
+                _fft_mag = np.abs(np.fft.rfft(audio))
+                _freqs = np.fft.rfftfreq(len(audio), d=1.0 / self.target_sample_rate)
+                _mask = (_freqs >= 100) & (_freqs <= self.target_sample_rate / 2 - 200)
+                _dom_hz = float(_freqs[_mask][np.argmax(_fft_mag[_mask])]) if _mask.any() else 0.0
+                self._log(
+                    f"cw_sweep_audio pos={pos_hz}Hz samples={len(audio)} "
+                    f"rms={audio_rms:.6f} peak={audio_peak:.4f} dom_freq={_dom_hz:.0f}Hz "
+                    f"sr={source_sample_rate}",
+                    level="debug",
+                )
                 result = await asyncio.to_thread(self._decoder.decode, audio)
 
                 self._last_decode_text = result.text
@@ -343,15 +362,20 @@ class CWSweepDecoder:
                     f"cw_sweep pos={pos_hz}Hz attempt={self._decode_attempts} "
                     f"tone={result.dominant_freq_hz:.0f}Hz "
                     f"wpm={result.wpm:.1f} conf={result.confidence:.2f} "
-                    f"text={repr(result.text[:40])}"
+                    f"text={repr(result.text[:40])}",
+                    level="info" if result.confidence > 0 else "debug",
                 )
 
                 # ── 7. Emit events ────────────────────────────────────────
                 if result.callsigns and result.confidence >= self.min_confidence:
-                    self._callsigns_detected += len(result.callsigns)
+                    # Deduplicate: a single transmission often repeats the same
+                    # callsign (e.g. "IK6LBT IK6LBT DE CT7BFV"). Emit once per
+                    # unique callsign, preserving first-seen order.
+                    unique_callsigns = list(dict.fromkeys(result.callsigns))
+                    self._callsigns_detected += len(unique_callsigns)
                     # Absolute RF frequency: SDR centre + audio-domain tone offset
                     rf_freq_hz = pos_hz + int(result.dominant_freq_hz)
-                    for callsign in result.callsigns:
+                    for callsign in unique_callsigns:
                         event = {
                             "timestamp": _utc_now_iso(),
                             "mode": "CW",
