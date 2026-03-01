@@ -435,17 +435,6 @@ async def _start_cw_decoder(force: bool = False) -> Dict:
     
     started = await state.cw_decoder.start()
     state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
-
-    # Freeze the scan sweep while CW is active.
-    # CW decoding requires a continuous audio window (≥5 s) at a single
-    # fixed frequency.  If the engine is sweeping (step_hz > 0) and jumps
-    # to a new centre every dwell_ms=250 ms, the IQ buffer contains 20+
-    # different carriers that the decoder cannot resolve.  Parking keeps
-    # the SDR on the current centre_hz for the duration of the CW session.
-    if state.scan_engine.running and state.scan_engine.step_hz > 0:
-        state.scan_engine.park(state.scan_engine.center_hz)
-        log(f"cw_scan_parked at {state.scan_engine.center_hz} Hz")
-
     return {"started": bool(started), "reason": None}
 
 
@@ -469,12 +458,6 @@ async def _stop_cw_decoder() -> Dict:
     await state.cw_decoder.stop()
     state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
     state.cw_decoder = None
-
-    # Resume band sweep if it was frozen when CW started
-    if state.scan_engine.running:
-        state.scan_engine.unpark()
-        log("cw_scan_unparked")
-
     return {"stopped": True, "reason": None}
 
 
