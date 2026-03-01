@@ -10,36 +10,33 @@ Last update: 2026-02-22 16:27:19 UTC
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>4ham Spectrum Analysis</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
-      crossorigin="anonymous"
-    />
-    <link rel="stylesheet" href="styles.css?v=20260228-09" />
+    <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css?v=20260301000400" />
+    <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
   </head>
   <body>
     <main class="app container-fluid py-4">
       <div class="app-topbar mb-3">
         <header class="app__header">
           <h1>4ham Spectrum Analysis</h1>
-          <p class="kicker">Coded &amp; Powered by CT7BFV &nbsp;·&nbsp; &copy; <span id="copyrightYear"></span> Octávio Filipe Gonçalves</p>
-          <p class="header-meta">License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a></p>
+          <p class="kicker">Coded &amp; Powered by CT7BFV &nbsp;·&nbsp; Octávio Filipe Gonçalves</p>
         </header>
         <nav class="card panel menu-toolbar">
           <div class="card-body">
             <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Bands</button>
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#modesModal">Modes</button>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#favoriteBandsModal">Favorite Bands</button>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#filtersModal">Filters</button>
             <div class="dropdown">
               <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 Logs &amp; Reports
               </button>
               <ul class="dropdown-menu dropdown-menu-dark">
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#decoderStatusModal">Decoder Status</button></li>
                 <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#logsModal">Logs</button></li>
                 <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#summaryModal">Summary</button></li>
               </ul>
@@ -106,6 +103,17 @@ Last update: 2026-02-22 16:27:19 UTC
                 <span class="login-status status-chip" id="loginStatus">Auth: guest</span>
                 <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
               </div>
+              <!-- Mode selection controls -->
+              <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center">
+                <div style="width: 138px;"></div>
+                <div class="scan-quick-modes" aria-label="Quick mode selection">
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="CW">CW</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="WSPR">WSPR</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT4">FT4</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT8">FT8</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="SSB">SSB</button>
+                </div>
+              </div>
               <!-- Spectrum graph -->
               <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>
               <div class="waterfall" id="waterfall">
@@ -117,12 +125,20 @@ Last update: 2026-02-22 16:27:19 UTC
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-events-custom">
           <div class="card panel h-100">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2">
-                <h2 class="h5 mb-0">Events</h2>
-                <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#eventsSearchModal">&#128269; Search Events</button>
+                <h2 class="h5 mb-0" id="eventsCardTitle">Events</h2>
+                <div class="d-flex flex-column gap-2">
+                  <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#eventsSearchModal">&#128269; Search Events</button>
+                  <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#eventsFullscreenModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
+                      <path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                    Events Fullscreen
+                  </button>
+                </div>
               </div>
               <div class="d-flex align-items-center gap-2 events-pager">
                 <button class="btn btn-outline-info btn-sm" id="eventsPrev">Prev</button>
@@ -133,12 +149,12 @@ Last update: 2026-02-22 16:27:19 UTC
             </div>
           </div>
         </div>
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-propmap-custom">
           <div class="card panel h-100">
             <div class="card-body d-flex flex-column">
               <h2 class="h5">Propagation Map</h2>
               <div id="propagationMap" style="width:100%;flex:1 1 0;min-height:0;overflow:hidden;"></div>
-              <p id="propagationScore" class="mt-2 mb-1" style="font-size:.8rem;">Score: --</p>
+              <p id="propagationScore" class="mt-2 mb-0" style="font-size:1.125rem;">Score: --</p>
               <ul class="summary" id="propagationBands">
                 <li>No propagation data yet.</li>
               </ul>
@@ -158,31 +174,6 @@ Last update: 2026-02-22 16:27:19 UTC
         </div>
       </div>
 
-      <section class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Decoder Status</h2>
-              <ul class="summary" id="decoderStatus">
-                <li>External FT (jt9/wsprd): <span id="externalFtStatus">Unknown</span></li>
-                <li>Direwolf KISS: <span id="kissStatus">Unknown</span></li>
-                <li>Last decoder event: <span id="decoderLastEvent">-</span></li>
-                <li>AGC: <span id="agcStatus">-</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-lg-6">
-          <div class="card panel">
-            <div class="card-body">
-              <h2 class="h5">Total Events</h2>
-              <p id="eventsTotal">0</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div class="toast-stack" id="toast"></div>
     </main>
 
@@ -201,11 +192,31 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
+    <!-- Events Fullscreen Modal -->
+    <div class="modal fade" id="eventsFullscreenModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="eventsFullscreenTitle">Events</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex align-items-center gap-2 events-pager mb-3">
+              <button class="btn btn-outline-info btn-sm" id="eventsFullscreenPrev">Prev</button>
+              <button class="btn btn-outline-info btn-sm" id="eventsFullscreenNext">Next</button>
+              <span class="login-status" id="eventsFullscreenPageInfo">Page: 1/1</span>
+            </div>
+            <ul class="events events--fullscreen" id="eventsFullscreen"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade app-modal" id="eventsSearchModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">Events Search</h2>
+            <h2 class="modal-title h5">Events Search <small class="fw-normal fs-6 opacity-75">(Results limited to 500)</small></h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -246,8 +257,37 @@ Last update: 2026-02-22 16:27:19 UTC
                 <label class="form-label fs-6 fw-semibold">SNR mín. (dB)</label>
                 <input type="number" id="eventsSearchSnrMin" placeholder="ex: -10" min="-30" max="30" step="1" class="form-control" />
               </div>
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">Start date</label>
+                <div class="input-group">
+                  <input type="text" id="eventsSearchStart" class="form-control" placeholder="DD/MM/AAAA" autocomplete="off" readonly />
+                  <span class="input-group-text" style="cursor:pointer;" onclick="document.getElementById('eventsSearchStart')._flatpickr.open()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                  </span>
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label fs-6 fw-semibold">End date</label>
+                <div class="input-group">
+                  <input type="text" id="eventsSearchEnd" class="form-control" placeholder="DD/MM/AAAA" autocomplete="off" readonly />
+                  <span class="input-group-text" style="cursor:pointer;" onclick="document.getElementById('eventsSearchEnd')._flatpickr.open()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                  </span>
+                </div>
+              </div>
             </div>
-            <div id="eventsSearchCount" class="text-muted small mt-2"></div>
+            <div class="d-flex align-items-center justify-content-between mt-2">
+              <div id="eventsSearchCount" class="small opacity-75"></div>
+              <div class="d-flex align-items-center gap-2">
+                <button id="eventsSearchPrev" class="btn btn-sm btn-outline-light" disabled>&#8592; Prev</button>
+                <span id="eventsSearchPageInfo" class="small"></span>
+                <button id="eventsSearchNext" class="btn btn-sm btn-outline-light" disabled>Next &#8594;</button>
+              </div>
+            </div>
             <ul class="events events--search" id="eventsSearchResults"></ul>
           </div>
         </div>
@@ -464,62 +504,11 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
-    <div class="modal fade app-modal" id="modesModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 class="modal-title h5">1. Modes</h2>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="card panel">
-              <div class="card-body">
-                <h2 class="h5">Modes</h2>
-                <div class="filters row g-2 align-items-end">
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">FT8/FT4</label>
-                    <select id="ft8Toggle" class="form-select form-select-sm">
-                      <option value="on">On</option>
-                      <option value="off" selected>Off</option>
-                    </select>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">APRS</label>
-                    <select id="aprsToggle" class="form-select form-select-sm">
-                      <option value="on">On</option>
-                      <option value="off" selected>Off</option>
-                    </select>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">CW</label>
-                    <select id="cwToggle" class="form-select form-select-sm">
-                      <option value="on">On</option>
-                      <option value="off" selected>Off</option>
-                    </select>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">SSB</label>
-                    <select id="ssbToggle" class="form-select form-select-sm">
-                      <option value="on" selected>On</option>
-                      <option value="off">Off</option>
-                    </select>
-                  </div>
-                  <div class="col-12">
-                    <button class="btn btn-outline-info" id="saveModes">Save modes</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="modal fade app-modal" id="presetsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">2. Presets</h2>
+            <h2 class="modal-title h5">1. Presets</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -551,38 +540,11 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
-    <div class="modal fade app-modal" id="favoriteBandsModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 class="modal-title h5">3. Favorite Bands</h2>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="card panel">
-              <div class="card-body">
-                <h2 class="h5">Favorite Bands</h2>
-                <div class="filters row g-2 align-items-end">
-                  <div class="col-12">
-                    <select id="favoriteBands" class="form-select form-select-sm"></select>
-                  </div>
-                  <div class="col-12 d-flex gap-2">
-                    <button class="btn btn-outline-info" id="addFavorite">Add favorite</button>
-                    <button class="btn btn-outline-info" id="removeFavorite">Remove favorite</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="modal fade app-modal" id="filtersModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">4. Filters</h2>
+            <h2 class="modal-title h5">2. Filters</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -606,14 +568,11 @@ Last update: 2026-02-22 16:27:19 UTC
                       <option value="">All</option>
                       <option value="FT8">FT8</option>
                       <option value="FT4">FT4</option>
+                      <option value="WSPR">WSPR</option>
                       <option value="APRS">APRS</option>
                       <option value="CW">CW</option>
                       <option value="SSB">SSB</option>
                     </select>
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label">Favorites</label>
-                    <select id="favoriteFilter" class="form-select form-select-sm"></select>
                   </div>
                   <div class="col-6 col-md-3">
                     <label class="form-label">Callsign</label>
@@ -640,11 +599,35 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
+    <div class="modal fade app-modal" id="decoderStatusModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Decoder Status</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">Decoder Status</h2>
+                <ul class="summary">
+                  <li>External FT (jt9/wsprd): <span id="externalFtStatusModal">Unknown</span></li>
+                  <li>Direwolf KISS: <span id="kissStatusModal">Unknown</span></li>
+                  <li>Last decoder event: <span id="decoderLastEventModal">-</span></li>
+                  <li>AGC: <span id="agcStatusModal">-</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade app-modal" id="logsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">5.1 Logs</h2>
+            <h2 class="modal-title h5">3.1 Logs</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -663,7 +646,7 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">5.2 Summary</h2>
+            <h2 class="modal-title h5">3.2 Summary</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -709,14 +692,18 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-      crossorigin="anonymous"
-    ></script>
+    <footer class="app-footer">
+      <span>Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; &copy; 2026 Octávio Filipe Gonçalves</span>
+      <span class="app-footer__sep">|</span>
+      <span>License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a></span>
+    </footer>
+
+    <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
-    <script src="map.js?v=20260228-04"></script>
-    <script type="module" src="app.js?v=20260226-02"></script>
+    <script src="map.js?v=20260228104050"></script>
+    <script src="vendor/flatpickr/flatpickr.min.js"></script>
+    <script src="vendor/flatpickr/pt.js"></script>
+    <script type="module" src="app.js?v=20260301000300"></script>
   </body>
 </html>

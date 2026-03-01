@@ -85,6 +85,16 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
             record_decoder_event_invalid()
             continue
         
+        # Only save events during active scan (not in preview or stopped mode)
+        if state.scan_state.get("state") != "running":
+            continue
+        
+        # Filter events by selected decoder mode (case-insensitive)
+        event_mode = str(event.get("mode", "")).strip().upper()
+        selected_mode = str(state.scan_state.get("decoder_mode", "")).strip().upper()
+        if selected_mode and event_mode != selected_mode:
+            continue  # Ignore events from different decoder modes
+        
         # Save event
         touch_decoder_source(event.get("source"))
         state.db.insert_callsign(event)

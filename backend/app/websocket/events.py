@@ -246,6 +246,11 @@ async def ws_events(websocket: WebSocket) -> None:
             await asyncio.sleep(0.5)
             continue
         
+        # Only save events during active scan (not in preview or stopped mode)
+        if state.scan_state.get("state") != "running":
+            await asyncio.sleep(0.5)
+            continue
+        
         # Persist to database
         state.db.insert_occupancy(event)
         

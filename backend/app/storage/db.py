@@ -120,6 +120,7 @@ class Database:
         self._add_column("callsign_events", "lat REAL")
         self._add_column("callsign_events", "lon REAL")
         self._add_column("callsign_events", "msg TEXT")
+        self._add_column("callsign_events", "power_dbm REAL")
 
     def _add_column(self, table, column_def):
         try:
@@ -276,8 +277,8 @@ class Database:
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
                 df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
-                payload, lat, lon, msg, source, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                payload, lat, lon, msg, source, device, power_dbm
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -301,12 +302,13 @@ class Database:
                 event.get("lon"),
                 event.get("msg"),
                 event.get("source"),
-                event.get("device")
+                event.get("device"),
+                event.get("power_dbm")
             )
         )
         self.conn.commit()
 
-    def get_events(self, limit=1000, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
+    def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
         events = []
 
         # occupancy_events has no callsign column — skip entirely when filtering by callsign
@@ -325,7 +327,8 @@ class Database:
                 time_filter = "AND timestamp BETWEEN ? AND ?"
                 params.append(start)
                 params.append(end)
-            params.extend([limit, offset])
+            # LIMIT -1 means no limit in SQLite
+            params.extend([limit if limit is not None else -1, offset])
 
             for row in self.conn.execute(
                 """
@@ -363,13 +366,14 @@ class Database:
             time_filter = "AND timestamp BETWEEN ? AND ?"
             params.append(start)
             params.append(end)
-        params.extend([limit, offset])
+        # LIMIT -1 means no limit in SQLite
+        params.extend([limit if limit is not None else -1, offset])
 
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                  mode, callsign, snr_db, df_hz, confidence, raw, grid, report,
-                 time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device
+                 time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
             FROM callsign_events
             WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
             ORDER BY timestamp DESC
@@ -386,7 +390,7 @@ class Database:
             events.append(dict(row))
 
         events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-        return events[:limit]
+        return events if limit is None else events[:limit]
 
     def count_events(self, band=None, mode=None, callsign=None, start=None, end=None):
         params = []
@@ -421,19 +425,29 @@ class Database:
         return int(occ) + int(calls)
 
     def get_event_stats(self):
-        stats = {}
+        stats = {"modes": {}, "total": 0}
+        
+        # Count occupancy events
+        occupancy_total = 0
         for row in self.conn.execute(
             "SELECT mode, COUNT(*) AS total FROM occupancy_events GROUP BY mode"
         ):
             mode = row["mode"] or "Unknown"
-            stats[mode] = stats.get(mode, 0) + int(row["total"])
+            count = int(row["total"])
+            stats["modes"][mode] = stats["modes"].get(mode, 0) + count
+            occupancy_total += count
 
+        # Count callsign events
+        callsign_total = 0
         for row in self.conn.execute(
             "SELECT mode, COUNT(*) AS total FROM callsign_events GROUP BY mode"
         ):
             mode = row["mode"] or "Unknown"
-            stats[mode] = stats.get(mode, 0) + int(row["total"])
-
+            count = int(row["total"])
+            stats["modes"][mode] = stats["modes"].get(mode, 0) + count
+            callsign_total += count
+        
+        stats["total"] = occupancy_total + callsign_total
         return stats
 
     def get_decoder_baseline_stats(self):

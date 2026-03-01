@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import re
 
 
-_ALLOWED_MODES = {"FT8", "FT4", "APRS", "CW", "SSB", "Unknown"}
+_ALLOWED_MODES = {"FT8", "FT4", "WSPR", "APRS", "CW", "SSB", "Unknown"}
 _BAND_RANGES = [
     ("160m", 1800000, 2000000),
     ("80m", 3500000, 4000000),
@@ -33,7 +33,7 @@ def _normalize_mode(value):
 
 
 def _infer_source(mode):
-    if mode in ("FT8", "FT4"):
+    if mode in ("FT8", "FT4", "WSPR"):
         return "external_ft"
     if mode == "APRS":
         return "direwolf"

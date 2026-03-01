@@ -30,7 +30,7 @@ limiter = Limiter(key_func=get_remote_address)
 @limiter.limit("300/minute")  # Rate limit: 300 requests per minute (shared with auto-refresh)
 def events(
     request: Request,
-    limit: int = 1000,
+    limit: Optional[int] = None,
     offset: int = 0,
     band: Optional[str] = None,
     mode: Optional[str] = None,
@@ -47,7 +47,7 @@ def events(
     Supports pagination, filtering by band/mode/callsign/time, and CSV export.
     
     Args:
-        limit: Maximum number of events to return (default: 1000)
+        limit: Maximum number of events to return (default: all)
         offset: Offset for pagination (default: 0)
         band: Filter by band name
         mode: Filter by mode (FT8, APRS, etc.)

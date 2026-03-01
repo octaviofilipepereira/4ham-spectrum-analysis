@@ -97,6 +97,17 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
+    # Store selected decoder mode in scan state for later use
+    decoder_mode = normalized_payload.get("decoder_mode", "").lower()
+    if decoder_mode:
+        state.scan_state["decoder_mode"] = decoder_mode
+        log(f"scan_decoder_mode:{decoder_mode}")
+        # Update external FT decoder so it only processes the selected mode
+        decoder_mode_upper = decoder_mode.upper()
+        if state.ft_external_decoder is not None:
+            state.ft_external_decoder.set_modes([decoder_mode_upper])
+        state.ft_external_modes[:] = [decoder_mode_upper]
+
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()
 
@@ -246,6 +257,44 @@ async def preview_tune(payload: dict, _: None = Depends(verify_basic_auth)) -> D
     band = str(payload.get("band") or "")
     log(f"preview_tune center_hz={center_hz}" + (f" band={band}" if band else ""))
     return state.scan_state
+
+
+@router.post("/mode")
+async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Change decoder mode during active scan.
+    
+    Allows switching between decoders (FT8, FT4, WSPR, etc.) without stopping the scan.
+    Updates scan_state with new decoder_mode for decoder selection.
+    
+    Args:
+        payload: Dict with key:
+            - decoder_mode: New decoder mode (ft8, ft4, wspr, cw, ssb, aprs)
+            
+    Returns:
+        Status dict with updated scan_state
+    """
+    decoder_mode = str(payload.get("decoder_mode", "")).strip().lower()
+    if not decoder_mode:
+        raise HTTPException(status_code=400, detail="decoder_mode is required")
+    
+    # Validate decoder mode is one of the supported modes
+    valid_modes = ["ft8", "ft4", "wspr", "cw", "ssb", "aprs"]
+    if decoder_mode not in valid_modes:
+        raise HTTPException(status_code=400, detail=f"Invalid decoder_mode. Must be one of: {', '.join(valid_modes)}")
+    
+    # Update scan state with new decoder mode
+    state.scan_state["decoder_mode"] = decoder_mode
+    log(f"scan_decoder_mode_changed:{decoder_mode}")
+
+    # Update external FT decoder modes so it only processes the selected mode
+    decoder_mode_upper = decoder_mode.upper()
+    if state.ft_external_decoder is not None:
+        state.ft_external_decoder.set_modes([decoder_mode_upper])
+        state.ft_external_modes[:] = [decoder_mode_upper]
+        log(f"scan_decoder_external_modes_updated:{decoder_mode_upper}")
+
+    return {"status": "ok", "decoder_mode": decoder_mode}
 
 
 @router.get("/status")

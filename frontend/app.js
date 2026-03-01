@@ -13,11 +13,22 @@ const eventsSearchCallsignInput = document.getElementById("eventsSearchCallsign"
 const eventsSearchModeInput = document.getElementById("eventsSearchMode");
 const eventsSearchBandInput = document.getElementById("eventsSearchBand");
 const eventsSearchSnrMinInput = document.getElementById("eventsSearchSnrMin");
+const eventsSearchStartInput = document.getElementById("eventsSearchStart");
+const eventsSearchEndInput = document.getElementById("eventsSearchEnd");
 const eventsSearchCountEl = document.getElementById("eventsSearchCount");
+const eventsSearchPrevBtn = document.getElementById("eventsSearchPrev");
+const eventsSearchNextBtn = document.getElementById("eventsSearchNext");
+const eventsSearchPageInfoEl = document.getElementById("eventsSearchPageInfo");
 const eventsPrevBtn = document.getElementById("eventsPrev");
 const eventsNextBtn = document.getElementById("eventsNext");
 const eventsPageInfo = document.getElementById("eventsPageInfo");
 const eventsSearchResultsEl = document.getElementById("eventsSearchResults");
+const eventsFullscreenEl = document.getElementById("eventsFullscreen");
+const eventsFullscreenPrevBtn = document.getElementById("eventsFullscreenPrev");
+const eventsFullscreenNextBtn = document.getElementById("eventsFullscreenNext");
+const eventsFullscreenPageInfo = document.getElementById("eventsFullscreenPageInfo");
+const eventsFullscreenTitle = document.getElementById("eventsFullscreenTitle");
+const eventsFullscreenModal = document.getElementById("eventsFullscreenModal");
 const copyrightYearEl = document.getElementById("copyrightYear");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
@@ -77,7 +88,11 @@ const audioSampleRateInput = document.getElementById("audioSampleRate");
 const audioRxGainInput = document.getElementById("audioRxGain");
 const audioTxGainInput = document.getElementById("audioTxGain");
 const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
+const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
+
+// Selected decoder mode for scan
+let selectedDecoderMode = null;
 
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
@@ -164,11 +179,7 @@ const deletePresetBtn = document.getElementById("deletePreset");
 const presetSelect = document.getElementById("presetSelect");
 const exportPresetsBtn = document.getElementById("exportPresets");
 const importPresetsInput = document.getElementById("importPresets");
-const favoriteBandsSelect = document.getElementById("favoriteBands");
-const addFavoriteBtn = document.getElementById("addFavorite");
-const removeFavoriteBtn = document.getElementById("removeFavorite");
 const toast = document.getElementById("toast");
-const favoriteFilter = document.getElementById("favoriteFilter");
 const loginUserInput = document.getElementById("loginUser");
 const loginPassInput = document.getElementById("loginPass");
 const loginSaveBtn = document.getElementById("loginSave");
@@ -186,21 +197,16 @@ const qualityBar = document.getElementById("qualityBar");
 const qualityLabel = document.getElementById("qualityLabel");
 const summaryMatrixTable = document.getElementById("summaryMatrixTable");
 const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
-const eventsTotal = document.getElementById("eventsTotal");
+const eventsCardTitle = document.getElementById("eventsCardTitle");
 const propagationScore = document.getElementById("propagationScore");
 const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
-const decoderStatusEl = document.getElementById("decoderStatus");
-const externalFtStatusEl = document.getElementById("externalFtStatus");
-const kissStatusEl = document.getElementById("kissStatus");
-const decoderLastEventEl = document.getElementById("decoderLastEvent");
-const agcStatusEl = document.getElementById("agcStatus");
-const ft8Toggle = document.getElementById("ft8Toggle");
-const aprsToggle = document.getElementById("aprsToggle");
-const cwToggle = document.getElementById("cwToggle");
-const ssbToggle = document.getElementById("ssbToggle");
-const saveModesBtn = document.getElementById("saveModes");
+let totalEventsInDB = 0;
+const externalFtStatusModalEl = document.getElementById("externalFtStatusModal");
+const kissStatusModalEl = document.getElementById("kissStatusModal");
+const decoderLastEventModalEl = document.getElementById("decoderLastEventModal");
+const agcStatusModalEl = document.getElementById("agcStatusModal");
 const DEVICE_AUTO_PROFILES = {
   rtl: { sample_rate: 2048000, gain: 30, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
   hackrf: { sample_rate: 2000000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
@@ -307,7 +313,22 @@ function refreshQuickBandButtons() {
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 }
-const EVENTS_PANEL_PAGE_SIZE = 7;
+
+function refreshModeButtons() {
+  if (!quickModeButtons.length) {
+    return;
+  }
+
+  quickModeButtons.forEach((button) => {
+    const buttonMode = String(button.dataset.quickMode || "").trim();
+    const isActive = selectedDecoderMode === buttonMode;
+    button.disabled = scanActionInFlight;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+const EVENTS_PANEL_PAGE_SIZE = 50;
 let eventOffset = 0;
 let eventsPanelPage = 0;
 let latestEvents = [];
@@ -719,15 +740,29 @@ function buildStableWaterfallMarkers(frame) {
   const defaultEndHz = Number(frame?.center_hz || 0) + (Number(frame?.span_hz || 0) / 2);
   const rangeStartHz = hasScanRange ? scanStartHz : defaultStartHz;
   const rangeEndHz = hasScanRange ? scanEndHz : defaultEndHz;
+  
+  // Only show markers during active scan with mode selected
+  if (!isScanRunning || !selectedDecoderMode) {
+    return {
+      markers: [],
+      rangeStartHz,
+      rangeEndHz
+    };
+  }
+  
   const now = Date.now();
 
   if (Array.isArray(frame?.mode_markers)) {
+    const selectedMode = String(selectedDecoderMode).toUpperCase();
+    
     frame.mode_markers.forEach((marker) => {
       const markerMode = normalizeModeLabel(marker?.mode);
-      // Only show FT8 / FT4 markers — discard everything else
-      if (markerMode !== "FT8" && markerMode !== "FT4") {
+      
+      // Filter by selected decoder mode - only show markers matching current mode
+      if (markerMode !== selectedMode) {
         return;
       }
+      
       const markerFreq = Number(marker?.frequency_hz);
       const markerOffset = Number(marker?.offset_hz ?? 0);
       const inferredFreq = Number(frame?.center_hz || 0) + markerOffset;
@@ -771,12 +806,16 @@ function buildStableWaterfallMarkers(frame) {
     mergedMarkerMap.set(key, marker); // DSP marker wins when both exist
   }
 
+  const selectedMode = String(selectedDecoderMode).toUpperCase();
+  
   const markers = Array.from(mergedMarkerMap.values())
     .filter((marker) => {
       const frequencyHz = Number(marker?.frequency_hz);
       const m = String(marker?.mode || "").toUpperCase();
-      // Only keep FT8 / FT4 markers
-      if (m !== "FT8" && m !== "FT4") return false;
+      
+      // Filter by selected decoder mode
+      if (m !== selectedMode) return false;
+      
       return Number.isFinite(frequencyHz)
         && frequencyHz >= rangeStartHz
         && frequencyHz <= rangeEndHz;
@@ -965,9 +1004,19 @@ function updateCallsignCacheFromEvent(eventItem) {
   if (!eventItem || typeof eventItem !== "object") {
     return;
   }
+  
+  // Filter events by selected decoder mode - reject mismatched modes
+  const eventMode = String(eventItem.mode || "").toUpperCase();
+  if (selectedDecoderMode) {
+    const selectedMode = String(selectedDecoderMode).toUpperCase();
+    if (eventMode !== selectedMode) {
+      return; // Ignore events from different decoder modes
+    }
+  }
+  
   const callsign = String(eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "").trim().toUpperCase();
   const frequencyHz = Number(eventItem.frequency_hz);
-  const mode = String(eventItem.mode || "").toUpperCase();
+  const mode = eventMode;
   const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
   const seenAtMs = Number.isFinite(timestampMs) ? timestampMs : Date.now();
   cacheLatestCallsign(callsign, seenAtMs);
@@ -1078,11 +1127,29 @@ function buildSimulatedModeMarkers(spanHz, rangeStartHz = null, rangeEndHz = nul
     return items;
   };
 
-  return [
-    ...buildModeSet("FT8", 10, 8.0, 0.0, 0.33),
-    ...buildModeSet("CW", 20, 10.0, 0.33, 0.66),
-    ...buildModeSet("SSB", 30, 12.0, 0.66, 1.0)
-  ];
+  // Filter simulated markers by selected decoder mode
+  if (!selectedDecoderMode) {
+    return []; // No mode selected, show no markers
+  }
+  
+  const selectedMode = String(selectedDecoderMode || "").toUpperCase();
+  
+  // Generate markers only for the selected mode
+  switch (selectedMode) {
+    case "FT8":
+    case "FT4":
+      return buildModeSet(selectedMode, 10, 8.0, 0.0, 1.0);
+    case "CW":
+      return buildModeSet("CW", 20, 10.0, 0.0, 1.0);
+    case "SSB":
+      return buildModeSet("SSB", 30, 12.0, 0.0, 1.0);
+    case "WSPR":
+      return buildModeSet("WSPR", 8, 6.0, 0.0, 1.0);
+    case "APRS":
+      return buildModeSet("APRS", 12, 9.0, 0.0, 1.0);
+    default:
+      return [];
+  }
 }
 
 function updateFullscreenButtonState() {
@@ -1142,6 +1209,16 @@ function renderToast(message, isError = false) {
   noticeEl.appendChild(messageEl);
   noticeEl.appendChild(closeBtn);
   toast.appendChild(noticeEl);
+
+  // Auto-dismiss informational toasts after 5 seconds
+  // Error toasts remain until manually closed
+  if (!isError) {
+    setTimeout(() => {
+      if (noticeEl.parentNode) {
+        noticeEl.remove();
+      }
+    }, 5000);
+  }
 }
 
 function showToast(message) {
@@ -1344,115 +1421,6 @@ presetSelect.addEventListener("change", () => {
   recordPathInput.value = selected.record_path || "";
   logLine("Preset applied");
 });
-
-function loadFavorites() {
-  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  const currentSelection = favoriteBandsSelect.value;
-  favoriteBandsSelect.innerHTML = "";
-  favoriteFilter.innerHTML = "";
-
-  const allFavoritesOption = document.createElement("option");
-  allFavoritesOption.value = "";
-  allFavoritesOption.textContent = "All";
-  favoriteFilter.appendChild(allFavoritesOption);
-
-  if (!data.length) {
-    const emptyOption = document.createElement("option");
-    emptyOption.value = "";
-    emptyOption.textContent = "No favorite bands";
-    emptyOption.selected = true;
-    favoriteBandsSelect.appendChild(emptyOption);
-    updateFavoriteActionsState();
-    return;
-  }
-
-  data.forEach((band) => {
-    const option = document.createElement("option");
-    option.value = band;
-    option.textContent = band;
-    favoriteBandsSelect.appendChild(option);
-    const filterOption = document.createElement("option");
-    filterOption.value = band;
-    filterOption.textContent = band;
-    favoriteFilter.appendChild(filterOption);
-  });
-
-  if (currentSelection && data.includes(currentSelection)) {
-    favoriteBandsSelect.value = currentSelection;
-  }
-
-  updateFavoriteActionsState();
-}
-
-function updateFavoriteActionsState() {
-  const hasValidSelection = Boolean(favoriteBandsSelect.value);
-  removeFavoriteBtn.disabled = !hasValidSelection;
-}
-
-addFavoriteBtn.addEventListener("click", () => {
-  const selectedBand = String(bandNameInput?.value || bandSelect.value || "").trim();
-  if (!selectedBand) {
-    showToast("Select a band first");
-    return;
-  }
-
-  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  if (data.includes(selectedBand)) {
-    showToast("Band is already a favorite");
-    return;
-  }
-
-  data.push(selectedBand);
-  localStorage.setItem("favoriteBands", JSON.stringify(data));
-  loadFavorites();
-  favoriteBandsSelect.value = selectedBand;
-  updateFavoriteActionsState();
-  showToast("Favorite added");
-  logLine("Favorite added");
-  syncFavorites();
-});
-
-removeFavoriteBtn.addEventListener("click", () => {
-  const selectedFavorite = String(favoriteBandsSelect.value || "").trim();
-  if (!selectedFavorite) {
-    showToast("No favorite selected");
-    return;
-  }
-
-  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  if (!data.includes(selectedFavorite)) {
-    showToast("Favorite not found");
-    loadFavorites();
-    return;
-  }
-
-  const filtered = data.filter((band) => band !== selectedFavorite);
-  localStorage.setItem("favoriteBands", JSON.stringify(filtered));
-  loadFavorites();
-  showToast("Favorite removed");
-  logLine("Favorite removed");
-  syncFavorites();
-});
-
-favoriteBandsSelect.addEventListener("change", () => {
-  updateFavoriteActionsState();
-});
-
-favoriteFilter.addEventListener("change", () => {
-  if (favoriteFilter.value) {
-    bandFilter.value = favoriteFilter.value;
-    fetchEvents();
-  }
-});
-
-async function syncFavorites() {
-  const data = JSON.parse(localStorage.getItem("favoriteBands") || "[]");
-  await fetch("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
-    body: JSON.stringify({ favorites: data })
-  });
-}
 
 function getAuthHeader() {
   const user = localStorage.getItem("authUser");
@@ -1662,9 +1630,24 @@ function pushLiveEventToPanel(eventPayload) {
   if (!eventPayload || typeof eventPayload !== "object") {
     return;
   }
+  
+  // Filter events by selected decoder mode
+  const eventMode = String(eventPayload.mode || "").toUpperCase();
+  if (selectedDecoderMode) {
+    const selectedMode = String(selectedDecoderMode).toUpperCase();
+    if (eventMode !== selectedMode) {
+      return; // Ignore events from different decoder modes
+    }
+  }
+  
   updateCallsignCacheFromEvent(eventPayload);
-  latestEvents = [eventPayload, ...latestEvents].slice(0, 500);
+  latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
+  
+  // Update fullscreen modal if it's open
+  if (eventsFullscreenModal && eventsFullscreenModal.classList.contains('show')) {
+    renderEventsFullscreen();
+  }
 }
 
 function applyEventsPanelFilters(items) {
@@ -1699,7 +1682,29 @@ function hasEventsSearchCriteria() {
 
 let _eventsSearchTimer = null;
 let _eventsSearchAbort = null;
+
+let _searchResultsCache = [];
+let _searchPage = 0;
+const SEARCH_PAGE_SIZE = 50;
+
+function renderSearchPage() {
+  const totalPages = Math.max(1, Math.ceil(_searchResultsCache.length / SEARCH_PAGE_SIZE));
+  if (_searchPage >= totalPages) _searchPage = totalPages - 1;
+  if (_searchPage < 0) _searchPage = 0;
+  const start = _searchPage * SEARCH_PAGE_SIZE;
+  const pageItems = _searchResultsCache.slice(start, start + SEARCH_PAGE_SIZE);
+  renderEventList(eventsSearchResultsEl, pageItems, "No events match the current Events search.");
+  if (eventsSearchPageInfoEl) {
+    eventsSearchPageInfoEl.textContent = _searchResultsCache.length > 0
+      ? `Page ${_searchPage + 1}/${totalPages}`
+      : "";
+  }
+  if (eventsSearchPrevBtn) eventsSearchPrevBtn.disabled = _searchPage <= 0;
+  if (eventsSearchNextBtn) eventsSearchNextBtn.disabled = _searchPage >= totalPages - 1;
+}
+
 function scheduleEventsSearch() {
+  _searchPage = 0;
   clearTimeout(_eventsSearchTimer);
   _eventsSearchTimer = setTimeout(fetchAndRenderSearchResults, 400);
 }
@@ -1710,8 +1715,10 @@ async function fetchAndRenderSearchResults() {
   const mode     = (eventsSearchModeInput?.value     || "").trim();
   const band     = (eventsSearchBandInput?.value     || "").trim();
   const snrMin   = (eventsSearchSnrMinInput?.value   || "").trim();
+  const start    = (eventsSearchStartInput?.value    || "").trim();
+  const end      = (eventsSearchEndInput?.value      || "").trim();
 
-  if (!callsign && !mode && !band && !snrMin) {
+  if (!callsign && !mode && !band && !snrMin && !start && !end) {
     if (eventsSearchCountEl) eventsSearchCountEl.textContent = "";
     renderEventList(eventsSearchResultsEl, [], "Use search fields to display results.");
     return;
@@ -1733,6 +1740,10 @@ async function fetchAndRenderSearchResults() {
   if (mode)     params.set("mode", mode);
   if (band)     params.set("band", band);
   if (snrMin !== "") params.set("snr_min", snrMin);
+  const startISO = start.length === 10 ? (() => { const [d,m,y] = start.split("/"); const dt = new Date(`${y}-${m}-${d}T00:00:00`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  const endISO   = end.length   === 10 ? (() => { const [d,m,y] = end.split("/");   const dt = new Date(`${y}-${m}-${d}T23:59:59`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  if (startISO) params.set("start", startISO);
+  if (endISO)   params.set("end",   endISO);
 
   try {
     const resp = await fetch(`/api/events?${params.toString()}`, {
@@ -1749,18 +1760,18 @@ async function fetchAndRenderSearchResults() {
     // Search only shows callsign events
     data = data.filter(e => e.type === "callsign");
 
+    _searchResultsCache = data;
     if (eventsSearchCountEl) {
       eventsSearchCountEl.textContent = data.length === 0 ? "" : `${data.length} result${data.length === 1 ? "" : "s"}`;
     }
-
-    renderEventList(
-      eventsSearchResultsEl,
-      data,
-      "No events match the current Events search."
-    );
+    renderSearchPage();
   } catch (err) {
     if (err.name === "AbortError") return; // superseded by newer search
     _eventsSearchAbort = null; // reset so next search starts clean
+    _searchResultsCache = [];
+    if (eventsSearchPrevBtn) eventsSearchPrevBtn.disabled = true;
+    if (eventsSearchNextBtn) eventsSearchNextBtn.disabled = true;
+    if (eventsSearchPageInfoEl) eventsSearchPageInfoEl.textContent = "";
     renderEventList(eventsSearchResultsEl, [], "Search error. Try again.");
   }
 }
@@ -1859,7 +1870,7 @@ function renderEventList(targetEl, items, emptyMessage) {
     modeBadge.textContent = eventItem.mode || "Unknown";
 
     const timeStamp = document.createElement("span");
-    const timeText = eventItem.timestamp ? new Date(eventItem.timestamp).toLocaleTimeString() : "--";
+    const timeText = eventItem.timestamp ? new Date(eventItem.timestamp).toLocaleString("pt-PT", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "--";
     timeStamp.className = "event-item__time";
     timeStamp.textContent = timeText;
 
@@ -1943,7 +1954,10 @@ function renderEvents(items) {
 
   const filteredItems = applyEventsPanelFilters(orderedEvents);
 
-  eventsTotal.textContent = String(totalEvents);
+  if (eventsCardTitle) {
+    const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
+    eventsCardTitle.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
+  }
   updateEventsPager(totalEvents);
 
   filteredItems.forEach((eventItem) => {
@@ -2052,11 +2066,31 @@ function renderEvents(items) {
   grandCell.textContent = String(grandTotal);
   footRow.appendChild(grandCell);
   foot.appendChild(footRow);
+  
+  // Update fullscreen modal if it's open
+  if (eventsFullscreenModal && eventsFullscreenModal.classList.contains('show')) {
+    renderEventsFullscreen();
+  }
 }
 
+let _fetchEventsAbort = null;
+let _fetchEventsVersion = 0;
+
 async function fetchEvents() {
+  // Increment version — any older in-flight call that completes will be discarded
+  _fetchEventsVersion++;
+  const myVersion = _fetchEventsVersion;
+
+  // Cancel any in-flight request
+  if (_fetchEventsAbort) {
+    _fetchEventsAbort.abort();
+    _fetchEventsAbort = null;
+  }
+  const controller = new AbortController();
+  _fetchEventsAbort = controller;
+
   try {
-    const params = new URLSearchParams({ limit: "200", offset: String(eventOffset) });
+    const params = new URLSearchParams({ offset: String(eventOffset), limit: "200" });
     if (bandFilter.value) {
       params.append("band", bandFilter.value);
     }
@@ -2068,18 +2102,29 @@ async function fetchEvents() {
     }
     if (startFilter.value) {
       params.append("start", new Date(startFilter.value).toISOString());
+    } else {
+      // Default: last 24 hours
+      params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     }
     if (endFilter.value) {
       params.append("end", new Date(endFilter.value).toISOString());
     }
     const resp = await fetch(`/api/events?${params.toString()}`, {
-      headers: { ...getAuthHeader() }
+      headers: { ...getAuthHeader() },
+      signal: controller.signal
     });
+    // Discard if a newer call has already started
+    if (myVersion !== _fetchEventsVersion) return;
+    _fetchEventsAbort = null;
+
     if (resp.status === 401) {
       showToastError("Authentication failed");
       return;
     }
     const data = await resp.json();
+    // Discard if superseded while parsing JSON
+    if (myVersion !== _fetchEventsVersion) return;
+
     renderEvents(data);
     localStorage.setItem("filters", JSON.stringify({
       band: bandFilter.value,
@@ -2089,6 +2134,8 @@ async function fetchEvents() {
       end: endFilter.value
     }));
   } catch (err) {
+    if (err.name === "AbortError") return; // superseded by newer request
+    _fetchEventsAbort = null;
     addEvent("Failed to load events");
   }
 }
@@ -2107,6 +2154,9 @@ async function fetchTotal() {
     }
     if (startFilter.value) {
       params.append("start", new Date(startFilter.value).toISOString());
+    } else {
+      // Default: last 24 hours
+      params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     }
     if (endFilter.value) {
       params.append("end", new Date(endFilter.value).toISOString());
@@ -2117,7 +2167,8 @@ async function fetchTotal() {
     if (!resp.ok) {
       return;
     }
-    await resp.json();
+    const data = await resp.json();
+    totalEventsInDB = Number(data.total || 0);
   } catch (err) {
     return;
   }
@@ -2131,6 +2182,7 @@ async function fetchModeStats() {
     }
     const data = await resp.json();
     modeStatsCache = data.modes || {};
+    // totalEventsInDB is managed by fetchTotal() which applies the 24h filter
   } catch (err) {
     return;
   }
@@ -2184,7 +2236,7 @@ async function requestPropagationSummary(windowMinutes, limit) {
 
 async function fetchPropagationSummary() {
   try {
-    const primaryWindowMinutes = 30;
+    const primaryWindowMinutes = 60;
     const fallbackWindowMinutes = 1440;
     const limit = 3000;
 
@@ -2290,6 +2342,7 @@ function updateScanButtonState() {
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
   refreshQuickBandButtons();
+  refreshModeButtons();
 }
 
 function inferDeviceFamily(deviceId) {
@@ -2319,6 +2372,12 @@ function normalizeScanSampleRate(deviceId, sampleRate) {
 }
 
 async function startScan() {
+  // Validate decoder mode is selected
+  if (!selectedDecoderMode) {
+    showToast("⚠️ Selecione o modo pretendido antes de iniciar o scan");
+    return;
+  }
+
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
   const selectedDeviceId = deviceSelect.value || null;
@@ -2335,6 +2394,7 @@ async function startScan() {
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify({
       device: selectedDeviceId,
+      decoder_mode: selectedDecoderMode.toLowerCase(),
       scan: {
         band: selectedBand,
         start_hz: range.start_hz,
@@ -2355,6 +2415,13 @@ async function startScan() {
   isScanRunning = true;
   setStatus("Scan running");
   logLine("Scan started");
+  // Sync the events filter with the selected decoder mode so only
+  // events from this mode appear in the panel.
+  if (selectedDecoderMode) {
+    modeFilter.value = selectedDecoderMode;
+    fetchEvents();
+    fetchTotal();
+  }
 }
 
 async function stopScan() {
@@ -2365,6 +2432,14 @@ async function stopScan() {
     throw new Error(message);
   }
   isScanRunning = false;
+  
+  // Clear waterfall marker caches when scan stops
+  waterfallMarkerCache.clear();
+  waterfallDecodedMarkerCache.clear();
+  waterfallCallsignCache.clear();
+  latestEvents = []; // Clear events list
+  renderEventsPanelFromCache(); // Refresh empty panel
+  
   setStatus("Scan stopped");
   logLine("Scan stopped");
 }
@@ -2382,6 +2457,18 @@ async function syncScanState() {
       isScanRunning = nextRunning;
       setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
+    }
+    // Restore selectedDecoderMode from backend state (handles page refresh mid-scan)
+    const backendMode = String(data?.decoder_mode || "").trim().toUpperCase();
+    if (backendMode && backendMode !== selectedDecoderMode) {
+      selectedDecoderMode = backendMode;
+      refreshModeButtons();
+      // Sync the events panel filter with the restored mode
+      if (modeFilter.value !== backendMode) {
+        modeFilter.value = backendMode;
+        fetchEvents();
+        fetchTotal();
+      }
     }
   } catch (err) {
     return;
@@ -2514,7 +2601,8 @@ function connectEvents() {
 
 connectEvents();
 fetchEvents();
-setInterval(fetchEvents, 5000);
+fetchTotal();
+setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
 
 /**
  * Dedicated unfiltered fetch to populate the waterfall callsign cache.
@@ -2640,6 +2728,74 @@ if (eventsNextBtn) {
     const totalPages = Math.max(1, Math.ceil(filteredItems.length / EVENTS_PANEL_PAGE_SIZE));
     eventsPanelPage = Math.min(totalPages - 1, eventsPanelPage + 1);
     renderEventsPanelFromCache();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Events Fullscreen Modal
+// ══════════════════════════════════════════════════════════════════
+
+let eventsFullscreenPage = 0;
+
+function renderEventsFullscreen() {
+  const sourceItems = latestEvents || [];
+  const totalEvents = sourceItems.length;
+  const orderedEvents = orderEventsForDisplay(sourceItems);
+  const totalPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
+  
+  if (eventsFullscreenPage > totalPages - 1) {
+    eventsFullscreenPage = totalPages - 1;
+  }
+  if (eventsFullscreenPage < 0) {
+    eventsFullscreenPage = 0;
+  }
+  
+  const startIndex = eventsFullscreenPage * EVENTS_PANEL_PAGE_SIZE;
+  const pagedItems = orderedEvents.slice(startIndex, startIndex + EVENTS_PANEL_PAGE_SIZE);
+  
+  renderEventList(
+    eventsFullscreenEl,
+    pagedItems,
+    "No events available."
+  );
+  
+  if (eventsFullscreenTitle) {
+    const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
+    eventsFullscreenTitle.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
+  }
+  
+  if (eventsFullscreenPageInfo) {
+    eventsFullscreenPageInfo.textContent = `Page: ${eventsFullscreenPage + 1}/${totalPages}`;
+  }
+  
+  if (eventsFullscreenPrevBtn) {
+    eventsFullscreenPrevBtn.disabled = eventsFullscreenPage <= 0;
+  }
+  
+  if (eventsFullscreenNextBtn) {
+    eventsFullscreenNextBtn.disabled = eventsFullscreenPage >= totalPages - 1;
+  }
+}
+
+if (eventsFullscreenPrevBtn) {
+  eventsFullscreenPrevBtn.addEventListener("click", () => {
+    eventsFullscreenPage = Math.max(0, eventsFullscreenPage - 1);
+    renderEventsFullscreen();
+  });
+}
+
+if (eventsFullscreenNextBtn) {
+  eventsFullscreenNextBtn.addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil((latestEvents || []).length / EVENTS_PANEL_PAGE_SIZE));
+    eventsFullscreenPage = Math.min(totalPages - 1, eventsFullscreenPage + 1);
+    renderEventsFullscreen();
+  });
+}
+
+if (eventsFullscreenModal) {
+  eventsFullscreenModal.addEventListener("show.bs.modal", () => {
+    eventsFullscreenPage = eventsPanelPage;
+    renderEventsFullscreen();
   });
 }
 
@@ -3068,9 +3224,6 @@ function connectStatus() {
 connectStatus();
 
 async function fetchDecoderStatus() {
-  if (!decoderStatusEl) {
-    return;
-  }
   try {
     const resp = await fetch("/api/decoders/status", { headers: { ...getAuthHeader() } });
     if (!resp.ok) {
@@ -3084,22 +3237,22 @@ async function fetchDecoderStatus() {
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
     if (extFt.enabled) {
       const modes = (extFt.modes || []).join(", ");
-      externalFtStatusEl.textContent = `Configured (${modes})`;
+      if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = `Configured (${modes})`;
     } else {
-      externalFtStatusEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
+      if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
     }
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
     const kissDisabledReason = kiss.last_error
       ? ` (${kiss.last_error})`
       : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
-    kissStatusEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
-    decoderLastEventEl.textContent = lastEvent;
-    agcStatusEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
+    if (kissStatusModalEl) kissStatusModalEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
+    if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = lastEvent;
+    if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
-    externalFtStatusEl.textContent = "Unavailable";
-    kissStatusEl.textContent = "Unavailable";
-    decoderLastEventEl.textContent = "-";
-    agcStatusEl.textContent = "-";
+    if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Unavailable";
+    if (kissStatusModalEl) kissStatusModalEl.textContent = "Unavailable";
+    if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = "-";
+    if (agcStatusModalEl) agcStatusModalEl.textContent = "-";
   }
 }
 
@@ -3415,16 +3568,6 @@ async function loadSettings() {
     if (data.device_id) {
       deviceSelect.value = data.device_id;
     }
-    if (Array.isArray(data.favorites)) {
-      localStorage.setItem("favoriteBands", JSON.stringify(data.favorites));
-      loadFavorites();
-    }
-    if (data.modes) {
-      ft8Toggle.value = data.modes.ft8 ? "on" : "off";
-      aprsToggle.value = data.modes.aprs ? "on" : "off";
-      cwToggle.value = data.modes.cw ? "on" : "off";
-      ssbToggle.value = data.modes.ssb ? "on" : "off";
-    }
     if (data.station) {
       stationCallsignInput.value = data.station.callsign || "";
       stationOperatorInput.value = data.station.operator || "";
@@ -3449,23 +3592,6 @@ async function loadSettings() {
     logLine("Failed to load settings");
   }
 }
-
-saveModesBtn.addEventListener("click", async () => {
-  const payload = {
-    modes: {
-      ft8: ft8Toggle.value === "on",
-      aprs: aprsToggle.value === "on",
-      cw: cwToggle.value === "on",
-      ssb: ssbToggle.value === "on"
-    }
-  };
-  await fetch("/api/settings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
-    body: JSON.stringify(payload)
-  });
-  showToast("Modes saved");
-});
 
 if (prevPageBtn) {
   prevPageBtn.addEventListener("click", () => {
@@ -3859,6 +3985,68 @@ if (bandSelect && quickBandButtons.length) {
   });
 }
 
+if (quickModeButtons.length) {
+  quickModeButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (scanActionInFlight) {
+        return;
+      }
+      const mode = String(button.dataset.quickMode || "").trim();
+      
+      // During active scan: allow mode change but prevent deselection
+      if (isScanRunning) {
+        if (selectedDecoderMode === mode) {
+          // Trying to deselect during scan - block it
+          showToast("Não é possível desligar o modo durante o scan. Pare o scan primeiro.");
+          return;
+        }
+        // Changing to different mode during scan - clear caches and notify backend
+        waterfallMarkerCache.clear();
+        waterfallDecodedMarkerCache.clear();
+        waterfallCallsignCache.clear();
+        latestEvents = []; // Clear events from previous mode
+        renderEventsPanelFromCache(); // Refresh empty panel
+        
+        selectedDecoderMode = mode;
+        // Sync the events panel filter so only events from this mode are shown
+        modeFilter.value = mode;
+        refreshModeButtons();
+        logLine(`Modo alterado durante scan: ${mode}`);
+        try {
+          await fetch("/api/scan/mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getAuthHeader() },
+            body: JSON.stringify({ decoder_mode: mode.toLowerCase() })
+          });
+          showToast(`Modo alterado para ${mode}`);
+          fetchEvents();
+          fetchTotal();
+        } catch (err) {
+          showToastError(`Erro ao mudar modo: ${err.message}`);
+        }
+        return;
+      }
+      
+      // Not scanning: allow toggle (select/deselect)
+      if (selectedDecoderMode === mode) {
+        selectedDecoderMode = null;
+        modeFilter.value = "";
+        refreshModeButtons();
+        logLine(`Modo desseleccionado: ${mode}`);
+        fetchEvents();
+        fetchTotal();
+      } else {
+        selectedDecoderMode = mode;
+        modeFilter.value = mode;
+        refreshModeButtons();
+        logLine(`Modo selecionado: ${mode}`);
+        fetchEvents();
+        fetchTotal();
+      }
+    });
+  });
+}
+
 saveBandBtn.addEventListener("click", async () => {
   const payload = {
     band: {
@@ -3881,7 +4069,7 @@ saveBandBtn.addEventListener("click", async () => {
   loadBands();
 });
 
-loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFavorites).then(loadFilters).then(fetchTotal);
+loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFilters).then(fetchTotal);
 refreshQuickBandButtons();
 syncScanState();
 setInterval(syncScanState, 5000);
@@ -4145,6 +4333,25 @@ function updateVFODisplay(startHz, endHz) {
   // Events Search modal — callsign input also triggers API search
   // (mode/band/snrMin already have change/input listeners above)
   eventsSearchCallsignInput?.addEventListener("input", scheduleEventsSearch);
+  eventsSearchStartInput?.addEventListener("change", scheduleEventsSearch);
+  eventsSearchEndInput?.addEventListener("change", scheduleEventsSearch);
+  // Init Flatpickr date pickers with Portuguese locale
+  if (eventsSearchStartInput && window.flatpickr) {
+    flatpickr(eventsSearchStartInput, {
+      locale: "pt", dateFormat: "d/m/Y",
+      allowInput: false,
+      onChange: () => scheduleEventsSearch()
+    });
+  }
+  if (eventsSearchEndInput && window.flatpickr) {
+    flatpickr(eventsSearchEndInput, {
+      locale: "pt", dateFormat: "d/m/Y",
+      allowInput: false,
+      onChange: () => scheduleEventsSearch()
+    });
+  }
+  eventsSearchPrevBtn?.addEventListener("click", () => { _searchPage--; renderSearchPage(); });
+  eventsSearchNextBtn?.addEventListener("click", () => { _searchPage++; renderSearchPage(); });
   document.getElementById("eventsSearchModal")
     ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
 })();

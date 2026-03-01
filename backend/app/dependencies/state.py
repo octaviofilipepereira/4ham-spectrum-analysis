@@ -101,6 +101,8 @@ scan_state = {
 
 default_modes = {
     "ft8": False,
+    "ft4": False,
+    "wspr": False,
     "aprs": False,
     "cw": False,
     "ssb": True,

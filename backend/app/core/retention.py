@@ -15,11 +15,12 @@ Designed to be called:
 """
 
 import logging
+from typing import Optional
 
 _log = logging.getLogger("uvicorn.error")
 
 
-async def run_retention() -> dict | None:
+async def run_retention() -> Optional[dict]:
     """
     Execute one retention cycle.
 

@@ -112,16 +112,16 @@
     const bandsPresent = [...new Set(contacts.map((c) => c.band).filter(Boolean))].sort();
     const legG = svg.append("g").attr("class", "legend").attr("pointer-events", "none");
     bandsPresent.slice(0, 8).forEach((band, i) => {
-      const x = 8, y = H - 14 - i * 16;
-      legG.append("rect").attr("x", x).attr("y", y - 9).attr("width", 12).attr("height", 10)
+      const x = 5, y = H - 14 - i * 20;
+      legG.append("rect").attr("x", x).attr("y", y - 11).attr("width", 14).attr("height", 12)
         .attr("fill", bandColor(band)).attr("rx", 2);
-      legG.append("text").attr("x", x + 16).attr("y", y)
-        .attr("fill", "#cbd5e1").attr("font-size", "10px").attr("font-family", "monospace").text(band);
+      legG.append("text").attr("x", x + 18).attr("y", y)
+        .attr("fill", "#cbd5e1").attr("font-size", "15px").attr("font-family", "monospace").text(band);
     });
     const win = data.window_minutes || 60;
     const countLabel = svg.append("text")
       .attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
-      .attr("fill", "#64748b").attr("font-size", "9px").attr("font-family", "monospace")
+      .attr("fill", "#64748b").attr("font-size", "14px").attr("font-family", "monospace")
       .attr("pointer-events", "none")
       .text(`${contacts.length} contacts · ${win >= 1440 ? Math.round(win / 1440) + "d" : win + "min"}`);
 
@@ -264,7 +264,7 @@
   // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchData(windowMinutes) {
     const r = await fetch(
-      `/api/map/contacts?window_minutes=${windowMinutes}&limit=500`,
+      `/api/map/contacts?window_minutes=${windowMinutes}&limit=2000`,
       { headers: authHeader() }
     );
     if (!r.ok) throw new Error(r.status);
@@ -281,13 +281,16 @@
     const W = rect.width  || (isModal ? window.innerWidth  - 48 : 420);
     const H = isModal
       ? Math.max(window.innerHeight - 150, 300)
-      : (rect.height > 80 ? rect.height : Math.min(W * 0.9, 520));
+      : (rect.height > 80 ? rect.height : Math.min(W * 1.1, 680));
 
     let data;
     try {
       data = await fetchData(windowMinutes);
       if (!isModal) _lastData = data;
-    } catch (e) { console.warn("[map] fetch:", e); return; }
+    } catch {
+      console.warn("[map] fetch failed");
+      return;
+    }
 
     const world = await loadWorld();
     const { controls } = drawGlobe(container, W, H, data, world);
@@ -323,7 +326,9 @@
         _lastData = fresh;
         const { controls } = drawGlobe(c, W, H, fresh, world);
         addControls(c, controls, false);
-      } catch (_) {}
+      } catch {
+        // Silently ignore fetch errors in modal
+      }
     },
   };
 
@@ -331,8 +336,10 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("propagationMap")) {
-      // rAF ensures flex layout has resolved before we measure clientHeight
-      requestAnimationFrame(() => PropMap.init("propagationMap", 60));
+      // Double rAF ensures flex layout AND paint have completed before measuring
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => PropMap.init("propagationMap", 60));
+      });
     }
 
     const modalEl = document.getElementById("mapFullscreenModal");

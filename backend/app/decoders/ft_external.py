@@ -455,7 +455,9 @@ class ExternalFtDecoder:
                 # the expensive 120 s WSPR window periodically.
                 # Placed AFTER the frequency guard so the counter
                 # only increments when a real window could run.
-                if mode == "WSPR" and self.wspr_every_n > 1:
+                # Skip logic is bypassed when WSPR is the only active mode
+                # (user explicitly selected WSPR — run every 2-minute slot).
+                if mode == "WSPR" and self.wspr_every_n > 1 and len(self.modes) > 1:
                     self._wspr_skip_counter += 1
                     if self._wspr_skip_counter % self.wspr_every_n != 0:
                         continue
@@ -494,10 +496,21 @@ class ExternalFtDecoder:
                     )
                     freq_shift_hz = float(dial_hz - parked_center) if parked_center else 0.0
 
+                    # For WSPR, decimate at collection time to avoid OOM.
+                    # At 2048 kHz, 120 s = ~1.97 GB complex64.
+                    # Striding to ~48 kHz keeps the buffer under 60 MB;
+                    # wsprd only needs audio up to ~3 kHz so 48 kHz is fine.
+                    _WSPR_MAX_COLLECT_RATE_HZ = 48_000
+                    if mode == "WSPR" and source_sample_rate > _WSPR_MAX_COLLECT_RATE_HZ:
+                        collection_stride = max(1, source_sample_rate // _WSPR_MAX_COLLECT_RATE_HZ)
+                    else:
+                        collection_stride = 1
+
                     audio, decode_sample_rate = await self._collect_audio_window(
                         window_s=window_s,
                         source_sample_rate=source_sample_rate,
                         freq_shift_hz=freq_shift_hz,
+                        collection_stride=collection_stride,
                     )
                     if audio is None or audio.size == 0:
                         self._log(f"ft_external_empty_audio mode={mode}")
@@ -567,8 +580,14 @@ class ExternalFtDecoder:
     # 2-4 GB for WSPR at 2 MHz and caused OOM kills).
     _FREQ_SHIFT_CHUNK = 1_048_576  # ~1 M samples → ~8 MB complex64
 
-    async def _collect_audio_window(self, window_s, source_sample_rate, freq_shift_hz=0.0):
-        source_target_samples = max(1, int(float(window_s) * int(source_sample_rate)))
+    async def _collect_audio_window(self, window_s, source_sample_rate, freq_shift_hz=0.0,
+                                     collection_stride=1):
+        stride = max(1, int(collection_stride))
+        # When stride > 1 we decimate the IQ stream at collection time,
+        # reducing the effective sample rate before the buffer is allocated.
+        # This prevents OOM for WSPR (120 s × 2048 kHz ≈ 2 GB → 46 MB at 48 kHz).
+        effective_source_rate = source_sample_rate // stride if stride > 1 else source_sample_rate
+        source_target_samples = max(1, int(float(window_s) * int(effective_source_rate)))
         # Pre-allocate a single buffer to avoid the double-memory peak
         # of keeping a chunks list AND the concatenated array.
         buffer = np.empty(source_target_samples, dtype=np.complex64)
@@ -585,15 +604,15 @@ class ExternalFtDecoder:
                 await asyncio.sleep(0.005)
                 reads_since_yield = 0
                 continue
+            # Decimate the IQ chunk to reduce memory pressure.
             # Keep complex IQ — do NOT take real part here; USB
             # demodulation requires decimation first to avoid aliasing
             # wideband noise into the audio passband.
+            if stride > 1:
+                array = array[::stride]
             remaining = source_target_samples - total
             chunk_size = min(array.size, remaining)
-            if np.iscomplexobj(array):
-                buffer[total:total + chunk_size] = array[:chunk_size].astype(np.complex64, copy=False)
-            else:
-                buffer[total:total + chunk_size] = array[:chunk_size].astype(np.complex64, copy=False)
+            buffer[total:total + chunk_size] = array[:chunk_size].astype(np.complex64, copy=False)
             total += chunk_size
             del array, iq
             reads_since_yield += 1
@@ -604,7 +623,7 @@ class ExternalFtDecoder:
 
         if total == 0:
             del buffer
-            return None, int(source_sample_rate)
+            return None, int(effective_source_rate)
 
         # Trim buffer to actual size collected
         signal = buffer[:total]
@@ -617,7 +636,7 @@ class ExternalFtDecoder:
         audio, target_rate = await asyncio.to_thread(
             self._process_iq_to_audio_from_signal,
             signal,
-            source_sample_rate,
+            effective_source_rate,   # use the decimated rate, not the SDR rate
             freq_shift_hz,
             window_s,
         )
@@ -792,7 +811,9 @@ class ExternalFtDecoder:
             )
             self._last_command = command
             runner = self.command_runner or self._run_command
-            run_result = runner(command, timeout_s=self.decode_timeout_s)
+            # wsprd needs more time than jt9 — allow up to 90 s for deep decode
+            effective_timeout_s = 90.0 if mode_upper == "WSPR" else self.decode_timeout_s
+            run_result = runner(command, timeout_s=effective_timeout_s)
             stdout = str(run_result.get("stdout") or "")
             stderr = str(run_result.get("stderr") or "")
             merged_lines = [line for line in (stdout + "\n" + stderr).splitlines() if str(line).strip()]

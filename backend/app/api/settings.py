@@ -34,6 +34,8 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
     modes = settings.get("modes") or {}
     settings["modes"] = {
         "ft8": bool(modes.get("ft8", state.default_modes["ft8"])),
+        "ft4": bool(modes.get("ft4", state.default_modes["ft4"])),
+        "wspr": bool(modes.get("wspr", state.default_modes["wspr"])),
         "aprs": bool(modes.get("aprs", state.default_modes["aprs"])),
         "cw": bool(modes.get("cw", state.default_modes["cw"])),
         "ssb": bool(modes.get("ssb", state.default_modes["ssb"])),
@@ -83,6 +85,8 @@ def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
         modes = payload.get("modes") or {}
         existing["modes"] = {
             "ft8": bool(modes.get("ft8", state.default_modes["ft8"])),
+            "ft4": bool(modes.get("ft4", state.default_modes["ft4"])),
+            "wspr": bool(modes.get("wspr", state.default_modes["wspr"])),
             "aprs": bool(modes.get("aprs", state.default_modes["aprs"])),
             "cw": bool(modes.get("cw", state.default_modes["cw"])),
             "ssb": bool(modes.get("ssb", state.default_modes["ssb"])),

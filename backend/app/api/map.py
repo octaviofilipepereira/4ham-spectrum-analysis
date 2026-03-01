@@ -9,7 +9,7 @@ Provides geo-resolved contact data for the propagation world map.
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional
+from typing import Dict
 
 from fastapi import APIRouter, Depends
 from app.dependencies import state
@@ -26,7 +26,7 @@ router = APIRouter()
 @router.get("/map/contacts")
 def map_contacts(
     window_minutes: int = 60,
-    limit: int = 500,
+    limit: int = 2000,
     _: bool = Depends(optional_verify_basic_auth),
 ) -> Dict:
     """
@@ -38,13 +38,13 @@ def map_contacts(
 
     Args:
         window_minutes: Time window in minutes (default 60)
-        limit: Maximum contacts to return (default 500)
+        limit: Maximum contacts to return (default 2000)
 
     Returns:
         Dict with station coords, contact list, and metadata
     """
     safe_window = max(1, min(int(window_minutes or 60), 10080))  # cap at 1 week
-    safe_limit = max(10, min(int(limit or 500), 2000))
+    safe_limit = max(10, min(int(limit or 2000), 2000))
 
     # ── Station QTH from saved settings ─────────────────────────────────────
     settings = state.db.get_settings()
@@ -52,8 +52,8 @@ def map_contacts(
     locator = str(station.get("locator") or "").strip().upper()
     station_callsign = str(station.get("callsign") or "").strip().upper()
 
-    station_lat: Optional[float] = None
-    station_lon: Optional[float] = None
+    station_lat: float | None = None
+    station_lon: float | None = None
     if locator:
         pos = maidenhead_to_latlon(locator)
         if pos:
@@ -67,7 +67,7 @@ def map_contacts(
             station_lon = dxcc.get("lon")
 
     # Fallback: centre of Portugal (CT7BFV home)
-    if station_lat is None:
+    if station_lat is None or station_lon is None:
         station_lat = 39.5
         station_lon = -8.0
 
