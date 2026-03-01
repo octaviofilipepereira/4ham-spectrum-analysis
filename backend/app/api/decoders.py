@@ -396,6 +396,26 @@ def _cw_frequency_provider() -> int:
     return state.scan_engine.center_hz or 0
 
 
+def _cw_iq_provider_noargs() -> Optional[np.ndarray]:
+    """Adapter for CWSweepDecoder: no-argument wrapper around _cw_iq_provider."""
+    return _cw_iq_provider(4096)
+
+
+def _cw_flush_iq() -> None:
+    """Drain all pending samples from the CW IQ queue.
+
+    Called by CWSweepDecoder after each park() to discard stale IQ captured
+    at the previous SDR centre frequency.
+    """
+    if _cw_iq_queue is None:
+        return
+    while True:
+        try:
+            _cw_iq_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+
+
 async def _start_cw_decoder(force: bool = False) -> Dict:
     """
     Start CW decoder.
@@ -419,20 +439,52 @@ async def _start_cw_decoder(force: bool = False) -> Dict:
     
     # Initialize decoder if needed
     if state.cw_decoder is None:
-        from app.decoders.cw_session import CWDecoderSession
-        
-        state.cw_decoder = CWDecoderSession(
-            iq_provider=_cw_iq_provider,
-            sample_rate_provider=_cw_sample_rate_provider,
-            frequency_provider=_cw_frequency_provider,
-            on_event=_handle_cw_event,
-            logger=log,
-            target_sample_rate=state.cw_target_sample_rate,
-            window_seconds=state.cw_window_seconds,
-            overlap_seconds=state.cw_overlap_seconds,
-            min_confidence=state.cw_min_confidence,
+        # Choose sweep mode when the scan band covers more than one step width.
+        # Otherwise fall back to the existing fixed-frequency CWDecoderSession.
+        engine = state.scan_engine
+        band_start = getattr(engine, "start_hz", 0)
+        band_end = getattr(engine, "end_hz", 0)
+        sweep_available = (
+            band_start > 0
+            and band_end > band_start
+            and (band_end - band_start) > state.cw_sweep_step_hz
         )
-    
+
+        if sweep_available:
+            from app.decoders.cw_sweep import CWSweepDecoder
+
+            state.cw_decoder = CWSweepDecoder(
+                band_start_hz=band_start,
+                band_end_hz=band_end,
+                step_hz=state.cw_sweep_step_hz,
+                dwell_s=state.cw_sweep_dwell_s,
+                settle_ms=state.cw_sweep_settle_ms,
+                iq_provider=_cw_iq_provider_noargs,
+                iq_flush=_cw_flush_iq,
+                sample_rate_provider=_cw_sample_rate_provider,
+                frequency_provider=_cw_frequency_provider,
+                scan_park=lambda hz: state.scan_engine.park(hz),
+                scan_unpark=lambda: state.scan_engine.unpark(),
+                on_event=_handle_cw_event,
+                logger=log,
+                target_sample_rate=state.cw_target_sample_rate,
+                min_confidence=state.cw_min_confidence,
+            )
+        else:
+            from app.decoders.cw_session import CWDecoderSession
+
+            state.cw_decoder = CWDecoderSession(
+                iq_provider=_cw_iq_provider,
+                sample_rate_provider=_cw_sample_rate_provider,
+                frequency_provider=_cw_frequency_provider,
+                on_event=_handle_cw_event,
+                logger=log,
+                target_sample_rate=state.cw_target_sample_rate,
+                window_seconds=state.cw_window_seconds,
+                overlap_seconds=state.cw_overlap_seconds,
+                min_confidence=state.cw_min_confidence,
+            )
+
     started = await state.cw_decoder.start()
     state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
     return {"started": bool(started), "reason": None}

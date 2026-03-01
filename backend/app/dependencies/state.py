@@ -209,6 +209,9 @@ cw_target_sample_rate = _env_int("CW_TARGET_SAMPLE_RATE", 8000)
 cw_window_seconds = _env_float("CW_WINDOW_SECONDS", 5.0)
 cw_overlap_seconds = _env_float("CW_OVERLAP_SECONDS", 2.0)
 cw_min_confidence = _env_float("CW_MIN_CONFIDENCE", 0.3)
+cw_sweep_step_hz = _env_int("CW_SWEEP_STEP_HZ", 6500)
+cw_sweep_dwell_s = _env_float("CW_SWEEP_DWELL_S", 5.0)
+cw_sweep_settle_ms = _env_int("CW_SWEEP_SETTLE_MS", 100)
 
 # Other decoders
 ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
