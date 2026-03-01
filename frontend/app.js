@@ -2455,13 +2455,21 @@ async function syncScanState() {
     const nextRunning = data?.state === "running";
     const isPreview = data?.state === "preview";
     if (!scanActionInFlight) {
+      const wasRunning = isScanRunning;
       isScanRunning = nextRunning;
       setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
+      // Deselect mode button when scan transitions running → stopped
+      if (wasRunning && !nextRunning && selectedDecoderMode) {
+        selectedDecoderMode = null;
+        refreshModeButtons();
+      }
     }
     // Restore selectedDecoderMode from backend state (handles page refresh mid-scan)
+    // Only sync when a scan is actually running — when stopped, the stale
+    // decoder_mode in scan_state should not force a button selection.
     const backendMode = String(data?.decoder_mode || "").trim().toUpperCase();
-    if (backendMode && backendMode !== selectedDecoderMode) {
+    if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
       selectedDecoderMode = backendMode;
       refreshModeButtons();
       // Sync the events panel filter with the restored mode

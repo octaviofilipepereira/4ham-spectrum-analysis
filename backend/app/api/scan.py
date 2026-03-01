@@ -240,6 +240,7 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     """
     await state.scan_engine.stop_async()
     state.scan_state["state"] = "stopped"
+    state.scan_state["decoder_mode"] = ""  # clear so frontend doesn't auto-select the button
     state.db.end_scan(
         state.scan_state.get("scan_id"),
         datetime.now(timezone.utc).isoformat()
