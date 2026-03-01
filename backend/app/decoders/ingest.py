@@ -4,6 +4,7 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 from datetime import datetime, timezone
+import json
 import re
 
 
@@ -68,10 +69,14 @@ def build_callsign_event(payload, scan_state):
     if not isinstance(payload, dict):
         return None
     callsign = normalize_callsign(payload.get("callsign"))
-    if not callsign:
-        return None
-
     mode = _normalize_mode(payload.get("mode"))
+    if not callsign:
+        # For CW, allow events without an identified callsign so that decoded
+        # text and occupancy data are still recorded (callsign stored as "").
+        if mode == "CW" and payload.get("msg"):
+            callsign = ""
+        else:
+            return None
     frequency_hz = payload.get("frequency_hz")
     if frequency_hz is None:
         frequency_hz = 0
@@ -80,6 +85,23 @@ def build_callsign_event(payload, scan_state):
     except (TypeError, ValueError):
         frequency_hz = 0
     band = payload.get("band") or _infer_band_from_frequency(frequency_hz)
+
+    # Merge CW occupancy/decode fields into the payload JSON blob so they are
+    # persisted without needing new DB columns and are available to the API.
+    _extra = {}
+    for _key in ("occupancy_rms", "occupancy_peak", "wpm"):
+        _val = payload.get(_key)
+        if _val is not None:
+            _extra[_key] = _val
+    _base = payload.get("payload")
+    if _extra:
+        try:
+            _merged = {**(json.loads(_base) if isinstance(_base, str) else (_base or {})), **_extra}
+            payload_blob = json.dumps(_merged)
+        except Exception:
+            payload_blob = json.dumps(_extra)
+    else:
+        payload_blob = _base
 
     return {
         "type": "callsign",
@@ -98,10 +120,10 @@ def build_callsign_event(payload, scan_state):
         "dt_s": payload.get("dt_s"),
         "is_new": payload.get("is_new"),
         "path": payload.get("path"),
-        "payload": payload.get("payload"),
         "lat": payload.get("lat"),
         "lon": payload.get("lon"),
         "msg": payload.get("msg"),
+        "payload": payload_blob,
         "source": payload.get("source") or _infer_source(mode),
         "device": payload.get("device") or scan_state.get("device"),
         "scan_id": payload.get("scan_id") or scan_state.get("scan_id")

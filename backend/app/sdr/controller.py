@@ -120,6 +120,15 @@ class SDRController:
                 if details.get("driver") == device_id:
                     device_args = details
                     break
+        else:
+            # No specific device requested: pick the first non-audio device
+            # (the SoapySDR audio plugin opens host sound cards via PulseAudio/
+            # ALSA and should never be used as the SDR receiver).
+            for args in SoapySDR.Device.enumerate():
+                details = _kwargs_to_dict(args)
+                if details.get("driver", "").lower() not in ("audio",):
+                    device_args = details
+                    break
 
         device = SoapySDR.Device(device_args)
         device.setSampleRate(SOAPY_SDR_RX, 0, sample_rate)

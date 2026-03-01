@@ -367,33 +367,62 @@ class CWSweepDecoder:
                 )
 
                 # ── 7. Emit events ────────────────────────────────────────
-                if result.callsigns and result.confidence >= self.min_confidence:
-                    # Deduplicate: a single transmission often repeats the same
-                    # callsign (e.g. "IK6LBT IK6LBT DE CT7BFV"). Emit once per
-                    # unique callsign, preserving first-seen order.
-                    unique_callsigns = list(dict.fromkeys(result.callsigns))
-                    self._callsigns_detected += len(unique_callsigns)
+                if result.confidence >= self.min_confidence and result.text:
                     # Absolute RF frequency: SDR centre + audio-domain tone offset
                     rf_freq_hz = pos_hz + int(result.dominant_freq_hz)
-                    for callsign in unique_callsigns:
-                        event = {
-                            "timestamp": _utc_now_iso(),
-                            "mode": "CW",
-                            "callsign": callsign,
-                            "frequency_hz": rf_freq_hz,
-                            "snr_db": 0.0,
-                            "dt_s": 0.0,
-                            "df_hz": int(result.dominant_freq_hz),
-                            "confidence": result.confidence,
-                            "msg": result.text,
-                            "raw": f"CW {result.wpm:.1f}wpm",
-                            "source": "internal_cw",
-                        }
+
+                    # Common occupancy fields added to every CW event so the
+                    # frontend / database can show signal strength and decoded
+                    # text regardless of whether a callsign was identified.
+                    base_event = {
+                        "timestamp": _utc_now_iso(),
+                        "mode": "CW",
+                        "frequency_hz": rf_freq_hz,
+                        "snr_db": 0.0,
+                        "dt_s": 0.0,
+                        "df_hz": int(result.dominant_freq_hz),
+                        "confidence": result.confidence,
+                        "msg": result.text,
+                        "raw": f"CW {result.wpm:.1f}wpm",
+                        "source": "internal_cw",
+                        # Occupancy metrics: absolute signal level at this position
+                        "occupancy_rms": round(audio_rms, 6),
+                        "occupancy_peak": round(audio_peak, 4),
+                        "wpm": round(result.wpm, 1),
+                    }
+
+                    if result.callsigns:
+                        # Deduplicate: a single transmission often repeats the
+                        # same callsign (e.g. "IK6LBT IK6LBT DE CT7BFV").
+                        # Emit once per unique callsign, preserving order.
+                        unique_callsigns = list(dict.fromkeys(result.callsigns))
+                        self._callsigns_detected += len(unique_callsigns)
+                        for callsign in unique_callsigns:
+                            event = {**base_event, "callsign": callsign}
+                            if self.on_event:
+                                try:
+                                    self.on_event(event)
+                                    self._events_emitted += 1
+                                    self._last_event_at = _utc_now_iso()
+                                except Exception as exc:
+                                    self._log(f"cw_sweep_event_error {exc}")
+                    else:
+                        # No callsign identified — emit a single event with
+                        # callsign=None so the decoded text and occupancy data
+                        # are still recorded and visible in the frontend.
+                        event = {**base_event, "callsign": None}
                         if self.on_event:
                             try:
                                 self.on_event(event)
                                 self._events_emitted += 1
                                 self._last_event_at = _utc_now_iso()
+                                self._log(
+                                    f"cw_sweep_text_event pos={pos_hz}Hz "
+                                    f"conf={result.confidence:.2f} "
+                                    f"wpm={result.wpm:.1f} "
+                                    f"text={repr(result.text[:60])}",
+                                    level="info",
+                                )
                             except Exception as exc:
                                 self._log(f"cw_sweep_event_error {exc}")
 

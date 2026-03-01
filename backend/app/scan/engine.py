@@ -91,11 +91,21 @@ class ScanEngine:
         self.pass_count = 0
         record_path = self.config.get("record_path")
         device_id = self.config.get("device_id")
-        self.device, self.stream = self.controller.open(
-            device_id=device_id,
-            sample_rate=self.sample_rate,
-            center_hz=self.center_hz,
-            gain=self.config.get("gain")
+        _gain = self.config.get("gain")
+        _sr = self.sample_rate
+        _chz = self.center_hz
+        loop = asyncio.get_event_loop()
+        self.device, self.stream = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: self.controller.open(
+                    device_id=device_id,
+                    sample_rate=_sr,
+                    center_hz=_chz,
+                    gain=_gain,
+                ),
+            ),
+            timeout=10.0,  # prevent blocking the event loop on USB hang
         )
         if record_path:
             self._record_fp = open(record_path, "wb")
@@ -176,11 +186,20 @@ class ScanEngine:
         self.center_hz = int(center_hz or 14175000)
         self.preview_start_hz = int(start_hz or 0)
         self.preview_end_hz = int(end_hz or 0)
-        self.device, self.stream = self.controller.open(
-            device_id=device_id,
-            sample_rate=self.sample_rate,
-            center_hz=self.center_hz,
-            gain=gain,
+        _sr = self.sample_rate
+        _chz = self.center_hz
+        loop = asyncio.get_event_loop()
+        self.device, self.stream = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: self.controller.open(
+                    device_id=device_id,
+                    sample_rate=_sr,
+                    center_hz=_chz,
+                    gain=gain,
+                ),
+            ),
+            timeout=10.0,  # prevent blocking the event loop on USB hang
         )
         if self.device is None:
             self.preview_start_hz = 0
