@@ -56,7 +56,7 @@ async def _retention_loop():
 async def lifespan(app_instance: FastAPI):
     """Auto-start enabled decoders on startup and stop them gracefully on shutdown."""
     from app.dependencies import state as _state
-    from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder
+    from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder, _start_cw_decoder
 
     if _state.ft_external_enable:
         try:
@@ -71,6 +71,13 @@ async def lifespan(app_instance: FastAPI):
             _log.info("FT internal decoder startup: %s", result)
         except Exception as exc:
             _log.warning("FT internal decoder startup failed: %s", exc)
+
+    if _state.cw_internal_enable:
+        try:
+            result = await _start_cw_decoder(force=False)
+            _log.info("CW decoder startup: %s", result)
+        except Exception as exc:
+            _log.warning("CW decoder startup failed: %s", exc)
 
     # Auto-open preview if a real SDR device is available
     try:
