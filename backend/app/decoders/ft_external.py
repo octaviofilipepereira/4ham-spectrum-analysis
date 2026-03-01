@@ -440,9 +440,8 @@ class ExternalFtDecoder:
                     await asyncio.sleep(self.poll_s)
                     continue
 
-                # Determine the dial frequency for this mode + band
-                # BEFORE waiting for the slot boundary, so we can park
-                # the scanner on the correct frequency.
+                # Pre-check: verify frequency is known before waiting for slot.
+                # Re-evaluated after the wait to pick up any band/mode change.
                 center_hz = _to_int(
                     self.frequency_provider() if self.frequency_provider else 0,
                     default=0,
@@ -485,7 +484,26 @@ class ExternalFtDecoder:
                     self._log(f"ft_external_slot_aborted mode={mode}")
                     continue
 
-                # ── Park the scanner on the dial frequency ──────
+                # Re-evaluate band and dial frequency after the slot wait.
+                # If the user changed band or the scan restarted during the
+                # wait (which can be up to 120 s for WSPR), the park target
+                # and wsprd frequency argument must reflect the current band.
+                center_hz = _to_int(
+                    self.frequency_provider() if self.frequency_provider else 0,
+                    default=0,
+                )
+                band = str(
+                    self.band_provider() if self.band_provider else ""
+                ).strip().lower()
+                dial_hz = int(
+                    self.DIAL_FREQUENCIES.get(band, {}).get(mode, center_hz)
+                    or center_hz
+                )
+                if dial_hz <= 0:
+                    self._log(
+                        f"ft_external_skip_no_freq_post_wait mode={mode} band={band}"
+                    )
+                    continue
                 # In auto-scan mode the SDR hops across the band.
                 # Parking holds it on the dial frequency so every
                 # IQ sample in the window comes from ONE frequency.

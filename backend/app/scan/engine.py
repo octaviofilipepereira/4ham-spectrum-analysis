@@ -77,6 +77,11 @@ class ScanEngine:
         self.mode = self.config.get("mode", "auto")
         self.center_hz = int(self.config.get("center_hz", self.start_hz or 0))
         self.current_hz = self.center_hz
+        # Always reset parked state on new scan — a previous scan may have left
+        # the engine parked (e.g. WSPR window was in progress when scan stopped),
+        # which would block the new scan loop immediately.
+        self._parked = False
+        self._parked_event.set()
         if self.step_hz > 0 and self.end_hz > self.start_hz:
             span = self.end_hz - self.start_hz
             self.total_steps = (span // self.step_hz) + 1
