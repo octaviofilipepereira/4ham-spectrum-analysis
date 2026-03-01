@@ -118,6 +118,30 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
             if state.ft_external_decoder is not None:
                 await _stop_ft_external_decoder()
                 log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
+            # Apply per-scan CW sweep parameters from payload (overrides env defaults)
+            _cw_step = normalized_payload.get("cw_step_hz")
+            _cw_dwell = normalized_payload.get("cw_dwell_s")
+            _cw_params_changed = False
+            if _cw_step is not None:
+                try:
+                    _new_step = int(_cw_step)
+                    if _new_step != state.cw_sweep_step_hz:
+                        state.cw_sweep_step_hz = _new_step
+                        _cw_params_changed = True
+                except (ValueError, TypeError):
+                    pass
+            if _cw_dwell is not None:
+                try:
+                    _new_dwell = float(_cw_dwell)
+                    if _new_dwell != state.cw_sweep_dwell_s:
+                        state.cw_sweep_dwell_s = _new_dwell
+                        _cw_params_changed = True
+                except (ValueError, TypeError):
+                    pass
+            # Restart decoder if params changed (so new dwell/step take effect)
+            if state.cw_decoder and _cw_params_changed:
+                await _stop_cw_decoder()
+                log(f"scan_cw_decoder_restarted:step={state.cw_sweep_step_hz}hz dwell={state.cw_sweep_dwell_s}s")
             if not state.cw_decoder:
                 result = await _start_cw_decoder(
                     force=True,
