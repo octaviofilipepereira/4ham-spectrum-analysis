@@ -26,7 +26,12 @@ from app.config.loader import (
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
-from app.api.decoders import _start_cw_decoder, _stop_cw_decoder
+from app.api.decoders import (
+    _start_cw_decoder,
+    _stop_cw_decoder,
+    _start_ft_external_decoder,
+    _stop_ft_external_decoder,
+)
 
 
 router = APIRouter()
@@ -268,6 +273,11 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
     Allows switching between decoders (FT8, FT4, WSPR, etc.) without stopping the scan.
     Updates scan_state with new decoder_mode for decoder selection.
     
+    Implements mutual exclusion between decoders:
+    - FT8/FT4/WSPR → FT external decoder active, CW decoder stopped
+    - CW → CW decoder active, FT external decoder stopped
+    - SSB/APRS → Both decoders stopped (use other decoders)
+    
     Args:
         payload: Dict with key:
             - decoder_mode: New decoder mode (ft8, ft4, wspr, cw, ssb, aprs)
@@ -287,35 +297,81 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
     # Get previous mode to manage decoder lifecycle
     previous_mode = state.scan_state.get("decoder_mode", "").lower()
     
-    # Stop CW decoder if switching away from CW mode
-    if previous_mode == "cw" and decoder_mode != "cw":
-        if state.cw_decoder is not None:
-            try:
-                await _stop_cw_decoder()
-                log("scan_cw_decoder_stopped")
-            except Exception as exc:
-                log(f"scan_cw_decoder_stop_failed:{exc}")
+    # Define which modes use which decoder
+    ft_modes = ["ft8", "ft4", "wspr"]
+    cw_modes = ["cw"]
     
     # Update scan state with new decoder mode
     state.scan_state["decoder_mode"] = decoder_mode
     log(f"scan_decoder_mode_changed:{decoder_mode}")
-
-    # Update external FT decoder modes so it only processes the selected mode
-    decoder_mode_upper = decoder_mode.upper()
-    if state.ft_external_decoder is not None:
-        state.ft_external_decoder.set_modes([decoder_mode_upper])
-        state.ft_external_modes[:] = [decoder_mode_upper]
-        log(f"scan_decoder_external_modes_updated:{decoder_mode_upper}")
     
-    # Start CW decoder if switching to CW mode
-    if decoder_mode == "cw" and previous_mode != "cw":
-        try:
-            result = await _start_cw_decoder(force=True)
-            log(f"scan_cw_decoder_started:{result}")
-        except Exception as exc:
-            log(f"scan_cw_decoder_start_failed:{exc}")
+    # Manage decoder lifecycle based on mode transition
+    if decoder_mode in ft_modes:
+        # FT8/FT4/WSPR mode: need FT external decoder, stop CW decoder
+        
+        # Stop CW decoder if it's running
+        if state.cw_decoder is not None:
+            try:
+                await _stop_cw_decoder()
+                log("scan_cw_decoder_stopped:switching_to_ft_mode")
+            except Exception as exc:
+                log(f"scan_cw_decoder_stop_failed:{exc}")
+        
+        # Start FT external decoder if not already running
+        if state.ft_external_decoder is None:
+            try:
+                result = await _start_ft_external_decoder(force=True)
+                log(f"scan_ft_external_decoder_started:{result}")
+            except Exception as exc:
+                log(f"scan_ft_external_decoder_start_failed:{exc}")
+        
+        # Update FT decoder to process only the selected mode
+        decoder_mode_upper = decoder_mode.upper()
+        if state.ft_external_decoder is not None:
+            state.ft_external_decoder.set_modes([decoder_mode_upper])
+            state.ft_external_modes[:] = [decoder_mode_upper]
+            log(f"scan_ft_external_modes_updated:{decoder_mode_upper}")
+    
+    elif decoder_mode in cw_modes:
+        # CW mode: need CW decoder, stop FT external decoder
+        
+        # Stop FT external decoder if it's running
+        if state.ft_external_decoder is not None:
+            try:
+                await _stop_ft_external_decoder()
+                log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
+            except Exception as exc:
+                log(f"scan_ft_external_decoder_stop_failed:{exc}")
+        
+        # Start CW decoder if not already running
+        if state.cw_decoder is None:
+            try:
+                result = await _start_cw_decoder(force=True)
+                log(f"scan_cw_decoder_started:{result}")
+            except Exception as exc:
+                log(f"scan_cw_decoder_start_failed:{exc}")
+    
+    else:
+        # SSB/APRS mode: stop both decoders (use other decoders)
+        
+        # Stop CW decoder if running
+        if state.cw_decoder is not None:
+            try:
+                await _stop_cw_decoder()
+                log("scan_cw_decoder_stopped:switching_to_other_mode")
+            except Exception as exc:
+                log(f"scan_cw_decoder_stop_failed:{exc}")
+        
+        # Stop FT external decoder if running
+        if state.ft_external_decoder is not None:
+            try:
+                await _stop_ft_external_decoder()
+                log("scan_ft_external_decoder_stopped:switching_to_other_mode")
+            except Exception as exc:
+                log(f"scan_ft_external_decoder_stop_failed:{exc}")
 
     return {"status": "ok", "decoder_mode": decoder_mode}
+
 
 
 @router.get("/status")
