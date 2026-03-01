@@ -93,7 +93,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         - Closes connection with code 1008 if authentication fails
         
     Mode Markers:
-        - Only FT8 and FT4 markers are shown
+        - Only FT8, FT4 and WSPR markers are shown (DSP occupancy pipeline)
         - Quality gate: minimum SNR and confidence thresholds
         - Temporal persistence: requires multiple consecutive detections
         - Bucketed by 1 kHz slots to tolerate frequency drift
@@ -233,8 +233,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             ):
                 continue
             
-            # Filter: only show FT8 / FT4 markers (all others discarded)
-            if mode_name not in ("FT8", "FT4"):
+            # Filter: only show known digital mode markers (DSP occupancy pipeline)
+            if mode_name not in ("FT8", "FT4", "WSPR"):
                 continue
             
             # Quality gate: filter weak / low-confidence detections
