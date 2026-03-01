@@ -355,6 +355,20 @@ async def _stop_ft_external_decoder() -> Dict:
 
 def _handle_cw_event(payload: Dict) -> Dict:
     """Handle event from CW decoder."""
+    # Inject a waterfall marker so the decode is visible on the spectrogram
+    import time as _time
+    freq_hz = int(payload.get("frequency_hz") or 0)
+    if freq_hz > 0:
+        bucket = int(round(freq_hz / 500)) * 500  # 500 Hz bucket
+        state.cw_marker_cache[bucket] = {
+            "frequency_hz": freq_hz,
+            "offset_hz": int(payload.get("df_hz") or 0),
+            "mode": "CW",
+            "snr_db": float(payload.get("snr_db") or 0.0),
+            "bandwidth_hz": 200,
+            "confidence": float(payload.get("confidence") or 0.0),
+            "seen_at": _time.time(),
+        }
     return _ingest_callsign_payloads([payload], {"source": "internal_cw"})
 
 

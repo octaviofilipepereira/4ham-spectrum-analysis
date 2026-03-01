@@ -288,6 +288,21 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             if cand["hits"] >= state.marker_min_hits:
                 mode_markers.append(cand["marker"])
         
+        # Merge CW decode markers (come from actual decodes, not DSP occupancy)
+        _CW_MARKER_TTL_S = 45.0
+        for bucket, cw_m in list(state.cw_marker_cache.items()):
+            if now_ts - float(cw_m.get("seen_at", 0)) > _CW_MARKER_TTL_S:
+                state.cw_marker_cache.pop(bucket, None)
+                continue
+            mode_markers.append({
+                "offset_hz": cw_m["offset_hz"],
+                "frequency_hz": cw_m["frequency_hz"],
+                "mode": "CW",
+                "snr_db": cw_m["snr_db"],
+                "bandwidth_hz": cw_m["bandwidth_hz"],
+                "confidence": cw_m["confidence"],
+            })
+
         # Sort markers by offset and limit to 24
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
         mode_markers = mode_markers[:24]

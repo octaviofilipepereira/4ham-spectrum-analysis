@@ -141,6 +141,9 @@ last_agc_gain_db = None
 # Tracking dict: bucket_key -> {"hits": int, "last_seen": float, "marker": dict}
 marker_candidates = {}
 
+# CW decode markers: bucket_key (500 Hz) -> {frequency_hz, offset_hz, mode, snr_db, bandwidth_hz, confidence, seen_at}
+cw_marker_cache: dict = {}
+
 threshold_state = {}
 
 
