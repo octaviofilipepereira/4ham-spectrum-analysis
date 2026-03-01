@@ -78,10 +78,13 @@ class CWDecoderSession:
         
         # CW decoder instance with quality validations enabled
         # Real-world signals are always 5+ seconds, so we can apply strict filtering
+        # Note: Envelope-based algorithm works best up to ~60 WPM
+        # Contest speeds 60-80 WPM may work but with reduced accuracy
+        # Speeds > 80 WPM require advanced algorithms (matched filters, correlation)
         self.decoder = CWDecoder(
             sample_rate=self.target_sample_rate,
             min_snr_db=3.0,      # Reject if SNR < 3 dB (pure noise)
-            max_wpm=100.0,       # Reject if WPM > 100 (unrealistic)
+            max_wpm=120.0,       # Allow contest speeds, but accuracy degrades > 60 WPM
             min_audio_duration=2.0,  # Only apply SNR check to signals >= 2s
         )
         

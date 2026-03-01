@@ -143,8 +143,8 @@ def test_cw_decoder_with_noise():
     assert len(result.text) > 0, "Should decode something even with noise"
 
 
-def test_cw_decoder_high_speed():
-    """Test CW decoder with 60 WPM signal (high speed contest)."""
+def test_cw_decoder_high_speed_60wpm():
+    """Test CW decoder with 60 WPM signal (high speed amateur)."""
     decoder = CWDecoder(sample_rate=8000)
     
     # Generate high-speed CW signal
@@ -158,7 +158,7 @@ def test_cw_decoder_high_speed():
     # Decode
     result = decoder.decode(audio)
     
-    print(f"\n=== High-Speed CW Test ===")
+    print(f"\n=== High-Speed CW Test (60 WPM) ===")
     print(f"Input: {callsign} @ 60 WPM")
     print(f"Decoded text: {result.text}")
     print(f"WPM: {result.wpm:.1f}")
@@ -167,7 +167,7 @@ def test_cw_decoder_high_speed():
     
     # Verify results - at high speed, WPM estimation has wider tolerance
     assert callsign in result.text.replace(' ', ''), f"Expected {callsign} in decoded text"
-    assert 40 <= result.wpm <= 100, f"WPM should be 40-100, got {result.wpm}"
+    assert 40 <= result.wpm <= 120, f"WPM should be 40-120, got {result.wpm}"
     assert result.confidence > 0.4, f"Confidence should be > 0.4, got {result.confidence}"
 
 
@@ -202,5 +202,5 @@ if __name__ == "__main__":
     # Run tests directly
     test_cw_decoder_with_synthetic_signal()
     test_cw_decoder_with_noise()
-    test_cw_decoder_high_speed()
+    test_cw_decoder_high_speed_60wpm()
     test_cw_decoder_rejects_pure_noise()

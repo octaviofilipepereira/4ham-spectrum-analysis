@@ -165,6 +165,12 @@ class CWDecoder:
 
     Processes mono audio samples (float32, normalised to ±1.0)
     and returns decoded text with metadata.
+    
+    Performance Notes:
+    - Optimal: 10-50 WPM (typical amateur operation)
+    - Good: 50-60 WPM (high-speed amateur, some contests)
+    - Degraded: 60-80 WPM (contest software, reduced accuracy)
+    - Poor: > 80 WPM (requires advanced algorithms)
 
     Args:
         sample_rate:  Audio sample rate in Hz (default: 8000).
@@ -172,6 +178,9 @@ class CWDecoder:
         high_hz:      Bandpass upper cutoff (default: 900 Hz).
         smooth_ms:    Envelope smoothing window in ms (default: 5.0).
         threshold:    Binarisation threshold [0..1] or None for auto.
+        min_snr_db:   Minimum SNR to accept signal (0 = disabled).
+        max_wpm:      Maximum WPM before rejecting as noise (0 = disabled).
+        min_audio_duration: Min duration (s) to apply SNR validation.
     """
 
     def __init__(
