@@ -200,8 +200,14 @@ ft_external_command_wspr = str(os.getenv(
 ft_external_target_sr = _env_int("FT_EXTERNAL_TARGET_SAMPLE_RATE", 12000)
 ft_external_wspr_every_n = _env_int("FT_EXTERNAL_WSPR_EVERY_N", 5)
 
-# Other decoders
+# CW decoder
 cw_internal_enable = _env_bool("CW_INTERNAL_ENABLE", False)
+cw_target_sample_rate = _env_int("CW_TARGET_SAMPLE_RATE", 8000)
+cw_window_seconds = _env_float("CW_WINDOW_SECONDS", 5.0)
+cw_overlap_seconds = _env_float("CW_OVERLAP_SECONDS", 2.0)
+cw_min_confidence = _env_float("CW_MIN_CONFIDENCE", 0.3)
+
+# Other decoders
 ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
 psk_internal_enable = _env_bool("PSK_INTERNAL_ENABLE", False)
 
@@ -269,6 +275,14 @@ decoder_status = {
         "target_sample_rate": ft_external_target_sr,
         "status": None
     },
+    "cw": {
+        "enabled": cw_internal_enable,
+        "target_sample_rate": cw_target_sample_rate,
+        "window_seconds": cw_window_seconds,
+        "overlap_seconds": cw_overlap_seconds,
+        "min_confidence": cw_min_confidence,
+        "status": None
+    },
     "runtime": decoder_runtime_metrics,
 }
 
@@ -279,6 +293,7 @@ kiss_task = None
 direwolf_process = None
 ft_internal_decoder = None
 ft_external_decoder = None
+cw_decoder = None
 
 
 # ═══════════════════════════════════════════════════════════════════

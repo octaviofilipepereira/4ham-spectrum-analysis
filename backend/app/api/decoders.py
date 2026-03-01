@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import asyncio
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import state
@@ -34,6 +35,9 @@ router = APIRouter()
 # Created/registered in _start_ft_external_decoder, cleared in _stop.
 _ft_external_iq_queue: Optional[asyncio.Queue] = None
 
+# CW decoder IQ queue
+_cw_iq_queue: Optional[asyncio.Queue] = None
+
 
 def _refresh_decoder_process_status():
     """Update decoder process status from running instances."""
@@ -46,6 +50,9 @@ def _refresh_decoder_process_status():
     
     if state.ft_external_decoder:
         state.decoder_status["external_ft"]["ft_external_status"] = state.ft_external_decoder.snapshot()
+    
+    if state.cw_decoder:
+        state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
 
 
 def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
@@ -342,6 +349,97 @@ async def _stop_ft_external_decoder() -> Dict:
     return {"stopped": True, "reason": None}
 
 
+# ───────────────────────────────────────────────────────────────────
+# CW Decoder
+# ───────────────────────────────────────────────────────────────────
+
+def _handle_cw_event(payload: Dict) -> Dict:
+    """Handle event from CW decoder."""
+    return _ingest_callsign_payloads([payload], {"source": "internal_cw"})
+
+
+def _cw_iq_provider(num_samples: int) -> Optional[np.ndarray]:
+    """Provide IQ samples from the scan engine to CW decoder."""
+    if not state.scan_engine.running:
+        return None
+    return state.scan_engine.read_iq(num_samples)
+
+
+def _cw_sample_rate_provider() -> int:
+    """Get current scan sample rate."""
+    return state.scan_engine.sample_rate
+
+
+def _cw_frequency_provider() -> int:
+    """Get current scan center frequency."""
+    return state.scan_engine.center_hz or 0
+
+
+async def _start_cw_decoder(force: bool = False) -> Dict:
+    """
+    Start CW decoder.
+    
+    Args:
+        force: Force start even if disabled in config
+        
+    Returns:
+        Dict with started status and reason
+    """
+    global _cw_iq_queue
+    
+    if not force and not state.cw_internal_enable:
+        state.decoder_status["cw"]["status"] = None
+        return {"started": False, "reason": "cw_disabled"}
+    
+    # Create the IQ queue and register it with the engine's pump loop
+    if _cw_iq_queue is None:
+        _cw_iq_queue = asyncio.Queue(maxsize=512)
+        state.scan_engine.register_iq_listener(_cw_iq_queue)
+    
+    # Initialize decoder if needed
+    if state.cw_decoder is None:
+        from app.decoders.cw_session import CWDecoderSession
+        
+        state.cw_decoder = CWDecoderSession(
+            iq_provider=_cw_iq_provider,
+            sample_rate_provider=_cw_sample_rate_provider,
+            frequency_provider=_cw_frequency_provider,
+            on_event=_handle_cw_event,
+            logger=log,
+            target_sample_rate=state.cw_target_sample_rate,
+            window_seconds=state.cw_window_seconds,
+            overlap_seconds=state.cw_overlap_seconds,
+            min_confidence=state.cw_min_confidence,
+        )
+    
+    started = await state.cw_decoder.start()
+    state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
+    return {"started": bool(started), "reason": None}
+
+
+async def _stop_cw_decoder() -> Dict:
+    """
+    Stop CW decoder.
+    
+    Returns:
+        Dict with stopped status and reason
+    """
+    global _cw_iq_queue
+    
+    if _cw_iq_queue is not None:
+        state.scan_engine.unregister_iq_listener(_cw_iq_queue)
+        _cw_iq_queue = None
+    
+    if state.cw_decoder is None:
+        state.decoder_status["cw"]["status"] = None
+        return {"stopped": False, "reason": "cw_not_running"}
+    
+    await state.cw_decoder.stop()
+    state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
+    state.cw_decoder = None
+    return {"stopped": True, "reason": None}
+
+
 # ═══════════════════════════════════════════════════════════════════
 # API Endpoints
 # ═══════════════════════════════════════════════════════════════════
@@ -462,6 +560,30 @@ async def decoder_external_ft_modes(payload: dict, _: bool = Depends(optional_ve
         return {"status": "ok", "modes": updated}
     
     return {"status": "ok", "modes": [], "reason": "ft_external_not_running"}
+
+
+@router.post("/cw/start")
+async def decoder_cw_start(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
+    """Start CW decoder."""
+    result = await _start_cw_decoder(force=True)
+    return {
+        "status": "ok",
+        "started": bool(result.get("started")),
+        "reason": result.get("reason"),
+        "decoder": state.decoder_status["cw"]["status"],
+    }
+
+
+@router.post("/cw/stop")
+async def decoder_cw_stop(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
+    """Stop CW decoder."""
+    result = await _stop_cw_decoder()
+    return {
+        "status": "ok",
+        "stopped": bool(result.get("stopped")),
+        "reason": result.get("reason"),
+        "decoder": state.decoder_status["cw"]["status"],
+    }
 
 
 @router.post("/events")
@@ -600,10 +722,20 @@ async def decoder_start(
             "decoder": state.decoder_status["external_ft"]["ft_external_status"],
         }
     
+    elif decoder_type == "cw":
+        result = await _start_cw_decoder(force=True)
+        return {
+            "status": "ok",
+            "decoder_type": "cw",
+            "started": bool(result.get("started")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["cw"]["status"],
+        }
+    
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft"
+            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft, cw"
         )
 
 
@@ -648,9 +780,19 @@ async def decoder_stop(
             "decoder": state.decoder_status["external_ft"]["ft_external_status"],
         }
     
+    elif decoder_type == "cw":
+        result = await _stop_cw_decoder()
+        return {
+            "status": "ok",
+            "decoder_type": "cw",
+            "stopped": bool(result.get("stopped")),
+            "reason": result.get("reason"),
+            "decoder": state.decoder_status["cw"]["status"],
+        }
+    
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft"
+            detail=f"Unknown decoder type: {decoder_type}. Supported: internal-ft, external-ft, cw"
         )
 
