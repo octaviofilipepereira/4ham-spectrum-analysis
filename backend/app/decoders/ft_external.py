@@ -476,6 +476,10 @@ class ExternalFtDecoder:
                     if self._wspr_skip_counter % self.wspr_every_n != 0:
                         continue
 
+                # Remember the band BEFORE waiting so we can detect a
+                # band change that happened during the slot wait.
+                band_before_wait = band
+
                 # ── Wait for the next FT8/FT4 slot boundary ──
                 slot_ok = await self._wait_for_slot_boundary(window_s)
                 if not slot_ok:
@@ -502,6 +506,17 @@ class ExternalFtDecoder:
                 if dial_hz <= 0:
                     self._log(
                         f"ft_external_skip_no_freq_post_wait mode={mode} band={band}"
+                    )
+                    continue
+
+                # If the band changed while we were waiting for the slot
+                # boundary, the IQ data at the start of this window came
+                # from the OLD scan (wrong frequency).  Skip this window and
+                # let the next iteration start a fresh capture on the new band.
+                if band != band_before_wait and band_before_wait:
+                    self._log(
+                        f"ft_external_band_changed_abort"
+                        f" old={band_before_wait} new={band} mode={mode}"
                     )
                     continue
                 # In auto-scan mode the SDR hops across the band.
