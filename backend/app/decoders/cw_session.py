@@ -175,32 +175,38 @@ class CWDecoderSession:
                 
                 # Calculate samples needed for window
                 target_samples = int(self.window_seconds * self.target_sample_rate)
-                source_samples_needed = int(self.window_seconds * source_sample_rate)
                 
-                # Collect IQ samples
-                iq_samples = await asyncio.to_thread(
-                    self.iq_provider,
-                    source_samples_needed
-                )
-                
-                if iq_samples is None or len(iq_samples) == 0:
-                    await asyncio.sleep(self.poll_interval_s)
-                    continue
-                
-                # Convert IQ to audio (magnitude)
-                audio = np.abs(iq_samples).astype(np.float32)
-                
-                # Resample to target rate if needed
-                if source_sample_rate != self.target_sample_rate:
-                    from scipy.signal import resample_poly
-                    # Calculate rational resampling factors
-                    gcd = np.gcd(source_sample_rate, self.target_sample_rate)
-                    up = self.target_sample_rate // gcd
-                    down = source_sample_rate // gcd
-                    audio = resample_poly(audio, up, down).astype(np.float32)
-                
-                # Append to buffer
-                self._audio_buffer = np.concatenate([self._audio_buffer, audio])
+                # Collect IQ samples in chunks until we have enough for processing
+                # (scan_engine returns chunks of ~4096 samples each)
+                max_attempts = 100  # Prevent infinite loop
+                attempts = 0
+                while len(self._audio_buffer) < target_samples and attempts < max_attempts:
+                    attempts += 1
+                    
+                    # Try to get next chunk
+                    iq_samples = await asyncio.to_thread(
+                        self.iq_provider,
+                        4096  # Request chunk size
+                    )
+                    
+                    if iq_samples is None or len(iq_samples) == 0:
+                        await asyncio.sleep(0.01)  # Brief wait before retry
+                        continue
+                    
+                    # Convert IQ to audio (magnitude)
+                    audio = np.abs(iq_samples).astype(np.float32)
+                    
+                    # Resample to target rate if needed
+                    if source_sample_rate != self.target_sample_rate:
+                        from scipy.signal import resample_poly
+                        # Calculate rational resampling factors
+                        gcd = np.gcd(source_sample_rate, self.target_sample_rate)
+                        up = self.target_sample_rate // gcd
+                        down = source_sample_rate // gcd
+                        audio = resample_poly(audio, up, down).astype(np.float32)
+                    
+                    # Append to buffer
+                    self._audio_buffer = np.concatenate([self._audio_buffer, audio])
                 
                 # Process if we have enough samples
                 if len(self._audio_buffer) >= target_samples:

@@ -103,16 +103,44 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
-    # Store selected decoder mode in scan state for later use
+    # Store selected decoder mode in scan state and start appropriate decoder
     decoder_mode = normalized_payload.get("decoder_mode", "").lower()
     if decoder_mode:
         state.scan_state["decoder_mode"] = decoder_mode
         log(f"scan_decoder_mode:{decoder_mode}")
-        # Update external FT decoder so it only processes the selected mode
-        decoder_mode_upper = decoder_mode.upper()
-        if state.ft_external_decoder is not None:
-            state.ft_external_decoder.set_modes([decoder_mode_upper])
-        state.ft_external_modes[:] = [decoder_mode_upper]
+        
+        # Define mode categories
+        ft_modes = ["ft8", "ft4", "wspr"]
+        cw_modes = ["cw"]
+        
+        if decoder_mode in cw_modes:
+            # CW mode: stop FT decoder, start CW decoder
+            if state.ft_external_decoder is not None:
+                await _stop_ft_external_decoder()
+                log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
+            if not state.cw_decoder:
+                result = await _start_cw_decoder(force=True)
+                log(f"scan_cw_decoder_started:{result}")
+        elif decoder_mode in ft_modes:
+            # FT mode: stop CW decoder, start/configure FT decoder
+            if state.cw_decoder is not None:
+                await _stop_cw_decoder()
+                log("scan_cw_decoder_stopped:switching_to_ft_mode")
+            decoder_mode_upper = decoder_mode.upper()
+            if state.ft_external_decoder is not None:
+                state.ft_external_decoder.set_modes([decoder_mode_upper])
+            else:
+                result = await _start_ft_external_decoder(force=True)
+                log(f"scan_ft_external_decoder_started:{result}")
+                if state.ft_external_decoder:
+                    state.ft_external_decoder.set_modes([decoder_mode_upper])
+            state.ft_external_modes[:] = [decoder_mode_upper]
+        else:
+            # Other modes (SSB, APRS): stop both decoders
+            if state.cw_decoder is not None:
+                await _stop_cw_decoder()
+            if state.ft_external_decoder is not None:
+                await _stop_ft_external_decoder()
 
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()

@@ -2389,12 +2389,13 @@ async function startScan() {
   const recordPath = recordPathInput.value || null;
   const selectedBand = bandSelect.value;
   const range = getScanRangeForBand(selectedBand);
+  const decoderModeToSend = selectedDecoderMode ? selectedDecoderMode.toLowerCase() : "";
   const response = await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
     body: JSON.stringify({
       device: selectedDeviceId,
-      decoder_mode: selectedDecoderMode.toLowerCase(),
+      decoder_mode: decoderModeToSend,
       scan: {
         band: selectedBand,
         start_hz: range.start_hz,
