@@ -95,7 +95,9 @@ def binarise(
         noise_floor = float(np.median(sorted_vals[: max(1, len(sorted_vals) // 3)]))
         signal_peak = float(np.percentile(sorted_vals, 95))
         threshold = noise_floor + (signal_peak - noise_floor) * 0.5
-        threshold = max(threshold, 0.05)   # never below 5 %
+        # Guard: allow very weak on/off patterns (was 0.05 — too high for RTL-SDR
+        # direct sampling where signal peaks can be as low as 0.015 of full scale)
+        threshold = max(threshold, 0.01)
 
     return (norm > threshold).astype(np.int8)
 
@@ -106,20 +108,81 @@ def binarise(
 
 def dominant_frequency(audio: np.ndarray, sample_rate: int) -> float:
     """
-    Return the frequency bin with the highest power in 100 Hz – (Nyquist-200 Hz).
+    Return the frequency bin with the highest power in 100 Hz – 75 % of Nyquist.
 
-    Extended range vs the old 200-1200 Hz window so that CW tones are found
-    regardless of the SDR-to-carrier offset (up to ±(Nyquist-200) Hz from center).
-    A typical 48 kHz SDR resampled to 8 kHz gives a usable range of 100-3800 Hz.
+    The upper limit is capped at 75% of Nyquist (e.g. 6000 Hz at 16 kHz) to keep
+    the Butterworth bandpass well within its linear operating range.  Tones near
+    Nyquist cause severe phase distortion in the 4th-order IIR filter and produce
+    a noisy envelope that the CW timing analyser cannot interpret.
     """
     fft = np.abs(np.fft.rfft(audio))
     freqs = np.fft.rfftfreq(len(audio), d=1.0 / sample_rate)
-    nyquist = sample_rate / 2.0
-    mask = (freqs >= 100) & (freqs <= nyquist - 200)
+    safe_upper = sample_rate * 0.375   # 75% of Nyquist = 37.5% of sample_rate
+    mask = (freqs >= 100) & (freqs <= safe_upper)
     if not mask.any():
         return 700.0  # default CW tone
     idx = np.argmax(fft[mask])
     return float(freqs[mask][idx])
+
+
+def dominant_frequencies(
+    audio: np.ndarray,
+    sample_rate: int,
+    n: int = 3,
+    min_snr_db: float = 3.0,
+) -> list[float]:
+    """
+    Return up to *n* candidate CW tone frequencies, each with ≥ min_snr_db
+    local SNR above the surrounding ±500 Hz noise floor.
+
+    This replaces the single-peak approach so the decoder can try multiple
+    candidate tones per audio window (useful when there are 2+ CW stations
+    within the sweep position coverage of ±(step_hz/2) Hz).
+    """
+    fft = np.abs(np.fft.rfft(audio))
+    freqs = np.fft.rfftfreq(len(audio), d=1.0 / sample_rate)
+    safe_upper = sample_rate * 0.375   # 75% of Nyquist
+    freq_res = freqs[1] - freqs[0] if len(freqs) > 1 else 1.0
+    half_noise_bins = max(1, int(500.0 / freq_res))  # ±500 Hz neighbourhood
+
+    candidates: list[float] = []
+    power = fft ** 2
+    mask = (freqs >= 100) & (freqs <= safe_upper)
+    indices = np.where(mask)[0]
+
+    # Work on a copy so we can null-out found peaks
+    remaining = power.copy()
+    for _ in range(n):
+        sub = remaining[indices]
+        if sub.max() == 0:
+            break
+        best_local = int(indices[np.argmax(sub)])
+        freq = float(freqs[best_local])
+        peak_power = float(remaining[best_local])
+
+        # Estimate local noise from bins ±500 Hz away (excluding ±100 Hz around peak)
+        lo = max(0, best_local - half_noise_bins)
+        hi = min(len(remaining) - 1, best_local + half_noise_bins)
+        close_lo = max(0, best_local - int(100.0 / freq_res))
+        close_hi = min(len(remaining) - 1, best_local + int(100.0 / freq_res))
+        noise_bins = np.concatenate([
+            remaining[lo:close_lo],
+            remaining[close_hi+1:hi+1],
+        ])
+        noise_mean = float(noise_bins.mean()) if len(noise_bins) > 0 else 1e-30
+        if noise_mean < 1e-30:
+            break
+        snr_db = 10.0 * np.log10(peak_power / noise_mean)
+        if snr_db >= min_snr_db:
+            candidates.append(freq)
+
+        # Null out surrounding region so next iteration finds the next peak
+        null_bins = max(1, int(300.0 / freq_res))
+        null_lo = max(0, best_local - null_bins)
+        null_hi = min(len(remaining) - 1, best_local + null_bins)
+        remaining[null_lo:null_hi+1] = 0.0
+
+    return candidates if candidates else [dominant_frequency(audio, sample_rate)]
 
 
 def estimate_snr(audio: np.ndarray, sample_rate: int, tone_hz: float) -> float:
