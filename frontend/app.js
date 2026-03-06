@@ -257,6 +257,99 @@ function getScanRangeForBand(bandName) {
   return { start_hz: 14000000, end_hz: 14350000 };
 }
 
+function getWaterfallFullRangeHz() {
+  const frame = lastSpectrumFrame;
+  const scanStartHz = Number(frame?.scan_start_hz || 0);
+  const scanEndHz = Number(frame?.scan_end_hz || 0);
+  const centerHz = Number(frame?.center_hz || 0);
+  const spanHz = Number(frame?.span_hz || 0);
+  const hasScanRange = Number.isFinite(scanStartHz)
+    && Number.isFinite(scanEndHz)
+    && scanStartHz > 0
+    && scanEndHz > scanStartHz;
+  if (hasScanRange) {
+    return {
+      startHz: scanStartHz,
+      spanHz: scanEndHz - scanStartHz,
+    };
+  }
+  if (Number.isFinite(centerHz) && Number.isFinite(spanHz) && centerHz > 0 && spanHz > 0) {
+    const fullSpanHz = spanHz * WATERFALL_SEGMENT_COUNT;
+    return {
+      startHz: centerHz - (fullSpanHz / 2),
+      spanHz: fullSpanHz,
+    };
+  }
+  const fallbackBand = bandSelect?.value || "20m";
+  const fallbackRange = getScanRangeForBand(fallbackBand);
+  const startHz = Number(fallbackRange.start_hz || 0);
+  const endHz = Number(fallbackRange.end_hz || 0);
+  if (startHz > 0 && endHz > startHz) {
+    return {
+      startHz,
+      spanHz: endHz - startHz,
+    };
+  }
+  return null;
+}
+
+function getModeFocusFrequencyHz(mode) {
+  const normalizedMode = String(mode || "").trim().toUpperCase();
+  const selectedBand = String(bandSelect?.value || "").trim().toLowerCase();
+  if (normalizedMode === "CW" || normalizedMode === "CW_CANDIDATE") {
+    const cwFocusHz = Number(WATERFALL_CW_FOCUS_FREQUENCIES[selectedBand]);
+    if (Number.isFinite(cwFocusHz) && cwFocusHz > 0) {
+      return cwFocusHz;
+    }
+  }
+  const bandDialFrequencies = WATERFALL_DIAL_FREQUENCIES[selectedBand] || null;
+  if (bandDialFrequencies && Number.isFinite(Number(bandDialFrequencies[normalizedMode]))) {
+    return Number(bandDialFrequencies[normalizedMode]);
+  }
+  const bandRange = getScanRangeForBand(bandSelect?.value || "20m");
+  const startHz = Number(bandRange.start_hz || 0);
+  const endHz = Number(bandRange.end_hz || 0);
+  if (startHz > 0 && endHz > startHz) {
+    return Math.round((startHz + endHz) / 2);
+  }
+  return null;
+}
+
+function recenterWaterfallForMode(mode) {
+  if (!waterfallExplorerEnabled) {
+    waterfallExplorerEnabled = true;
+    localStorage.setItem(WATERFALL_EXPLORER_KEY, "1");
+  }
+  if (waterfallExplorerZoom <= 1) {
+    waterfallExplorerZoom = 4;
+    localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, "4");
+    applyWaterfallExplorerUi();
+  }
+  if (waterfallExplorerZoom <= 1) {
+    return;
+  }
+  const targetHz = Number(getModeFocusFrequencyHz(mode));
+  if (!Number.isFinite(targetHz) || targetHz <= 0) {
+    return;
+  }
+  const fullRange = getWaterfallFullRangeHz();
+  if (!fullRange) {
+    return;
+  }
+  const fullStartHz = Number(fullRange.startHz || 0);
+  const fullSpanHz = Number(fullRange.spanHz || 0);
+  if (!Number.isFinite(fullStartHz) || !Number.isFinite(fullSpanHz) || fullSpanHz <= 0) {
+    return;
+  }
+  const clampedTargetHz = Math.max(fullStartHz, Math.min(fullStartHz + fullSpanHz, targetHz));
+  const zoom = Math.max(1, Number(waterfallExplorerZoom || 1));
+  const visibleSpanHz = fullSpanHz / zoom;
+  const desiredStartHz = clampedTargetHz - (visibleSpanHz / 2);
+  const maxPan = Math.max(0, 1 - (1 / zoom));
+  waterfallExplorerPan = Math.max(0, Math.min(maxPan, (desiredStartHz - fullStartHz) / fullSpanHz));
+  redrawWaterfallFromHistory();
+}
+
 function populateBandSelectOptions(sourceBands) {
   if (!bandSelect) {
     return;
@@ -363,18 +456,36 @@ const WATERFALL_CALLSIGN_TTL_MS = 15 * 60 * 1000;
 // Used for DSP-marker to callsign proximity matching (non-decoded modes).
 const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
 
-// Standard dial frequencies for FT8 / FT4, mirrored from the backend.
+// Standard dial frequencies for FT8 / FT4 / WSPR, mirrored from the backend.
 // Used to snap decoded callsigns to a single marker position per band/mode.
 const WATERFALL_DIAL_FREQUENCIES = {
-  "160m": { FT8: 1_840_000, FT4: 1_840_000 },
-  "80m":  { FT8: 3_573_000, FT4: 3_575_500 },
-  "40m":  { FT8: 7_074_000, FT4: 7_047_500 },
-  "20m":  { FT8: 14_074_000, FT4: 14_080_000 },
-  "17m":  { FT8: 18_100_000, FT4: 18_104_000 },
-  "15m":  { FT8: 21_074_000, FT4: 21_140_000 },
-  "12m":  { FT8: 24_915_000, FT4: 24_919_000 },
-  "10m":  { FT8: 28_074_000, FT4: 28_180_000 },
-  "2m":   { FT8: 144_174_000, FT4: 144_170_000 },
+  "160m": { FT8: 1_840_000, FT4: 1_840_000, WSPR: 1_836_600 },
+  "80m":  { FT8: 3_573_000, FT4: 3_575_500, WSPR: 3_592_600 },
+  "60m":  { FT8: 5_357_000, FT4: 5_357_000, WSPR: 5_287_200 },
+  "40m":  { FT8: 7_074_000, FT4: 7_047_500, WSPR: 7_040_100 },
+  "30m":  { FT8: 10_136_000, FT4: 10_140_000, WSPR: 10_140_200 },
+  "20m":  { FT8: 14_074_000, FT4: 14_080_000, WSPR: 14_095_600 },
+  "17m":  { FT8: 18_100_000, FT4: 18_104_000, WSPR: 18_104_600 },
+  "15m":  { FT8: 21_074_000, FT4: 21_140_000, WSPR: 21_094_600 },
+  "12m":  { FT8: 24_915_000, FT4: 24_919_000, WSPR: 24_924_600 },
+  "10m":  { FT8: 28_074_000, FT4: 28_180_000, WSPR: 28_124_600 },
+  "6m":   { FT8: 50_313_000, FT4: 50_318_000, WSPR: 50_293_000 },
+  "2m":   { FT8: 144_174_000, FT4: 144_170_000, WSPR: 144_489_000 },
+};
+
+const WATERFALL_CW_FOCUS_FREQUENCIES = {
+  "160m": 1_830_000,
+  "80m": 3_530_000,
+  "60m": 5_355_000,
+  "40m": 7_030_000,
+  "30m": 10_120_000,
+  "20m": 14_050_000,
+  "17m": 18_086_000,
+  "15m": 21_050_000,
+  "12m": 24_900_000,
+  "10m": 28_050_000,
+  "6m": 50_100_000,
+  "2m": 144_050_000,
 };
 // Maximum distance from a decoded freq to a known dial freq for the signal
 // to be considered "on that dial".  FT8 audio range is 0-3000 Hz; add 1 kHz
@@ -568,7 +679,22 @@ function clearWaterfallFrame() {
 
 function normalizeModeLabel(mode) {
   const text = String(mode || "").trim().toUpperCase();
+  if (text === "CW_CANDIDATE") {
+    return "CW TRAFFIC";
+  }
   return text || "SIG";
+}
+
+function modeMatchesSelectedMode(modeValue, selectedModeValue) {
+  const mode = String(modeValue || "").trim().toUpperCase();
+  const selectedMode = String(selectedModeValue || "").trim().toUpperCase();
+  if (!selectedMode) {
+    return true;
+  }
+  if (selectedMode === "CW") {
+    return mode === "CW" || mode === "CW_CANDIDATE";
+  }
+  return mode === selectedMode;
 }
 
 function formatRulerFrequencyLabel(frequencyHz) {
@@ -758,10 +884,10 @@ function buildStableWaterfallMarkers(frame) {
     const selectedMode = String(selectedDecoderMode).toUpperCase();
     
     frame.mode_markers.forEach((marker) => {
-      const markerMode = normalizeModeLabel(marker?.mode);
+      const markerModeRaw = String(marker?.mode || "").trim().toUpperCase();
       
       // Filter by selected decoder mode - only show markers matching current mode
-      if (markerMode !== selectedMode) {
+      if (!modeMatchesSelectedMode(markerModeRaw, selectedMode)) {
         return;
       }
       
@@ -778,7 +904,7 @@ function buildStableWaterfallMarkers(frame) {
       const key = `${Math.round(frequencyHz / 50) * 50}`;
       waterfallMarkerCache.set(key, {
         frequency_hz: frequencyHz,
-        mode: markerMode,
+        mode: markerModeRaw,
         snr_db: Number(marker?.snr_db),
         crest_db: Number(marker?.crest_db),
         seen_at: now
@@ -817,7 +943,7 @@ function buildStableWaterfallMarkers(frame) {
       const m = String(marker?.mode || "").toUpperCase();
       
       // Filter by selected decoder mode
-      if (m !== selectedMode) return false;
+      if (!modeMatchesSelectedMode(m, selectedMode)) return false;
       
       return Number.isFinite(frequencyHz)
         && frequencyHz >= rangeStartHz
@@ -905,7 +1031,7 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     const markerCallsign = embeddedCallsign || proximityMatch?.callsign || "";
     const markerModeText = String(marker?.mode || "").trim().toUpperCase();
     const missingCallsignLabel = markerModeText === "CW_CANDIDATE"
-      ? "CW CANDIDATE"
+      ? "CW TRAFFIC"
       : markerModeText === "CW"
         ? "CW"
         : "-";
@@ -1025,7 +1151,7 @@ function updateCallsignCacheFromEvent(eventItem) {
   const eventMode = String(eventItem.mode || "").toUpperCase();
   if (selectedDecoderMode) {
     const selectedMode = String(selectedDecoderMode).toUpperCase();
-    if (eventMode !== selectedMode) {
+    if (!modeMatchesSelectedMode(eventMode, selectedMode)) {
       return; // Ignore events from different decoder modes
     }
   }
@@ -1898,7 +2024,7 @@ function renderEventList(targetEl, items, emptyMessage) {
 
     const modeBadge = document.createElement("span");
     modeBadge.className = "badge bg-primary";
-    modeBadge.textContent = eventItem.mode || "Unknown";
+    modeBadge.textContent = normalizeModeLabel(eventItem.mode || "Unknown");
 
     const timeStamp = document.createElement("span");
     const timeText = eventItem.timestamp ? new Date(eventItem.timestamp).toLocaleString("pt-PT", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "--";
@@ -1954,7 +2080,11 @@ function renderEventList(targetEl, items, emptyMessage) {
       const isCwMode = String(eventItem.mode || "").toUpperCase() === "CW";
       const snrValue = Number(eventItem.snr_db);
       const crestValue = Number(eventItem.crest_db);
-      const powerValue = Number(eventItem.power_dbm);
+      const rawPowerValue = eventItem.power_dbm;
+      const powerValue =
+        rawPowerValue === null || rawPowerValue === undefined || rawPowerValue === ""
+          ? NaN
+          : Number(rawPowerValue);
       const snrLabel = isCwMode ? "SNR(tone)" : "SNR";
       const snrText = Number.isFinite(snrValue) ? `${snrLabel} ${snrValue >= 0 ? "+" : ""}${snrValue.toFixed(1)} dB` : null;
       const crestText = Number.isFinite(crestValue) ? `Crest ${crestValue.toFixed(1)} dB` : null;
@@ -1968,13 +2098,18 @@ function renderEventList(targetEl, items, emptyMessage) {
       const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
       const snrValue = Number(eventItem.snr_db);
       const crestValue = Number(eventItem.crest_db);
-      const powerValue = Number(eventItem.power_dbm);
+      const rawPowerValue = eventItem.power_dbm;
+      const powerValue =
+        rawPowerValue === null || rawPowerValue === undefined || rawPowerValue === ""
+          ? NaN
+          : Number(rawPowerValue);
       const snr = Number.isFinite(snrValue) ? `${snrValue.toFixed(1)} dB` : "-";
       const crest = Number.isFinite(crestValue) ? `${crestValue.toFixed(1)} dB` : "-";
-      const pwr = Number.isFinite(powerValue) ? `${powerValue.toFixed(1)} dBm` : "-";
-      detail.textContent = isCwMode
-        ? `bw=${bw} snr(tone)=${snr} crest=${crest} pwr=${pwr}`
-        : `bw=${bw} snr=${snr} pwr=${pwr}`;
+      const pwr = Number.isFinite(powerValue) ? `pwr=${powerValue.toFixed(1)} dBm` : null;
+      const detailParts = isCwMode
+        ? [`bw=${bw}`, `snr(tone)=${snr}`, `crest=${crest}`, pwr]
+        : [`bw=${bw}`, `snr=${snr}`, pwr];
+      detail.textContent = detailParts.filter(Boolean).join(" ");
     }
 
     li.appendChild(header);
@@ -2484,24 +2619,29 @@ async function startScan() {
   const selectedBand = bandSelect.value;
   const range = getScanRangeForBand(selectedBand);
   const decoderModeToSend = selectedDecoderMode ? selectedDecoderMode.toLowerCase() : "";
+  const requestPayload = {
+    device: selectedDeviceId,
+    decoder_mode: decoderModeToSend,
+    scan: {
+      band: selectedBand,
+      start_hz: range.start_hz,
+      end_hz: range.end_hz,
+      step_hz: 2000,
+      dwell_ms: 250,
+      mode: "auto",
+      gain,
+      sample_rate: sampleRate,
+      record_path: recordPath
+    }
+  };
+  if (decoderModeToSend === "cw") {
+    requestPayload.cw_step_hz = 2500;
+    requestPayload.cw_dwell_s = 5.0;
+  }
   const response = await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
-    body: JSON.stringify({
-      device: selectedDeviceId,
-      decoder_mode: decoderModeToSend,
-      scan: {
-        band: selectedBand,
-        start_hz: range.start_hz,
-        end_hz: range.end_hz,
-        step_hz: 2000,
-        dwell_ms: 250,
-        mode: "auto",
-        gain,
-        sample_rate: sampleRate,
-        record_path: recordPath
-      }
-    })
+    body: JSON.stringify(requestPayload)
   });
   if (!response.ok) {
     const message = await parseApiError(response, "Failed to start scan");
@@ -2513,6 +2653,7 @@ async function startScan() {
   // Sync the events filter with the selected decoder mode so only
   // events from this mode appear in the panel.
   if (selectedDecoderMode) {
+    recenterWaterfallForMode(selectedDecoderMode);
     modeFilter.value = selectedDecoderMode;
     fetchEvents();
     fetchTotal();
@@ -2553,6 +2694,9 @@ async function syncScanState() {
       isScanRunning = nextRunning;
       setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
+      if (!wasRunning && nextRunning && selectedDecoderMode) {
+        recenterWaterfallForMode(selectedDecoderMode);
+      }
       // Deselect mode button when scan transitions running → stopped
       if (wasRunning && !nextRunning && selectedDecoderMode) {
         selectedDecoderMode = null;
@@ -2565,6 +2709,7 @@ async function syncScanState() {
     const backendMode = String(data?.decoder_mode || "").trim().toUpperCase();
     if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
       selectedDecoderMode = backendMode;
+      recenterWaterfallForMode(backendMode);
       refreshModeButtons();
       // Sync the events panel filter with the restored mode
       if (modeFilter.value !== backendMode) {
@@ -2715,7 +2860,10 @@ setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
  */
 async function fetchCallsignCacheUpdate() {
   try {
-    const resp = await fetch("/api/events?limit=100", {
+    const modeParam = selectedDecoderMode
+      ? `&mode=${encodeURIComponent(String(selectedDecoderMode).toUpperCase())}`
+      : "";
+    const resp = await fetch(`/api/events?limit=300${modeParam}`, {
       headers: { ...getAuthHeader() }
     });
     if (!resp.ok) return;
@@ -4126,6 +4274,7 @@ if (quickModeButtons.length) {
         renderEventsPanelFromCache(); // Refresh empty panel
         
         selectedDecoderMode = mode;
+        recenterWaterfallForMode(mode);
         // Sync the events panel filter so only events from this mode are shown
         modeFilter.value = mode;
         refreshModeButtons();
@@ -4155,6 +4304,7 @@ if (quickModeButtons.length) {
         fetchTotal();
       } else {
         selectedDecoderMode = mode;
+        recenterWaterfallForMode(mode);
         modeFilter.value = mode;
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
