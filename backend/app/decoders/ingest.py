@@ -75,6 +75,8 @@ def build_callsign_event(payload, scan_state):
         # text and occupancy data are still recorded (callsign stored as "").
         if mode == "CW" and payload.get("msg"):
             callsign = ""
+        elif mode == "SSB" and (payload.get("msg") or payload.get("raw")):
+            callsign = ""
         else:
             return None
     frequency_hz = payload.get("frequency_hz")
@@ -89,7 +91,15 @@ def build_callsign_event(payload, scan_state):
     # Merge CW occupancy/decode fields into the payload JSON blob so they are
     # persisted without needing new DB columns and are available to the API.
     _extra = {}
-    for _key in ("occupancy_rms", "occupancy_peak", "wpm", "crest_db"):
+    for _key in (
+        "occupancy_rms",
+        "occupancy_peak",
+        "wpm",
+        "crest_db",
+        "ssb_state",
+        "ssb_score",
+        "ssb_parse_method",
+    ):
         _val = payload.get(_key)
         if _val is not None:
             _extra[_key] = _val

@@ -213,6 +213,7 @@ def parse_ssb_asr_text(text):
             "callsign": direct,
             "raw": raw,
             "mode": "SSB",
+            "parse_method": "direct",
             "frequency_hz": frequency_hz,
             "grid": grid,
             "report": report
@@ -256,6 +257,7 @@ def parse_ssb_asr_text(text):
         "callsign": callsign,
         "raw": raw,
         "mode": "SSB",
+        "parse_method": "phonetic",
         "frequency_hz": frequency_hz,
         "grid": grid,
         "report": report

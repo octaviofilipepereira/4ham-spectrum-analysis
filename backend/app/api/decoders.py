@@ -13,6 +13,7 @@ Mode decoder control and event ingestion endpoints.
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import asyncio
+import re
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
@@ -38,6 +39,52 @@ _ft_external_iq_queue: Optional[asyncio.Queue] = None
 
 # CW decoder IQ queue
 _cw_iq_queue: Optional[asyncio.Queue] = None
+
+_SSB_TRAFFIC_KEYWORDS = {
+    "CQ",
+    "QRZ",
+    "OVER",
+    "COPY",
+    "REPORT",
+    "CALLING",
+    "STATION",
+    "CONTACT",
+    "NAME",
+    "QTH",
+    "FIVE",
+    "NINE",
+    "73",
+}
+
+
+def _score_ssb_confirmed_event(event: Dict) -> float:
+    score = 0.40
+    parse_method = str(event.get("parse_method") or "").strip().lower()
+    if parse_method == "direct":
+        score += 0.30
+    elif parse_method == "phonetic":
+        score += 0.22
+    if event.get("grid"):
+        score += 0.10
+    if event.get("report"):
+        score += 0.10
+    if event.get("frequency_hz"):
+        score += 0.10
+    return min(1.0, round(score, 3))
+
+
+def _score_ssb_traffic_text(text: str) -> float:
+    tokens = re.findall(r"[A-Za-z0-9]+", str(text).upper())
+    score = 0.18
+    if len(tokens) >= 3:
+        score += 0.12
+    if len(tokens) >= 6:
+        score += 0.10
+    if any(token in _SSB_TRAFFIC_KEYWORDS for token in tokens):
+        score += 0.20
+    if any(token.isdigit() for token in tokens):
+        score += 0.08
+    return min(0.68, round(score, 3))
 
 
 def _refresh_decoder_process_status():
@@ -821,11 +868,28 @@ def decoder_ssb(payload: dict, _: bool = Depends(optional_verify_basic_auth)) ->
     
     events = []
     for text in texts:
+        raw_text = str(text).strip()
         parsed = parse_ssb_asr_text(text)
         if parsed:
+            confidence = _score_ssb_confirmed_event(parsed)
+            ssb_state = "SSB_CONFIRMED" if confidence >= 0.70 else "SSB_TRAFFIC"
+            parsed["confidence"] = confidence
+            parsed["ssb_score"] = confidence
+            parsed["ssb_state"] = ssb_state
+            parsed["ssb_parse_method"] = parsed.get("parse_method") or "unknown"
+            parsed["msg"] = raw_text
             events.append(parsed)
         else:
-            events.append({"raw": str(text).strip(), "mode": "SSB"})
+            confidence = _score_ssb_traffic_text(raw_text)
+            events.append({
+                "raw": raw_text,
+                "msg": raw_text,
+                "mode": "SSB",
+                "confidence": confidence,
+                "ssb_score": confidence,
+                "ssb_state": "SSB_TRAFFIC",
+                "ssb_parse_method": "none",
+            })
     
     return _ingest_callsign_payloads(events, payload)
 

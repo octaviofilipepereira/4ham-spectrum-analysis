@@ -4,6 +4,7 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 import struct
+import json
 
 from app.decoders.direwolf_kiss import parse_kiss_frame
 from app.decoders.ingest import build_callsign_event
@@ -41,6 +42,7 @@ def test_ssb_asr_parser_phonetic_callsign():
     assert event is not None
     assert event["mode"] == "SSB"
     assert event["callsign"] == "CT1ABC/P"
+    assert event["parse_method"] == "phonetic"
 
 
 def test_ssb_asr_parser_returns_none_without_callsign():
@@ -52,6 +54,7 @@ def test_ssb_asr_parser_extracts_grid_report_and_frequency():
     event = parse_ssb_asr_text("CT1ABC IN51 59 14.255 MHz")
     assert event is not None
     assert event["callsign"] == "CT1ABC"
+    assert event["parse_method"] == "direct"
     assert event["grid"] == "IN51"
     assert event["report"] == "59"
     assert event["frequency_hz"] == 14255000
@@ -67,6 +70,27 @@ def test_ssb_asr_parser_accepts_german_number_words_with_umlaut():
     event = parse_ssb_asr_text("hier charlie tango fünf alpha bravo charlie portabel")
     assert event is not None
     assert event["callsign"] == "CT5ABC/P"
+
+
+def test_build_callsign_event_allows_ssb_traffic_without_callsign():
+    event = build_callsign_event(
+        {
+            "mode": "SSB",
+            "raw": "good afternoon all stations",
+            "msg": "good afternoon all stations",
+            "ssb_state": "SSB_TRAFFIC",
+            "ssb_score": 0.41,
+            "ssb_parse_method": "none",
+        },
+        {},
+    )
+    assert event is not None
+    assert event["mode"] == "SSB"
+    assert event["callsign"] == ""
+    payload = json.loads(event["payload"])
+    assert payload["ssb_state"] == "SSB_TRAFFIC"
+    assert float(payload["ssb_score"]) == 0.41
+    assert payload["ssb_parse_method"] == "none"
 
 
 def test_build_callsign_event_infers_20m_band_from_frequency():
