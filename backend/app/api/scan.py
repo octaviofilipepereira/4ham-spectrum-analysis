@@ -52,6 +52,10 @@ _CW_SUBBANDS_HZ = {
     "10m": (28_000_000, 28_300_000),
 }
 
+_SSB_SUBBANDS_HZ = {
+    "40m": (7_090_000, 7_199_000),
+}
+
 
 def _resolve_cw_sweep_bounds(
     band_name: str,
@@ -69,6 +73,22 @@ def _resolve_cw_sweep_bounds(
 
     if clipped_end <= clipped_start:
         return int(start_hz), int(end_hz)
+    return int(clipped_start), int(clipped_end)
+
+
+def _resolve_ssb_bounds(
+    band_name: str,
+    start_hz: int,
+    end_hz: int,
+) -> tuple[int, int]:
+    band = str(band_name or "").strip().lower()
+    ssb_bounds = _SSB_SUBBANDS_HZ.get(band)
+    if not ssb_bounds:
+        return int(start_hz), int(end_hz)
+
+    ssb_start, ssb_end = ssb_bounds
+    clipped_start = max(int(start_hz), int(ssb_start))
+    clipped_end = min(int(end_hz), int(ssb_end))
     return int(clipped_start), int(clipped_end)
 
 
@@ -134,11 +154,24 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     # Validate frequency range
     start_hz = int(scan.get("start_hz", 0) or 0)
     end_hz = int(scan.get("end_hz", 0) or 0)
+
+    # Enforce mode-specific SSB subband limits before validation.
+    decoder_mode = normalized_payload.get("decoder_mode", "").lower()
+    if decoder_mode == "ssb":
+        clipped_start_hz, clipped_end_hz = _resolve_ssb_bounds(
+            scan.get("band"),
+            start_hz,
+            end_hz,
+        )
+        scan["start_hz"] = clipped_start_hz
+        scan["end_hz"] = clipped_end_hz
+        start_hz = clipped_start_hz
+        end_hz = clipped_end_hz
+
     if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
     # Store selected decoder mode in scan state and start appropriate decoder
-    decoder_mode = normalized_payload.get("decoder_mode", "").lower()
     if decoder_mode:
         state.scan_state["decoder_mode"] = decoder_mode
         log(f"scan_decoder_mode:{decoder_mode}")
@@ -416,9 +449,6 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
     if decoder_mode not in valid_modes:
         raise HTTPException(status_code=400, detail=f"Invalid decoder_mode. Must be one of: {', '.join(valid_modes)}")
     
-    # Get previous mode to manage decoder lifecycle
-    previous_mode = state.scan_state.get("decoder_mode", "").lower()
-    
     # Define which modes use which decoder
     ft_modes = ["ft8", "ft4", "wspr"]
     cw_modes = ["cw"]
@@ -501,6 +531,32 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_ft_external_decoder_stop_failed:{exc}")
 
         if decoder_mode == "ssb":
+            current_scan = dict(state.scan_state.get("scan") or {})
+            scan_start_hz = int(current_scan.get("start_hz", 0) or 0)
+            scan_end_hz = int(current_scan.get("end_hz", 0) or 0)
+            clipped_start_hz, clipped_end_hz = _resolve_ssb_bounds(
+                current_scan.get("band"),
+                scan_start_hz,
+                scan_end_hz,
+            )
+            needs_clip = (
+                clipped_start_hz > 0
+                and clipped_end_hz > clipped_start_hz
+                and (clipped_start_hz != scan_start_hz or clipped_end_hz != scan_end_hz)
+            )
+            if needs_clip and state.scan_state.get("state") == "running":
+                current_scan["start_hz"] = clipped_start_hz
+                current_scan["end_hz"] = clipped_end_hz
+                if int(current_scan.get("center_hz", 0) or 0) < clipped_start_hz:
+                    current_scan["center_hz"] = clipped_start_hz
+                await state.scan_engine.stop_async()
+                await state.scan_engine.start_async(current_scan)
+                state.scan_state["scan"] = current_scan
+                log(
+                    f"scan_ssb_range_clipped:{scan_start_hz}-{scan_end_hz}"
+                    f"->{clipped_start_hz}-{clipped_end_hz}"
+                )
+
             try:
                 result = await _start_ssb_detector(force=True)
                 log(f"scan_ssb_detector_started:{result}")
