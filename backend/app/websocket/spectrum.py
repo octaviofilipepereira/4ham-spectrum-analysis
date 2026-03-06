@@ -289,16 +289,35 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 mode_markers.append(cand["marker"])
         
         # Merge CW decode markers (come from actual decodes, not DSP occupancy)
-        _CW_MARKER_TTL_S = 45.0
+        _cw_marker_ttl_s = float(getattr(state, "cw_marker_ttl_s", 45.0) or 45.0)
+        try:
+            _cw_snapshot = state.cw_decoder.snapshot() if state.cw_decoder else {}
+        except Exception:
+            _cw_snapshot = {}
+        if isinstance(_cw_snapshot, dict) and str(_cw_snapshot.get("mode") or "") == "sweep":
+            _start = int(_cw_snapshot.get("band_start_hz") or 0)
+            _end = int(_cw_snapshot.get("band_end_hz") or 0)
+            _step = max(1, int(_cw_snapshot.get("step_hz") or 1))
+            _dwell = max(0.0, float(_cw_snapshot.get("dwell_s") or 0.0))
+            _settle = max(0.0, float(_cw_snapshot.get("settle_ms") or 0.0) / 1000.0)
+            if _end > _start:
+                _diff = _end - _start
+                _positions = (_diff // _step) + 1
+                if (_diff % _step) != 0:
+                    _positions += 1
+                _cycle_s = max(1, _positions) * (_dwell + _settle)
+                _cw_marker_ttl_s = max(_cw_marker_ttl_s, _cycle_s + 5.0)
+
         for bucket, cw_m in list(state.cw_marker_cache.items()):
-            if now_ts - float(cw_m.get("seen_at", 0)) > _CW_MARKER_TTL_S:
+            if now_ts - float(cw_m.get("seen_at", 0)) > _cw_marker_ttl_s:
                 state.cw_marker_cache.pop(bucket, None)
                 continue
             mode_markers.append({
                 "offset_hz": cw_m["offset_hz"],
                 "frequency_hz": cw_m["frequency_hz"],
-                "mode": "CW",
+                "mode": cw_m.get("mode") or "CW",
                 "snr_db": cw_m["snr_db"],
+                "crest_db": cw_m.get("crest_db"),
                 "bandwidth_hz": cw_m["bandwidth_hz"],
                 "confidence": cw_m["confidence"],
             })

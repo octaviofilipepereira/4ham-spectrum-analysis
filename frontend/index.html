@@ -129,7 +129,15 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="card panel h-100">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-2">
-                <h2 class="h5 mb-0" id="eventsCardTitle">Events</h2>
+                <h2 class="h5 mb-0" id="eventsCardTitle">
+                  <span id="eventsCardTitleText">Events</span>
+                  <span
+                    class="events-metrics-help"
+                    data-tooltip="SNR = generic mode SNR. In CW, SNR(tone) is tone-based and Crest is peak-to-RMS."
+                    aria-label="Events metrics help"
+                    tabindex="0"
+                  >ⓘ</span>
+                </h2>
                 <div class="d-flex flex-column gap-2">
                   <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#eventsSearchModal">&#128269; Search Events</button>
                   <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#eventsFullscreenModal">
@@ -143,6 +151,12 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="d-flex align-items-center gap-2 events-pager">
                 <button class="btn btn-outline-info btn-sm" id="eventsPrev">Prev</button>
                 <button class="btn btn-outline-info btn-sm" id="eventsNext">Next</button>
+                <select class="form-select form-select-sm" id="eventsTypeFilter" aria-label="Events type filter">
+                  <option value="all" selected>Show All</option>
+                  <option value="cw-candidate">CW Candidate</option>
+                  <option value="cw-only">CW Only</option>
+                  <option value="callsign-only">Callsign Only</option>
+                </select>
                 <span class="login-status" id="eventsPageInfo">Page: 1/1</span>
               </div>
               <ul class="events events--fixed" id="events"></ul>

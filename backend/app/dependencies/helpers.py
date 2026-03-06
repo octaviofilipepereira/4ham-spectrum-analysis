@@ -208,6 +208,21 @@ def sanitize_events_for_api(items: List[Dict]) -> List[Dict]:
     sanitized = []
     for item in items or []:
         row = dict(item)
+
+        # Backward compatibility: older callsign rows may carry CW metrics
+        # only inside payload JSON; expose crest_db at top-level for the UI.
+        if row.get("crest_db") is None and str(row.get("type") or "") == "callsign":
+            payload = row.get("payload")
+            payload_obj = None
+            if isinstance(payload, dict):
+                payload_obj = payload
+            elif isinstance(payload, str) and payload.strip():
+                try:
+                    payload_obj = json.loads(payload)
+                except Exception:
+                    payload_obj = None
+            if isinstance(payload_obj, dict) and payload_obj.get("crest_db") is not None:
+                row["crest_db"] = payload_obj.get("crest_db")
         
         # Filter invalid occupancy events
         if str(row.get("type") or "") == "occupancy":

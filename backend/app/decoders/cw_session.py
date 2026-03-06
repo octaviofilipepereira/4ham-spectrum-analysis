@@ -11,9 +11,11 @@ Similar to ExternalFtDecoder but for CW.
 """
 
 import asyncio
+import math
 from datetime import datetime, timezone
 from typing import Callable, Optional
 import numpy as np
+from .cw.dsp import estimate_snr
 
 from .cw.decoder import CWDecoder
 
@@ -222,6 +224,8 @@ class CWDecoderSession:
                 if len(self._audio_buffer) >= target_samples:
                     # Take window
                     window = self._audio_buffer[:target_samples]
+                    audio_rms = float(np.sqrt(np.mean(window ** 2))) if len(window) > 0 else 0.0
+                    audio_peak = float(np.max(np.abs(window))) if len(window) > 0 else 0.0
                     
                     # Decode
                     self._decode_attempts += 1
@@ -237,26 +241,86 @@ class CWDecoderSession:
                         f"text={repr(result.text[:40])}"
                     )
                     
-                    # Emit events if callsigns detected and confidence sufficient
-                    if result.callsigns and result.confidence >= self.min_confidence:
-                        self._callsigns_detected += len(result.callsigns)
-                        center_hz = self.frequency_provider() if self.frequency_provider else 0
-                        
-                        for callsign in result.callsigns:
-                            event = {
-                                "timestamp": _utc_now_iso(),
-                                "mode": "CW",
-                                "callsign": callsign,
-                                "frequency_hz": center_hz + int(result.dominant_freq_hz),
-                                "snr_db": 0.0,  # CW decoder doesn't compute SNR
-                                "dt_s": 0.0,
-                                "df_hz": int(result.dominant_freq_hz),
-                                "confidence": result.confidence,
-                                "msg": result.text,
-                                "raw": f"CW {result.wpm:.1f}wpm",
-                                "source": "internal_cw",
-                            }
-                            
+                    center_hz = self.frequency_provider() if self.frequency_provider else 0
+                    rf_freq_hz = center_hz + int(result.dominant_freq_hz)
+                    _safe_rms = max(float(audio_rms), 1e-12)
+                    _safe_peak = max(float(audio_peak), _safe_rms)
+                    est_power_dbm = round(20.0 * math.log10(_safe_rms), 1)
+                    crest_db = round(max(0.0, 20.0 * math.log10(_safe_peak / _safe_rms)), 1)
+                    _tone_snr_db = float(
+                        estimate_snr(
+                            window,
+                            self.target_sample_rate,
+                            float(result.dominant_freq_hz),
+                        )
+                    )
+                    if not math.isfinite(_tone_snr_db):
+                        _tone_snr_db = 0.0
+                    est_snr_db = round(_tone_snr_db, 1)
+
+                    # Emit occupancy event for every decode window.
+                    if self.on_event:
+                        occupancy_mode = "CW" if float(result.confidence or 0.0) > 0.1 else "CW_CANDIDATE"
+                        occupancy_event = {
+                            "type": "occupancy",
+                            "timestamp": _utc_now_iso(),
+                            "mode": occupancy_mode,
+                            "frequency_hz": rf_freq_hz,
+                            "bandwidth_hz": 200,
+                            "snr_db": est_snr_db,
+                            "crest_db": crest_db,
+                            "power_dbm": est_power_dbm,
+                            "threshold_dbm": None,
+                            "occupied": True,
+                            "confidence": result.confidence,
+                            "source": "internal_cw",
+                            "df_hz": int(result.dominant_freq_hz),
+                            "occupancy_rms": round(audio_rms, 6),
+                            "occupancy_peak": round(audio_peak, 4),
+                            "wpm": round(result.wpm, 1),
+                        }
+                        try:
+                            self.on_event(occupancy_event)
+                            self._events_emitted += 1
+                            self._last_event_at = _utc_now_iso()
+                        except Exception as exc:
+                            self._log(f"cw_event_callback_failed {exc}")
+
+                    # Emit partial decode text regardless of confidence, and
+                    # emit callsign-identified events only above min_confidence.
+                    if result.text:
+                        base_event = {
+                            "timestamp": _utc_now_iso(),
+                            "mode": "CW",
+                            "frequency_hz": rf_freq_hz,
+                            "snr_db": est_snr_db,
+                            "crest_db": crest_db,
+                            "power_dbm": est_power_dbm,
+                            "dt_s": 0.0,
+                            "df_hz": int(result.dominant_freq_hz),
+                            "confidence": result.confidence,
+                            "msg": result.text,
+                            "raw": f"CW {result.wpm:.1f}wpm",
+                            "source": "internal_cw",
+                            "occupancy_rms": round(audio_rms, 6),
+                            "occupancy_peak": round(audio_peak, 4),
+                            "wpm": round(result.wpm, 1),
+                        }
+
+                        if result.callsigns and result.confidence >= self.min_confidence:
+                            unique_callsigns = list(dict.fromkeys(result.callsigns))
+                            self._callsigns_detected += len(unique_callsigns)
+                            for callsign in unique_callsigns:
+                                event = {**base_event, "callsign": callsign}
+                                if self.on_event:
+                                    try:
+                                        self.on_event(event)
+                                        self._events_emitted += 1
+                                        self._last_event_at = _utc_now_iso()
+                                    except Exception as exc:
+                                        self._log(f"cw_event_callback_failed {exc}")
+                        else:
+                            event = {**base_event, "callsign": None}
                             if self.on_event:
                                 try:
                                     self.on_event(event)

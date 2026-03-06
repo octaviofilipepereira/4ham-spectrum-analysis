@@ -67,3 +67,12 @@ def test_build_callsign_event_infers_15m_band_from_frequency():
     event = build_callsign_event({"callsign": "CT1ABC", "frequency_hz": 21250000}, {})
     assert event is not None
     assert event["band"] == "15m"
+
+
+def test_build_callsign_event_preserves_power_dbm():
+    event = build_callsign_event(
+        {"callsign": "CT1ABC", "frequency_hz": 14250000, "power_dbm": -73.2},
+        {}
+    )
+    assert event is not None
+    assert float(event["power_dbm"]) == -73.2

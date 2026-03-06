@@ -24,6 +24,7 @@ from app.dependencies.helpers import (
     touch_decoder_source,
     record_decoder_event_saved,
     record_decoder_event_invalid,
+    is_plausible_occupancy_event,
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
@@ -252,14 +253,24 @@ def _ft_external_band_provider() -> str:
 
 def _ft_external_scan_park(dial_hz: int):
     """Hold scanner on specific frequency during decode."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"_ft_external_scan_park dial_hz={dial_hz} running={state.scan_engine.running} device={state.scan_engine.device is not None}")
     if state.scan_engine.running and state.scan_engine.device:
         state.scan_engine.park(int(dial_hz))
+    else:
+        logger.warning(f"_ft_external_scan_park_skipped dial_hz={dial_hz} running={state.scan_engine.running} device={state.scan_engine.device is not None}")
 
 
 def _ft_external_scan_unpark():
     """Resume normal scanning after decode."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"_ft_external_scan_unpark running={state.scan_engine.running}")
     if state.scan_engine.running:
         state.scan_engine.unpark()
+    else:
+        logger.warning(f"_ft_external_scan_unpark_skipped running={state.scan_engine.running}")
 
 
 async def _start_ft_external_decoder(force: bool = False) -> Dict:
@@ -358,17 +369,76 @@ def _handle_cw_event(payload: Dict) -> Dict:
     # Inject a waterfall marker so the decode is visible on the spectrogram
     import time as _time
     freq_hz = int(payload.get("frequency_hz") or 0)
+    if freq_hz <= 0:
+        freq_hz = int(state.scan_engine.center_hz or state.spectrum_cache.get("center_hz") or 0)
+
     if freq_hz > 0:
+        marker_mode = str(payload.get("mode") or "CW").strip().upper()
+        if marker_mode not in ("CW", "CW_CANDIDATE"):
+            marker_mode = "CW"
         bucket = int(round(freq_hz / 500)) * 500  # 500 Hz bucket
         state.cw_marker_cache[bucket] = {
             "frequency_hz": freq_hz,
             "offset_hz": int(payload.get("df_hz") or 0),
-            "mode": "CW",
+            "mode": marker_mode,
             "snr_db": float(payload.get("snr_db") or 0.0),
+            "crest_db": float(payload.get("crest_db") or 0.0),
             "bandwidth_hz": 200,
             "confidence": float(payload.get("confidence") or 0.0),
             "seen_at": _time.time(),
         }
+
+    event_type = str(payload.get("type") or "").strip().lower()
+    if event_type == "occupancy":
+        if state.scan_state.get("state") != "running":
+            return {"status": "ok", "saved": 0, "errors": []}
+
+        try:
+            confidence_value = float(payload.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence_value = 0.0
+        confidence_value = max(0.0, min(1.0, confidence_value))
+
+        mode_label = str(payload.get("mode") or "").strip().upper()
+        if confidence_value > 0.1:
+            mode_label = "CW"
+        else:
+            mode_label = "CW_CANDIDATE"
+
+        try:
+            snr_db = float(payload.get("snr_db") or 0.0)
+        except (TypeError, ValueError):
+            snr_db = 0.0
+        if snr_db < 0:
+            snr_db = 0.0
+
+        try:
+            bandwidth_hz = int(payload.get("bandwidth_hz") or 200)
+        except (TypeError, ValueError):
+            bandwidth_hz = 200
+
+        occupancy_event = {
+            "timestamp": payload.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+            "band": payload.get("band") or state.scan_state.get("band"),
+            "frequency_hz": freq_hz,
+            "bandwidth_hz": max(50, bandwidth_hz),
+            "power_dbm": payload.get("power_dbm"),
+            "snr_db": snr_db,
+            "crest_db": payload.get("crest_db"),
+            "threshold_dbm": payload.get("threshold_dbm"),
+            "occupied": bool(payload.get("occupied", True)),
+            "mode": mode_label,
+            "confidence": confidence_value,
+            "device": payload.get("device") or state.scan_state.get("device"),
+            "scan_id": payload.get("scan_id") or state.scan_state.get("scan_id"),
+        }
+
+        if not is_plausible_occupancy_event(occupancy_event):
+            return {"status": "ok", "saved": 0, "errors": [{"error": "invalid_occupancy"}]}
+
+        state.db.insert_occupancy(occupancy_event)
+        return {"status": "ok", "saved": 1, "errors": []}
+
     return _ingest_callsign_payloads([payload], {"source": "internal_cw"})
 
 

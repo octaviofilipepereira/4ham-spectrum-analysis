@@ -239,8 +239,9 @@ def test_events_emitted_with_correct_rf_frequency():
         await decoder.stop()
 
         assert len(emitted) >= 1
-        first = emitted[0]
-        assert first["callsign"] == "CT7BFV"
+        callsign_events = [ev for ev in emitted if ev.get("callsign") == "CT7BFV"]
+        assert len(callsign_events) >= 1
+        first = callsign_events[0]
         assert first["mode"] == "CW"
         # RF frequency = park position + audio-domain tone offset
         # Accept any parked position in the band
@@ -252,7 +253,7 @@ def test_events_emitted_with_correct_rf_frequency():
 
 
 def test_low_confidence_events_suppressed():
-    """Events below min_confidence must NOT be emitted."""
+    """Low confidence must not emit identified callsigns, but should still emit occupancy/text."""
     async def scenario():
         emitted = []
 
@@ -270,7 +271,54 @@ def test_low_confidence_events_suppressed():
         await asyncio.sleep(0.30)
         await decoder.stop()
 
-        assert len(emitted) == 0
+        assert len(emitted) >= 1
+
+        occupancy_events = [ev for ev in emitted if ev.get("type") == "occupancy"]
+        assert len(occupancy_events) >= 1
+        assert "crest_db" in occupancy_events[0]
+        assert isinstance(occupancy_events[0].get("snr_db"), (int, float))
+        assert all(ev.get("mode") == "CW_CANDIDATE" for ev in occupancy_events)
+
+        callsign_events = [ev for ev in emitted if ev.get("callsign")]
+        assert len(callsign_events) == 0
+
+        text_events = [ev for ev in emitted if ev.get("msg")]
+        assert len(text_events) >= 1
+        assert text_events[0].get("callsign") is None
+
+    asyncio.run(scenario())
+
+
+def test_event_frequency_clamped_to_upper_band_edge():
+    """RF frequency must not exceed sweep band_end_hz even with large tone offset."""
+    async def scenario():
+        emitted = []
+
+        decoder, parked_at, _ = _make_decoder(
+            band_start_hz=14_117_000,
+            band_end_hz=14_117_000,
+            step_hz=6500,
+            dwell_s=0.05,
+            settle_ms=5,
+            on_event=lambda e: emitted.append(e),
+        )
+
+        decoder._decoder.decode = lambda audio: _stub_result(
+            callsigns=["CT7BFV"],
+            confidence=0.95,
+            dominant_hz=2500.0,
+            text="CQ CT7BFV",
+        )
+
+        await decoder.start()
+        await asyncio.sleep(0.20)
+        await decoder.stop()
+
+        assert len(parked_at) >= 1
+        callsign_events = [ev for ev in emitted if ev.get("callsign") == "CT7BFV"]
+        assert len(callsign_events) >= 1
+        first = callsign_events[0]
+        assert first["frequency_hz"] == 14_117_000
 
     asyncio.run(scenario())
 

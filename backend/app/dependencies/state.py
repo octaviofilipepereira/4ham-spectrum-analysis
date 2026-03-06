@@ -13,6 +13,7 @@ Central repository for all global application state variables.
 import asyncio
 import collections
 import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 from app.scan.engine import ScanEngine
@@ -72,10 +73,17 @@ controller = SDRController()
 scan_engine = ScanEngine(controller)
 
 # Database and export manager
-os.makedirs("data", exist_ok=True)
-db = Database("data/events.sqlite")
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DATA_DIR = Path(os.getenv("DATA_DIR", str(_PROJECT_ROOT / "data"))).expanduser()
+_DB_PATH = Path(os.getenv("EVENTS_DB_PATH", str(_DATA_DIR / "events.sqlite"))).expanduser()
+_EXPORT_DIR = Path(os.getenv("EXPORT_DIR", str(_DATA_DIR / "exports"))).expanduser()
+
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+db = Database(str(_DB_PATH))
 export_manager = ExportManager(
-    export_dir="data/exports",
+    export_dir=str(_EXPORT_DIR),
     db=db,
     max_files=_env_int("EXPORT_MAX_FILES", 50),
     max_age_days=_env_int("EXPORT_MAX_AGE_DAYS", 7),
@@ -141,7 +149,7 @@ last_agc_gain_db = None
 # Tracking dict: bucket_key -> {"hits": int, "last_seen": float, "marker": dict}
 marker_candidates = {}
 
-# CW decode markers: bucket_key (500 Hz) -> {frequency_hz, offset_hz, mode, snr_db, bandwidth_hz, confidence, seen_at}
+# CW decode markers: bucket_key (500 Hz) -> {frequency_hz, offset_hz, mode, snr_db, crest_db, bandwidth_hz, confidence, seen_at}
 cw_marker_cache: dict = {}
 
 threshold_state = {}
@@ -212,6 +220,7 @@ cw_min_confidence = _env_float("CW_MIN_CONFIDENCE", 0.3)
 cw_sweep_step_hz = _env_int("CW_SWEEP_STEP_HZ", 6500)
 cw_sweep_dwell_s = _env_float("CW_SWEEP_DWELL_S", 30.0)
 cw_sweep_settle_ms = _env_int("CW_SWEEP_SETTLE_MS", 100)
+cw_marker_ttl_s = _env_float("CW_MARKER_TTL_S", 45.0)
 
 # Other decoders
 ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)

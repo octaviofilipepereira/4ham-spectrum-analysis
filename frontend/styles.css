@@ -736,6 +736,50 @@ h1,
   letter-spacing: 0.01em;
 }
 
+#eventsTypeFilter {
+  min-width: 190px;
+  max-width: 220px;
+}
+
+.events-metrics-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-left: 0.35rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+  cursor: help;
+  user-select: none;
+}
+
+.events-metrics-help::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: 260px;
+  max-width: 320px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(8, 12, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+  transition: opacity 120ms ease;
+}
+
+.events-metrics-help:hover::after,
+.events-metrics-help:focus-visible::after {
+  opacity: 1;
+}
+
 .event-item__body {
   display: flex;
   flex-wrap: wrap;
@@ -747,6 +791,53 @@ h1,
 .event-item__muted {
   color: var(--muted);
   font-size: 1.12rem;
+}
+
+.event-decoded-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-width: 2.4rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(69, 214, 197, 0.12);
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  padding: 0 0.45rem;
+}
+
+.event-decoded-help::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 320px;
+  max-width: 460px;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(8, 12, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+  transition: opacity 120ms ease;
+}
+
+.event-decoded-help:hover::after,
+.event-decoded-help:focus-visible::after {
+  opacity: 1;
 }
 
 .event-item__call {

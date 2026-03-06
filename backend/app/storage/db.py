@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS occupancy_events (
   bandwidth_hz INTEGER NOT NULL,
   power_dbm REAL,
   snr_db REAL,
+    crest_db REAL,
   threshold_dbm REAL,
   occupied INTEGER NOT NULL,
   mode TEXT,
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS callsign_events (
   mode TEXT NOT NULL,
   callsign TEXT NOT NULL,
   snr_db REAL,
+    crest_db REAL,
   df_hz INTEGER,
   confidence REAL,
   raw TEXT,
@@ -121,6 +123,8 @@ class Database:
         self._add_column("callsign_events", "lon REAL")
         self._add_column("callsign_events", "msg TEXT")
         self._add_column("callsign_events", "power_dbm REAL")
+        self._add_column("occupancy_events", "crest_db REAL")
+        self._add_column("callsign_events", "crest_db REAL")
 
     def _add_column(self, table, column_def):
         try:
@@ -251,8 +255,8 @@ class Database:
             """
             INSERT INTO occupancy_events(
                 scan_id, timestamp, band, frequency_hz, bandwidth_hz, power_dbm,
-                snr_db, threshold_dbm, occupied, mode, confidence, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                snr_db, crest_db, threshold_dbm, occupied, mode, confidence, device
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -262,6 +266,7 @@ class Database:
                 event.get("bandwidth_hz", 0),
                 event.get("power_dbm"),
                 event.get("snr_db"),
+                event.get("crest_db"),
                 event.get("threshold_dbm"),
                 1 if event.get("occupied") else 0,
                 event.get("mode"),
@@ -276,9 +281,9 @@ class Database:
             """
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
-                df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
+                crest_db, df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
                 payload, lat, lon, msg, source, device, power_dbm
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -288,6 +293,7 @@ class Database:
                 event.get("mode"),
                 event.get("callsign"),
                 event.get("snr_db"),
+                event.get("crest_db"),
                 event.get("df_hz"),
                 event.get("confidence"),
                 event.get("raw"),
@@ -333,7 +339,7 @@ class Database:
             for row in self.conn.execute(
                 """
                 SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
-                     bandwidth_hz, mode, power_dbm, snr_db, threshold_dbm, occupied, confidence,
+                     bandwidth_hz, mode, power_dbm, snr_db, crest_db, threshold_dbm, occupied, confidence,
                        device
                 FROM occupancy_events
                 WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
@@ -372,7 +378,7 @@ class Database:
         for row in self.conn.execute(
             """
              SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
-                 mode, callsign, snr_db, df_hz, confidence, raw, grid, report,
+                 mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
                  time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
             FROM callsign_events
             WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}

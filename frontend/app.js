@@ -21,6 +21,7 @@ const eventsSearchNextBtn = document.getElementById("eventsSearchNext");
 const eventsSearchPageInfoEl = document.getElementById("eventsSearchPageInfo");
 const eventsPrevBtn = document.getElementById("eventsPrev");
 const eventsNextBtn = document.getElementById("eventsNext");
+const eventsTypeFilter = document.getElementById("eventsTypeFilter");
 const eventsPageInfo = document.getElementById("eventsPageInfo");
 const eventsSearchResultsEl = document.getElementById("eventsSearchResults");
 const eventsFullscreenEl = document.getElementById("eventsFullscreen");
@@ -198,6 +199,7 @@ const qualityLabel = document.getElementById("qualityLabel");
 const summaryMatrixTable = document.getElementById("summaryMatrixTable");
 const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
 const eventsCardTitle = document.getElementById("eventsCardTitle");
+const eventsCardTitleText = document.getElementById("eventsCardTitleText");
 const propagationScore = document.getElementById("propagationScore");
 const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
@@ -778,6 +780,7 @@ function buildStableWaterfallMarkers(frame) {
         frequency_hz: frequencyHz,
         mode: markerMode,
         snr_db: Number(marker?.snr_db),
+        crest_db: Number(marker?.crest_db),
         seen_at: now
       });
     });
@@ -892,6 +895,7 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
     label.textContent = normalizeModeLabel(marker?.mode);
     const snr = Number(marker?.snr_db);
+    const crest = Number(marker?.crest_db);
     const markerKey = String(Math.round(markerFreq / 50) * 50);
     // Decoded markers (FT8/FT4 from jt9) have the callsign embedded directly.
     // DSP markers fall back to a proximity-based cache lookup.
@@ -899,15 +903,27 @@ function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, ra
     const embeddedSeenAtMs = marker?.seenAtMs || null;
     const proximityMatch = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
     const markerCallsign = embeddedCallsign || proximityMatch?.callsign || "";
+    const markerModeText = String(marker?.mode || "").trim().toUpperCase();
+    const missingCallsignLabel = markerModeText === "CW_CANDIDATE"
+      ? "CW CANDIDATE"
+      : markerModeText === "CW"
+        ? "CW"
+        : "-";
     const markerSeenAtText = formatLastSeenTime(embeddedSeenAtMs || proximityMatch?.seenAtMs);
+    const isCwMarker = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
     const freqText = Number.isFinite(markerFreq) && markerFreq > 0
       ? ` | ${(markerFreq / 1_000_000).toFixed(3)} MHz`
       : "";
-    const callsignText = ` | callsign ${markerCallsign || "-"}`;
-    const seenAtText = ` | last ${markerSeenAtText}`;
+    const callsignText = markerCallsign
+      ? ` | callsign ${markerCallsign}`
+      : ` | ${missingCallsignLabel}`;
+    const crestText = Number.isFinite(crest) ? ` | Crest ${crest.toFixed(1)} dB` : "";
+    const statusText = isCwMarker
+      ? `${Number.isFinite(snr) ? ` | SNR(tone) ${snr.toFixed(1)} dB` : " | SNR(tone) -"}${crestText}`
+      : ` | last ${markerSeenAtText}`;
     const tooltipText = Number.isFinite(snr)
-      ? `${label.textContent}${freqText}${callsignText}${seenAtText} | ${snr.toFixed(1)} dB`
-      : `${label.textContent}${freqText}${callsignText}${seenAtText}`;
+      ? `${label.textContent}${freqText}${callsignText}${statusText}${isCwMarker ? "" : ` | ${snr.toFixed(1)} dB`}`
+      : `${label.textContent}${freqText}${callsignText}${statusText}`;
     label.title = tooltipText;
     label.setAttribute("aria-label", tooltipText);
     label.addEventListener("mouseenter", (event) => {
@@ -1288,6 +1304,20 @@ function extractCallsignFromRaw(value) {
   return match ? match[0] : "";
 }
 
+function extractDecodedText(eventItem) {
+  if (!eventItem || typeof eventItem !== "object") {
+    return "";
+  }
+  const candidates = [eventItem.msg, eventItem.text];
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value) {
+      return value.length > 220 ? `${value.slice(0, 220)}…` : value;
+    }
+  }
+  return "";
+}
+
 function isValidLocator(value) {
   const text = String(value || "").trim().toUpperCase();
   if (!text) {
@@ -1630,16 +1660,7 @@ function pushLiveEventToPanel(eventPayload) {
   if (!eventPayload || typeof eventPayload !== "object") {
     return;
   }
-  
-  // Filter events by selected decoder mode
-  const eventMode = String(eventPayload.mode || "").toUpperCase();
-  if (selectedDecoderMode) {
-    const selectedMode = String(selectedDecoderMode).toUpperCase();
-    if (eventMode !== selectedMode) {
-      return; // Ignore events from different decoder modes
-    }
-  }
-  
+
   updateCallsignCacheFromEvent(eventPayload);
   latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
@@ -1669,6 +1690,24 @@ function applyEventsPanelFilters(items) {
     }
     return true;
   });
+}
+
+function applyEventsCardTypeFilter(items) {
+  const source = Array.isArray(items) ? items : [];
+  const selected = String(eventsTypeFilter?.value || "all").trim();
+  if (selected === "cw-candidate") {
+    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW_CANDIDATE");
+  }
+  if (selected === "cw-only") {
+    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW");
+  }
+  if (selected === "callsign-only") {
+    return source.filter((eventItem) => {
+      const callsignText = String(eventItem?.callsign || extractCallsignFromRaw(eventItem?.raw) || "").trim();
+      return callsignText.length > 0;
+    });
+  }
+  return source;
 }
 
 function hasEventsSearchCriteria() {
@@ -1796,14 +1835,6 @@ function renderEventsPanelFromCache() {
 function orderEventsForDisplay(items) {
   const source = Array.isArray(items) ? items.slice() : [];
   source.sort((a, b) => {
-    const aType = String(a?.type || "").toLowerCase();
-    const bType = String(b?.type || "").toLowerCase();
-    if (aType === "callsign" && bType !== "callsign") {
-      return -1;
-    }
-    if (aType !== "callsign" && bType === "callsign") {
-      return 1;
-    }
     const aTs = String(a?.timestamp || "");
     const bTs = String(b?.timestamp || "");
     if (aTs > bTs) {
@@ -1883,8 +1914,33 @@ function renderEventList(targetEl, items, emptyMessage) {
     const frequencyValue = Number(eventItem.frequency_hz);
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
-    const callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "-";
-    body.innerHTML = `<strong>${freq} Hz</strong> <span class="event-item__muted">${band}</span> <span class="event-item__call">${callsign}</span>`;
+    const callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "NO CALLSIGN DETECTED";
+    const decodedText = extractDecodedText(eventItem);
+
+    const frequencyEl = document.createElement("strong");
+    frequencyEl.textContent = `${freq} Hz`;
+
+    const bandEl = document.createElement("span");
+    bandEl.className = "event-item__muted";
+    bandEl.textContent = band;
+
+    body.appendChild(frequencyEl);
+    body.appendChild(bandEl);
+
+    if (decodedText) {
+      const decodedBtn = document.createElement("button");
+      decodedBtn.type = "button";
+      decodedBtn.className = "event-decoded-help";
+      decodedBtn.textContent = "TXT";
+      decodedBtn.setAttribute("data-tooltip", decodedText);
+      decodedBtn.setAttribute("aria-label", `Decoded text: ${decodedText}`);
+      body.appendChild(decodedBtn);
+    }
+
+    const callsignEl = document.createElement("span");
+    callsignEl.className = "event-item__call";
+    callsignEl.textContent = callsign;
+    body.appendChild(callsignEl);
 
     const detail = document.createElement("div");
     detail.className = "event-item__detail";
@@ -1895,14 +1951,30 @@ function renderEventList(targetEl, items, emptyMessage) {
       const lon = Number.isFinite(lonValue) ? lonValue.toFixed(3) : "--";
       detail.textContent = `path=${eventItem.path || "-"} | lat=${lat} lon=${lon} | ${eventItem.msg || eventItem.payload || ""}`.trim();
     } else if (eventItem.type === "callsign") {
+      const isCwMode = String(eventItem.mode || "").toUpperCase() === "CW";
       const snrValue = Number(eventItem.snr_db);
-      const snrText = Number.isFinite(snrValue) ? `SNR ${snrValue >= 0 ? "+" : ""}${snrValue.toFixed(0)} dB` : null;
-      if (snrText) detail.textContent = snrText;
+      const crestValue = Number(eventItem.crest_db);
+      const powerValue = Number(eventItem.power_dbm);
+      const snrLabel = isCwMode ? "SNR(tone)" : "SNR";
+      const snrText = Number.isFinite(snrValue) ? `${snrLabel} ${snrValue >= 0 ? "+" : ""}${snrValue.toFixed(1)} dB` : null;
+      const crestText = Number.isFinite(crestValue) ? `Crest ${crestValue.toFixed(1)} dB` : null;
+      const powerText = Number.isFinite(powerValue) ? `PWR ${powerValue.toFixed(1)} dBm` : null;
+      const detailParts = isCwMode
+        ? [snrText, crestText, powerText]
+        : [snrText, powerText];
+      detail.textContent = detailParts.filter(Boolean).join(" | ");
     } else if (eventItem.type === "occupancy") {
+      const isCwMode = String(eventItem.mode || "").toUpperCase() === "CW";
       const bw = eventItem.bandwidth_hz ? `${eventItem.bandwidth_hz} Hz` : "-";
       const snrValue = Number(eventItem.snr_db);
+      const crestValue = Number(eventItem.crest_db);
+      const powerValue = Number(eventItem.power_dbm);
       const snr = Number.isFinite(snrValue) ? `${snrValue.toFixed(1)} dB` : "-";
-      detail.textContent = `bw=${bw} snr=${snr}`;
+      const crest = Number.isFinite(crestValue) ? `${crestValue.toFixed(1)} dB` : "-";
+      const pwr = Number.isFinite(powerValue) ? `${powerValue.toFixed(1)} dBm` : "-";
+      detail.textContent = isCwMode
+        ? `bw=${bw} snr(tone)=${snr} crest=${crest} pwr=${pwr}`
+        : `bw=${bw} snr=${snr} pwr=${pwr}`;
     }
 
     li.appendChild(header);
@@ -1936,7 +2008,8 @@ function renderEvents(items) {
 
   const totalEvents = latestEvents.length;
   const orderedEvents = orderEventsForDisplay(latestEvents);
-  const totalEventPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
+  const cardItems = applyEventsCardTypeFilter(orderedEvents);
+  const totalEventPages = Math.max(1, Math.ceil(cardItems.length / EVENTS_PANEL_PAGE_SIZE));
   if (eventsPanelPage > totalEventPages - 1) {
     eventsPanelPage = totalEventPages - 1;
   }
@@ -1944,7 +2017,7 @@ function renderEvents(items) {
     eventsPanelPage = 0;
   }
   const eventsStartIndex = eventsPanelPage * EVENTS_PANEL_PAGE_SIZE;
-  const eventsPagedItems = orderedEvents.slice(eventsStartIndex, eventsStartIndex + EVENTS_PANEL_PAGE_SIZE);
+  const eventsPagedItems = cardItems.slice(eventsStartIndex, eventsStartIndex + EVENTS_PANEL_PAGE_SIZE);
 
   renderEventList(
     eventsEl,
@@ -1956,9 +2029,10 @@ function renderEvents(items) {
 
   if (eventsCardTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
-    eventsCardTitle.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
+    const titleTarget = eventsCardTitleText || eventsCardTitle;
+    titleTarget.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
   }
-  updateEventsPager(totalEvents);
+  updateEventsPager(cardItems.length);
 
   filteredItems.forEach((eventItem) => {
     const bandName = eventItem.band || inferBandFromFrequency(eventItem.frequency_hz);
@@ -2091,23 +2165,33 @@ async function fetchEvents() {
 
   try {
     const params = new URLSearchParams({ offset: String(eventOffset), limit: "200" });
-    if (bandFilter.value) {
-      params.append("band", bandFilter.value);
+    const selectedBand = String(bandFilter.value || "").trim();
+    const selectedMode = String(modeFilter.value || "").trim();
+    const selectedCallsign = String(callsignFilter.value || "").trim();
+
+    if (selectedBand) {
+      params.append("band", selectedBand);
     }
-    if (modeFilter.value) {
-      params.append("mode", modeFilter.value);
+    if (selectedMode) {
+      params.append("mode", selectedMode);
     }
-    if (callsignFilter.value) {
-      params.append("callsign", callsignFilter.value.trim());
+    if (selectedCallsign) {
+      params.append("callsign", selectedCallsign);
     }
     if (startFilter.value) {
-      params.append("start", new Date(startFilter.value).toISOString());
+      const startDate = new Date(startFilter.value);
+      if (Number.isFinite(startDate.getTime())) {
+        params.append("start", startDate.toISOString());
+      }
     } else {
       // Default: last 24 hours
       params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     }
     if (endFilter.value) {
-      params.append("end", new Date(endFilter.value).toISOString());
+      const endDate = new Date(endFilter.value);
+      if (Number.isFinite(endDate.getTime())) {
+        params.append("end", endDate.toISOString());
+      }
     }
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },
@@ -2127,9 +2211,9 @@ async function fetchEvents() {
 
     renderEvents(data);
     localStorage.setItem("filters", JSON.stringify({
-      band: bandFilter.value,
-      mode: modeFilter.value,
-      callsign: callsignFilter.value,
+      band: selectedBand,
+      mode: selectedMode,
+      callsign: selectedCallsign,
       start: startFilter.value,
       end: endFilter.value
     }));
@@ -2143,23 +2227,33 @@ async function fetchEvents() {
 async function fetchTotal() {
   try {
     const params = new URLSearchParams({});
-    if (bandFilter.value) {
-      params.append("band", bandFilter.value);
+    const selectedBand = String(bandFilter.value || "").trim();
+    const selectedMode = String(modeFilter.value || "").trim();
+    const selectedCallsign = String(callsignFilter.value || "").trim();
+
+    if (selectedBand) {
+      params.append("band", selectedBand);
     }
-    if (modeFilter.value) {
-      params.append("mode", modeFilter.value);
+    if (selectedMode) {
+      params.append("mode", selectedMode);
     }
-    if (callsignFilter.value) {
-      params.append("callsign", callsignFilter.value.trim());
+    if (selectedCallsign) {
+      params.append("callsign", selectedCallsign);
     }
     if (startFilter.value) {
-      params.append("start", new Date(startFilter.value).toISOString());
+      const startDate = new Date(startFilter.value);
+      if (Number.isFinite(startDate.getTime())) {
+        params.append("start", startDate.toISOString());
+      }
     } else {
       // Default: last 24 hours
       params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     }
     if (endFilter.value) {
-      params.append("end", new Date(endFilter.value).toISOString());
+      const endDate = new Date(endFilter.value);
+      if (Number.isFinite(endDate.getTime())) {
+        params.append("end", endDate.toISOString());
+      }
     }
     const resp = await fetch(`/api/events/count?${params.toString()}`, {
       headers: { ...getAuthHeader() }
@@ -2609,6 +2703,7 @@ function connectEvents() {
 }
 
 connectEvents();
+loadFilters();
 fetchEvents();
 fetchTotal();
 setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
@@ -2685,16 +2780,22 @@ window._debugWaterfall = function () {
   }
 };
 
-bandFilter.addEventListener("change", fetchEvents);
-modeFilter.addEventListener("change", fetchEvents);
-callsignFilter.addEventListener("change", fetchEvents);
-startFilter.addEventListener("change", fetchEvents);
-endFilter.addEventListener("change", fetchEvents);
-bandFilter.addEventListener("change", fetchTotal);
-modeFilter.addEventListener("change", fetchTotal);
-callsignFilter.addEventListener("change", fetchTotal);
-startFilter.addEventListener("change", fetchTotal);
-endFilter.addEventListener("change", fetchTotal);
+function resetEventsPagination() {
+  eventOffset = 0;
+  eventsPanelPage = 0;
+}
+
+function handleEventsFilterChange() {
+  resetEventsPagination();
+  fetchEvents();
+  fetchTotal();
+}
+
+bandFilter.addEventListener("change", handleEventsFilterChange);
+modeFilter.addEventListener("change", handleEventsFilterChange);
+callsignFilter.addEventListener("change", handleEventsFilterChange);
+startFilter.addEventListener("change", handleEventsFilterChange);
+endFilter.addEventListener("change", handleEventsFilterChange);
 
 if (eventsSearchCallsignInput) {
   eventsSearchCallsignInput.addEventListener("input", () => {
@@ -2733,9 +2834,17 @@ if (eventsPrevBtn) {
 
 if (eventsNextBtn) {
   eventsNextBtn.addEventListener("click", () => {
-    const filteredItems = applyEventsPanelFilters(latestEvents);
+    const orderedItems = orderEventsForDisplay(latestEvents);
+    const filteredItems = applyEventsCardTypeFilter(orderedItems);
     const totalPages = Math.max(1, Math.ceil(filteredItems.length / EVENTS_PANEL_PAGE_SIZE));
     eventsPanelPage = Math.min(totalPages - 1, eventsPanelPage + 1);
+    renderEventsPanelFromCache();
+  });
+}
+
+if (eventsTypeFilter) {
+  eventsTypeFilter.addEventListener("change", () => {
+    eventsPanelPage = 0;
     renderEventsPanelFromCache();
   });
 }
@@ -2748,9 +2857,9 @@ let eventsFullscreenPage = 0;
 
 function renderEventsFullscreen() {
   const sourceItems = latestEvents || [];
-  const totalEvents = sourceItems.length;
   const orderedEvents = orderEventsForDisplay(sourceItems);
-  const totalPages = Math.max(1, Math.ceil(totalEvents / EVENTS_PANEL_PAGE_SIZE));
+  const cardItems = applyEventsCardTypeFilter(orderedEvents);
+  const totalPages = Math.max(1, Math.ceil(cardItems.length / EVENTS_PANEL_PAGE_SIZE));
   
   if (eventsFullscreenPage > totalPages - 1) {
     eventsFullscreenPage = totalPages - 1;
@@ -2760,7 +2869,7 @@ function renderEventsFullscreen() {
   }
   
   const startIndex = eventsFullscreenPage * EVENTS_PANEL_PAGE_SIZE;
-  const pagedItems = orderedEvents.slice(startIndex, startIndex + EVENTS_PANEL_PAGE_SIZE);
+  const pagedItems = cardItems.slice(startIndex, startIndex + EVENTS_PANEL_PAGE_SIZE);
   
   renderEventList(
     eventsFullscreenEl,
@@ -2769,7 +2878,7 @@ function renderEventsFullscreen() {
   );
   
   if (eventsFullscreenTitle) {
-    const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
+    const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : cardItems.length;
     eventsFullscreenTitle.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
   }
   
@@ -2795,7 +2904,7 @@ if (eventsFullscreenPrevBtn) {
 
 if (eventsFullscreenNextBtn) {
   eventsFullscreenNextBtn.addEventListener("click", () => {
-    const totalPages = Math.max(1, Math.ceil((latestEvents || []).length / EVENTS_PANEL_PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(applyEventsCardTypeFilter(orderEventsForDisplay(latestEvents || [])).length / EVENTS_PANEL_PAGE_SIZE));
     eventsFullscreenPage = Math.min(totalPages - 1, eventsFullscreenPage + 1);
     renderEventsFullscreen();
   });

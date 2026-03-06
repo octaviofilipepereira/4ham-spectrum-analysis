@@ -38,6 +38,38 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
+_CW_SUBBANDS_HZ = {
+    "160m": (1_800_000, 1_840_000),
+    "80m": (3_500_000, 3_600_000),
+    "40m": (7_000_000, 7_040_000),
+    "30m": (10_100_000, 10_130_000),
+    "20m": (14_000_000, 14_117_000),
+    "17m": (18_068_000, 18_110_000),
+    "15m": (21_000_000, 21_150_000),
+    "12m": (24_890_000, 24_930_000),
+    "10m": (28_000_000, 28_300_000),
+}
+
+
+def _resolve_cw_sweep_bounds(
+    band_name: str,
+    start_hz: int,
+    end_hz: int,
+) -> tuple[int, int]:
+    band = str(band_name or "").strip().lower()
+    cw_bounds = _CW_SUBBANDS_HZ.get(band)
+    if not cw_bounds:
+        return int(start_hz), int(end_hz)
+
+    cw_start, cw_end = cw_bounds
+    clipped_start = max(int(start_hz), int(cw_start))
+    clipped_end = min(int(end_hz), int(cw_end))
+
+    if clipped_end <= clipped_start:
+        return int(start_hz), int(end_hz)
+    return int(clipped_start), int(clipped_end)
+
+
 @router.post("/start")
 @limiter.limit("10/minute")  # Rate limit: 10 scan starts per minute
 async def scan_start(payload: dict, request: Request, _: None = Depends(verify_basic_auth)) -> Dict:
@@ -118,10 +150,16 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
             if state.ft_external_decoder is not None:
                 await _stop_ft_external_decoder()
                 log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
+            cw_start_hz, cw_end_hz = _resolve_cw_sweep_bounds(
+                scan.get("band"),
+                start_hz,
+                end_hz,
+            )
             # Apply per-scan CW sweep parameters from payload (overrides env defaults)
             _cw_step = normalized_payload.get("cw_step_hz")
             _cw_dwell = normalized_payload.get("cw_dwell_s")
             _cw_params_changed = False
+            _cw_band_changed = False
             if _cw_step is not None:
                 try:
                     _new_step = int(_cw_step)
@@ -138,15 +176,32 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                         _cw_params_changed = True
                 except (ValueError, TypeError):
                     pass
-            # Restart decoder if params changed (so new dwell/step take effect)
-            if state.cw_decoder and _cw_params_changed:
+            # Restart decoder if scan band changed (so sweep bounds match band)
+            if state.cw_decoder is not None:
+                try:
+                    _snap = state.cw_decoder.snapshot() or {}
+                    _current_start = int(_snap.get("band_start_hz") or 0)
+                    _current_end = int(_snap.get("band_end_hz") or 0)
+                    _cw_band_changed = (
+                        _current_start != cw_start_hz or _current_end != cw_end_hz
+                    )
+                except Exception:
+                    _cw_band_changed = False
+
+            # Restart decoder if params or band changed
+            if state.cw_decoder and (_cw_params_changed or _cw_band_changed):
                 await _stop_cw_decoder()
-                log(f"scan_cw_decoder_restarted:step={state.cw_sweep_step_hz}hz dwell={state.cw_sweep_dwell_s}s")
+                log(
+                    f"scan_cw_decoder_restarted:step={state.cw_sweep_step_hz}hz "
+                    f"dwell={state.cw_sweep_dwell_s}s "
+                    f"band={cw_start_hz}-{cw_end_hz} "
+                    f"params_changed={_cw_params_changed} band_changed={_cw_band_changed}"
+                )
             if not state.cw_decoder:
                 result = await _start_cw_decoder(
                     force=True,
-                    band_start_hz=start_hz,
-                    band_end_hz=end_hz,
+                    band_start_hz=cw_start_hz,
+                    band_end_hz=cw_end_hz,
                 )
                 log(f"scan_cw_decoder_started:{result}")
         elif decoder_mode in ft_modes:

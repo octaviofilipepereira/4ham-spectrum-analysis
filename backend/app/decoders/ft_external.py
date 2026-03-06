@@ -522,12 +522,17 @@ class ExternalFtDecoder:
                 # In auto-scan mode the SDR hops across the band.
                 # Parking holds it on the dial frequency so every
                 # IQ sample in the window comes from ONE frequency.
+                self._log(f"ft_external_pre_park dial_hz={dial_hz} mode={mode} scan_park={(self.scan_park is not None)}")
                 if self.scan_park:
                     try:
+                        self._log(f"ft_external_parking dial_hz={dial_hz} mode={mode}")
                         self.scan_park(dial_hz)
-                    except Exception:
-                        pass
+                        self._log(f"ft_external_parked dial_hz={dial_hz}")
+                    except Exception as e:
+                        self._log(f"ft_external_park_error dial_hz={dial_hz} error={e}")
                     await asyncio.sleep(0.05)  # 50 ms SDR settle
+                else:
+                    self._log(f"ft_external_no_scan_park dial_hz={dial_hz} mode={mode}")
 
                 try:
                     # Reset the IQ provider so we only get fresh samples
@@ -592,9 +597,11 @@ class ExternalFtDecoder:
                     # ── Always unpark so the scan sweep resumes ──
                     if self.scan_unpark:
                         try:
+                            self._log(f"ft_external_unparking mode={mode}")
                             self.scan_unpark()
-                        except Exception:
-                            pass
+                            self._log(f"ft_external_unparked mode={mode}")
+                        except Exception as e:
+                            self._log(f"ft_external_unpark_error error={e}")
 
                 await asyncio.sleep(self.poll_s)
         except asyncio.CancelledError:

@@ -31,15 +31,21 @@ Position geometry (example: 20m CW, step=6500 Hz, settle=100 ms, dwell=5 s):
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Callable, List, Optional
 
 import numpy as np
+from .cw.dsp import estimate_snr
 
 _logger = logging.getLogger(__name__)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _clamp_hz(value_hz: int, min_hz: int, max_hz: int) -> int:
+    return max(int(min_hz), min(int(max_hz), int(value_hz)))
 
 
 class CWSweepDecoder:
@@ -83,7 +89,9 @@ class CWSweepDecoder:
     target_sample_rate : int
         Audio sample rate fed to CWDecoder (default 8000 Hz).
     min_confidence : float
-        Minimum CWDecoder confidence to emit events (0.0–1.0, default 0.3).
+        Minimum CWDecoder confidence required to emit callsign-identified
+        events (0.0–1.0, default 0.3). Occupancy events are emitted
+        independently.
     """
 
     def __init__(
@@ -366,32 +374,75 @@ class CWSweepDecoder:
                     level="info" if result.confidence > 0 else "debug",
                 )
 
-                # ── 7. Emit events ────────────────────────────────────────
-                if result.confidence >= self.min_confidence and result.text:
-                    # Absolute RF frequency: SDR centre + audio-domain tone offset
-                    rf_freq_hz = pos_hz + int(result.dominant_freq_hz)
+                # ── 7. Emit events (occupancy → partial text → callsign) ──
+                # Absolute RF frequency: SDR centre + audio-domain tone offset
+                rf_freq_hz = _clamp_hz(
+                    pos_hz + int(result.dominant_freq_hz),
+                    self.band_start_hz,
+                    self.band_end_hz,
+                )
+                _safe_rms = max(float(audio_rms), 1e-12)
+                _safe_peak = max(float(audio_peak), _safe_rms)
+                est_power_dbm = round(20.0 * math.log10(_safe_rms), 1)
+                crest_db = round(max(0.0, 20.0 * math.log10(_safe_peak / _safe_rms)), 1)
+                _tone_snr_db = float(
+                    estimate_snr(
+                        audio,
+                        self.target_sample_rate,
+                        float(result.dominant_freq_hz),
+                    )
+                )
+                if not math.isfinite(_tone_snr_db):
+                    _tone_snr_db = 0.0
+                est_snr_db = round(_tone_snr_db, 1)
 
-                    # Common occupancy fields added to every CW event so the
-                    # frontend / database can show signal strength and decoded
-                    # text regardless of whether a callsign was identified.
+                if self.on_event:
+                    occupancy_mode = "CW" if float(result.confidence or 0.0) > 0.1 else "CW_CANDIDATE"
+                    occupancy_event = {
+                        "type": "occupancy",
+                        "timestamp": _utc_now_iso(),
+                        "mode": occupancy_mode,
+                        "frequency_hz": rf_freq_hz,
+                        "bandwidth_hz": 200,
+                        "snr_db": est_snr_db,
+                        "crest_db": crest_db,
+                        "power_dbm": est_power_dbm,
+                        "threshold_dbm": None,
+                        "occupied": True,
+                        "confidence": result.confidence,
+                        "source": "internal_cw",
+                        "df_hz": int(result.dominant_freq_hz),
+                        "occupancy_rms": round(audio_rms, 6),
+                        "occupancy_peak": round(audio_peak, 4),
+                        "wpm": round(result.wpm, 1),
+                    }
+                    try:
+                        self.on_event(occupancy_event)
+                        self._events_emitted += 1
+                        self._last_event_at = _utc_now_iso()
+                    except Exception as exc:
+                        self._log(f"cw_sweep_event_error {exc}")
+
+                if result.text:
                     base_event = {
                         "timestamp": _utc_now_iso(),
                         "mode": "CW",
                         "frequency_hz": rf_freq_hz,
-                        "snr_db": 0.0,
+                        "snr_db": est_snr_db,
+                        "crest_db": crest_db,
+                        "power_dbm": est_power_dbm,
                         "dt_s": 0.0,
                         "df_hz": int(result.dominant_freq_hz),
                         "confidence": result.confidence,
                         "msg": result.text,
                         "raw": f"CW {result.wpm:.1f}wpm",
                         "source": "internal_cw",
-                        # Occupancy metrics: absolute signal level at this position
                         "occupancy_rms": round(audio_rms, 6),
                         "occupancy_peak": round(audio_peak, 4),
                         "wpm": round(result.wpm, 1),
                     }
 
-                    if result.callsigns:
+                    if result.callsigns and result.confidence >= self.min_confidence:
                         # Deduplicate: a single transmission often repeats the
                         # same callsign (e.g. "IK6LBT IK6LBT DE CT7BFV").
                         # Emit once per unique callsign, preserving order.
@@ -407,9 +458,8 @@ class CWSweepDecoder:
                                 except Exception as exc:
                                     self._log(f"cw_sweep_event_error {exc}")
                     else:
-                        # No callsign identified — emit a single event with
-                        # callsign=None so the decoded text and occupancy data
-                        # are still recorded and visible in the frontend.
+                        # Partial decode (or low-confidence decode): keep text
+                        # in callsign_events.msg without forcing a callsign.
                         event = {**base_event, "callsign": None}
                         if self.on_event:
                             try:

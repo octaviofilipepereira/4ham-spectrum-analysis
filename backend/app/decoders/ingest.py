@@ -89,7 +89,7 @@ def build_callsign_event(payload, scan_state):
     # Merge CW occupancy/decode fields into the payload JSON blob so they are
     # persisted without needing new DB columns and are available to the API.
     _extra = {}
-    for _key in ("occupancy_rms", "occupancy_peak", "wpm"):
+    for _key in ("occupancy_rms", "occupancy_peak", "wpm", "crest_db"):
         _val = payload.get(_key)
         if _val is not None:
             _extra[_key] = _val
@@ -111,6 +111,7 @@ def build_callsign_event(payload, scan_state):
         "mode": mode,
         "callsign": callsign,
         "snr_db": payload.get("snr_db"),
+        "crest_db": payload.get("crest_db"),
         "df_hz": payload.get("df_hz"),
         "confidence": payload.get("confidence"),
         "raw": payload.get("raw"),
@@ -126,5 +127,6 @@ def build_callsign_event(payload, scan_state):
         "payload": payload_blob,
         "source": payload.get("source") or _infer_source(mode),
         "device": payload.get("device") or scan_state.get("device"),
-        "scan_id": payload.get("scan_id") or scan_state.get("scan_id")
+        "scan_id": payload.get("scan_id") or scan_state.get("scan_id"),
+        "power_dbm": payload.get("power_dbm"),
     }

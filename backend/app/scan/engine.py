@@ -237,16 +237,27 @@ class ScanEngine:
         The scan loop will stop hopping and stay on this frequency,
         allowing the FT decoder to capture a clean audio window.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"scan_engine_park freq_hz={frequency_hz} device={self.device is not None}")
         self._parked = True
         self._parked_event.clear()
         self.center_hz = int(frequency_hz)
         self.current_hz = int(frequency_hz)
-        self.controller.tune(self.device, int(frequency_hz))
+        try:
+            self.controller.tune(self.device, int(frequency_hz))
+            logger.info(f"scan_engine_parked freq_hz={frequency_hz}")
+        except Exception as e:
+            logger.error(f"scan_engine_park_tune_error freq_hz={frequency_hz} error={e}")
 
     def unpark(self) -> None:
         """Resume normal scan sweeping."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"scan_engine_unpark _parked={self._parked}")
         self._parked = False
         self._parked_event.set()
+        logger.info(f"scan_engine_unparked")
 
     async def _scan_loop(self) -> None:
         start_hz = self.start_hz or self.center_hz
