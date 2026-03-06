@@ -4,6 +4,7 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 import re
+import unicodedata
 
 
 _CALLSIGN_RE = re.compile(r"\b[A-Z0-9]{1,3}\d{1,4}[A-Z0-9]{1,3}(?:/[A-Z0-9]+)?\b")
@@ -24,6 +25,7 @@ _PHONETIC_MAP = {
     "INDIA": "I",
     "JULIET": "J",
     "JULIETT": "J",
+    "JULIETTE": "J",
     "KILO": "K",
     "LIMA": "L",
     "MIKE": "M",
@@ -37,9 +39,12 @@ _PHONETIC_MAP = {
     "UNIFORM": "U",
     "VICTOR": "V",
     "WHISKEY": "W",
+    "WHISKY": "W",
     "XRAY": "X",
+    "X-RAY": "X",
     "YANKEE": "Y",
     "ZULU": "Z",
+    "ZOULOU": "Z",
 }
 
 _NUMBER_WORD_MAP = {
@@ -71,6 +76,25 @@ _NUMBER_WORD_MAP = {
     "NOVE": "9",
     "NUEVE": "9",
     "NINE": "9",
+    "UN": "1",
+    "DEUX": "2",
+    "TROIS": "3",
+    "QUATRE": "4",
+    "CINQ": "5",
+    "SIX": "6",
+    "SEPT": "7",
+    "HUIT": "8",
+    "NEUF": "9",
+    "EINS": "1",
+    "ZWEI": "2",
+    "DREI": "3",
+    "VIER": "4",
+    "FUENF": "5",
+    "FUNF": "5",
+    "SECHS": "6",
+    "SIEBEN": "7",
+    "ACHT": "8",
+    "NEUN": "9",
 }
 
 _SKIP_WORDS = {
@@ -83,6 +107,13 @@ _SKIP_WORDS = {
     "FROM",
     "CHAMANDO",
     "LLAMANDO",
+    "APPEL",
+    "RUFT",
+    "IST",
+    "HIER",
+    "VON",
+    "ICI",
+    "DEPUIS",
 }
 
 _SLASH_WORDS = {
@@ -97,7 +128,16 @@ _SUFFIX_WORDS = {
     "MARITIME": "MM",
     "QRP": "QRP",
     "QRPP": "QRPP",
+    "PORTATIF": "P",
+    "PORTABEL": "P",
+    "MOBIL": "M",
 }
+
+
+def _normalize_token(token):
+    normalized = unicodedata.normalize("NFKD", token)
+    without_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return without_accents.upper()
 
 
 def extract_callsign(text):
@@ -141,7 +181,8 @@ def parse_ssb_asr_text(text):
         return None
 
     raw = str(text).strip()
-    tokens = re.findall(r"[A-Za-z0-9./+-]+", raw.upper())
+    raw_tokens = re.findall(r"[\w./+-]+", raw, flags=re.UNICODE)
+    tokens = [_normalize_token(token) for token in raw_tokens if token]
 
     grid = None
     report = None

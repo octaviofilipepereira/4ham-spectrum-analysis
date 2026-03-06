@@ -57,6 +57,18 @@ def test_ssb_asr_parser_extracts_grid_report_and_frequency():
     assert event["frequency_hz"] == 14255000
 
 
+def test_ssb_asr_parser_accepts_french_number_words():
+    event = parse_ssb_asr_text("appel charlie tango un alpha bravo charlie portatif")
+    assert event is not None
+    assert event["callsign"] == "CT1ABC/P"
+
+
+def test_ssb_asr_parser_accepts_german_number_words_with_umlaut():
+    event = parse_ssb_asr_text("hier charlie tango fünf alpha bravo charlie portabel")
+    assert event is not None
+    assert event["callsign"] == "CT5ABC/P"
+
+
 def test_build_callsign_event_infers_20m_band_from_frequency():
     event = build_callsign_event({"callsign": "CT1ABC", "frequency_hz": 14255000}, {})
     assert event is not None
