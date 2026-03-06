@@ -118,6 +118,11 @@ def generate_cw_audio(
         if i < len(morse_list) - 1:
             segments.append(silence(char_gap))
 
+    # Add a short trailing gap so single-character signals still include a
+    # terminal off interval, improving timing classification stability.
+    if segments:
+        segments.append(silence(char_gap))
+
     if not segments:
         return np.zeros(sample_rate, dtype=np.float32)
 
