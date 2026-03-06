@@ -5,6 +5,7 @@
 
 import sqlite3
 import json
+from datetime import datetime, timedelta, timezone
 
 
 _SCHEMA_SQL = """
@@ -501,6 +502,88 @@ class Database:
             baseline["callsign_modes"][mode] = int(row["total"] or 0)
 
         return baseline
+
+    def get_ssb_metrics(self, window_minutes: int = 15):
+        try:
+            minutes = int(window_minutes)
+        except (TypeError, ValueError):
+            minutes = 15
+        minutes = max(1, min(1440, minutes))
+
+        now = datetime.now(timezone.utc)
+        cutoff = (now - timedelta(minutes=minutes)).isoformat()
+
+        rows = self.conn.execute(
+            """
+            SELECT timestamp, callsign, confidence, payload
+            FROM callsign_events
+            WHERE UPPER(mode) = 'SSB' AND timestamp >= ?
+            ORDER BY timestamp DESC
+            """,
+            (cutoff,),
+        ).fetchall()
+
+        by_state = {
+            "SSB_CONFIRMED": 0,
+            "SSB_TRAFFIC": 0,
+            "SSB_UNKNOWN": 0,
+        }
+        by_parse_method = {}
+        scores = []
+
+        first_event_at = rows[-1]["timestamp"] if rows else None
+        last_event_at = rows[0]["timestamp"] if rows else None
+
+        for row in rows:
+            payload_raw = row["payload"]
+            payload = {}
+            if isinstance(payload_raw, str) and payload_raw.strip():
+                try:
+                    payload = json.loads(payload_raw)
+                except json.JSONDecodeError:
+                    payload = {}
+
+            callsign_value = str(row["callsign"] or "").strip()
+            state = payload.get("ssb_state")
+            if not state:
+                state = "SSB_CONFIRMED" if callsign_value else "SSB_TRAFFIC"
+            state = str(state).strip().upper()
+            if state not in by_state:
+                state = "SSB_UNKNOWN"
+            by_state[state] += 1
+
+            parse_method = str(payload.get("ssb_parse_method") or "unknown").strip().lower()
+            by_parse_method[parse_method] = by_parse_method.get(parse_method, 0) + 1
+
+            score_value = payload.get("ssb_score", row["confidence"])
+            try:
+                score_float = float(score_value)
+            except (TypeError, ValueError):
+                score_float = None
+            if score_float is not None:
+                score_float = max(0.0, min(1.0, score_float))
+                scores.append(score_float)
+
+        total_events = len(rows)
+        confirmed = by_state.get("SSB_CONFIRMED", 0)
+
+        return {
+            "window_minutes": minutes,
+            "window_start": cutoff,
+            "window_end": now.isoformat(),
+            "first_event_at": first_event_at,
+            "last_event_at": last_event_at,
+            "total_events": total_events,
+            "by_state": by_state,
+            "confirmed_ratio": round((confirmed / total_events), 3) if total_events else 0.0,
+            "scores": {
+                "count": len(scores),
+                "avg": round(sum(scores) / len(scores), 3) if scores else None,
+                "min": round(min(scores), 3) if scores else None,
+                "max": round(max(scores), 3) if scores else None,
+            },
+            "parse_methods": by_parse_method,
+        }
 
     def purge_invalid_events(self):
         occupancy_where_clause = """

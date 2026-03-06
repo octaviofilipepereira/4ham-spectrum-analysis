@@ -16,7 +16,7 @@ import asyncio
 import re
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import state
 from app.dependencies.auth import optional_verify_basic_auth
@@ -892,6 +892,19 @@ def decoder_ssb(payload: dict, _: bool = Depends(optional_verify_basic_auth)) ->
             })
     
     return _ingest_callsign_payloads(events, payload)
+
+
+@router.get("/ssb/metrics")
+def decoder_ssb_metrics(
+    window_minutes: int = Query(15, ge=1, le=1440),
+    _: bool = Depends(optional_verify_basic_auth),
+) -> Dict:
+    """Get SSB confidence/state metrics for a recent time window."""
+    metrics = state.db.get_ssb_metrics(window_minutes=window_minutes)
+    return {
+        "status": "ok",
+        "metrics": metrics,
+    }
 
 
 @router.post("/start/{decoder_type}")
