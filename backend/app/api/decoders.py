@@ -22,6 +22,8 @@ from app.dependencies import state
 from app.dependencies.auth import optional_verify_basic_auth
 from app.dependencies.helpers import (
     log,
+    safe_float,
+    hint_mode_by_frequency,
     touch_decoder_source,
     record_decoder_event_saved,
     record_decoder_event_invalid,
@@ -29,6 +31,12 @@ from app.dependencies.helpers import (
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
+from app.dsp.pipeline import (
+    apply_agc_smoothed,
+    compute_power_db,
+    estimate_occupancy,
+    classify_mode_heuristic,
+)
 
 
 router = APIRouter()
@@ -39,6 +47,11 @@ _ft_external_iq_queue: Optional[asyncio.Queue] = None
 
 # CW decoder IQ queue
 _cw_iq_queue: Optional[asyncio.Queue] = None
+
+# SSB detector IQ queue and task
+_ssb_iq_queue: Optional[asyncio.Queue] = None
+_ssb_detector_task: Optional[asyncio.Task] = None
+_ssb_traffic_last_emit: Dict = {}
 
 _SSB_TRAFFIC_KEYWORDS = {
     "CQ",
@@ -101,6 +114,276 @@ def _refresh_decoder_process_status():
     
     if state.cw_decoder:
         state.decoder_status["cw"]["status"] = state.cw_decoder.snapshot()
+
+    state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+
+
+def _snapshot_ssb_detector_status() -> Dict:
+    running = bool(_ssb_detector_task is not None and not _ssb_detector_task.done())
+    queue_size = 0
+    if _ssb_iq_queue is not None:
+        try:
+            queue_size = _ssb_iq_queue.qsize()
+        except Exception:
+            queue_size = 0
+    return {
+        "enabled": bool(state.ssb_internal_enable),
+        "running": running,
+        "queue_size": int(queue_size),
+    }
+
+
+def _update_noise_floor_ssb(band: str, power_db: float) -> float:
+    alpha = 0.1
+    current = state.noise_floor.get(band)
+    if current is None:
+        state.noise_floor[band] = power_db
+        return power_db
+    updated = alpha * power_db + (1 - alpha) * current
+    state.noise_floor[band] = updated
+    return updated
+
+
+def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
+    if not isinstance(occupancy_event, dict):
+        return
+
+    if not occupancy_event.get("occupied"):
+        return
+
+    mode_name = str(occupancy_event.get("mode") or "").strip().upper()
+    if mode_name != "SSB":
+        return
+
+    frequency_hz = int(safe_float(occupancy_event.get("frequency_hz"), 0.0) or 0)
+    if frequency_hz <= 0:
+        return
+
+    now_ts = datetime.now(timezone.utc).timestamp()
+    bucket_key = (
+        str(occupancy_event.get("band") or ""),
+        int(frequency_hz / 2000),
+    )
+    last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
+    if (now_ts - last_emit_ts) < 8.0:
+        return
+    _ssb_traffic_last_emit[bucket_key] = now_ts
+
+    if len(_ssb_traffic_last_emit) > 4096:
+        stale_before = now_ts - 120.0
+        for key, value in list(_ssb_traffic_last_emit.items()):
+            if value < stale_before:
+                _ssb_traffic_last_emit.pop(key, None)
+
+    base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
+    snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
+    ssb_score = min(0.78, max(0.35, base_confidence + snr_bonus + 0.12))
+
+    msg = f"SSB traffic candidate @ {frequency_hz / 1_000_000:.3f} MHz"
+    payload = {
+        "mode": "SSB",
+        "callsign": "",
+        "raw": msg,
+        "msg": msg,
+        "band": occupancy_event.get("band"),
+        "frequency_hz": frequency_hz,
+        "snr_db": occupancy_event.get("snr_db"),
+        "power_dbm": occupancy_event.get("power_dbm"),
+        "confidence": round(ssb_score, 3),
+        "ssb_state": "SSB_TRAFFIC",
+        "ssb_score": round(ssb_score, 3),
+        "ssb_parse_method": "occupancy",
+        "source": "internal_ssb_occupancy",
+        "device": occupancy_event.get("device"),
+        "scan_id": occupancy_event.get("scan_id"),
+    }
+    event = build_callsign_event(payload, state.scan_state)
+    if not event:
+        return
+
+    state.db.insert_callsign(event)
+    touch_decoder_source(event.get("source"))
+    record_decoder_event_saved(event)
+
+
+async def _run_ssb_detector_loop() -> None:
+    global _ssb_iq_queue
+
+    while True:
+        try:
+            if _ssb_iq_queue is None:
+                await asyncio.sleep(0.2)
+                continue
+
+            if not state.scan_engine.running or state.scan_state.get("state") != "running":
+                await asyncio.sleep(0.5)
+                continue
+
+            if str(state.scan_state.get("decoder_mode") or "").strip().lower() != "ssb":
+                await asyncio.sleep(0.5)
+                continue
+
+            try:
+                iq = await asyncio.wait_for(_ssb_iq_queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+
+            while _ssb_iq_queue is not None and not _ssb_iq_queue.empty():
+                try:
+                    iq = _ssb_iq_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+            if iq is None or len(iq) == 0:
+                continue
+
+            if state.agc_enabled:
+                iq, gain_db = apply_agc_smoothed(
+                    iq,
+                    state.agc_state,
+                    target_rms=state.agc_target_rms,
+                    max_gain_db=state.agc_max_gain_db,
+                    alpha=state.agc_alpha,
+                )
+                state.last_agc_gain_db = gain_db
+
+            band = state.scan_engine.config.get("band") if state.scan_engine.config else None
+            power_db = compute_power_db(iq)
+            noise_floor = _update_noise_floor_ssb(band, power_db)
+            threshold_dbm = noise_floor + 6.0
+            sample_rate = int(state.scan_engine.sample_rate or 0)
+            if sample_rate <= 0:
+                await asyncio.sleep(0.2)
+                continue
+
+            occupancy = estimate_occupancy(
+                iq,
+                sample_rate,
+                threshold_dbm=threshold_dbm,
+                adapt=False,
+                snr_threshold_db=min(float(state.snr_threshold_db), 3.0),
+                min_bw_hz=min(int(state.min_bw_hz), 250),
+            )
+            if not occupancy:
+                continue
+
+            candidates = []
+            for candidate in occupancy:
+                bw_hz = int(safe_float(candidate.get("bandwidth_hz"), 0) or 0)
+                if bw_hz < 250 or bw_hz > 5000:
+                    continue
+                candidates.append(candidate)
+            if not candidates:
+                continue
+
+            best = max(candidates, key=lambda item: item.get("snr_db", 0.0))
+            offset_hz = best.get("offset_hz")
+            center_hz = int(state.scan_engine.center_hz or 0)
+            if center_hz <= 0:
+                continue
+            if offset_hz is not None:
+                frequency_hz = int(center_hz + float(offset_hz))
+            else:
+                frequency_hz = center_hz
+            if frequency_hz <= 0:
+                continue
+
+            mode_name, mode_confidence = classify_mode_heuristic(
+                best.get("bandwidth_hz"),
+                best.get("snr_db"),
+            )
+            freq_hint = hint_mode_by_frequency(
+                frequency_hz,
+                band_name=band,
+                bandwidth_hz=best.get("bandwidth_hz"),
+            )
+            if freq_hint:
+                mode_name = freq_hint
+
+            if mode_name in {"SSB", "AM"}:
+                mode_name = "SSB"
+                mode_confidence = max(float(mode_confidence or 0.0), 0.6)
+            else:
+                continue
+
+            event = {
+                "type": "occupancy",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "band": band,
+                "frequency_hz": frequency_hz,
+                "offset_hz": offset_hz,
+                "bandwidth_hz": best.get("bandwidth_hz"),
+                "power_dbm": power_db,
+                "snr_db": best.get("snr_db"),
+                "threshold_dbm": best.get("threshold_dbm", threshold_dbm),
+                "occupied": bool(best.get("occupied")),
+                "mode": mode_name,
+                "confidence": float(mode_confidence or 0.0),
+                "device": state.scan_state.get("device"),
+                "scan_id": state.scan_state.get("scan_id"),
+            }
+
+            if not is_plausible_occupancy_event(event):
+                continue
+
+            state.db.insert_occupancy(event)
+            _emit_ssb_traffic_event_from_occupancy(event)
+
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            log(f"ssb_detector_loop_error:{exc}")
+            await asyncio.sleep(0.5)
+
+
+async def _start_ssb_detector(force: bool = False) -> Dict:
+    global _ssb_iq_queue, _ssb_detector_task
+
+    if not force and not state.ssb_internal_enable:
+        state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+        return {"started": False, "reason": "ssb_internal_disabled"}
+
+    if state.scan_engine is None:
+        state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+        return {"started": False, "reason": "scan_engine_unavailable"}
+
+    if _ssb_iq_queue is None:
+        _ssb_iq_queue = asyncio.Queue(maxsize=1024)
+        state.scan_engine.register_iq_listener(_ssb_iq_queue)
+
+    if _ssb_detector_task is not None and not _ssb_detector_task.done():
+        state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+        return {"started": False, "reason": "ssb_detector_already_running"}
+
+    _ssb_detector_task = asyncio.create_task(_run_ssb_detector_loop())
+    state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+    return {"started": True, "reason": None}
+
+
+async def _stop_ssb_detector() -> Dict:
+    global _ssb_iq_queue, _ssb_detector_task
+
+    if _ssb_iq_queue is not None:
+        try:
+            state.scan_engine.unregister_iq_listener(_ssb_iq_queue)
+        except Exception:
+            pass
+        _ssb_iq_queue = None
+
+    if _ssb_detector_task is None:
+        state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+        return {"stopped": False, "reason": "ssb_detector_not_running"}
+
+    _ssb_detector_task.cancel()
+    try:
+        await _ssb_detector_task
+    except asyncio.CancelledError:
+        pass
+    _ssb_detector_task = None
+
+    state.decoder_status["internal_native"]["ssb_internal_status"] = _snapshot_ssb_detector_status()
+    return {"stopped": True, "reason": None}
 
 
 def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:

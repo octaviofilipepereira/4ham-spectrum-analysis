@@ -31,6 +31,8 @@ from app.api.decoders import (
     _stop_cw_decoder,
     _start_ft_external_decoder,
     _stop_ft_external_decoder,
+    _start_ssb_detector,
+    _stop_ssb_detector,
 )
 
 
@@ -150,6 +152,7 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
             if state.ft_external_decoder is not None:
                 await _stop_ft_external_decoder()
                 log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
+            await _stop_ssb_detector()
             cw_start_hz, cw_end_hz = _resolve_cw_sweep_bounds(
                 scan.get("band"),
                 start_hz,
@@ -209,6 +212,7 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
             if state.cw_decoder is not None:
                 await _stop_cw_decoder()
                 log("scan_cw_decoder_stopped:switching_to_ft_mode")
+            await _stop_ssb_detector()
             decoder_mode_upper = decoder_mode.upper()
             if state.ft_external_decoder is not None:
                 state.ft_external_decoder.set_modes([decoder_mode_upper])
@@ -219,11 +223,16 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                     state.ft_external_decoder.set_modes([decoder_mode_upper])
             state.ft_external_modes[:] = [decoder_mode_upper]
         else:
-            # Other modes (SSB, APRS): stop both decoders
+            # Other modes (SSB, APRS): stop FT/CW and start SSB detector for SSB
             if state.cw_decoder is not None:
                 await _stop_cw_decoder()
             if state.ft_external_decoder is not None:
                 await _stop_ft_external_decoder()
+            if decoder_mode == "ssb":
+                result = await _start_ssb_detector(force=True)
+                log(f"scan_ssb_detector_started:{result}")
+            else:
+                await _stop_ssb_detector()
 
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()
@@ -294,6 +303,7 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
         Updated scan state dict
     """
     await state.scan_engine.stop_async()
+    await _stop_ssb_detector()
     state.scan_state["state"] = "stopped"
     state.scan_state["decoder_mode"] = ""  # clear so frontend doesn't auto-select the button
     state.db.end_scan(
@@ -428,6 +438,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log("scan_cw_decoder_stopped:switching_to_ft_mode")
             except Exception as exc:
                 log(f"scan_cw_decoder_stop_failed:{exc}")
+        try:
+            await _stop_ssb_detector()
+        except Exception as exc:
+            log(f"scan_ssb_detector_stop_failed:{exc}")
         
         # Start FT external decoder if not already running
         if state.ft_external_decoder is None:
@@ -454,6 +468,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log("scan_ft_external_decoder_stopped:switching_to_cw_mode")
             except Exception as exc:
                 log(f"scan_ft_external_decoder_stop_failed:{exc}")
+        try:
+            await _stop_ssb_detector()
+        except Exception as exc:
+            log(f"scan_ssb_detector_stop_failed:{exc}")
         
         # Start CW decoder if not already running
         if state.cw_decoder is None:
@@ -464,7 +482,7 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_cw_decoder_start_failed:{exc}")
     
     else:
-        # SSB/APRS mode: stop both decoders (use other decoders)
+        # SSB/APRS mode: stop FT/CW decoders; start SSB detector for SSB
         
         # Stop CW decoder if running
         if state.cw_decoder is not None:
@@ -481,6 +499,18 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log("scan_ft_external_decoder_stopped:switching_to_other_mode")
             except Exception as exc:
                 log(f"scan_ft_external_decoder_stop_failed:{exc}")
+
+        if decoder_mode == "ssb":
+            try:
+                result = await _start_ssb_detector(force=True)
+                log(f"scan_ssb_detector_started:{result}")
+            except Exception as exc:
+                log(f"scan_ssb_detector_start_failed:{exc}")
+        else:
+            try:
+                await _stop_ssb_detector()
+            except Exception as exc:
+                log(f"scan_ssb_detector_stop_failed:{exc}")
 
     return {"status": "ok", "decoder_mode": decoder_mode}
 

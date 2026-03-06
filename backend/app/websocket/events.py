@@ -237,13 +237,21 @@ async def ws_events(websocket: WebSocket) -> None:
         threshold_dbm = noise_floor + 6.0  # 6 dB above noise floor
         
         # Detect occupancy
+        selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+        if selected_decoder_mode == "ssb":
+            snr_threshold_db = min(float(state.snr_threshold_db), 3.0)
+            min_bw_hz = min(int(state.min_bw_hz), 250)
+        else:
+            snr_threshold_db = state.snr_threshold_db
+            min_bw_hz = state.min_bw_hz
+
         occupancy = estimate_occupancy(
             iq,
             state.scan_engine.sample_rate,
             threshold_dbm=threshold_dbm,
             adapt=False,
-            snr_threshold_db=state.snr_threshold_db,
-            min_bw_hz=state.min_bw_hz
+            snr_threshold_db=snr_threshold_db,
+            min_bw_hz=min_bw_hz
         )
         
         if not occupancy:
@@ -288,7 +296,6 @@ async def ws_events(websocket: WebSocket) -> None:
 
         # In explicit SSB scan mode, treat voice-like occupancy classes as SSB
         # so operators can see activity through the SSB filter.
-        selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
         if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
             mode_name = "SSB"
             mode_confidence = max(float(mode_confidence or 0.0), 0.6)
