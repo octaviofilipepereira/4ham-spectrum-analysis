@@ -358,6 +358,18 @@ Last update: 2026-02-22 16:27:19 UTC
                 <label class="form-label">Record path</label>
                 <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
               </div>
+              <div class="col-12 d-none" id="cwScanParamsRow">
+                <div class="row g-2">
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">CW Step (Hz)</label>
+                    <input type="number" id="cwStepHz" value="2500" min="1000" step="100" class="form-control form-control-sm" />
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label">CW Dwell (s)</label>
+                    <input type="number" id="cwDwellS" value="5" min="0.5" step="0.5" class="form-control form-control-sm" />
+                  </div>
+                </div>
+              </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">Login</h3></div>
               <div class="col-6">

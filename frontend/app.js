@@ -51,6 +51,9 @@ let waterfallRenderer = "2d";
 const gainInput = document.getElementById("gain");
 const sampleRateInput = document.getElementById("sampleRate");
 const recordPathInput = document.getElementById("recordPath");
+const cwScanParamsRow = document.getElementById("cwScanParamsRow");
+const cwStepHzInput = document.getElementById("cwStepHz");
+const cwDwellSInput = document.getElementById("cwDwellS");
 const logsEl = document.getElementById("logs");
 const bandFilter = document.getElementById("bandFilter");
 const modeFilter = document.getElementById("modeFilter");
@@ -410,17 +413,19 @@ function refreshQuickBandButtons() {
 }
 
 function refreshModeButtons() {
-  if (!quickModeButtons.length) {
-    return;
+  if (quickModeButtons.length) {
+    quickModeButtons.forEach((button) => {
+      const buttonMode = String(button.dataset.quickMode || "").trim();
+      const isActive = selectedDecoderMode === buttonMode;
+      button.disabled = scanActionInFlight;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
   }
-
-  quickModeButtons.forEach((button) => {
-    const buttonMode = String(button.dataset.quickMode || "").trim();
-    const isActive = selectedDecoderMode === buttonMode;
-    button.disabled = scanActionInFlight;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  });
+  if (cwScanParamsRow) {
+    const isCwMode = String(selectedDecoderMode || "").trim().toUpperCase() === "CW";
+    cwScanParamsRow.classList.toggle("d-none", !isCwMode);
+  }
 }
 
 const EVENTS_PANEL_PAGE_SIZE = 50;
@@ -2635,8 +2640,14 @@ async function startScan() {
     }
   };
   if (decoderModeToSend === "cw") {
-    requestPayload.cw_step_hz = 2500;
-    requestPayload.cw_dwell_s = 5.0;
+    const cwStepHzValue = Number(cwStepHzInput?.value);
+    const cwDwellSValue = Number(cwDwellSInput?.value);
+    requestPayload.cw_step_hz = Number.isFinite(cwStepHzValue)
+      ? Math.max(1000, Math.round(cwStepHzValue))
+      : 2500;
+    requestPayload.cw_dwell_s = Number.isFinite(cwDwellSValue)
+      ? Math.max(0.5, cwDwellSValue)
+      : 5.0;
   }
   const response = await fetch("/api/scan/start", {
     method: "POST",
