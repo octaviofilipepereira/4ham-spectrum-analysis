@@ -2644,10 +2644,10 @@ async function startScan() {
     const cwDwellSValue = Number(cwDwellSInput?.value);
     requestPayload.cw_step_hz = Number.isFinite(cwStepHzValue)
       ? Math.max(1000, Math.round(cwStepHzValue))
-      : 2500;
+      : 6500;
     requestPayload.cw_dwell_s = Number.isFinite(cwDwellSValue)
       ? Math.max(0.5, cwDwellSValue)
-      : 5.0;
+      : 30.0;
   }
   const response = await fetch("/api/scan/start", {
     method: "POST",

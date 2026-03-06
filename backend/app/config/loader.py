@@ -122,6 +122,10 @@ def load_scan_request(payload: dict) -> dict:
         merged["region_profile_path"] = payload["region_profile_path"]
     if payload.get("decoder_mode"):
         merged["decoder_mode"] = payload["decoder_mode"]
+    if "cw_step_hz" in payload:
+        merged["cw_step_hz"] = payload.get("cw_step_hz")
+    if "cw_dwell_s" in payload:
+        merged["cw_dwell_s"] = payload.get("cw_dwell_s")
     return merged
 
 

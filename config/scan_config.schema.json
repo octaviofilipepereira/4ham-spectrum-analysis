@@ -6,6 +6,11 @@
   "required": ["scan"],
   "additionalProperties": false,
   "properties": {
+    "device": { "type": "string" },
+    "decoder_mode": { "type": "string" },
+    "region_profile_path": { "type": "string" },
+    "cw_step_hz": { "type": "integer", "minimum": 1 },
+    "cw_dwell_s": { "type": "number", "exclusiveMinimum": 0 },
     "scan": {
       "type": "object",
       "required": ["band", "start_hz", "end_hz", "step_hz", "dwell_ms", "mode"],
