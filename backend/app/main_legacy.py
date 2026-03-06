@@ -1387,8 +1387,7 @@ def events(
     callsign: str | None = None,
     start: str | None = None,
     end: str | None = None,
-    format: str | None = None,
-    request: Request = None
+    format: str | None = None
 ):
     if request:
         _enforce_auth(request)
