@@ -10,11 +10,14 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
+from app.decoders.ingest import build_callsign_event
 from app.dependencies.helpers import (
     safe_float,
     log,
     hint_mode_by_frequency,
-    is_plausible_occupancy_event
+    is_plausible_occupancy_event,
+    touch_decoder_source,
+    record_decoder_event_saved,
 )
 from app.dsp.pipeline import (
     apply_agc_smoothed,
@@ -24,6 +27,81 @@ from app.dsp.pipeline import (
 )
 
 router = APIRouter()
+
+
+_ssb_traffic_last_emit = {}
+
+
+def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> None:
+    """Emit SSB_TRAFFIC callsign events from occupancy detections in SSB mode."""
+    if not isinstance(occupancy_event, dict):
+        return
+
+    decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+    if decoder_mode != "ssb":
+        return
+
+    if not occupancy_event.get("occupied"):
+        return
+
+    mode_name = str(occupancy_event.get("mode") or "").strip().upper()
+    if mode_name not in {"SSB", "AM"}:
+        return
+
+    frequency_hz = int(safe_float(occupancy_event.get("frequency_hz"), 0.0) or 0)
+    if frequency_hz <= 0:
+        return
+
+    now_ts = datetime.now(timezone.utc).timestamp()
+    bucket_key = (
+        str(occupancy_event.get("band") or ""),
+        int(frequency_hz / 2000),
+    )
+    last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
+    if (now_ts - last_emit_ts) < 8.0:
+        return
+    _ssb_traffic_last_emit[bucket_key] = now_ts
+
+    if len(_ssb_traffic_last_emit) > 4096:
+        stale_before = now_ts - 120.0
+        for key, value in list(_ssb_traffic_last_emit.items()):
+            if value < stale_before:
+                _ssb_traffic_last_emit.pop(key, None)
+
+    base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
+    snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
+    if mode_name == "SSB":
+        mode_bonus = 0.12
+    else:
+        mode_bonus = 0.04
+    ssb_score = min(0.78, max(0.35, base_confidence + snr_bonus + mode_bonus))
+
+    msg = f"SSB traffic candidate @ {frequency_hz / 1_000_000:.3f} MHz"
+    payload = {
+        "mode": "SSB",
+        "callsign": "",
+        "raw": msg,
+        "msg": msg,
+        "band": occupancy_event.get("band"),
+        "frequency_hz": frequency_hz,
+        "snr_db": occupancy_event.get("snr_db"),
+        "power_dbm": occupancy_event.get("power_dbm"),
+        "confidence": round(ssb_score, 3),
+        "ssb_state": "SSB_TRAFFIC",
+        "ssb_score": round(ssb_score, 3),
+        "ssb_parse_method": "occupancy",
+        "source": "internal_ssb_occupancy",
+        "device": occupancy_event.get("device"),
+        "scan_id": occupancy_event.get("scan_id"),
+    }
+    event = build_callsign_event(payload, state.scan_state)
+    if not event:
+        return
+
+    state.db.insert_callsign(event)
+    touch_decoder_source(event.get("source"))
+    record_decoder_event_saved(event)
 
 
 def update_noise_floor(band: str, power_db: float) -> float:
@@ -207,6 +285,13 @@ async def ws_events(websocket: WebSocket) -> None:
         )
         if freq_hint:
             mode_name = freq_hint
+
+        # In explicit SSB scan mode, treat voice-like occupancy classes as SSB
+        # so operators can see activity through the SSB filter.
+        selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+        if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
+            mode_name = "SSB"
+            mode_confidence = max(float(mode_confidence or 0.0), 0.6)
         
         # Build event
         event = {
@@ -253,6 +338,7 @@ async def ws_events(websocket: WebSocket) -> None:
         
         # Persist to database
         state.db.insert_occupancy(event)
+        _emit_ssb_traffic_event_from_occupancy(event)
         
         # Stream to client
         await websocket.send_json({"event": event})
