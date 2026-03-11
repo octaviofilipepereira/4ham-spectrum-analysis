@@ -296,6 +296,10 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     await state.scan_engine.stop_async()
     state.scan_state["state"] = "stopped"
     state.scan_state["decoder_mode"] = ""  # clear so frontend doesn't auto-select the button
+    # Drop stale scan bounds from the previous run. Keeping this payload while
+    # entering preview can make the spectrum ruler use an old narrow test range
+    # (for example 7.073-7.075 MHz) instead of the preview band limits.
+    state.scan_state["scan"] = None
     state.db.end_scan(
         state.scan_state.get("scan_id"),
         datetime.now(timezone.utc).isoformat()
@@ -310,13 +314,25 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
         if sdr_devices:
             preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
             preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            preview_start = int(os.getenv("PREVIEW_START_HZ", "14000000"))
+            preview_end = int(os.getenv("PREVIEW_END_HZ", "14350000"))
             opened = await state.scan_engine.preview_open(
                 device_id=sdr_devices[0]["id"],
                 sample_rate=preview_sr,
                 center_hz=preview_hz,
+                start_hz=preview_start,
+                end_hz=preview_end,
             )
             if opened:
                 state.scan_state["state"] = "preview"
+                state.scan_state["scan"] = {
+                    "band": "20m",
+                    "center_hz": preview_hz,
+                    "start_hz": preview_start,
+                    "end_hz": preview_end,
+                    "sample_rate": preview_sr,
+                    "mode": "fixed",
+                }
     except Exception:
         pass
     return state.scan_state

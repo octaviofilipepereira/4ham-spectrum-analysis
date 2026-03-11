@@ -55,20 +55,92 @@ _DIRECT_SAMPLING_THRESHOLD_HZ = 24_000_000
 
 _last_direct_samp_mode: str = ""
 
+# Track if the current device is an RTL-SDR Blog V4 (uses upconverter, NOT direct sampling)
+_is_rtlsdr_v4: bool = False
+
+
+def _detect_rtlsdr_v4(device, device_args: dict) -> bool:
+    """Detect if the device is an RTL-SDR Blog V4.
+
+    The V4 uses an R828D tuner and a built-in upconverter for HF reception.
+    It does NOT use direct sampling — enabling direct sampling on the V4
+    BREAKS reception entirely (see GitHub issue rtlsdrblog/rtl-sdr-blog#63).
+
+    Returns True if the device is a V4, False otherwise.
+    """
+    # Method 1: Check enumeration args (most reliable for SoapyRTLSDR)
+    # RTL-SDR Blog V4 reports: manufacturer=RTLSDRBlog, product=Blog V4
+    if device_args:
+        product = str(device_args.get("product", "")).lower()
+        manufacturer = str(device_args.get("manufacturer", "")).lower()
+        if "v4" in product or "blog v4" in product:
+            return True
+        if "rtlsdrblog" in manufacturer and "r828d" in product.lower():
+            return True
+
+    # Method 2: Check device hardware info (fallback)
+    try:
+        hw_info = device.getHardwareInfo()
+        if isinstance(hw_info, dict):
+            product = str(hw_info.get("product", "")).lower()
+            if "v4" in product or "blog v4" in product:
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _disable_rtl_hardware_agc(device):
+    """Best-effort disable of RTL hardware AGC paths.
+
+    Some frontends (notably RTL-SDR Blog V4) behave better for weak-signal
+    digital decoding when IF/tuner AGC is disabled and gain is controlled
+    manually by the application.
+    """
+    try:
+        # Common Soapy API toggle for tuner AGC.
+        device.setGainMode(False)
+    except Exception:
+        pass
+
+    # Driver-specific settings vary; try the common keys and ignore failures.
+    for key in ("agc", "tuner_agc", "if_agc"):
+        try:
+            device.writeSetting(key, "0")
+        except Exception:
+            pass
+
 
 def _apply_direct_sampling(device, center_hz):
     """Enable or disable RTL-SDR V3 direct sampling based on frequency.
 
-    For frequencies below 24 MHz, enables Q-branch direct sampling
-    (mode 2) which bypasses the R820T2 tuner and samples the ADC
-    directly — required for HF reception on RTL-SDR V3.
-    For frequencies >= 24 MHz, disables direct sampling so the
-    R820T2 tuner is used normally.
+    For RTL-SDR V3 (R820T2/R860 tuner):
+        - Frequencies below 24 MHz: enables Q-branch direct sampling (mode 2)
+          which bypasses the tuner and samples the ADC directly.
+        - Frequencies >= 24 MHz: disables direct sampling (mode 0).
 
-    Caches the last mode to avoid redundant writes (the driver prints
-    a log line on every writeSetting call).
+    For RTL-SDR V4 (R828D tuner with built-in upconverter):
+        - NEVER enable direct sampling. The V4 has a built-in SA612 mixer
+          that upconverts HF signals by 28.8 MHz. The driver handles this
+          automatically. Enabling direct sampling on V4 BREAKS reception.
+          See: https://github.com/rtlsdrblog/rtl-sdr-blog/issues/63
+
+    Caches the last mode to avoid redundant writes.
     """
-    global _last_direct_samp_mode
+    global _last_direct_samp_mode, _is_rtlsdr_v4
+
+    # V4 devices must NOT use direct sampling - they have an upconverter
+    if _is_rtlsdr_v4:
+        if _last_direct_samp_mode != "0":
+            try:
+                device.writeSetting("direct_samp", "0")
+                _last_direct_samp_mode = "0"
+            except Exception:
+                pass
+        return
+
+    # V3 and other RTL-SDR devices: use direct sampling for HF
     try:
         freq = int(center_hz or 0)
         if freq <= 0:
@@ -99,11 +171,12 @@ class SDRController:
         return devices
 
     def open(self, device_id=None, sample_rate=48000, center_hz=0, gain=None):
-        global _last_direct_samp_mode
-        # Reset cache: hardware reverts to mode "0" every time the device is
+        global _last_direct_samp_mode, _is_rtlsdr_v4
+        # Reset caches: hardware reverts to mode "0" every time the device is
         # closed, so the next open() MUST re-apply the correct mode even when
         # the frequency (and therefore the desired mode) hasn't changed.
         _last_direct_samp_mode = ""
+        _is_rtlsdr_v4 = False
         SoapySDR = _import_soapy_sdr()
         if SoapySDR is None:
             return None, None
@@ -131,7 +204,18 @@ class SDRController:
                     break
 
         device = SoapySDR.Device(device_args)
+
+        # Detect V4 BEFORE applying any settings — critical for HF reception
+        _is_rtlsdr_v4 = _detect_rtlsdr_v4(device, device_args)
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+        if _is_rtlsdr_v4:
+            _log.info("RTL-SDR Blog V4 detected — using upconverter (direct_samp disabled)")
+        else:
+            _log.debug("RTL-SDR V3 or compatible — direct sampling available for HF")
+
         device.setSampleRate(SOAPY_SDR_RX, 0, sample_rate)
+        _disable_rtl_hardware_agc(device)
         if center_hz:
             _apply_direct_sampling(device, center_hz)
             device.setFrequency(SOAPY_SDR_RX, 0, center_hz)
