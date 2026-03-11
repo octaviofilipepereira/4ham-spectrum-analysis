@@ -4,7 +4,9 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 import importlib
+import re
 import sys
+from typing import Optional
 
 
 def _import_soapy_sdr():
@@ -54,9 +56,40 @@ _DIRECT_SAMPLING_THRESHOLD_HZ = 24_000_000
 
 
 _last_direct_samp_mode: str = ""
+_last_rtl_generation: Optional[int] = None
 
 
-def _apply_direct_sampling(device, center_hz):
+def _detect_rtl_generation(details: dict) -> Optional[int]:
+    """Return RTL dongle generation from Soapy enumerate() details.
+
+    Examples of known strings:
+    - product: "Blog V4"
+    - label:   "Generic RTL2832U OEM :: 00000001"
+    """
+    if not isinstance(details, dict):
+        return None
+
+    driver = str(details.get("driver") or "").strip().lower()
+    if driver != "rtlsdr":
+        return None
+
+    text = " ".join(
+        [
+            str(details.get("manufacturer") or ""),
+            str(details.get("product") or ""),
+            str(details.get("label") or ""),
+        ]
+    )
+    match = re.search(r"\bV(\d+)\b", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except Exception:
+        return None
+
+
+def _apply_direct_sampling(device, center_hz, rtl_generation: Optional[int] = None):
     """Enable or disable RTL-SDR V3 direct sampling based on frequency.
 
     For frequencies below 24 MHz, enables Q-branch direct sampling
@@ -73,7 +106,17 @@ def _apply_direct_sampling(device, center_hz):
         freq = int(center_hz or 0)
         if freq <= 0:
             return
-        mode = "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+
+        # RTL-SDR Blog V4+ provides native HF support and should not be forced
+        # into direct sampling mode by legacy V3 rules.
+        if rtl_generation is not None and rtl_generation >= 4:
+            mode = "0"
+        elif rtl_generation == 3:
+            mode = "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+        else:
+            # Unknown generation: preserve existing behavior for compatibility.
+            mode = "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+
         if mode != _last_direct_samp_mode:
             device.writeSetting("direct_samp", mode)
             _last_direct_samp_mode = mode
@@ -99,11 +142,12 @@ class SDRController:
         return devices
 
     def open(self, device_id=None, sample_rate=48000, center_hz=0, gain=None):
-        global _last_direct_samp_mode
+        global _last_direct_samp_mode, _last_rtl_generation
         # Reset cache: hardware reverts to mode "0" every time the device is
         # closed, so the next open() MUST re-apply the correct mode even when
         # the frequency (and therefore the desired mode) hasn't changed.
         _last_direct_samp_mode = ""
+        _last_rtl_generation = None
         SoapySDR = _import_soapy_sdr()
         if SoapySDR is None:
             return None, None
@@ -114,11 +158,13 @@ class SDRController:
             return None, None
 
         device_args = {}
+        selected_details = {}
         if device_id:
             for args in SoapySDR.Device.enumerate():
                 details = _kwargs_to_dict(args)
                 if details.get("driver") == device_id:
                     device_args = details
+                    selected_details = details
                     break
         else:
             # No specific device requested: pick the first non-audio device
@@ -128,12 +174,15 @@ class SDRController:
                 details = _kwargs_to_dict(args)
                 if details.get("driver", "").lower() not in ("audio",):
                     device_args = details
+                    selected_details = details
                     break
+
+        _last_rtl_generation = _detect_rtl_generation(selected_details)
 
         device = SoapySDR.Device(device_args)
         device.setSampleRate(SOAPY_SDR_RX, 0, sample_rate)
         if center_hz:
-            _apply_direct_sampling(device, center_hz)
+            _apply_direct_sampling(device, center_hz, rtl_generation=_last_rtl_generation)
             device.setFrequency(SOAPY_SDR_RX, 0, center_hz)
         if gain is not None:
             device.setGain(SOAPY_SDR_RX, 0, gain)
@@ -187,7 +236,7 @@ class SDRController:
         if SoapySDR is None:
             return
         SOAPY_SDR_RX = SoapySDR.SOAPY_SDR_RX
-        _apply_direct_sampling(device, center_hz)
+        _apply_direct_sampling(device, center_hz, rtl_generation=_last_rtl_generation)
         device.setFrequency(SOAPY_SDR_RX, 0, int(center_hz))
 
     def close(self, device, stream):
