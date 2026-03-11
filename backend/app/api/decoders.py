@@ -935,6 +935,13 @@ def decoder_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
         Comprehensive decoder status dict
     """
     _refresh_decoder_process_status()
+    rtl_runtime = state.controller.get_rtl_runtime_status(
+        center_hz=int(state.scan_engine.center_hz or state.spectrum_cache.get("center_hz") or 0)
+    )
+    state.decoder_status["internal_native"]["rtl_generation_detected"] = rtl_runtime.get("rtl_generation_detected")
+    state.decoder_status["internal_native"]["direct_sampling_policy"] = rtl_runtime.get("direct_sampling_policy")
+    state.decoder_status["internal_native"]["direct_sampling_mode_target"] = rtl_runtime.get("direct_sampling_mode_target")
+    state.decoder_status["internal_native"]["direct_sampling_mode_applied"] = rtl_runtime.get("direct_sampling_mode_applied")
     return {
         "ingest": {
             "endpoint": "/api/decoders/events",

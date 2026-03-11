@@ -57,3 +57,28 @@ def test_apply_direct_sampling_unknown_keeps_legacy_behavior():
     controller._apply_direct_sampling(device, 7_100_000, rtl_generation=None)
 
     assert device.calls == [("direct_samp", "2")]
+
+
+def test_get_rtl_runtime_status_for_v4_policy_and_modes():
+    ctrl = controller.SDRController()
+    controller._last_rtl_generation = 4
+    controller._last_direct_samp_mode = "0"
+
+    status = ctrl.get_rtl_runtime_status(center_hz=7_150_000)
+
+    assert status["rtl_generation_detected"] == 4
+    assert status["direct_sampling_policy"] == "force_off_v4_plus"
+    assert status["direct_sampling_mode_target"] == "0"
+    assert status["direct_sampling_mode_applied"] == "0"
+
+
+def test_get_rtl_runtime_status_for_v3_hf_target_mode_2():
+    ctrl = controller.SDRController()
+    controller._last_rtl_generation = 3
+    controller._last_direct_samp_mode = "2"
+
+    status = ctrl.get_rtl_runtime_status(center_hz=7_150_000)
+
+    assert status["rtl_generation_detected"] == 3
+    assert status["direct_sampling_policy"] == "v3_hf_direct_sampling_below_24mhz"
+    assert status["direct_sampling_mode_target"] == "2"

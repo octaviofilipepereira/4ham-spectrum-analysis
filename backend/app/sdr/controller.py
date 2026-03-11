@@ -124,7 +124,52 @@ def _apply_direct_sampling(device, center_hz, rtl_generation: Optional[int] = No
         pass
 
 
+def _direct_sampling_policy_name(rtl_generation: Optional[int]) -> str:
+    if rtl_generation is not None and rtl_generation >= 4:
+        return "force_off_v4_plus"
+    if rtl_generation == 3:
+        return "v3_hf_direct_sampling_below_24mhz"
+    return "legacy_unknown_generation_below_24mhz"
+
+
+def _target_direct_sampling_mode(center_hz: int, rtl_generation: Optional[int]) -> Optional[str]:
+    freq = int(center_hz or 0)
+    if freq <= 0:
+        return None
+    if rtl_generation is not None and rtl_generation >= 4:
+        return "0"
+    if rtl_generation == 3:
+        return "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+    return "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
+
+
 class SDRController:
+    def _find_first_rtlsdr_details(self) -> dict:
+        SoapySDR = _import_soapy_sdr()
+        if SoapySDR is None:
+            return {}
+        for args in SoapySDR.Device.enumerate():
+            details = _kwargs_to_dict(args)
+            if str(details.get("driver") or "").strip().lower() == "rtlsdr":
+                return details
+        return {}
+
+    def get_rtl_runtime_status(self, center_hz: int = 0) -> dict:
+        details = self._find_first_rtlsdr_details()
+        generation = _last_rtl_generation
+        if generation is None:
+            generation = _detect_rtl_generation(details)
+
+        target_mode = _target_direct_sampling_mode(center_hz, generation)
+        applied_mode = _last_direct_samp_mode or None
+
+        return {
+            "rtl_generation_detected": generation,
+            "direct_sampling_policy": _direct_sampling_policy_name(generation),
+            "direct_sampling_mode_target": target_mode,
+            "direct_sampling_mode_applied": applied_mode,
+        }
+
     def list_devices(self):
         SoapySDR = _import_soapy_sdr()
         if SoapySDR is None:
