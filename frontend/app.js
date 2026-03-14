@@ -1599,6 +1599,8 @@ function getAuthHeader() {
 function updateLoginStatus() {
   const user = localStorage.getItem("authUser");
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) logoutBtn.classList.toggle("d-none", !user);
 }
 
 async function updateAuthStatusBadge() {
@@ -4435,6 +4437,29 @@ connectLogs();
 fetchLogs();
 setInterval(fetchLogs, 4000);
 initMenuDropdownModalBehavior();
+
+// ── Logout button ──
+const logoutBtnEl = document.getElementById("logoutBtn");
+if (logoutBtnEl) {
+  logoutBtnEl.addEventListener("click", async () => {
+    localStorage.removeItem("authUser");
+    localStorage.removeItem("authPass");
+    updateLoginStatus();
+    // Show login modal if server still requires auth
+    try {
+      const resp = await fetch("/api/auth/status");
+      const data = await resp.json();
+      if (data.auth_required) {
+        const loginModalEl = document.getElementById("loginModal");
+        const loginModalUser = document.getElementById("loginModalUser");
+        const loginModalPass = document.getElementById("loginModalPass");
+        if (loginModalUser) loginModalUser.value = "";
+        if (loginModalPass) loginModalPass.value = "";
+        new bootstrap.Modal(loginModalEl, { backdrop: "static" }).show();
+      }
+    } catch (_) {}
+  });
+}
 
 // ── Login modal: show when server requires auth and no stored credentials ──
 (async () => {
