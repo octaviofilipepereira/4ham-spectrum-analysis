@@ -197,6 +197,31 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="toast-stack" id="toast"></div>
     </main>
 
+    <!-- Login Modal (shown when server requires auth and no stored credentials) -->
+    <div class="modal fade" id="loginModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="loginModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="loginModalLabel">Authentication required</h5>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label" for="loginModalUser">Username</label>
+              <input type="text" id="loginModalUser" class="form-control" autocomplete="username" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="loginModalPass">Password</label>
+              <input type="password" id="loginModalPass" class="form-control" autocomplete="current-password" />
+            </div>
+            <div id="loginModalError" class="alert alert-danger py-1 d-none"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Fullscreen Propagation Map modal -->
     <div class="modal fade" id="mapFullscreenModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-fullscreen">
@@ -350,6 +375,14 @@ Last update: 2026-02-22 16:27:19 UTC
                 <label class="form-label">Auth pass</label>
                 <input type="password" id="authPass" class="form-control form-control-sm" />
               </div>
+              <div class="col-12">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                  <button class="btn btn-outline-info btn-sm" id="saveCredentials">Save credentials</button>
+                  <button class="btn btn-outline-warning btn-sm" id="clearCredentials">Clear credentials</button>
+                  <span id="authStatusBadge" class="badge bg-secondary ms-1">checking…</span>
+                </div>
+                <small class="text-muted d-block mt-1">Credentials are stored in the server database. Leave blank and click "Clear" to disable authentication.</small>
+              </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">Scan parameters</h3></div>
               <div class="col-6 col-md-3">
@@ -365,18 +398,6 @@ Last update: 2026-02-22 16:27:19 UTC
                 <input type="text" id="recordPath" value="data/iq_recording.c64" class="form-control form-control-sm" />
               </div>
               <div class="col-12"><hr class="my-2" /></div>
-              <div class="col-12"><h3 class="h6 mb-1">Login</h3></div>
-              <div class="col-6">
-                <label class="form-label">User</label>
-                <input type="text" id="loginUser" class="form-control form-control-sm" />
-              </div>
-              <div class="col-6">
-                <label class="form-label">Password</label>
-                <input type="password" id="loginPass" class="form-control form-control-sm" />
-              </div>
-              <div class="col-12">
-                <button class="btn btn-outline-info" id="loginSave">Save credentials</button>
-              </div>
               <div class="col-12 d-flex gap-2 flex-wrap">
                 <button class="btn btn-outline-info" id="refreshDevices">Refresh devices</button>
                 <button class="btn btn-outline-info" id="saveSettings">Save</button>

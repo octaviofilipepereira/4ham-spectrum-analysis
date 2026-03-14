@@ -184,9 +184,12 @@ const presetSelect = document.getElementById("presetSelect");
 const exportPresetsBtn = document.getElementById("exportPresets");
 const importPresetsInput = document.getElementById("importPresets");
 const toast = document.getElementById("toast");
-const loginUserInput = document.getElementById("loginUser");
-const loginPassInput = document.getElementById("loginPass");
-const loginSaveBtn = document.getElementById("loginSave");
+const loginUserInput = document.getElementById("loginModalUser");
+const loginPassInput = document.getElementById("loginModalPass");
+const loginSaveBtn = document.getElementById("loginModalSave");
+const saveCredentialsBtn = document.getElementById("saveCredentials");
+const clearCredentialsBtn = document.getElementById("clearCredentials");
+const authStatusBadge = document.getElementById("authStatusBadge");
 const loginStatus = document.getElementById("loginStatus");
 const wsStatus = document.getElementById("wsStatus");
 const onboarding = document.getElementById("onboarding");
@@ -1596,6 +1599,25 @@ function getAuthHeader() {
 function updateLoginStatus() {
   const user = localStorage.getItem("authUser");
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
+}
+
+async function updateAuthStatusBadge() {
+  if (!authStatusBadge) return;
+  try {
+    const resp = await fetch("/api/auth/status");
+    const data = await resp.json();
+    if (data.auth_required) {
+      const src = data.env_locked ? " (env)" : "";
+      authStatusBadge.textContent = `Auth ON${src}`;
+      authStatusBadge.className = "badge bg-success ms-1";
+    } else {
+      authStatusBadge.textContent = "Auth OFF";
+      authStatusBadge.className = "badge bg-secondary ms-1";
+    }
+  } catch (_) {
+    authStatusBadge.textContent = "unknown";
+    authStatusBadge.className = "badge bg-warning ms-1";
+  }
 }
 
 function updateQuality(minDb, maxDb) {
@@ -3826,8 +3848,6 @@ async function loadSettings() {
   const authPass = localStorage.getItem("authPass") || "";
   authUserInput.value = authUser;
   authPassInput.value = authPass;
-  loginUserInput.value = authUser;
-  loginPassInput.value = authPass;
 
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
@@ -3891,12 +3911,65 @@ if (compactToggle) {
   });
 }
 
-loginSaveBtn.addEventListener("click", () => {
-  localStorage.setItem("authUser", loginUserInput.value);
-  localStorage.setItem("authPass", loginPassInput.value);
-  showToast("Credentials saved");
-  updateLoginStatus();
-});
+if (saveCredentialsBtn) {
+  saveCredentialsBtn.addEventListener("click", async () => {
+    const user = (authUserInput?.value || "").trim();
+    const pass = (authPassInput?.value || "").trim();
+    if (!user || !pass) {
+      showToastError("Both username and password are required");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/auth/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ user, password: pass }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save credentials");
+        showToastError(message);
+        return;
+      }
+      localStorage.setItem("authUser", user);
+      localStorage.setItem("authPass", pass);
+      showToast("Credentials saved");
+      updateLoginStatus();
+      updateAuthStatusBadge();
+    } catch (err) {
+      showToastError("Failed to save credentials");
+    }
+  });
+}
+
+if (clearCredentialsBtn) {
+  clearCredentialsBtn.addEventListener("click", async () => {
+    const confirmed = window.confirm("Clear server credentials? Authentication will be disabled.");
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const resp = await fetch("/api/auth/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ user: "", password: "" }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to clear credentials");
+        showToastError(message);
+        return;
+      }
+      localStorage.removeItem("authUser");
+      localStorage.removeItem("authPass");
+      if (authUserInput) authUserInput.value = "";
+      if (authPassInput) authPassInput.value = "";
+      showToast("Credentials cleared — authentication disabled");
+      updateLoginStatus();
+      updateAuthStatusBadge();
+    } catch (err) {
+      showToastError("Failed to clear credentials");
+    }
+  });
+}
 
 const onboardingSteps = [
   {
@@ -3949,8 +4022,6 @@ function loadFilters() {
 }
 
 saveSettingsBtn.addEventListener("click", async () => {
-  localStorage.setItem("authUser", authUserInput.value);
-  localStorage.setItem("authPass", authPassInput.value);
   if (!isValidCallsign(stationCallsignInput.value)) {
     showToastError("Invalid callsign format");
     return;
@@ -4359,10 +4430,55 @@ setInterval(fetchPropagationSummary, 15000);
 fetchDecoderStatus();
 setInterval(fetchDecoderStatus, 10000);
 updateLoginStatus();
+updateAuthStatusBadge();
 connectLogs();
 fetchLogs();
 setInterval(fetchLogs, 4000);
 initMenuDropdownModalBehavior();
+
+// ── Login modal: show when server requires auth and no stored credentials ──
+(async () => {
+  try {
+    const resp = await fetch("/api/auth/status");
+    const data = await resp.json();
+    if (data.auth_required && !localStorage.getItem("authUser")) {
+      const loginModal = new bootstrap.Modal(document.getElementById("loginModal"), { backdrop: "static" });
+      loginModal.show();
+    }
+  } catch (_) { /* server unreachable at load; normal fetch failures will show 401s later */ }
+})();
+
+const loginModalSaveBtnEl = document.getElementById("loginModalSave");
+if (loginModalSaveBtnEl) {
+  loginModalSaveBtnEl.addEventListener("click", async () => {
+    const user = (document.getElementById("loginModalUser")?.value || "").trim();
+    const pass = (document.getElementById("loginModalPass")?.value || "").trim();
+    const errEl = document.getElementById("loginModalError");
+    if (!user || !pass) {
+      if (errEl) { errEl.textContent = "Enter username and password"; errEl.classList.remove("d-none"); }
+      return;
+    }
+    // Probe credentials against a protected endpoint; 401/403 = bad creds, 200 = ok
+    const testToken = btoa(`${user}:${pass}`);
+    const testResp = await fetch("/api/settings", {
+      headers: { Authorization: `Basic ${testToken}` }
+    }).catch(() => null);
+    if (!testResp || (testResp.status === 401 || testResp.status === 403)) {
+      if (errEl) { errEl.textContent = "Invalid username or password"; errEl.classList.remove("d-none"); }
+      return;
+    }
+    localStorage.setItem("authUser", user);
+    localStorage.setItem("authPass", pass);
+    if (errEl) errEl.classList.add("d-none");
+    const loginModalEl = document.getElementById("loginModal");
+    bootstrap.Modal.getInstance(loginModalEl)?.hide();
+    updateLoginStatus();
+    // Reload data now that we have credentials
+    loadSettings();
+    fetchEvents();
+    fetchTotal();
+  });
+}
 
 if (!localStorage.getItem("onboardingDone")) {
   onboarding.classList.add("show");

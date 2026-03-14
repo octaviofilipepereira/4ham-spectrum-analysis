@@ -198,6 +198,38 @@ class Database:
         except json.JSONDecodeError:
             return {}
 
+    def get_auth_config(self):
+        """Return stored auth credentials or empty strings if not configured."""
+        rows = self.conn.execute(
+            "SELECT key, value FROM settings WHERE key IN (?, ?)",
+            ("_auth_user", "_auth_pass_hash"),
+        ).fetchall()
+        result = {"auth_user": "", "auth_pass_hash": ""}
+        for row in rows:
+            if row[0] == "_auth_user":
+                result["auth_user"] = row[1]
+            elif row[0] == "_auth_pass_hash":
+                result["auth_pass_hash"] = row[1]
+        return result
+
+    def save_auth_config(self, user: str, pass_hash: str) -> None:
+        """Persist auth credentials. Pass empty strings to clear credentials."""
+        if user and pass_hash:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("_auth_user", user),
+            )
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("_auth_pass_hash", pass_hash),
+            )
+        else:
+            self.conn.execute(
+                "DELETE FROM settings WHERE key IN (?, ?)",
+                ("_auth_user", "_auth_pass_hash"),
+            )
+        self.conn.commit()
+
     def upsert_band(self, band):
         self.conn.execute(
             "INSERT OR REPLACE INTO bands(name, start_hz, end_hz) VALUES (?, ?, ?)",

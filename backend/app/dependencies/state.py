@@ -330,17 +330,45 @@ count_cache = {
 # Authentication
 # ═══════════════════════════════════════════════════════════════════
 
-auth_user = os.getenv("BASIC_AUTH_USER")
-auth_pass = os.getenv("BASIC_AUTH_PASS")
-auth_pass_is_hashed = None
-if auth_pass:
-    auth_pass_is_hashed = is_bcrypt_hash(auth_pass)
+# Env-var credentials serve as an emergency fallback only. DB credentials
+# take precedence when present. Set AUTH_REQUIRED=0 to force-disable auth.
+_env_auth_user = os.getenv("BASIC_AUTH_USER")
+_env_auth_pass = os.getenv("BASIC_AUTH_PASS")
 
-# AUTH_REQUIRED env var acts as a global on/off switch.
-# When set to 0, false or no, authentication is disabled even if credentials
-# are configured in .env. Defaults to True when credentials are present.
-_auth_required_env = os.getenv("AUTH_REQUIRED", "1").strip().lower()
-auth_required = (_auth_required_env not in ("0", "false", "no")) and bool(auth_user and auth_pass)
+def _load_auth_from_db():
+    """Load auth credentials from DB, falling back to env vars.
+
+    Returns a tuple (user, pass_or_hash, is_hashed, required).
+    """
+    _auth_required_env = os.getenv("AUTH_REQUIRED", "1").strip().lower()
+    _force_disabled = _auth_required_env in ("0", "false", "no")
+
+    _db_cfg = db.get_auth_config()
+    _db_user = _db_cfg.get("auth_user") or ""
+    _db_hash = _db_cfg.get("auth_pass_hash") or ""
+
+    if _db_user and _db_hash:
+        # DB credentials take precedence
+        return _db_user, _db_hash, True, (not _force_disabled)
+
+    if _env_auth_user and _env_auth_pass:
+        _hashed = is_bcrypt_hash(_env_auth_pass)
+        return _env_auth_user, _env_auth_pass, _hashed, (not _force_disabled)
+
+    return None, None, None, False
+
+
+auth_user, auth_pass, auth_pass_is_hashed, auth_required = _load_auth_from_db()
+
+
+def reload_auth_from_db() -> None:
+    """Re-read auth credentials from DB and update module-level globals.
+
+    Call this after saving or clearing credentials via the API so that the
+    running process picks up the change without a restart.
+    """
+    global auth_user, auth_pass, auth_pass_is_hashed, auth_required
+    auth_user, auth_pass, auth_pass_is_hashed, auth_required = _load_auth_from_db()
 
 
 # ═══════════════════════════════════════════════════════════════════

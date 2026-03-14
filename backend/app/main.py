@@ -29,7 +29,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
 
 
@@ -194,6 +194,7 @@ async def add_security_headers(request: Request, call_next):
 
 # Include all API routers with /api prefix
 app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(events.router, prefix="/api", tags=["Events"])
 app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
