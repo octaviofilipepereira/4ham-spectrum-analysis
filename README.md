@@ -58,6 +58,18 @@ For full platform-specific installation and decoder setup, see [docs/installatio
 
 ## Changelog (cumulative)
 
+### v0.5.0
+- Complete CW Morse decoder in pure Python (Butterworth filter, Hilbert envelope, auto-threshold, timing analysis, Morse table lookup).
+- CWSweepDecoder for FFT-guided band sweep with configurable step/dwell.
+- CW decoder integrated into API with auto-start, mutual exclusion with FT decoders.
+- CW sweep controls in frontend scan panel; CW markers on waterfall.
+- RTL-SDR V4 detection and HF handling (R828D upconverter, no direct sampling).
+- WSPR dial frequencies corrected for IARU Region 1; WSPR OOM and mid-scan abort fixes.
+- Improved UI layout: larger VFO, status in VFO bar, vibrant band lines, fixed layout shifts.
+- Propagation map polish: drag speed reduced, globe fills card, larger control buttons.
+- Preview scan bounds configurable via env vars; stale bounds cleared on stop.
+- Added scipy to requirements.txt.
+
 ### v0.2.6
 - Added waterfall mode-label hover tooltip with frequency, latest callsign, last-seen time, and SNR.
 - Callsign in tooltip is resolved by nearest frequency match in cache; when no local match exists, it falls back to the most recent detected callsign.

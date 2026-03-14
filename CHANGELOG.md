@@ -2,10 +2,98 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-26 UTC
+Last update: 2026-03-14 UTC
 -->
 
 # Changelog
+
+## v0.5.0 - 2026-03-14
+
+### Added
+
+#### CW Decoder — Módulo Completo
+- **`backend/app/decoders/cw/`** — decoder Morse puro Python (sem binários externos):
+  - Bandpass Butterworth 4ª ordem (300–900 Hz)
+  - Extracção de envelope via transformada de Hilbert + média móvel
+  - Binarização automática com threshold estilo Otsu
+  - Análise temporal: run-length encode → dit estimation → WPM = 1200/dit_ms
+  - Tabela Morse completa com lookup de indicativos via regex
+  - Confidence scoring: `0.5×char + 0.3×wpm + 0.2×length`
+  - Suporte para CW de alta velocidade (contest, até 60+ WPM)
+  - SNR e WPM configuráveis com validações
+- **`backend/app/decoders/cw_sweep.py`** — `CWSweepDecoder` para varrimento de banda:
+  - Sweep guiado por FFT com step configurável (default 6500 Hz)
+  - Dwell time ajustável (default 30 s)
+  - Detecção multi-peak com rejeição near-Nyquist
+  - Diagnósticos de produção integrados
+- **`backend/app/decoders/cw_session.py`** — `CWDecoderSession` para monitorização contínua:
+  - Feed IQ em tempo real com janela deslizante
+- **Integração API**:
+  - CW decoder integrado em `/api/scan/mode` com start/stop automático
+  - Auto-start ao arranque da aplicação
+  - Exclusão mútua entre CW e FT decoders (um activo de cada vez)
+  - Eventos de texto CW emitidos mesmo sem callsign + campos de ocupação
+
+#### CW no Frontend
+- Controlos CW sweep no painel de scan (step Hz, dwell s)
+- Marcadores CW injectados no waterfall como `mode_markers`
+- Botão CW corrigido: já não fica sempre seleccionado após parar o scan
+
+#### RTL-SDR V4 Support
+- **`backend/app/sdr/controller.py`**:
+  - Detecção automática de RTL-SDR V4 (tuner R828D)
+  - V4 usa upconverter integrado — não aplica direct sampling para HF
+  - Desactivação de hardware AGC para melhor descodificação de sinais fracos
+- **`backend/app/api/scan.py`**:
+  - Preview scan bounds configuráveis via env vars (`PREVIEW_START_HZ`, `PREVIEW_END_HZ`)
+  - Limpeza de scan bounds stale ao parar
+  - Estado de scan correcto durante modo preview
+
+### Fixed
+
+#### WSPR
+- Frequências dial WSPR corrigidas para IARU Região 1
+- Fix de OOM (Out-of-Memory) em janelas WSPR longas
+- Interrupção da janela WSPR quando a banda muda mid-scan
+- Abort da janela WSPR quando o modo muda durante slot wait
+- Reset de estado parked no início do scan + reavaliação de dial freq após slot wait
+
+#### CW
+- 3 bugs críticos que causavam zero eventos CW descodificados
+- Degradação Butterworth near-Nyquist + detecção multi-peak
+- Default dwell corrigido para 30s; leitura de `cw_dwell_s`/`cw_step_hz` do scan payload
+- Deadlock no event loop resolvido (USB open)
+- Revert de park do scan engine durante CW decoder activo (abordagem abandonada)
+
+#### Frontend / UX
+- Marcadores WSPR agora visíveis no waterfall (pipeline DSP occupancy)
+- Botão CW no frontend: estado correcto após scan stop
+- Parâmetro duplicado removido no events endpoint (legacy)
+
+### Changed
+
+#### Layout & UX
+- VFO display maior com fontes aumentadas
+- Status movido para a barra VFO abaixo do SNR
+- Signal Quality reposicionado junto ao botão GO
+- Largura fixa para `vfo-goto-group` (elimina layout shift)
+- Altura fixa para status inline display
+- Linhas de banda com cores vibrantes e maior opacidade
+- Onboarding overlay: wrapper element em falta adicionado
+- Default waterfall zoom: 4x com vista centrada (revertido para 1x na primeira visita)
+
+#### Mapa de Propagação
+- Velocidade de drag do globo reduzida (0.5 → 0.25)
+- Globe SVG preenche altura do card (100%/100%, `getBoundingClientRect`)
+- Card Propagation Map mesma altura que Events
+- Botões de controlo maiores (30 → 40px), ícones substituídos (reset=↻, fullscreen=⤢)
+- Removido círculo de glow atmosférico
+- Raio de glow actualiza correctamente com zoom
+
+### Dependencies
+- `scipy` adicionado a `requirements.txt` (necessário para CW decoder)
+
+---
 
 ## v0.4.0 - 2026-02-26
 
