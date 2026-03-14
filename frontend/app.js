@@ -54,6 +54,9 @@ const recordPathInput = document.getElementById("recordPath");
 const cwScanParamsRow = document.getElementById("cwScanParamsRow");
 const cwStepHzInput = document.getElementById("cwStepHz");
 const cwDwellSInput = document.getElementById("cwDwellS");
+const scanRangeSummaryEl = document.getElementById("scanRangeSummary");
+const cwSegmentSummaryWrapEl = document.getElementById("cwSegmentSummaryWrap");
+const cwSegmentSummaryEl = document.getElementById("cwSegmentSummary");
 const logsEl = document.getElementById("logs");
 const bandFilter = document.getElementById("bandFilter");
 const modeFilter = document.getElementById("modeFilter");
@@ -97,6 +100,19 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 
 // Selected decoder mode for scan
 let selectedDecoderMode = null;
+let latestScanState = null;
+
+const CW_DECODER_SUBBANDS = {
+  "160m": { start_hz: 1_800_000, end_hz: 1_840_000 },
+  "80m": { start_hz: 3_500_000, end_hz: 3_600_000 },
+  "40m": { start_hz: 7_000_000, end_hz: 7_040_000 },
+  "30m": { start_hz: 10_100_000, end_hz: 10_130_000 },
+  "20m": { start_hz: 14_000_000, end_hz: 14_070_000 },
+  "17m": { start_hz: 18_068_000, end_hz: 18_110_000 },
+  "15m": { start_hz: 21_000_000, end_hz: 21_150_000 },
+  "12m": { start_hz: 24_890_000, end_hz: 24_930_000 },
+  "10m": { start_hz: 28_000_000, end_hz: 28_300_000 },
+};
 
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
@@ -429,6 +445,73 @@ function refreshModeButtons() {
     const isCwMode = String(selectedDecoderMode || "").trim().toUpperCase() === "CW";
     cwScanParamsRow.classList.toggle("d-none", !isCwMode);
   }
+  renderScanContextSummary(latestScanState);
+}
+
+function formatScanRangeSummary(startHz, endHz) {
+  const start = Number(startHz || 0);
+  const end = Number(endHz || 0);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end <= start) {
+    return "--";
+  }
+  return `${formatRulerFrequencyLabel(start)} - ${formatRulerFrequencyLabel(end)}`;
+}
+
+function resolveActiveBandName(scanState) {
+  const stateBand = String(scanState?.scan?.band || "").trim();
+  if (stateBand) {
+    return stateBand;
+  }
+  return String(bandSelect?.value || "").trim();
+}
+
+function resolveDisplayedScanRange(scanState) {
+  const scan = scanState?.scan || null;
+  const startHz = Number(scan?.start_hz || 0);
+  const endHz = Number(scan?.end_hz || 0);
+  if (Number.isFinite(startHz) && Number.isFinite(endHz) && startHz > 0 && endHz > startHz) {
+    return { start_hz: startHz, end_hz: endHz };
+  }
+  const selectedBand = resolveActiveBandName(scanState);
+  return getScanRangeForBand(selectedBand);
+}
+
+function resolveCwDecoderSegment(scanState) {
+  const activeBand = String(resolveActiveBandName(scanState) || "").trim().toLowerCase();
+  const subband = CW_DECODER_SUBBANDS[activeBand];
+  if (!subband) {
+    return null;
+  }
+
+  const scanRange = resolveDisplayedScanRange(scanState);
+  const clippedStartHz = Math.max(Number(scanRange?.start_hz || 0), subband.start_hz);
+  const clippedEndHz = Math.min(Number(scanRange?.end_hz || 0), subband.end_hz);
+  if (!Number.isFinite(clippedStartHz) || !Number.isFinite(clippedEndHz) || clippedEndHz <= clippedStartHz) {
+    return null;
+  }
+  return { start_hz: clippedStartHz, end_hz: clippedEndHz };
+}
+
+function renderScanContextSummary(scanState) {
+  if (scanRangeSummaryEl) {
+    const scanRange = resolveDisplayedScanRange(scanState);
+    scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
+  }
+
+  if (!cwSegmentSummaryWrapEl || !cwSegmentSummaryEl) {
+    return;
+  }
+
+  const isCwMode = String(selectedDecoderMode || "").trim().toUpperCase() === "CW";
+  cwSegmentSummaryWrapEl.classList.toggle("d-none", !isCwMode);
+  if (!isCwMode) {
+    return;
+  }
+
+  const cwSegment = resolveCwDecoderSegment(scanState);
+  cwSegmentSummaryEl.textContent = cwSegment
+    ? formatScanRangeSummary(cwSegment.start_hz, cwSegment.end_hz)
+    : "full band";
 }
 
 const EVENTS_PANEL_PAGE_SIZE = 50;
@@ -1587,17 +1670,11 @@ presetSelect.addEventListener("change", () => {
 });
 
 function getAuthHeader() {
-  const user = localStorage.getItem("authUser");
-  const pass = localStorage.getItem("authPass");
-  if (!user || !pass) {
-    return {};
-  }
-  const token = btoa(`${user}:${pass}`);
-  return { Authorization: `Basic ${token}` };
+  return {};
 }
 
 function updateLoginStatus() {
-  const user = localStorage.getItem("authUser");
+  const user = window.__authUser || "";
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) logoutBtn.classList.toggle("d-none", !user);
@@ -1608,17 +1685,24 @@ async function updateAuthStatusBadge() {
   try {
     const resp = await fetch("/api/auth/status");
     const data = await resp.json();
+    window.__authUser = data.user || "";
+    updateLoginStatus();
     if (data.auth_required) {
       const src = data.env_locked ? " (env)" : "";
-      authStatusBadge.textContent = `Auth ON${src}`;
+      const stateLabel = data.authenticated ? "session" : "login required";
+      authStatusBadge.textContent = `Auth ON${src} · ${stateLabel}`;
       authStatusBadge.className = "badge bg-success ms-1";
     } else {
       authStatusBadge.textContent = "Auth OFF";
       authStatusBadge.className = "badge bg-secondary ms-1";
     }
+    return data;
   } catch (_) {
+    window.__authUser = "";
+    updateLoginStatus();
     authStatusBadge.textContent = "unknown";
     authStatusBadge.className = "badge bg-warning ms-1";
+    return null;
   }
 }
 
@@ -1633,12 +1717,7 @@ function updateQuality(minDb, maxDb) {
 }
 
 function wsUrl(path) {
-  const user = localStorage.getItem("authUser");
-  const pass = localStorage.getItem("authPass");
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  if (user && pass) {
-    return `${protocol}://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${window.location.host}${path}`;
-  }
   return `${protocol}://${window.location.host}${path}`;
 }
 
@@ -2722,6 +2801,7 @@ async function syncScanState() {
       return;
     }
     const data = await response.json();
+    latestScanState = data;
     const nextRunning = data?.state === "running";
     const isPreview = data?.state === "preview";
     if (!scanActionInFlight) {
@@ -2753,6 +2833,7 @@ async function syncScanState() {
         fetchTotal();
       }
     }
+    renderScanContextSummary(data);
   } catch (err) {
     return;
   }
@@ -2881,12 +2962,6 @@ function connectEvents() {
     logLine("WebSocket not available");
   }
 }
-
-connectEvents();
-loadFilters();
-fetchEvents();
-fetchTotal();
-setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
 
 /**
  * Dedicated unfiltered fetch to populate the waterfall callsign cache.
@@ -3453,26 +3528,6 @@ document.addEventListener("pointerup", () => {
   }
 });
 
-connectSpectrum();
-ensureWaterfallFallback();
-
-// On page load: check if any SDR device is detected
-(async () => {
-  try {
-    const res = await fetch("/api/health");
-    if (res.ok) {
-      const data = await res.json();
-      const deviceCount = Number(data?.devices ?? -1);
-      if (deviceCount === 0) {
-        setWaterfallGenericStatus("No SDR device detected. Connect your device and start a scan.");
-        drawSpectrumIdle("No SDR device detected. Connect your device and start a scan.");
-        showToastError("No SDR device detected. Connect your device and start a scan.");
-      }
-    }
-  } catch (_) {
-    // health check is best-effort; ignore network errors
-  }
-})();
 
 function decodeSpectrumFrame(frame) {
   if (!frame) {
@@ -3521,8 +3576,6 @@ function connectStatus() {
     setStatus("Status stream unavailable");
   }
 }
-
-connectStatus();
 
 async function fetchDecoderStatus() {
   try {
@@ -3837,19 +3890,19 @@ async function loadBands() {
     const bands = await resp.json();
     if (Array.isArray(bands)) {
       populateBandSelectOptions(bands);
+      renderScanContextSummary(latestScanState);
       return;
     }
   } catch (err) {
     logLine("Failed to load bands");
   }
   populateBandSelectOptions([]);
+  renderScanContextSummary(latestScanState);
 }
 
 async function loadSettings() {
-  const authUser = localStorage.getItem("authUser") || "";
-  const authPass = localStorage.getItem("authPass") || "";
-  authUserInput.value = authUser;
-  authPassInput.value = authPass;
+  authUserInput.value = "";
+  authPassInput.value = "";
 
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
@@ -3864,6 +3917,7 @@ async function loadSettings() {
         bandEndInput.value = data.band.end_hz ?? bandEndInput.value;
       }
     }
+    renderScanContextSummary(latestScanState);
     if (data.device_id) {
       deviceSelect.value = data.device_id;
     }
@@ -3932,11 +3986,10 @@ if (saveCredentialsBtn) {
         showToastError(message);
         return;
       }
-      localStorage.setItem("authUser", user);
-      localStorage.setItem("authPass", pass);
+      window.__authUser = user;
       showToast("Credentials saved");
       updateLoginStatus();
-      updateAuthStatusBadge();
+      await updateAuthStatusBadge();
     } catch (err) {
       showToastError("Failed to save credentials");
     }
@@ -3960,13 +4013,12 @@ if (clearCredentialsBtn) {
         showToastError(message);
         return;
       }
-      localStorage.removeItem("authUser");
-      localStorage.removeItem("authPass");
+      window.__authUser = "";
       if (authUserInput) authUserInput.value = "";
       if (authPassInput) authPassInput.value = "";
       showToast("Credentials cleared — authentication disabled");
       updateLoginStatus();
-      updateAuthStatusBadge();
+      await updateAuthStatusBadge();
     } catch (err) {
       showToastError("Failed to clear credentials");
     }
@@ -4320,6 +4372,7 @@ if (bandSelect && bandNameInput) {
       bandNameInput.value = bandSelect.value;
     }
     refreshQuickBandButtons();
+    renderScanContextSummary(latestScanState);
   });
 }
 
@@ -4421,56 +4474,90 @@ saveBandBtn.addEventListener("click", async () => {
   loadBands();
 });
 
-loadDevices().then(loadBands).then(loadSettings).then(loadPresets).then(loadFilters).then(fetchTotal);
-refreshQuickBandButtons();
-syncScanState();
-setInterval(syncScanState, 5000);
-fetchModeStats();
-setInterval(fetchModeStats, 10000);
-fetchPropagationSummary();
-setInterval(fetchPropagationSummary, 15000);
-fetchDecoderStatus();
-setInterval(fetchDecoderStatus, 10000);
-updateLoginStatus();
-updateAuthStatusBadge();
-connectLogs();
-fetchLogs();
-setInterval(fetchLogs, 4000);
-initMenuDropdownModalBehavior();
+let appStarted = false;
+
+async function startApplication() {
+  if (appStarted) {
+    return;
+  }
+  appStarted = true;
+  connectSpectrum();
+  ensureWaterfallFallback();
+  connectStatus();
+  connectEvents();
+  await loadDevices();
+  await loadBands();
+  await loadSettings();
+  await loadPresets();
+  loadFilters();
+  fetchEvents();
+  fetchTotal();
+  setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
+  refreshQuickBandButtons();
+  syncScanState();
+  setInterval(syncScanState, 5000);
+  fetchModeStats();
+  setInterval(fetchModeStats, 10000);
+  fetchPropagationSummary();
+  setInterval(fetchPropagationSummary, 15000);
+  fetchDecoderStatus();
+  setInterval(fetchDecoderStatus, 10000);
+  connectLogs();
+  fetchLogs();
+  setInterval(fetchLogs, 4000);
+  initMenuDropdownModalBehavior();
+
+  try {
+    const res = await fetch("/api/health");
+    if (res.ok) {
+      const data = await res.json();
+      const deviceCount = Number(data?.devices ?? -1);
+      if (deviceCount === 0) {
+        setWaterfallGenericStatus("No SDR device detected. Connect your device and start a scan.");
+        drawSpectrumIdle("No SDR device detected. Connect your device and start a scan.");
+        showToastError("No SDR device detected. Connect your device and start a scan.");
+      }
+    }
+  } catch (_) {
+    // health check is best-effort; ignore network errors
+  }
+
+  if (!localStorage.getItem("onboardingDone")) {
+    onboarding.classList.add("show");
+    renderOnboarding();
+  }
+}
 
 // ── Logout button ──
 const logoutBtnEl = document.getElementById("logoutBtn");
 if (logoutBtnEl) {
   logoutBtnEl.addEventListener("click", async () => {
-    localStorage.removeItem("authUser");
-    localStorage.removeItem("authPass");
-    updateLoginStatus();
-    // Show login modal if server still requires auth
     try {
-      const resp = await fetch("/api/auth/status");
-      const data = await resp.json();
-      if (data.auth_required) {
-        const loginModalEl = document.getElementById("loginModal");
-        const loginModalUser = document.getElementById("loginModalUser");
-        const loginModalPass = document.getElementById("loginModalPass");
-        if (loginModalUser) loginModalUser.value = "";
-        if (loginModalPass) loginModalPass.value = "";
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.__authUser = "";
+      updateLoginStatus();
+      const loginModalEl = document.getElementById("loginModal");
+      const loginModalUser = document.getElementById("loginModalUser");
+      const loginModalPass = document.getElementById("loginModalPass");
+      if (loginModalUser) loginModalUser.value = "";
+      if (loginModalPass) loginModalPass.value = "";
+      const data = await updateAuthStatusBadge();
+      if (data?.auth_required) {
         new bootstrap.Modal(loginModalEl, { backdrop: "static" }).show();
       }
     } catch (_) {}
   });
 }
 
-// ── Login modal: show when server requires auth and no stored credentials ──
+// ── Login modal: show when server requires auth and no valid session ──
 (async () => {
-  try {
-    const resp = await fetch("/api/auth/status");
-    const data = await resp.json();
-    if (data.auth_required && !localStorage.getItem("authUser")) {
-      const loginModal = new bootstrap.Modal(document.getElementById("loginModal"), { backdrop: "static" });
-      loginModal.show();
-    }
-  } catch (_) { /* server unreachable at load; normal fetch failures will show 401s later */ }
+  const data = await updateAuthStatusBadge();
+  if (data?.auth_required && !data.authenticated) {
+    const loginModal = new bootstrap.Modal(document.getElementById("loginModal"), { backdrop: "static" });
+    loginModal.show();
+    return;
+  }
+  await startApplication();
 })();
 
 const loginModalSaveBtnEl = document.getElementById("loginModalSave");
@@ -4483,31 +4570,26 @@ if (loginModalSaveBtnEl) {
       if (errEl) { errEl.textContent = "Enter username and password"; errEl.classList.remove("d-none"); }
       return;
     }
-    // Probe credentials against a protected endpoint; 401/403 = bad creds, 200 = ok
-    const testToken = btoa(`${user}:${pass}`);
-    const testResp = await fetch("/api/settings", {
-      headers: { Authorization: `Basic ${testToken}` }
+    const testResp = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user, password: pass })
     }).catch(() => null);
-    if (!testResp || (testResp.status === 401 || testResp.status === 403)) {
+    if (!testResp || !testResp.ok) {
       if (errEl) { errEl.textContent = "Invalid username or password"; errEl.classList.remove("d-none"); }
       return;
     }
-    localStorage.setItem("authUser", user);
-    localStorage.setItem("authPass", pass);
+    window.__authUser = user;
     if (errEl) errEl.classList.add("d-none");
     const loginModalEl = document.getElementById("loginModal");
     bootstrap.Modal.getInstance(loginModalEl)?.hide();
     updateLoginStatus();
-    // Reload data now that we have credentials
+    await updateAuthStatusBadge();
+    await startApplication();
     loadSettings();
     fetchEvents();
     fetchTotal();
   });
-}
-
-if (!localStorage.getItem("onboardingDone")) {
-  onboarding.classList.add("show");
-  renderOnboarding();
 }
 
 // ── Spectrum graph renderer (above waterfall) ──

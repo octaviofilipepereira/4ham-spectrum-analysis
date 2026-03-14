@@ -45,7 +45,7 @@ _CW_SUBBANDS_HZ = {
     "80m": (3_500_000, 3_600_000),
     "40m": (7_000_000, 7_040_000),
     "30m": (10_100_000, 10_130_000),
-    "20m": (14_000_000, 14_117_000),
+    "20m": (14_000_000, 14_070_000),
     "17m": (18_068_000, 18_110_000),
     "15m": (21_000_000, 21_150_000),
     "12m": (24_890_000, 24_930_000),
@@ -518,11 +518,22 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             await _stop_ssb_detector()
         except Exception as exc:
             log(f"scan_ssb_detector_stop_failed:{exc}")
+
+        current_scan = dict(state.scan_state.get("scan") or {})
+        cw_start_hz, cw_end_hz = _resolve_cw_sweep_bounds(
+            current_scan.get("band"),
+            int(current_scan.get("start_hz", 0) or 0),
+            int(current_scan.get("end_hz", 0) or 0),
+        )
         
         # Start CW decoder if not already running
         if state.cw_decoder is None:
             try:
-                result = await _start_cw_decoder(force=True)
+                result = await _start_cw_decoder(
+                    force=True,
+                    band_start_hz=cw_start_hz,
+                    band_end_hz=cw_end_hz,
+                )
                 log(f"scan_cw_decoder_started:{result}")
             except Exception as exc:
                 log(f"scan_cw_decoder_start_failed:{exc}")

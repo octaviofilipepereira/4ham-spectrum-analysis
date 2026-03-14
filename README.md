@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 16:27:19 UTC
+Last update: 2026-03-14 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -57,6 +57,12 @@ curl -X POST http://127.0.0.1:8000/api/scan/stop
 For full platform-specific installation and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
+
+### v2.0.1
+- Added session-based authentication backed by SQLite credentials, with `/api/auth/status`, login, logout, and cookie session validation across reloads and WebSocket streams.
+- Fixed the browser auth-popup problem by removing `WWW-Authenticate` challenges from the in-app auth flow.
+- Corrected the CW decoder segment for 20 m to `14.000-14.070 MHz` while keeping the 20 m scan band at `14.000-14.350 MHz`.
+- Added a scan context summary in the UI so operators can see both the scan band and the active CW decoder subsegment.
 
 ### v0.5.0
 - Complete CW Morse decoder in pure Python (Butterworth filter, Hilbert envelope, auto-threshold, timing analysis, Morse table lookup).

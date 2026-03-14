@@ -111,8 +111,9 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         - Uses delta + int8 encoding for bandwidth reduction
     """
     # Authenticate before accepting connection
-    if state.auth_required and not state.verify_basic_auth_header(
-        websocket.headers.get("authorization")
+    if state.auth_required and not state.verify_auth_transport(
+        websocket.headers.get("authorization"),
+        websocket.headers.get("cookie"),
     ):
         await websocket.close(code=1008)
         return

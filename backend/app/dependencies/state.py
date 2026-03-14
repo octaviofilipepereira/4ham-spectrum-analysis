@@ -346,12 +346,13 @@ def _load_auth_from_db():
     _db_cfg = db.get_auth_config()
     _db_user = _db_cfg.get("auth_user") or ""
     _db_hash = _db_cfg.get("auth_pass_hash") or ""
+    _db_enabled = bool(_db_cfg.get("auth_enabled"))
 
-    if _db_user and _db_hash:
+    if _db_enabled and _db_user and _db_hash:
         # DB credentials take precedence
-        return _db_user, _db_hash, True, (not _force_disabled)
+        return _db_user, _db_hash, True, True
 
-    if _env_auth_user and _env_auth_pass:
+    if (not _force_disabled) and _env_auth_user and _env_auth_pass:
         _hashed = is_bcrypt_hash(_env_auth_pass)
         return _env_auth_user, _env_auth_pass, _hashed, (not _force_disabled)
 
@@ -429,4 +430,13 @@ def verify_basic_auth_header(auth_header: str) -> bool:
         # SECURITY WARNING: Plaintext passwords are not secure!
         # Run 'python scripts/hash_password.py' to generate a hash
         return password == auth_pass
+
+
+def verify_auth_transport(auth_header: str = None, cookie_header: str = None) -> bool:
+    """Verify either a session cookie or legacy Basic Auth header."""
+    from app.dependencies.auth import verify_session_cookie_header
+
+    if verify_session_cookie_header(cookie_header):
+        return True
+    return verify_basic_auth_header(auth_header)
 

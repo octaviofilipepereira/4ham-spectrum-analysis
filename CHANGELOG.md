@@ -7,6 +7,23 @@ Last update: 2026-03-14 UTC
 
 # Changelog
 
+## v2.0.1 - 2026-03-14
+
+### Added
+- Session-based authentication stored in SQLite, with login, logout, and session validation via cookie instead of browser Basic Auth prompts.
+- Frontend auth bootstrap that validates the session on reload and only starts protected streams after authentication is confirmed.
+- Scan context summary in the main UI showing the active scan range and, when CW is selected, the active CW decoder segment.
+
+### Changed
+- CW decoder 20 m segment corrected to `14.000-14.070 MHz`.
+- CW mode changes during an active scan now start the CW decoder with the correct subsegment for the current band.
+- Logout control restyled as a proper status chip and the login modal inputs restyled for readable black-on-white entry.
+
+### Fixed
+- Removed `WWW-Authenticate` prompts that were causing browser-native auth popups.
+- Waterfall and protected WebSocket/data startup now happen after successful login, avoiding manual reload after authentication.
+- WebSocket authentication now accepts the authenticated session cookie, keeping logs, events, spectrum, and status streams aligned with the UI login state.
+
 ## v0.5.0 - 2026-03-14
 
 ### Added

@@ -270,6 +270,16 @@ h1,
   line-height: 1.2;
 }
 
+.logout-chip {
+  appearance: none;
+  cursor: pointer;
+}
+
+.logout-chip:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
 .ws-status {
   color: var(--accent-2);
 }
@@ -344,6 +354,27 @@ h1,
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.scan-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  align-items: center;
+  padding-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.scan-context__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scan-context__label {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .mode-quick-btn {
@@ -1117,6 +1148,35 @@ h1,
 
 .app-modal .btn-close:hover {
   opacity: 1;
+}
+
+.modal#loginModal .modal-content {
+  background: #f7f7f9;
+  color: #111;
+}
+
+.modal#loginModal .form-label,
+.modal#loginModal .modal-title {
+  color: #111;
+}
+
+.modal#loginModal .form-control {
+  background: #fff;
+  background-color: #fff;
+  border-color: #b9c0c8;
+  color: #111;
+}
+
+.modal#loginModal .form-control::placeholder {
+  color: #666;
+}
+
+.modal#loginModal .form-control:focus {
+  background: #fff;
+  background-color: #fff;
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+  color: #111;
 }
 
 .modal-backdrop.show {
