@@ -12,36 +12,36 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <style>
-    body { background: #0e1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: #0e1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 16px; }
     .manual-wrap { max-width: 100%; margin: 0; padding: 2rem 2.5rem 4rem; }
-    h1.manual-title { color: #58a6ff; font-size: 1.9rem; font-weight: 700; margin-bottom: 0.2rem; }
-    .manual-subtitle { color: #8b949e; font-size: 0.95rem; margin-bottom: 2.5rem; }
-    h2.section-title { color: #79c0ff; font-size: 1.25rem; font-weight: 600; border-bottom: 1px solid #21262d; padding-bottom: 0.4rem; margin-top: 2.5rem; margin-bottom: 1rem; }
-    h3.sub-title { color: #d2a8ff; font-size: 1rem; font-weight: 600; margin-top: 1.4rem; margin-bottom: 0.5rem; }
-    p, li { font-size: 0.92rem; line-height: 1.65; color: #c9d1d9; }
+    h1.manual-title { color: #58a6ff; font-size: 2.2rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .manual-subtitle { color: #8b949e; font-size: 1.05rem; margin-bottom: 2.5rem; }
+    h2.section-title { color: #79c0ff; font-size: 1.45rem; font-weight: 600; border-bottom: 1px solid #21262d; padding-bottom: 0.4rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+    h3.sub-title { color: #d2a8ff; font-size: 1.15rem; font-weight: 600; margin-top: 1.4rem; margin-bottom: 0.5rem; }
+    p, li { font-size: 1rem; line-height: 1.75; color: #c9d1d9; }
     a { color: #58a6ff; }
     a:hover { color: #79c0ff; }
     .toc { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 2.5rem; }
     .toc ol { margin: 0; padding-left: 1.4rem; }
-    .toc li { font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .toc li { font-size: 1rem; margin-bottom: 0.3rem; }
     .toc a { color: #58a6ff; text-decoration: none; }
     .toc a:hover { text-decoration: underline; }
-    .info-box { background: #0d1117; border-left: 3px solid #58a6ff; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.88rem; }
-    .warn-box  { background: #0d1117; border-left: 3px solid #e3b341; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.88rem; }
-    table.manual-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 0.75rem 0 1.25rem; }
-    table.manual-table th { background: #21262d; color: #c9d1d9; font-weight: 600; padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #30363d; }
-    table.manual-table td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+    .info-box { background: #0d1117; border-left: 3px solid #58a6ff; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.97rem; }
+    .warn-box  { background: #0d1117; border-left: 3px solid #e3b341; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.97rem; }
+    table.manual-table { width: 100%; border-collapse: collapse; font-size: 0.97rem; margin: 0.75rem 0 1.25rem; }
+    table.manual-table th { background: #21262d; color: #c9d1d9; font-weight: 600; padding: 0.55rem 0.85rem; text-align: left; border-bottom: 1px solid #30363d; }
+    table.manual-table td { padding: 0.5rem 0.85rem; border-bottom: 1px solid #21262d; vertical-align: top; }
     table.manual-table tr:last-child td { border-bottom: none; }
-    kbd { background: #21262d; border: 1px solid #444c56; border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.82rem; font-family: monospace; color: #e6edf3; }
-    .badge-mode { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 4px; letter-spacing: 0.04em; vertical-align: middle; }
+    kbd { background: #21262d; border: 1px solid #444c56; border-radius: 4px; padding: 0.1rem 0.5rem; font-size: 0.92rem; font-family: monospace; color: #e6edf3; }
+    .badge-mode { display: inline-block; font-size: 0.85rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 4px; letter-spacing: 0.04em; vertical-align: middle; }
     .badge-ft8  { background: #0d419d; color: #79c0ff; }
     .badge-ft4  { background: #1b3a2b; color: #56d364; }
     .badge-wspr { background: #3a2b0d; color: #f0883e; }
     .badge-cw   { background: #3a1a2b; color: #e8b4d8; }
     .badge-ssb  { background: #1a2a3a; color: #7db5d8; }
-    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.88rem; color: #58a6ff; text-decoration: none; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 1rem; color: #58a6ff; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
-    .manual-footer { margin-top: 3rem; border-top: 1px solid #21262d; padding-top: 1rem; font-size: 0.8rem; color: #8b949e; text-align: center; }
+    .manual-footer { margin-top: 3rem; border-top: 1px solid #21262d; padding-top: 1rem; font-size: 0.9rem; color: #8b949e; text-align: center; }
     @media (max-width: 600px) { .manual-wrap { padding: 1rem 1rem 3rem; } }
   </style>
 </head>
