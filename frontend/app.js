@@ -1299,7 +1299,8 @@ function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), 
   waterfallCallsignCache.set(String(bucketHz), {
     callsign: normalizedCallsign,
     frequency_hz: numericFrequency,
-    seen_at: seenAtMs,
+    seen_at: Date.now(),   // TTL relative to injection time, not event timestamp
+    seenAtMs: seenAtMs,    // original decode timestamp (for display/tooltip)
     mode: normalizedMode
   });
 
@@ -1318,15 +1319,18 @@ function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), 
   const markerKey = `${dialHz}_${normalizedMode}`;
   const existing = waterfallDecodedMarkerCache.get(markerKey);
   const ts = Number(seenAtMs);
-  // Update when: no existing entry, or this decode is the same age or newer
-  if (!existing || ts >= Number(existing.seen_at || 0)) {
+  // Update when: no existing entry, or this decode is the same age or newer.
+  // Use Date.now() for seen_at so the TTL is relative to injection time, not
+  // the historical event timestamp (which would cause immediate expiry for
+  // events fetched from the DB).
+  if (!existing || ts >= Number(existing.seenAtMs || 0)) {
     waterfallDecodedMarkerCache.set(markerKey, {
       frequency_hz: dialHz,    // anchor at dial freq (band centre), not audio offset
       mode: normalizedMode,
       snr_db: null,
-      seen_at: ts,
-      callsign: normalizedCallsign,   // *** embedded directly in the marker ***
-      seenAtMs: ts,
+      seen_at: Date.now(),     // TTL relative to injection time, not event timestamp
+      callsign: normalizedCallsign,
+      seenAtMs: ts,            // original decode timestamp for ordering/tooltip
       decoded: true,
     });
   }
