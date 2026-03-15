@@ -23,49 +23,27 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Quick Start
-Run from the repository root.
 
-1) Clone the repository:
+Clone the repository and run the automatic installer — it handles everything:
+
 ```bash
 git clone https://github.com/octaviofilipepereira/4ham-spectrum-analysis.git
 cd 4ham-spectrum-analysis
+./install.sh
 ```
 
-2) Install system dependencies (Ubuntu/Debian/Raspberry Pi OS):
-```bash
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip \
-    soapysdr-tools libsoapysdr-dev python3-soapysdr \
-    soapysdr-module-rtlsdr rtl-sdr
-```
-> **RTL-SDR Blog v4 only** — the standard `rtl-sdr` apt package does not support v4. See [docs/install.md](docs/install.md) for the build-from-source instructions.
+The installer will:
+- Install all system packages (SoapySDR, RTL-SDR drivers, Python tools)
+- Optionally build the RTL-SDR Blog v4 driver from source
+- Create and populate the Python virtual environment
+- Ask for an admin username and password (stored securely in the local database)
+- Install and start the background service (systemd)
 
-3) Add your user to the `plugdev` group for USB access (log out and back in after):
-```bash
-sudo usermod -aG plugdev $USER
-```
+At the end, **just open the printed URL in your browser and log in**.
 
-4) Create and activate a Python virtual environment:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
+> **RTL-SDR Blog v4** — the installer will ask whether you have a v4 dongle and build the correct driver automatically. See [docs/install.md](docs/install.md) for details.
 
-5) Install Python dependencies:
-```bash
-python -m pip install -r backend/requirements.txt
-```
-
-6) Start the backend (serves the UI at the same origin):
-```bash
-python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
-```
-
-7) Open in your browser:
-- UI: `http://127.0.0.1:8000/`
-- API health check: `http://127.0.0.1:8000/api/health`
-
-For full platform-specific installation, RTL-SDR v4 driver setup, and decoder configuration, see [docs/installation_manual.md](docs/installation_manual.md).
+For full platform-specific installation notes and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
 
