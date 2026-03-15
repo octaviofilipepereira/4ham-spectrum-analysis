@@ -248,7 +248,10 @@ async def run_retention_now(_: None = Depends(verify_basic_auth)) -> Dict:
         Result dict with purged count, export info, and download URL.
     """
     from app.core.retention import run_retention
+    import time
+    from app.dependencies import state as _state
     notification = await run_retention()
+    _state.db.set_kv("last_retention_run", str(time.time()))
     return {
         "status": "ok",
         "result": notification if notification else {

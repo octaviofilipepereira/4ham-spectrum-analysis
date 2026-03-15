@@ -45,15 +45,28 @@ _log = logging.getLogger("uvicorn.error")
 
 
 async def _retention_loop():
-    """Background task: run retention once at startup (+10 s delay), then every 24 h."""
+    """Background task: run retention every 24 h, skipping startup run if <24 h since last run."""
+    import time
     await asyncio.sleep(10)  # allow server to finish startup
     while True:
         try:
             from app.core.retention import run_retention
+            from app.dependencies import state as _state
+            _RETENTION_KV_KEY = "last_retention_run"
+            _24H = 86400
+            last_ts = _state.db.get_kv(_RETENTION_KV_KEY)
+            elapsed = time.time() - float(last_ts) if last_ts else _24H
+            if elapsed < _24H:
+                remaining = int(_24H - elapsed)
+                _log.info("Retention: skipping startup run, last run %.1f h ago (next in %d h %02d min)",
+                          elapsed / 3600, remaining // 3600, (remaining % 3600) // 60)
+                await asyncio.sleep(remaining)
+                continue
             await run_retention()
+            _state.db.set_kv(_RETENTION_KV_KEY, str(time.time()))
         except Exception as exc:
             _log.warning("Retention task error: %s", exc)
-        await asyncio.sleep(86400)  # 24 h
+        await asyncio.sleep(_24H)
 
 
 @asynccontextmanager

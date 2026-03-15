@@ -204,6 +204,23 @@ class Database:
             except json.JSONDecodeError:
                 return {}
 
+    def get_kv(self, key: str) -> str | None:
+        """Read a single string value from the settings table by key."""
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (key,)
+            ).fetchone()
+            return row[0] if row else None
+
+    def set_kv(self, key: str, value: str) -> None:
+        """Write a single string value to the settings table."""
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                (key, value),
+            )
+            self.conn.commit()
+
     def get_auth_config(self):
         """Return stored auth credentials and enable flag."""
         rows = self.conn.execute(
