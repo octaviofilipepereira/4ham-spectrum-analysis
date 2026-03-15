@@ -10,7 +10,7 @@ Web platform for amateur radio spectrum analysis, with DSP, real-time events, an
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
-It is designed to run on Raspberry Pi and Linux PC, with a modern multilingual interface (pt/en/es).
+It is designed to run on Raspberry Pi and Linux PC, with a modern web interface (currently English; Portuguese and Spanish planned).
 
 ## Main requirements
 - Hardware: RTL-SDR (primary), with readiness for HackRF, Airspy, and transceivers with SDR interface.
@@ -18,7 +18,7 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern multilingual i
 - Real-time waterfall and history.
 - Automatic callsign identification for FT8/FT4, APRS, CW, and SSB (voice).
 - Modern, clean, and responsive web UI.
-- Languages: Portuguese, English, Spanish (selected during installation).
+- Language: English (Portuguese and Spanish planned for a future release).
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
