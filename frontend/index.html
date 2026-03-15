@@ -766,17 +766,61 @@ Last update: 2026-02-22 16:27:19 UTC
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="card panel">
+
+            <!-- User Manual link -->
+            <div class="card panel mb-3">
+              <div class="card-body d-flex align-items-center justify-content-between gap-3">
+                <div>
+                  <strong>User Manual</strong>
+                  <p class="mb-0 text-muted" style="font-size:.85rem;">Full documentation: interface tour, scan modes, waterfall, metrics, export, FAQ &amp; troubleshooting.</p>
+                </div>
+                <a href="help.html" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info btn-sm text-nowrap">Open Manual ↗</a>
+              </div>
+            </div>
+
+            <!-- Keyboard shortcuts -->
+            <div class="card panel mb-3">
               <div class="card-body">
-                <h2 class="h5">Help</h2>
-                <ul class="help">
-                  <li>Press <strong>s</strong> to start scan.</li>
-                  <li>Press <strong>x</strong> to stop scan.</li>
-                  <li>Use filters to narrow events and export CSV/JSON/PNG.</li>
-                  <li>Favorites apply quick band filter.</li>
+                <h3 class="h6 mb-2">Keyboard shortcuts</h3>
+                <ul class="help mb-0">
+                  <li><kbd style="background:#21262d;border:1px solid #444c56;border-radius:4px;padding:.1rem .4rem;font-size:.82rem;font-family:monospace">S</kbd> &nbsp;Start scan (when idle)</li>
+                  <li><kbd style="background:#21262d;border:1px solid #444c56;border-radius:4px;padding:.1rem .4rem;font-size:.82rem;font-family:monospace">X</kbd> &nbsp;Stop scan (when running)</li>
+                  <li><kbd style="background:#21262d;border:1px solid #444c56;border-radius:4px;padding:.1rem .4rem;font-size:.82rem;font-family:monospace">Enter</kbd> &nbsp;Go to frequency (in the VFO Go&nbsp;to field)</li>
                 </ul>
               </div>
             </div>
+
+            <!-- Scan modes at a glance -->
+            <div class="card panel mb-3">
+              <div class="card-body">
+                <h3 class="h6 mb-2">Scan modes at a glance</h3>
+                <table class="table table-sm table-dark mb-0" style="font-size:.85rem;">
+                  <thead><tr><th>Mode</th><th>Window</th><th>Marker TTL</th><th>Notes</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>FT8</strong></td><td>15 s</td><td>45 s</td><td>Weak-signal digital, decoded with jt9</td></tr>
+                    <tr><td><strong>FT4</strong></td><td>7.5 s</td><td>23 s</td><td>Faster FT8 variant</td></tr>
+                    <tr><td><strong>WSPR</strong></td><td>120 s</td><td>360 s</td><td>Beacon mode, 2-minute windows</td></tr>
+                    <tr><td><strong>CW</strong></td><td>dwell 30 s</td><td>45 s</td><td>Morse — sweeps across band in configurable steps</td></tr>
+                    <tr><td><strong>SSB</strong></td><td>continuous</td><td>12 s</td><td>Voice occupancy detection, no callsign output</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Quick tips -->
+            <div class="card panel">
+              <div class="card-body">
+                <h3 class="h6 mb-2">Quick tips</h3>
+                <ul class="help mb-0">
+                  <li>Switch band live using the quick-band buttons (160m … 10m) without stopping the scan.</li>
+                  <li>Use <strong>Logs &amp; Reports → Search &amp; Export Data</strong> to filter events and export CSV / JSON / PNG.</li>
+                  <li>The <strong>Propagation Score</strong> (0–100) reflects band quality over the last 60 min — a single strong signal does not guarantee a high score.</li>
+                  <li>FT8/FT4 waterfall markers expire after 3 missed decode cycles — this is normal during low-activity periods.</li>
+                  <li>Admin settings (SDR device, gain, retention) require admin login via <strong>Admin Config</strong>.</li>
+                </ul>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

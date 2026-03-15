@@ -1,0 +1,413 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>4ham Spectrum Analysis — User Manual</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { background: #0e1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .manual-wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    h1.manual-title { color: #58a6ff; font-size: 1.9rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .manual-subtitle { color: #8b949e; font-size: 0.95rem; margin-bottom: 2.5rem; }
+    h2.section-title { color: #79c0ff; font-size: 1.25rem; font-weight: 600; border-bottom: 1px solid #21262d; padding-bottom: 0.4rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+    h3.sub-title { color: #d2a8ff; font-size: 1rem; font-weight: 600; margin-top: 1.4rem; margin-bottom: 0.5rem; }
+    p, li { font-size: 0.92rem; line-height: 1.65; color: #c9d1d9; }
+    a { color: #58a6ff; }
+    a:hover { color: #79c0ff; }
+    .toc { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.2rem 1.5rem; margin-bottom: 2.5rem; }
+    .toc ol { margin: 0; padding-left: 1.4rem; }
+    .toc li { font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .toc a { color: #58a6ff; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .info-box { background: #0d1117; border-left: 3px solid #58a6ff; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.88rem; }
+    .warn-box  { background: #0d1117; border-left: 3px solid #e3b341; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.88rem; }
+    table.manual-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 0.75rem 0 1.25rem; }
+    table.manual-table th { background: #21262d; color: #c9d1d9; font-weight: 600; padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #30363d; }
+    table.manual-table td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+    table.manual-table tr:last-child td { border-bottom: none; }
+    kbd { background: #21262d; border: 1px solid #444c56; border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.82rem; font-family: monospace; color: #e6edf3; }
+    .badge-mode { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 4px; letter-spacing: 0.04em; vertical-align: middle; }
+    .badge-ft8  { background: #0d419d; color: #79c0ff; }
+    .badge-ft4  { background: #1b3a2b; color: #56d364; }
+    .badge-wspr { background: #3a2b0d; color: #f0883e; }
+    .badge-cw   { background: #3a1a2b; color: #e8b4d8; }
+    .badge-ssb  { background: #1a2a3a; color: #7db5d8; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; font-size: 0.88rem; color: #58a6ff; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .manual-footer { margin-top: 3rem; border-top: 1px solid #21262d; padding-top: 1rem; font-size: 0.8rem; color: #8b949e; text-align: center; }
+    @media (max-width: 600px) { .manual-wrap { padding: 1rem 1rem 3rem; } }
+  </style>
+</head>
+<body>
+<div class="manual-wrap">
+
+  <a class="back-link" href="index.html">← Back to application</a>
+
+  <h1 class="manual-title">4ham Spectrum Analysis</h1>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.6.3 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc" aria-label="Table of contents">
+    <strong style="color:#c9d1d9; font-size:0.9rem;">Contents</strong>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#interface">Interface tour</a></li>
+      <li><a href="#scan-modes">Scan modes</a></li>
+      <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
+      <li><a href="#events">Events log</a></li>
+      <li><a href="#metrics">Metrics explained (SNR &amp; Propagation Score)</a></li>
+      <li><a href="#export">Export &amp; reports</a></li>
+      <li><a href="#admin">Admin &amp; configuration</a></li>
+      <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+      <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. OVERVIEW -->
+  <section id="overview">
+    <h2 class="section-title">1 · Overview</h2>
+    <p>
+      <strong>4ham Spectrum Analysis</strong> is a real-time spectrum monitoring and digital-mode decoding system
+      for amateur radio, built around an SDR (Software Defined Radio) receiver. It continuously scans configured
+      HF bands, decodes digital signals (FT8, FT4, WSPR, CW) and SSB occupancy, logs every detected event,
+      and displays all activity on a live waterfall and propagation map.
+    </p>
+    <p>The system has two parts:</p>
+    <ul>
+      <li><strong>Backend</strong> — Python/FastAPI server that drives the SDR, runs the decoders and stores events in SQLite.</li>
+      <li><strong>Frontend</strong> — Single-page web application served by the backend; accessible on the local network at <code>http://&lt;host&gt;:8000</code>.</li>
+    </ul>
+  </section>
+
+  <!-- 2. INTERFACE TOUR -->
+  <section id="interface">
+    <h2 class="section-title">2 · Interface tour</h2>
+
+    <h3 class="sub-title">Top toolbar</h3>
+    <table class="manual-table">
+      <thead><tr><th>Button</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Band Config</strong></td><td>Configure which bands are scanned, their frequency ranges, and enable/disable individual bands.</td></tr>
+        <tr><td><strong>Logs &amp; Reports</strong></td><td>Dropdown with access to Decoder Status, Session Summary, frontend/server logs, and the Search &amp; Export panel.</td></tr>
+        <tr><td><strong>Admin Config</strong></td><td>System settings: SDR device, gain, sample rate, data retention, authentication. Requires admin login.</td></tr>
+        <tr><td><strong>Help</strong></td><td>This manual and a quick-reference card.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Waterfall toolbar</h3>
+    <table class="manual-table">
+      <thead><tr><th>Control</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Explorer SIM: ON/OFF</strong></td><td>Enables Explorer simulation mode — overlays synthetic signal markers for testing the display without a live SDR signal.</td></tr>
+        <tr><td><strong>Zoom slider</strong></td><td>Zoom the waterfall horizontally (×1 to ×16).</td></tr>
+        <tr><td><strong>Reset view</strong></td><td>Return to the default zoom and scroll position.</td></tr>
+        <tr><td><strong>Fullscreen</strong></td><td>Expand the waterfall to fill the browser window.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">VFO bar</h3>
+    <p>Displays the frequency currently under the mouse cursor on the waterfall. The <strong>Go to</strong> field lets you jump directly to a frequency in MHz (e.g. <code>14.074</code>).</p>
+
+    <h3 class="sub-title">Scan controls</h3>
+    <p>
+      <strong>Start scanning / Stop scanning</strong> — toggles the active scan. The band quick-buttons (160m … 10m) switch to that band immediately, even while a scan is running.
+      The mode quick-buttons (CW / WSPR / FT4 / FT8 / SSB) select the decoder for the next scan start or switch the running scan live.
+    </p>
+
+    <h3 class="sub-title">Status indicators</h3>
+    <table class="manual-table">
+      <thead><tr><th>Indicator</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Auth: guest / logged in</strong></td><td>Shows authentication state. Guests can view but cannot change settings or start/stop scans.</td></tr>
+        <tr><td><strong>WS: connected / disconnected</strong></td><td>WebSocket connection to the backend spectrum stream.</td></tr>
+        <tr><td><strong>SNR + bar</strong></td><td>Live SNR reading for the current frequency under the VFO cursor.</td></tr>
+        <tr><td><strong>Scan context line</strong></td><td>Shows the active band, frequency range and (for CW) current decoder segment.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 3. SCAN MODES -->
+  <section id="scan-modes">
+    <h2 class="section-title">3 · Scan modes</h2>
+    <p>Only one mode runs at a time on one band. Select the mode before (or during) a scan using the mode buttons.</p>
+
+    <table class="manual-table">
+      <thead><tr><th>Mode</th><th>Window</th><th>Marker TTL</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge-mode badge-ft8">FT8</span></td>
+          <td>15 s</td><td>45 s</td>
+          <td>Most popular weak-signal HF mode. Decoded with <code>jt9</code>. Shows callsign markers on the waterfall dial frequency.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-mode badge-ft4">FT4</span></td>
+          <td>7.5 s</td><td>23 s</td>
+          <td>Faster variant of FT8, also decoded with <code>jt9</code>. Higher throughput, slightly less sensitivity.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-mode badge-wspr">WSPR</span></td>
+          <td>120 s</td><td>360 s</td>
+          <td>Very slow beaconing mode, typically below the noise floor. 2-minute decode windows.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-mode badge-cw">CW</span></td>
+          <td>dwell 30 s</td><td>45 s</td>
+          <td>Morse code decoder. Steps across the band in configurable frequency steps. <strong>CW Step (Hz)</strong> and <strong>CW Dwell (s)</strong> parameters appear when CW is selected.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-mode badge-ssb">SSB</span></td>
+          <td>continuous</td><td>12 s</td>
+          <td>SSB occupancy detection — detects voice/sideband activity without decoding content. No callsign output.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">CW-specific parameters</h3>
+    <table class="manual-table">
+      <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>CW Step (Hz)</td><td>6500 Hz</td><td>How many Hz the decoder moves each dwell interval. Smaller steps = more resolution but slower full-band sweep.</td></tr>
+        <tr><td>CW Dwell (s)</td><td>30 s</td><td>Time spent listening at each frequency step before moving on.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box">
+      💡 <strong>FT8/FT4 dial frequency</strong> — the decoder locks onto the standard dial frequency for each band (e.g. 14.074 MHz for FT8 20m). A single waterfall marker represents the last decoded callsign for that band/mode combination.
+    </div>
+  </section>
+
+  <!-- 4. WATERFALL -->
+  <section id="waterfall">
+    <h2 class="section-title">4 · Waterfall &amp; spectrum display</h2>
+
+    <h3 class="sub-title">Layout</h3>
+    <ul>
+      <li><strong>Spectrum graph</strong> (top strip) — instantaneous power spectrum, updated at ~5–10 fps.</li>
+      <li><strong>Frequency ruler</strong> — shows frequency labels aligned to the waterfall below.</li>
+      <li><strong>Waterfall canvas</strong> — scrolling time-frequency display. Newer data is at the top; time flows downward.</li>
+      <li><strong>Mode overlay</strong> — coloured labels pinned to known mode frequencies (e.g. FT8 dial, WSPR, CW segment). The label contains mode, last decoded callsign, and SNR.</li>
+    </ul>
+
+    <h3 class="sub-title">Interacting with the waterfall</h3>
+    <ul>
+      <li><strong>Mouse / touch drag</strong> — pan horizontally when zoomed in.</li>
+      <li><strong>Zoom slider</strong> — horizontal zoom from ×1 (full band view) to ×16.</li>
+      <li><strong>Mouse hover</strong> — VFO bar updates to show the frequency under the cursor, plus live SNR.</li>
+      <li><strong>Go to field</strong> — type a frequency in MHz and press <kbd>Enter</kbd> or click <strong>GO</strong> to centre the view on that frequency.</li>
+    </ul>
+
+    <h3 class="sub-title">Marker colours</h3>
+    <table class="manual-table">
+      <thead><tr><th>Colour</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td style="color:#79c0ff">■ Blue</td><td>FT8 decoded callsign marker</td></tr>
+        <tr><td style="color:#56d364">■ Green</td><td>FT4 decoded callsign marker</td></tr>
+        <tr><td style="color:#f0883e">■ Orange</td><td>WSPR decoded marker</td></tr>
+        <tr><td style="color:#e8b4d8">■ Pink/purple</td><td>CW detected signal marker</td></tr>
+        <tr><td style="color:#7db5d8">■ Light blue</td><td>SSB occupancy marker</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Transition overlay</h3>
+    <p>When switching bands or modes, a transition overlay appears over the waterfall while the backend reconfigures. This is normal — the spinner disappears once the new spectrum stream arrives.</p>
+  </section>
+
+  <!-- 5. EVENTS LOG -->
+  <section id="events">
+    <h2 class="section-title">5 · Events log</h2>
+    <p>All decoded signals and detected occupancy events are stored in the SQLite database and displayed in the Events table in real time.</p>
+
+    <h3 class="sub-title">Event columns</h3>
+    <table class="manual-table">
+      <thead><tr><th>Column</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Time</td><td>UTC timestamp of detection.</td></tr>
+        <tr><td>Band</td><td>Amateur band (160m, 80m, …, 10m).</td></tr>
+        <tr><td>Mode</td><td>Decoder mode that produced the event.</td></tr>
+        <tr><td>Frequency</td><td>Centre frequency of the detected signal in MHz.</td></tr>
+        <tr><td>Callsign</td><td>Decoded callsign (FT8/FT4/WSPR/CW), or blank for SSB occupancy.</td></tr>
+        <tr><td>SNR</td><td>Signal-to-noise ratio in dB at time of detection.</td></tr>
+        <tr><td>Score</td><td>Propagation score (0–100) for the band at time of event.</td></tr>
+        <tr><td>Country / DXCC</td><td>Resolved from callsign prefix (if available).</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Filters</h3>
+    <p>Use the <strong>Search &amp; Export Data</strong> panel (Logs &amp; Reports → Search &amp; Export Data) to filter events by:</p>
+    <ul>
+      <li>Date/time range (from / to)</li>
+      <li>Band</li>
+      <li>Mode</li>
+      <li>Callsign (partial match)</li>
+      <li>Country / DXCC prefix</li>
+      <li>Minimum SNR</li>
+    </ul>
+
+    <h3 class="sub-title">Favourites</h3>
+    <p>The band favourite buttons below the events table provide one-click filtering to a specific band without opening the full filter panel.</p>
+  </section>
+
+  <!-- 6. METRICS -->
+  <section id="metrics">
+    <h2 class="section-title">6 · Metrics explained</h2>
+
+    <h3 class="sub-title">SNR (Signal-to-Noise Ratio)</h3>
+    <p>Instantaneous measurement of a single signal relative to the noise floor, in dB.</p>
+    <table class="manual-table">
+      <thead><tr><th>SNR range</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr><td>&lt; 8 dB</td><td>Signal rejected — too weak to decode reliably.</td></tr>
+        <tr><td>8–15 dB</td><td>Weak but decodable.</td></tr>
+        <tr><td>15–25 dB</td><td>Strong signal.</td></tr>
+        <tr><td>&gt; 25 dB</td><td>Excellent signal strength.</td></tr>
+      </tbody>
+    </table>
+    <p>The SNR shown next to each band in the propagation map is the <strong>maximum peak SNR</strong> recorded in the last 60 minutes — not a current reading.</p>
+
+    <h3 class="sub-title">Propagation Score (0–100)</h3>
+    <p>
+      An aggregated quality score for a band, computed from all events in the last 60 minutes.
+      Each event contributes a weighted score based on SNR, decode confidence, and how recently it occurred.
+      Recent, high-confidence events with strong SNR push the score up.
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Score</th><th>Classification</th></tr></thead>
+      <tbody>
+        <tr><td>≥ 70</td><td>🟢 Excellent</td></tr>
+        <tr><td>50–69</td><td>🟡 Good</td></tr>
+        <tr><td>30–49</td><td>🟠 Fair</td></tr>
+        <tr><td>&lt; 30</td><td>🔴 Poor</td></tr>
+      </tbody>
+    </table>
+    <div class="warn-box">
+      ⚠ A band can show a high peak SNR but a <em>Fair</em> or <em>Poor</em> propagation score if activity was sparse or concentrated in the distant past.
+    </div>
+  </section>
+
+  <!-- 7. EXPORT -->
+  <section id="export">
+    <h2 class="section-title">7 · Export &amp; reports</h2>
+
+    <h3 class="sub-title">Search &amp; Export Data</h3>
+    <p>Accessed via <strong>Logs &amp; Reports → Search &amp; Export Data</strong>. Apply filters and then export matching events as:</p>
+    <ul>
+      <li><strong>CSV</strong> — comma-separated, compatible with spreadsheets.</li>
+      <li><strong>JSON</strong> — structured data for programmatic use.</li>
+      <li><strong>PNG</strong> — screenshot of the current events table view.</li>
+    </ul>
+
+    <h3 class="sub-title">Session Summary</h3>
+    <p>Opens a modal with per-band statistics for the current session: total events, mode breakdown, peak SNR, and propagation score history.</p>
+
+    <h3 class="sub-title">Decoder Status</h3>
+    <p>Shows the live status of all decoder pipelines (jt9, CW, WSPR), including whether each decoder process is running, its last decode time, and error counts.</p>
+
+    <h3 class="sub-title">Logs</h3>
+    <ul>
+      <li><strong>4ham FrontEnd logs</strong> — browser-side diagnostic log.</li>
+      <li><strong>4ham Server logs</strong> — backend log stream (last N lines).</li>
+    </ul>
+  </section>
+
+  <!-- 8. ADMIN -->
+  <section id="admin">
+    <h2 class="section-title">8 · Admin &amp; configuration</h2>
+    <div class="info-box">
+      🔒 Admin settings require authentication. Log in with the admin password configured during installation.
+    </div>
+
+    <h3 class="sub-title">Band Config</h3>
+    <p>Enable or disable individual bands, adjust their frequency ranges (start/stop in Hz), and configure per-band scan parameters.</p>
+
+    <h3 class="sub-title">Admin Config</h3>
+    <table class="manual-table">
+      <thead><tr><th>Section</th><th>Settings</th></tr></thead>
+      <tbody>
+        <tr><td>SDR</td><td>Device index, gain (dB), sample rate, PPM correction, antenna.</td></tr>
+        <tr><td>Scan</td><td>Default dwell time, FFT size, overlap.</td></tr>
+        <tr><td>Retention</td><td>Maximum event count before auto-export + purge; number of recent events to keep; export directory.</td></tr>
+        <tr><td>Authentication</td><td>Change admin password.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Retention policy</h3>
+    <p>
+      When the total number of stored events exceeds the configured threshold (default 500,000), the system automatically:
+    </p>
+    <ol>
+      <li>Exports all events to a CSV file in the <code>data/exports/</code> directory.</li>
+      <li>Purges older events, keeping only the most recent 50,000 (configurable).</li>
+    </ol>
+    <p>This runs at most once every 24 hours. You can trigger it manually via the Admin Config panel.</p>
+  </section>
+
+  <!-- 9. KEYBOARD SHORTCUTS -->
+  <section id="shortcuts">
+    <h2 class="section-title">9 · Keyboard shortcuts</h2>
+    <table class="manual-table">
+      <thead><tr><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>S</kbd></td><td>Start scan (only when no scan is running).</td></tr>
+        <tr><td><kbd>X</kbd></td><td>Stop scan (only when a scan is running).</td></tr>
+        <tr><td><kbd>Enter</kbd> (Go to field)</td><td>Jump the waterfall view to the entered frequency.</td></tr>
+      </tbody>
+    </table>
+    <p>All shortcuts are case-insensitive and do not fire when focus is inside a text input.</p>
+  </section>
+
+  <!-- 10. FAQ -->
+  <section id="faq">
+    <h2 class="section-title">10 · FAQ &amp; troubleshooting</h2>
+
+    <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
+    <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>
+    <ul>
+      <li>The SDR device is connected and recognized (<code>rtl_test</code> or equivalent).</li>
+      <li>No other process (e.g. SDR#, GQRX) is using the device.</li>
+      <li>The backend is running — check <strong>Server logs</strong>.</li>
+    </ul>
+
+    <h3 class="sub-title">FT8/FT4 markers appear and then disappear</h3>
+    <p>
+      This is expected behaviour. Markers expire after 3 decode-window periods of inactivity (FT8: 45 s, FT4: 23 s).
+      If no station is decoded on that band/mode during that time, the marker is removed.
+      A new decode will re-create it immediately.
+    </p>
+
+    <h3 class="sub-title">CW markers disappear too fast</h3>
+    <p>CW markers expire after 45 s (1.5 × the default 30 s dwell). Increase the <strong>CW Dwell</strong> value to stay longer on each frequency; the marker TTL will remain at the backend's configured value.</p>
+
+    <h3 class="sub-title">No callsigns decoded in FT8/FT4</h3>
+    <ul>
+      <li>Ensure <code>jt9</code> (from the WSJT-X package) is installed and on the system <code>PATH</code>.</li>
+      <li>Check <strong>Decoder Status</strong> — the jt9 pipeline should show "running".</li>
+      <li>Weak propagation conditions may result in zero decodes even with a clear spectrum.</li>
+    </ul>
+
+    <h3 class="sub-title">The retention toast appears at every startup</h3>
+    <p>
+      Fixed in v0.6.2. The system now persists the last-run timestamp and skips the retention check if it ran within the last 24 hours.
+      If you are still seeing this, upgrade to v0.6.2 or later.
+    </p>
+
+    <h3 class="sub-title">How do I access the API documentation?</h3>
+    <p>The backend exposes an OpenAPI UI at <code>http://&lt;host&gt;:8000/api/docs</code> (SwaggerUI) and <code>/api/redoc</code> (ReDoc).</p>
+
+    <h3 class="sub-title">Where is the data stored?</h3>
+    <p>All events are stored in <code>data/events.sqlite</code>. Automatic exports go to <code>data/exports/</code>. Manual exports from the Search &amp; Export panel are also saved there.</p>
+  </section>
+
+  <div class="manual-footer">
+    4ham Spectrum Analysis &nbsp;·&nbsp; © 2026 Octávio Filipe Gonçalves (CT7BFV) &nbsp;·&nbsp;
+    <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>
+  </div>
+</div>
+</body>
+</html>
