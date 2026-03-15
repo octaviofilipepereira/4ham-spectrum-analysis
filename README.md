@@ -10,7 +10,7 @@ Web platform for amateur radio spectrum analysis, with DSP, real-time events, an
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
-It is designed to run on Raspberry Pi and PC (Linux/Windows), with a modern multilingual interface (pt/en/es).
+It is designed to run on Raspberry Pi and Linux PC, with a modern multilingual interface (pt/en/es).
 
 ## Main requirements
 - Hardware: RTL-SDR (primary), with readiness for HackRF, Airspy, and transceivers with SDR interface.
@@ -429,7 +429,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 
 ## Decoder integration (minimum configuration)
 ### WSJT-X (FT8/FT4)
-- Use virtual audio (Linux: ALSA loopback/Pulse; Windows: VB-Cable).
+- Use virtual audio (ALSA loopback or PulseAudio).
 - Enable UDP decoded output (configurable port).
 - Read `ALL.TXT` and `decoded` files as fallback.
 - Sync time (NTP) to avoid decode losses.
@@ -479,4 +479,3 @@ Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
 - Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
 - Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).
-- Windows runner: see [scripts/run_dev.ps1](scripts/run_dev.ps1).

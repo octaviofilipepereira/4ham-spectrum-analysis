@@ -7,7 +7,7 @@ Last update: 2026-02-22 16:27:19 UTC
 
 # DSP performance benchmark
 
-Use this benchmark to compare DSP performance across platforms (Linux/Windows) with the same parameters.
+Use this benchmark to compare DSP performance across Linux platforms (PC and Raspberry Pi) with the same parameters.
 
 ## Command
 
@@ -15,7 +15,6 @@ Run from repository root:
 
 `/path/to/.venv/bin/python backend/benchmarks/benchmark_dsp.py --sample-rate 48000 --fft-size 8192 --iterations 80 --output data/bench_linux.json`
 
-On Windows, run equivalent using the project virtual environment.
 
 ## Output
 

@@ -35,25 +35,4 @@ Default runtime behavior in service template:
 - External FT decoder enabled (`FT_EXTERNAL_ENABLE=1`)
 - Direwolf KISS enabled + autostart
 
-## Windows service
 
-File:
-
-- `deploy/windows/install-service.ps1`
-
-### Install (PowerShell as Administrator)
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\deploy\windows\install-service.ps1 -ProjectDir "C:\4ham-spectrum-analysis" -ServiceName "4ham-spectrum-analysis"
-```
-
-Notes:
-
-- Script creates an auto-start service running `uvicorn`.
-- Script sets machine-level env vars for decoder ingest/autostart.
-- Confirm with:
-
-```powershell
-sc.exe query 4ham-spectrum-analysis
-```

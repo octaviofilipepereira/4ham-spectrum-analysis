@@ -7,12 +7,11 @@ Last update: 2026-02-22 16:27:19 UTC
 
 # Installation Manual
 
-This manual provides a complete setup for Linux, Windows, and Raspberry Pi, including optional decoder integrations.
+This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi, including optional decoder integrations.
 
 ## Contents
 - Prerequisites
 - Linux (Ubuntu/Debian)
-- Windows
 - Raspberry Pi
 - Decoder Integrations
 - Verification
@@ -63,31 +62,6 @@ python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 ### 5) Open the UI
 Open the backend-served UI in your browser:
 - `http://localhost:8000/`
-
-## Windows
-
-### 1) SDR drivers
-- Install Zadig and replace the RTL-SDR driver with WinUSB.
-- For HackRF/Airspy, install the vendor SDKs.
-
-### 2) SoapySDR
-- Install SoapySDR for Windows, or use the vendor SDK if it includes Soapy support.
-- Validate device discovery with SoapySDRUtil (if available).
-
-### 3) Python environment
-```
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -r backend\requirements.txt
-```
-
-### 4) Run backend
-```
-python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
-```
-
-### 5) Open the UI
-Open `http://localhost:8000/` in your browser.
 
 ## Raspberry Pi
 
@@ -249,7 +223,7 @@ python backend/cli.py --stop
 
 ## Uninstall
 - Remove the virtual environment: `rm -rf .venv`
-- Remove system packages (Linux):
+- Remove system packages:
 ```
 sudo apt remove soapysdr-tools libsoapysdr-dev python3-soapysdr rtl-sdr
 ```

@@ -22,13 +22,6 @@ For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
 4. Run backend with uvicorn:
 	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
 
-## Windows
-1. Install SDR drivers (Zadig for RTL-SDR).
-2. Install Python 3.10+.
-3. Install SoapySDR Windows package or vendor SDK.
-4. Run backend with uvicorn and open the UI in the browser:
-	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
-
 ## Raspberry Pi
 1. Use 64-bit OS and update packages.
 2. Install SoapySDR and RTL-SDR.
