@@ -2219,15 +2219,20 @@ async function fetchAndRenderSearchResults() {
 }
 
 function updateEventsPager(totalItems) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / EVENTS_PANEL_PAGE_SIZE));
+  const totalLocalPages = Math.max(1, Math.ceil(totalItems / EVENTS_PANEL_PAGE_SIZE));
   if (eventsPageInfo) {
-    eventsPageInfo.textContent = `Page: ${eventsPanelPage + 1}/${totalPages}`;
+    const globalPage = Math.floor(eventOffset / EVENTS_PANEL_PAGE_SIZE) + eventsPanelPage + 1;
+    const totalGlobalPages = totalEventsInDB > 0
+      ? Math.ceil(totalEventsInDB / EVENTS_PANEL_PAGE_SIZE)
+      : totalLocalPages;
+    eventsPageInfo.textContent = `Page: ${globalPage}/${totalGlobalPages}`;
   }
   if (eventsPrevBtn) {
-    eventsPrevBtn.disabled = eventsPanelPage <= 0;
+    eventsPrevBtn.disabled = eventsPanelPage <= 0 && eventOffset <= 0;
   }
   if (eventsNextBtn) {
-    eventsNextBtn.disabled = eventsPanelPage >= totalPages - 1;
+    const moreServerEvents = totalEventsInDB > eventOffset + latestEvents.length;
+    eventsNextBtn.disabled = eventsPanelPage >= totalLocalPages - 1 && !moreServerEvents;
   }
 }
 
@@ -2442,7 +2447,7 @@ function renderEvents(items) {
   if (eventsCardTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
     const titleTarget = eventsCardTitleText || eventsCardTitle;
-    titleTarget.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
+    titleTarget.textContent = `Events (${displayTotal.toLocaleString()} total)`;
   }
   updateEventsPager(cardItems.length);
 
@@ -2629,7 +2634,7 @@ async function fetchModeStats() {
     }
     const data = await resp.json();
     modeStatsCache = data.modes || {};
-    // totalEventsInDB is managed by fetchTotal() which applies the 24h filter
+    // totalEventsInDB is managed by fetchTotal() (counts all events, no time filter)
   } catch (err) {
     return;
   }
@@ -3220,8 +3225,15 @@ if (eventsSearchSnrMinInput) {
 
 if (eventsPrevBtn) {
   eventsPrevBtn.addEventListener("click", () => {
-    eventsPanelPage = Math.max(0, eventsPanelPage - 1);
-    renderEventsPanelFromCache();
+    if (eventsPanelPage > 0) {
+      eventsPanelPage = Math.max(0, eventsPanelPage - 1);
+      renderEventsPanelFromCache();
+    } else if (eventOffset > 0) {
+      // At start of local window — load previous server batch
+      eventOffset = Math.max(0, eventOffset - 200);
+      eventsPanelPage = 0;
+      fetchEvents();
+    }
   });
 }
 
@@ -3229,9 +3241,17 @@ if (eventsNextBtn) {
   eventsNextBtn.addEventListener("click", () => {
     const orderedItems = orderEventsForDisplay(latestEvents);
     const filteredItems = applyEventsCardTypeFilter(orderedItems);
-    const totalPages = Math.max(1, Math.ceil(filteredItems.length / EVENTS_PANEL_PAGE_SIZE));
-    eventsPanelPage = Math.min(totalPages - 1, eventsPanelPage + 1);
-    renderEventsPanelFromCache();
+    const totalLocalPages = Math.max(1, Math.ceil(filteredItems.length / EVENTS_PANEL_PAGE_SIZE));
+    if (eventsPanelPage < totalLocalPages - 1) {
+      // Still pages left in the current local window
+      eventsPanelPage = Math.min(totalLocalPages - 1, eventsPanelPage + 1);
+      renderEventsPanelFromCache();
+    } else if (totalEventsInDB > eventOffset + latestEvents.length) {
+      // Reached end of local window — load next server batch
+      eventOffset += 200;
+      eventsPanelPage = 0;
+      fetchEvents();
+    }
   });
 }
 
@@ -3272,7 +3292,7 @@ function renderEventsFullscreen() {
   
   if (eventsFullscreenTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : cardItems.length;
-    eventsFullscreenTitle.textContent = `Events (Total: ${displayTotal.toLocaleString()} Events - last 24h)`;
+    eventsFullscreenTitle.textContent = `Events (${displayTotal.toLocaleString()} total)`;
   }
   
   if (eventsFullscreenPageInfo) {
