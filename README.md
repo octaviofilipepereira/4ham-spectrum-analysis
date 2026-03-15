@@ -20,6 +20,8 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
 
+> **Note on SSB:** SSB mode is partially implemented — the UI, scan integration, and event structure are in place, but full voice demodulation and ASR-based callsign identification are still under development and will be available in a future release.
+
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Screenshots
