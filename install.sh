@@ -3,20 +3,11 @@
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 #
-# 4ham-spectrum-analysis — Automatic Installer
+# 4ham-spectrum-analysis — Graphical Installer (whiptail TUI)
 #
 # Usage:
 #   chmod +x install.sh
 #   ./install.sh
-#
-# What this does:
-#   1. Installs system packages (SoapySDR, RTL-SDR, Python, build tools)
-#   2. Optionally builds the RTL-SDR Blog v4 driver from source
-#   3. Adds the current user to the 'plugdev' group (USB access)
-#   4. Creates a Python virtual environment and installs dependencies
-#   5. Sets up the admin account (stored securely in the local database)
-#   6. Installs and enables the systemd background service
-#   7. Prints the URL to open in the browser
 
 set -euo pipefail
 
@@ -25,205 +16,264 @@ ROOT_DIR="$SCRIPT_DIR"
 SERVICE_NAME="4ham-spectrum-analysis"
 VENV_DIR="$ROOT_DIR/.venv"
 PYTHON_BIN="$VENV_DIR/bin/python"
-DB_DIR="$ROOT_DIR/data"
+LOG_FILE="/tmp/4ham-install-$(date +%Y%m%d-%H%M%S).log"
+BT="4ham-spectrum-analysis — Installer"
 
-# ── colour helpers ─────────────────────────────────────────────────────────────
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+FIFO=""
+GAUGE_PID=""
+declare -a _TMPFILES=()
 
-info()    { echo -e "  ${CYAN}▸${NC} $*"; }
-ok()      { echo -e "  ${GREEN}✔${NC} $*"; }
-warn()    { echo -e "  ${YELLOW}⚠${NC}  $*"; }
-error()   { echo -e "  ${RED}✘${NC} $*" >&2; }
-section() { echo -e "\n${BOLD}━━━ $* ━━━${NC}"; }
+run_sudo() { [[ "${EUID}" -eq 0 ]] && "$@" || sudo "$@"; }
 
-run_sudo() {
-  if [[ "${EUID}" -eq 0 ]]; then
-    "$@"
-  else
-    sudo "$@"
+# ── cleanup on exit ────────────────────────────────────────────────────────────
+cleanup() {
+  exec 3>&- 2>/dev/null || true
+  [[ -n "${GAUGE_PID:-}" ]] && kill "${GAUGE_PID}" 2>/dev/null || true
+  [[ -n "${FIFO:-}"      ]] && rm -f "${FIFO}"    2>/dev/null || true
+  if [[ ${#_TMPFILES[@]} -gt 0 ]]; then
+    for _f in "${_TMPFILES[@]}"; do rm -f "$_f" 2>/dev/null || true; done
   fi
 }
+trap cleanup EXIT
 
-# ── banner ──────────────────────────────────────────────────────────────────────
-clear
-echo -e "${BOLD}${CYAN}"
-cat <<'BANNER'
-   _  _  _                     ___                  _
-  | || || |                   / __)                | |
-  | || || | ____ ____   ____ ( (__  ____  ____  ___| |_  ____ _   _ ____
-  | ||_|| |/ _  ) _  | / ___)  \__ \|  _ \/ _  )/ ___) |_/ ___) | | |    \
-  | |___| ( (/ ( ( | |( (___ _ / __/ | | ( (/ /( (___| |_| |   | |_| | | | |
-   \_____/ \____)_||_| \____(_)_____)_| |_|\____)\___)\___)_|    \____|_|_|_|
+# ── progress gauge helpers ─────────────────────────────────────────────────────
+start_gauge() {
+  FIFO="$(mktemp -u /tmp/4ham-gauge-XXXXXX)"
+  mkfifo "$FIFO"
+  whiptail --backtitle "$BT" --gauge "$1" 8 72 0 < "$FIFO" &
+  GAUGE_PID=$!
+  exec 3>"$FIFO"
+}
 
-              S p e c t r u m   A n a l y s i s   —   C T 7 B F V
-BANNER
-echo -e "${NC}"
-echo -e "${BOLD}Automatic Installer${NC}  ·  GNU AGPL-3.0"
-echo
+gauge_step() {
+  printf 'XXX\n%d\n%s\n\nSee log: %s\nXXX\n' "$1" "$2" "$LOG_FILE" >&3 2>/dev/null || true
+}
 
-# ── step 0: basic checks ────────────────────────────────────────────────────────
-section "Checking prerequisites"
+close_gauge() {
+  printf 'XXX\n100\nComplete.\nXXX\n' >&3 2>/dev/null || true
+  exec 3>&- 2>/dev/null || true
+  wait "${GAUGE_PID}" 2>/dev/null || true
+  rm -f "${FIFO}"; FIFO=""; GAUGE_PID=""
+}
 
-if [[ "${EUID}" -eq 0 ]]; then
-  error "Do not run this installer as root."
-  error "Run as a normal user that has sudo access: ./install.sh"
+abort() {
+  exec 3>&- 2>/dev/null || true
+  if [[ -n "${GAUGE_PID:-}" ]]; then
+    kill "${GAUGE_PID}" 2>/dev/null || true
+    wait "${GAUGE_PID}" 2>/dev/null || true
+    GAUGE_PID=""
+  fi
+  [[ -n "${FIFO:-}" ]] && { rm -f "${FIFO}"; FIFO=""; }
+  whiptail --backtitle "$BT" --title "Installation Failed" \
+    --msgbox "Error during installation.\n\nDetail: $1\n\nFull log:\n  $LOG_FILE" 13 70
   exit 1
+}
+
+# ── ensure whiptail is available ───────────────────────────────────────────────
+if ! command -v whiptail &>/dev/null; then
+  echo "Installing whiptail for graphical interface..."
+  run_sudo apt-get update -qq
+  run_sudo apt-get install -y whiptail
 fi
 
-if ! command -v sudo &>/dev/null; then
-  error "'sudo' is not available. Install it first, then re-run."
+# ── sanity checks ──────────────────────────────────────────────────────────────
+if [[ "${EUID}" -eq 0 ]]; then
+  whiptail --backtitle "$BT" --title "Error" \
+    --msgbox "Do not run this installer as root.\n\nRun as a normal user with sudo access:\n\n  ./install.sh" 11 62
   exit 1
 fi
 
 if ! command -v apt-get &>/dev/null; then
-  error "This installer requires apt (Ubuntu, Debian, Raspberry Pi OS, Linux Mint)."
+  whiptail --backtitle "$BT" --title "Unsupported OS" \
+    --msgbox "This installer requires apt.\nSupported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS." 9 66
   exit 1
 fi
 
 if ! command -v python3 &>/dev/null; then
-  error "python3 not found. Install it with: sudo apt install python3"
+  whiptail --backtitle "$BT" --title "Error" \
+    --msgbox "python3 not found.\nInstall it first: sudo apt install python3" 9 58
   exit 1
 fi
 
-PYVER_OK=$(python3 -c "import sys; print('ok' if sys.version_info >= (3,10) else 'fail')" 2>/dev/null || echo fail)
-if [[ "$PYVER_OK" != "ok" ]]; then
-  error "Python 3.10 or later is required. Found: $(python3 --version 2>&1)"
+_pyok=$(python3 -c "import sys; print('ok' if sys.version_info>=(3,10) else 'old')" 2>/dev/null || echo old)
+if [[ "$_pyok" != "ok" ]]; then
+  whiptail --backtitle "$BT" --title "Python Version" \
+    --msgbox "Python 3.10 or later is required.\nFound: $(python3 --version 2>&1)" 9 60
   exit 1
 fi
 
-ok "Running as user: $(id -un)"
-ok "Python: $(python3 --version)"
-ok "OS: $(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-Linux}" || echo Linux)"
+# ── welcome screen ─────────────────────────────────────────────────────────────
+whiptail --backtitle "$BT" --title "Welcome" \
+  --msgbox "\
+Welcome to the 4ham Spectrum Analysis installer!
 
-# ── step 1: system packages ─────────────────────────────────────────────────────
-section "Installing system packages"
+This wizard will:
+  1. Install system packages (SoapySDR, RTL-SDR, Python)
+  2. Optionally build the RTL-SDR Blog v4 driver from source
+  3. Create the Python virtual environment
+  4. Set up your admin account (stored securely in the local DB)
+  5. Install and start the background service (systemd)
 
-info "Running apt update..."
-run_sudo apt-get update -qq
+Requirements: internet access and sudo rights.
 
-info "Installing SoapySDR, RTL-SDR, Python tools and build tools..."
+Press Enter to continue." \
+  19 68
+
+# ── RTL-SDR dongle version ─────────────────────────────────────────────────────
+_rtlv4=0
+_rtlv4_label="Standard (v1/v2/v3 or other SoapySDR dongle)"
+if whiptail --backtitle "$BT" --title "RTL-SDR Dongle" \
+  --yesno "\
+Do you have an RTL-SDR Blog v4 dongle?
+
+  YES  ->  Build the v4 driver from source (~5 minutes).
+  NO   ->  Use the standard driver from apt.
+
+The RTL-SDR Blog v4 requires a different driver and
+will NOT work with the standard apt package." \
+  13 66; then
+  _rtlv4=1
+  _rtlv4_label="RTL-SDR Blog v4 (build from source)"
+fi
+
+# ── admin username ─────────────────────────────────────────────────────────────
+_admin_user=""
+while [[ -z "$_admin_user" ]]; do
+  _admin_user=$(whiptail --backtitle "$BT" --title "Admin Account - Username" \
+    --inputbox "Choose a username for the web interface admin account:" \
+    9 66 "admin" 3>&1 1>&2 2>&3) || exit 0
+  _admin_user="${_admin_user//[[:space:]]/}"
+  if [[ -z "$_admin_user" ]]; then
+    whiptail --backtitle "$BT" --title "Error" \
+      --msgbox "Username cannot be empty." 7 42
+  fi
+done
+
+# ── admin password ─────────────────────────────────────────────────────────────
+_admin_pass=""
+while true; do
+  _admin_pass=$(whiptail --backtitle "$BT" --title "Admin Account - Password" \
+    --passwordbox "Enter a password for '${_admin_user}':" \
+    9 66 "" 3>&1 1>&2 2>&3) || exit 0
+
+  if [[ -z "$_admin_pass" ]]; then
+    whiptail --backtitle "$BT" --title "Error" \
+      --msgbox "Password cannot be empty." 7 42
+    continue
+  fi
+
+  if [[ ${#_admin_pass} -lt 8 ]]; then
+    if ! whiptail --backtitle "$BT" --title "Weak Password" \
+      --yesno "Password is shorter than 8 characters.\nContinue anyway?" 8 54; then
+      continue
+    fi
+  fi
+
+  _admin_pass2=$(whiptail --backtitle "$BT" --title "Admin Account - Confirm Password" \
+    --passwordbox "Confirm password:" \
+    9 66 "" 3>&1 1>&2 2>&3) || exit 0
+
+  if [[ "$_admin_pass" == "$_admin_pass2" ]]; then
+    break
+  fi
+  whiptail --backtitle "$BT" --title "Error" \
+    --msgbox "Passwords do not match. Please try again." 7 52
+done
+unset _admin_pass2
+
+# ── confirmation ───────────────────────────────────────────────────────────────
+whiptail --backtitle "$BT" --title "Confirm Installation" \
+  --yesno "\
+Ready to install. Summary:
+
+  SDR driver  :  $_rtlv4_label
+  Admin user  :  $_admin_user
+  Service     :  systemd (auto-start on boot)
+  Install log :  $LOG_FILE
+
+Proceed with installation?" \
+  15 70 || exit 0
+
+# ── installation with progress gauge ──────────────────────────────────────────
+start_gauge "Installing 4ham-spectrum-analysis - please wait..."
+
+gauge_step 3 "Updating package lists..."
+run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
+  || abort "apt-get update failed"
+
+gauge_step 18 "Installing system packages (SoapySDR, Python, build tools)..."
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
-  build-essential cmake libusb-1.0-0-dev
+  build-essential cmake libusb-1.0-0-dev \
+  >> "$LOG_FILE" 2>&1 \
+  || abort "System package installation failed"
 
-ok "System packages installed"
+if [[ $_rtlv4 -eq 1 ]]; then
+  gauge_step 33 "Removing conflicting standard rtl-sdr package..."
+  run_sudo apt-get remove -y rtl-sdr librtlsdr0 librtlsdr-dev >> "$LOG_FILE" 2>&1 || true
 
-# ── step 2: RTL-SDR Blog v4 driver (optional) ──────────────────────────────────
-section "RTL-SDR driver"
+  gauge_step 37 "Cloning RTL-SDR Blog v4 driver source..."
+  _rtltmp="$(mktemp -d /tmp/rtlsdr-XXXXXX)"
+  git clone --depth=1 https://github.com/rtlsdrblog/rtl-sdr-blog "$_rtltmp/src" \
+    >> "$LOG_FILE" 2>&1 || abort "Failed to clone rtl-sdr-blog repository"
 
-echo    "The standard 'rtl-sdr' apt package does NOT support the RTL-SDR Blog v4."
-echo    "If you have a v4 dongle the driver must be built from source."
-echo
-read -rp "  Do you have an RTL-SDR Blog v4 dongle? [y/N]: " _rtlv4
-_rtlv4="${_rtlv4,,}"
+  gauge_step 43 "Configuring RTL-SDR Blog v4 driver (cmake)..."
+  cmake -B "$_rtltmp/build" "$_rtltmp/src" \
+    -DINSTALL_UDEV_RULES=ON -DCMAKE_BUILD_TYPE=Release -Wno-dev \
+    >> "$LOG_FILE" 2>&1 || abort "cmake configuration failed"
 
-if [[ "$_rtlv4" == "y" || "$_rtlv4" == "yes" ]]; then
-  info "Removing standard rtl-sdr package to avoid conflicts..."
-  run_sudo apt-get remove -y rtl-sdr librtlsdr0 librtlsdr-dev 2>/dev/null || true
+  gauge_step 50 "Compiling RTL-SDR Blog v4 driver (make - takes a few minutes)..."
+  make -C "$_rtltmp/build" -j"$(nproc)" >> "$LOG_FILE" 2>&1 || abort "Compilation failed"
 
-  _RTLTMP="$(mktemp -d)"
-  # Clean up temp directory on exit (success or error)
-  trap 'rm -rf "$_RTLTMP"' EXIT
+  gauge_step 58 "Installing RTL-SDR Blog v4 driver..."
+  run_sudo make -C "$_rtltmp/build" install >> "$LOG_FILE" 2>&1 || abort "Driver install failed"
+  run_sudo ldconfig >> "$LOG_FILE" 2>&1
 
-  info "Cloning rtl-sdr-blog driver source..."
-  git clone --depth=1 https://github.com/rtlsdrblog/rtl-sdr-blog "$_RTLTMP/rtl-sdr-blog"
-
-  info "Building driver (this may take a few minutes)..."
-  cmake -B "$_RTLTMP/rtl-sdr-blog/build" "$_RTLTMP/rtl-sdr-blog" \
-    -DINSTALL_UDEV_RULES=ON -DCMAKE_BUILD_TYPE=Release -Wno-dev
-  make -C "$_RTLTMP/rtl-sdr-blog/build" -j"$(nproc)"
-  run_sudo make -C "$_RTLTMP/rtl-sdr-blog/build" install
-  run_sudo ldconfig
-
-  info "Blacklisting conflicting kernel modules..."
+  gauge_step 62 "Blacklisting conflicting kernel modules..."
   run_sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'BLACKLIST'
 blacklist dvb_usb_rtl28xxu
 blacklist rtl2832
 blacklist rtl2830
 BLACKLIST
-  run_sudo modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
+  run_sudo modprobe -r dvb_usb_rtl28xxu >> "$LOG_FILE" 2>&1 || true
 
-  ok "RTL-SDR Blog v4 driver installed"
-  warn "A reboot is recommended to activate the kernel module blacklist."
-else
-  ok "Using standard RTL-SDR driver (already installed via apt)"
+  rm -rf "$_rtltmp"
 fi
 
-# ── step 3: USB access ──────────────────────────────────────────────────────────
-section "USB device access"
-
-_CURRENT_USER="$(id -un)"
-if id -nG "$_CURRENT_USER" 2>/dev/null | grep -qw plugdev; then
-  ok "User '$_CURRENT_USER' is already in the 'plugdev' group"
-else
-  run_sudo usermod -aG plugdev "$_CURRENT_USER"
-  ok "Added '$_CURRENT_USER' to the 'plugdev' group"
-  warn "USB access takes effect after you log out and back in (or reboot)."
-  warn "The service will start correctly regardless — this affects direct CLI use."
+gauge_step 65 "Configuring USB device access (plugdev group)..."
+if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
+  run_sudo usermod -aG plugdev "$(id -un)" >> "$LOG_FILE" 2>&1
 fi
 
-# ── step 4: Python virtual environment ─────────────────────────────────────────
-section "Python virtual environment"
-
-if [[ -x "$PYTHON_BIN" ]]; then
-  info "Virtual environment already exists — reusing it"
-else
-  info "Creating virtual environment at .venv/ ..."
-  python3 -m venv "$VENV_DIR"
+gauge_step 72 "Creating Python virtual environment..."
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  python3 -m venv "$VENV_DIR" >> "$LOG_FILE" 2>&1 || abort "Failed to create Python venv"
 fi
 
-info "Installing Python dependencies (this may take a minute)..."
-"$PYTHON_BIN" -m pip install --quiet --upgrade pip
-"$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt"
+gauge_step 84 "Installing Python dependencies..."
+"$PYTHON_BIN" -m pip install --quiet --upgrade pip >> "$LOG_FILE" 2>&1
+"$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
+  >> "$LOG_FILE" 2>&1 || abort "pip install failed"
 
-ok "Python environment ready ($(\"$PYTHON_BIN\" --version))"
+gauge_step 91 "Saving admin credentials to database..."
+mkdir -p "$ROOT_DIR/data"
 
-# ── step 5: admin account setup ────────────────────────────────────────────────
-section "Administrator account"
+# Write the Python setup script to a temp file so we can pipe the password
+# via stdin without conflict — the password never appears in argv or env vars.
+_tmp_py="$(mktemp /tmp/4ham-setup-XXXXXX.py)"
+_TMPFILES+=("$_tmp_py")
+chmod 600 "$_tmp_py"
 
-echo    "Create the admin account for the web interface."
-echo    "These credentials are stored securely (bcrypt) in the local database."
-echo
-
-read -rp "  Admin username [admin]: " _admin_user
-_admin_user="${_admin_user:-admin}"
-
-while true; do
-  read -rsp "  Admin password: " _admin_pass
-  echo
-  read -rsp "  Confirm password: " _admin_pass2
-  echo
-  if [[ "$_admin_pass" == "$_admin_pass2" ]]; then
-    break
-  fi
-  warn "Passwords do not match. Try again."
-done
-
-if [[ ${#_admin_pass} -lt 8 ]]; then
-  warn "Password is shorter than 8 characters — consider using a stronger one."
-fi
-
-info "Saving credentials to database..."
-mkdir -p "$DB_DIR"
-
-# Pass password via stdin (never as a command-line argument) to avoid
-# exposure in process lists.
-printf '%s' "$_admin_pass" | "$PYTHON_BIN" - "$ROOT_DIR" "$_admin_user" <<'PYEOF'
+cat > "$_tmp_py" << 'PYEOF'
 import sys, os, sqlite3
-
 sys.path.insert(0, os.path.join(sys.argv[1], "backend"))
 import bcrypt
 
 root     = sys.argv[1]
 username = sys.argv[2]
-password = sys.stdin.read()          # received via stdin pipe — never in argv
+password = sys.stdin.read()   # piped via stdin — never in argv or env
 
 pw_hash = bcrypt.hashpw(
     password.encode("utf-8"),
@@ -232,12 +282,10 @@ pw_hash = bcrypt.hashpw(
 
 db_path = os.path.join(root, "data", "events.sqlite")
 conn = sqlite3.connect(db_path)
-conn.execute("""
-    CREATE TABLE IF NOT EXISTS settings (
-        key   TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-    )
-""")
+conn.execute(
+    "CREATE TABLE IF NOT EXISTS settings "
+    "(key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+)
 for key, val in [
     ("_auth_user",      username),
     ("_auth_pass_hash", pw_hash),
@@ -249,47 +297,48 @@ for key, val in [
     )
 conn.commit()
 conn.close()
-print(f"    Credentials saved for user: {username}")
 PYEOF
 
-ok "Admin account '$_admin_user' configured"
+printf '%s' "$_admin_pass" \
+  | "$PYTHON_BIN" "$_tmp_py" "$ROOT_DIR" "$_admin_user" >> "$LOG_FILE" 2>&1 \
+  || abort "Failed to save admin credentials"
 
-# unset password variables as soon as they are no longer needed
-unset _admin_pass _admin_pass2
+rm -f "$_tmp_py"
+unset _admin_pass
 
-# ── step 6: systemd service ─────────────────────────────────────────────────────
-section "Installing systemd service"
+gauge_step 97 "Installing and enabling systemd service..."
+bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
+  || abort "Service installation failed"
 
-info "Installing and enabling the '$SERVICE_NAME' service..."
-bash "$ROOT_DIR/scripts/install_systemd_service.sh" install
+close_gauge
 
-ok "Service '$SERVICE_NAME' installed and started"
+# ── installation complete ──────────────────────────────────────────────────────
+_local_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
 
-# ── step 7: final summary ───────────────────────────────────────────────────────
-_LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
-
-echo
-echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║           Installation complete!                    ║${NC}"
-echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
-echo
-echo -e "  ${BOLD}Open in your browser:${NC}"
-echo -e "    ${CYAN}http://${_LOCAL_IP}:8000/${NC}        (local network)"
-echo -e "    ${CYAN}http://127.0.0.1:8000/${NC}     (this machine)"
-echo
-echo -e "  ${BOLD}Login with:${NC}"
-echo -e "    Username: ${BOLD}$_admin_user${NC}"
-echo -e "    Password: (the one you just set)"
-echo
-echo -e "  ${BOLD}Service management:${NC}"
-echo -e "    Status : ${CYAN}./scripts/install_systemd_service.sh status${NC}"
-echo -e "    Logs   : ${CYAN}./scripts/install_systemd_service.sh logs${NC}"
-echo -e "    Restart: ${CYAN}./scripts/install_systemd_service.sh restart${NC}"
-echo -e "    Remove : ${CYAN}./scripts/install_systemd_service.sh uninstall${NC}"
-echo
-if id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
-  true
-else
-  warn "Remember to log out and back in (or reboot) to activate USB device access."
-  echo
+_extra_notes=""
+if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
+  _extra_notes="${_extra_notes}\n\nUSB access: log out and back in (or reboot)\nto activate USB device access for your user."
 fi
+if [[ $_rtlv4 -eq 1 ]]; then
+  _extra_notes="${_extra_notes}\n\nRTL-SDR v4: a reboot is recommended to fully\nactivate the kernel module blacklist."
+fi
+
+whiptail --backtitle "$BT" --title "Installation Complete!" \
+  --msgbox "\
+4ham-spectrum-analysis is installed and running!
+
+Open in your browser:
+  http://${_local_ip}:8000/
+  http://127.0.0.1:8000/
+
+Login with:
+  Username : $_admin_user
+  Password : (the one you set)
+
+Service management:
+  Status   ./scripts/install_systemd_service.sh status
+  Logs     ./scripts/install_systemd_service.sh logs
+  Restart  ./scripts/install_systemd_service.sh restart
+  Remove   ./scripts/install_systemd_service.sh uninstall
+${_extra_notes}" \
+  24 70
