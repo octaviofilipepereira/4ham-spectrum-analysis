@@ -474,7 +474,6 @@ Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 - Add packaged operational defaults (retention, log rotation, service health checks).
 
 ## References
-- Technical backlog: see [docs/backlog.md](docs/backlog.md).
 - Installation: see [docs/install.md](docs/install.md).
 - SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
