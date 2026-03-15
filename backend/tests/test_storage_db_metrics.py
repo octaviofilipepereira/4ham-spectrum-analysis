@@ -3,7 +3,13 @@
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 # Last update: 2026-02-22 17:24:00 UTC
 
+from datetime import datetime, timezone, timedelta
+
 from app.storage.db import Database
+
+
+def _now_minus(minutes: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
 
 
 def _callsign_event(callsign, mode, source, timestamp):
@@ -56,7 +62,7 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
     db.insert_callsign(
         _ssb_event(
             "CT1ABC",
-            "2026-03-06T19:00:00+00:00",
+            _now_minus(30),
             0.82,
             '{"ssb_state":"SSB_CONFIRMED","ssb_score":0.82,"ssb_parse_method":"direct"}',
         )
@@ -64,7 +70,7 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
     db.insert_callsign(
         _ssb_event(
             "",
-            "2026-03-06T19:01:00+00:00",
+            _now_minus(20),
             0.41,
             '{"ssb_state":"SSB_TRAFFIC","ssb_score":0.41,"ssb_parse_method":"none"}',
         )
@@ -72,7 +78,7 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
     db.insert_callsign(
         _ssb_event(
             "EA1XYZ",
-            "2026-03-06T19:02:00+00:00",
+            _now_minus(10),
             0.76,
             '{"ssb_state":"SSB_CONFIRMED","ssb_score":0.76,"ssb_parse_method":"phonetic"}',
         )
@@ -94,8 +100,8 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
 def test_ssb_metrics_fallbacks_when_payload_is_missing(tmp_path):
     db = Database(str(tmp_path / "events.sqlite"))
 
-    db.insert_callsign(_ssb_event("CT2AAA", "2026-03-06T20:00:00+00:00", 0.55, None))
-    db.insert_callsign(_ssb_event("", "2026-03-06T20:01:00+00:00", 0.33, None))
+    db.insert_callsign(_ssb_event("CT2AAA", _now_minus(30), 0.55, None))
+    db.insert_callsign(_ssb_event("", _now_minus(20), 0.33, None))
 
     metrics = db.get_ssb_metrics(window_minutes=1440)
 
