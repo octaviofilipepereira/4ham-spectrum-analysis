@@ -24,6 +24,9 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 
 ## Screenshots
 
+![Graphical installer](images/screenshot-installer.png)
+*Graphical installer — interactive whiptail TUI*
+
 ![Waterfall with FT8 markers](images/screenshot-waterfall.png)
 *Main panel — VFO, band and mode selection, live waterfall with FT8 markers*
 
