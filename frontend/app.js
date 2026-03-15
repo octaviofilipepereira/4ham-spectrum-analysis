@@ -649,17 +649,17 @@ const waterfallMarkerCache = new Map();
 // Instead we inject ONE marker per known dial frequency per mode, carrying
 // the most-recently decoded callsign.  This avoids flooding the waterfall
 // with one marker per decoded station (can be 50-100 per cycle on busy bands).
-// TTL per mode = mode_window × 6 bands (generous scan-list estimate).
-// FT8 window = 15 s → 6 × 15 = 90 s.
-// FT4 window =  7.5 s → 6 × 7.5 = 45 s.
-// WSPR window = 120 s → 3 × 120 = 360 s.
-// Only one mode runs at a time, so TTLs are independent.
-const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  90 * 1000; // 6 × 15 s
-const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  45 * 1000; // 6 × 7.5 s
+// TTL = 3 × mode_window: allows 2 consecutive missed decode cycles before
+// the marker disappears.  Only 1 band + 1 mode runs at a time.
+// FT8:  3 × 15 s  =  45 s
+// FT4:  3 × 7.5 s =  23 s (rounded up)
+// WSPR: 3 × 120 s = 360 s
+const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  45 * 1000; // 3 × 15 s
+const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  23 * 1000; // 3 × 7.5 s
 const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000; // 3 × 120 s
 // One decoded-marker entry per "<dialHz>_<MODE>" key.
 const waterfallDecodedMarkerCache = new Map();
-const WATERFALL_CALLSIGN_TTL_MS = 90 * 1000;
+const WATERFALL_CALLSIGN_TTL_MS = 45 * 1000; // match FT8 TTL (dominant mode)
 // Used for DSP-marker to callsign proximity matching (non-decoded modes).
 const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
 
