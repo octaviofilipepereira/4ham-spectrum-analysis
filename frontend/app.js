@@ -641,7 +641,8 @@ const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
 let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
 const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR device connection and scan status.";
 const WATERFALL_SIMULATE_MODE_MARKERS = false;
-const WATERFALL_MARKER_TTL_MS = 12000;
+const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
+const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
 const waterfallMarkerCache = new Map();
 // Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
 // 15-20 dB below the noise floor so DSP quality gates never fire for them.
@@ -1134,7 +1135,9 @@ function buildStableWaterfallMarkers(frame) {
   }
 
   for (const [key, marker] of waterfallMarkerCache.entries()) {
-    if ((now - Number(marker?.seen_at || 0)) > WATERFALL_MARKER_TTL_MS) {
+    const isCw = marker?.mode === "CW" || marker?.mode === "CW_CANDIDATE";
+    const ttl  = isCw ? WATERFALL_MARKER_TTL_CW_MS : WATERFALL_MARKER_TTL_MS;
+    if ((now - Number(marker?.seen_at || 0)) > ttl) {
       waterfallMarkerCache.delete(key);
     }
   }
