@@ -7,7 +7,16 @@ Last update: 2026-03-15 UTC
 
 # Changelog
 
-## v0.6.2 - 2026-03-15
+## v0.6.3 - 2026-03-15
+
+### Fixed
+- Waterfall decoded-marker TTL now per-mode and correctly scoped to a single band/mode session (no band-count factor, no cross-mode mixing):
+  - FT8: 45 s (3 × 15 s window)
+  - FT4: 23 s (3 × 7.5 s window)
+  - WSPR: 360 s (3 × 120 s window)
+  - CW/CW_CANDIDATE DSP markers: 45 s (1.5 × 30 s dwell, aligned to backend `cw_marker_ttl_s`)
+  - Callsign proximity cache: 45 s (aligned to FT8)
+- Previous TTL values were inflated by a spurious ×6-bands factor and incorrectly combined FT8+FT4 window times — both errors removed.
 
 ### Fixed
 - CI test fragility in `test_storage_db_metrics.py`: replaced hardcoded timestamps from `2026-03-06` with dynamic relative timestamps (`datetime.now(timezone.utc) - timedelta(minutes=X)`) so the SSB metrics tests always fall within the query window regardless of when they run.

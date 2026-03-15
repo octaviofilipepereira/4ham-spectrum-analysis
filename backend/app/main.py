@@ -153,7 +153,7 @@ async def lifespan(app_instance: FastAPI):
 app = FastAPI(
     title="4ham Spectrum Analysis",
     description="Real-time spectrum monitoring and digital mode decoding for amateur radio",
-    version="2.0.1",
+    version="2.0.2",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
