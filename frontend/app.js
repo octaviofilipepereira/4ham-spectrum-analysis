@@ -30,6 +30,7 @@ const eventsFullscreenNextBtn = document.getElementById("eventsFullscreenNext");
 const eventsFullscreenPageInfo = document.getElementById("eventsFullscreenPageInfo");
 const eventsFullscreenTitle = document.getElementById("eventsFullscreenTitle");
 const eventsFullscreenModal = document.getElementById("eventsFullscreenModal");
+const adminModalEl = document.getElementById("adminModal");
 const copyrightYearEl = document.getElementById("copyrightYear");
 const waterfallEl = document.getElementById("waterfall");
 const waterfallStatus = document.getElementById("waterfallStatus");
@@ -57,12 +58,14 @@ const cwDwellSInput = document.getElementById("cwDwellS");
 const scanRangeSummaryEl = document.getElementById("scanRangeSummary");
 const cwSegmentSummaryWrapEl = document.getElementById("cwSegmentSummaryWrap");
 const cwSegmentSummaryEl = document.getElementById("cwSegmentSummary");
-const logsEl = document.getElementById("logs");
-const bandFilter = document.getElementById("bandFilter");
-const modeFilter = document.getElementById("modeFilter");
-const callsignFilter = document.getElementById("callsignFilter");
-const startFilter = document.getElementById("startFilter");
-const endFilter = document.getElementById("endFilter");
+const frontendLogsEl = document.getElementById("frontendLogs");
+const frontendLogsOpsEl = document.getElementById("frontendLogsOps");
+const serverLogsEl = document.getElementById("serverLogs");
+const exportBandFilter = document.getElementById("exportBandFilter");
+const exportModeFilter = document.getElementById("exportModeFilter");
+const exportCallsignFilter = document.getElementById("exportCallsignFilter");
+const exportStartFilter = document.getElementById("exportStartFilter");
+const exportEndFilter = document.getElementById("exportEndFilter");
 const exportCsvBtn = document.getElementById("exportCsv");
 const exportJsonBtn = document.getElementById("exportJson");
 const exportPngBtn = document.getElementById("exportPng");
@@ -70,6 +73,7 @@ const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
 const authPassInput = document.getElementById("authPass");
+const AUTH_PASSWORD_MASK = "********";
 const saveSettingsBtn = document.getElementById("saveSettings");
 const testConfigBtn = document.getElementById("testConfig");
 const refreshDevicesBtn = document.getElementById("refreshDevices");
@@ -129,10 +133,10 @@ function updateAdminAudioStatus(audioProfile, options = {}) {
   adminSetupStatus.classList.remove("d-none", "alert-success", "alert-warning");
   if (hasDetectedEndpoints) {
     adminSetupStatus.classList.add("alert-success");
-    adminSetupStatus.textContent = `Áudio ${sourceLabel}: entrada=${inputDevice || "não definido"} | saída=${outputDevice || "não definido"} | sample rate=${sampleRate} Hz (${methods})`;
+    adminSetupStatus.textContent = `Audio ${sourceLabel}: input=${inputDevice || "not set"} | output=${outputDevice || "not set"} | sample rate=${sampleRate} Hz (${methods})`;
   } else {
     adminSetupStatus.classList.add("alert-warning");
-    adminSetupStatus.textContent = `Áudio não detetado automaticamente: entrada/saída por definir | sample rate=${sampleRate} Hz. Configure manualmente ou execute Auto-detect Device novamente.`;
+    adminSetupStatus.textContent = `Audio not automatically detected: input/output not set | sample rate=${sampleRate} Hz. Configure manually or run Auto-detect Device again.`;
   }
 }
 
@@ -279,6 +283,109 @@ function getScanRangeForBand(bandName) {
   return { start_hz: 14000000, end_hz: 14350000 };
 }
 
+function formatBandOptionLabel(bandName) {
+  const normalizedBand = String(bandName || "").trim();
+  if (!normalizedBand) {
+    return "";
+  }
+  const defaultOption = DEFAULT_BAND_OPTIONS.find((item) => item.name === normalizedBand);
+  const baseLabel = defaultOption?.label || normalizedBand;
+  const range = getScanRangeForBand(normalizedBand);
+  const startHz = Number(range.start_hz || 0);
+  const endHz = Number(range.end_hz || 0);
+  if (!(startHz > 0 && endHz > startHz)) {
+    return baseLabel;
+  }
+  return `${baseLabel} (${(startHz / 1_000_000).toFixed(3)} - ${(endHz / 1_000_000).toFixed(3)} MHz)`;
+}
+
+function refreshBandEditorOptions() {
+  if (!bandNameInput) {
+    return;
+  }
+
+  const optionNames = new Set([
+    ...DEFAULT_BAND_OPTIONS.map((item) => item.name),
+    ...bandRangesByName.keys(),
+  ]);
+
+  const currentValue = String(bandNameInput.value || "").trim();
+  bandNameInput.innerHTML = "";
+  Array.from(optionNames).forEach((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = formatBandOptionLabel(name);
+    bandNameInput.appendChild(option);
+  });
+
+  if (currentValue && optionNames.has(currentValue)) {
+    bandNameInput.value = currentValue;
+  } else if (optionNames.has("20m")) {
+    bandNameInput.value = "20m";
+  } else {
+    bandNameInput.value = Array.from(optionNames)[0] || "";
+  }
+}
+
+function syncBandEditorFields(bandName) {
+  if (!bandNameInput || !bandStartInput || !bandEndInput) {
+    return;
+  }
+  const normalizedBand = String(bandName || bandNameInput.value || "").trim();
+  if (!normalizedBand) {
+    return;
+  }
+  const range = getScanRangeForBand(normalizedBand);
+  bandNameInput.value = normalizedBand;
+  bandStartInput.value = String(Number(range.start_hz || 0));
+  bandEndInput.value = String(Number(range.end_hz || 0));
+}
+
+async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) {
+  const nextBand = String(selectedBand || "").trim();
+  if (!nextBand) {
+    return;
+  }
+
+  const bandRange = getScanRangeForBand(nextBand);
+  const bandStartHz = Number(bandRange.start_hz);
+  const bandEndHz = Number(bandRange.end_hz);
+  if (!(bandStartHz > 0 && bandEndHz > bandStartHz)) {
+    return;
+  }
+
+  if (bandSelect) {
+    const hasOption = Array.from(bandSelect.options || []).some((option) => option.value === nextBand);
+    if (hasOption) {
+      bandSelect.value = nextBand;
+      bandSelect.dispatchEvent(new Event("change"));
+    }
+  }
+  if (syncInputs) {
+    syncBandEditorFields(nextBand);
+  }
+
+  const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
+  renderWaterfallRuler(bandStartHz, bandEndHz);
+  updateVFODisplay(bandStartHz, bandEndHz);
+  lastSpectrumFrame = null;
+  clearWaterfallFrame();
+
+  try {
+    const resp = await fetch("/api/scan/preview/tune", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ center_hz: newCenterHz, band: nextBand, start_hz: bandStartHz, end_hz: bandEndHz })
+    });
+    if (!resp.ok) {
+      const message = await parseApiError(resp, `Failed to tune to ${nextBand}`);
+      showToastError(message);
+    }
+  } catch (err) {
+    showToastError(err?.message || `Failed to tune to ${nextBand}`);
+  }
+}
+
 function getWaterfallFullRangeHz() {
   const frame = lastSpectrumFrame;
   const scanStartHz = Number(frame?.scan_start_hz || 0);
@@ -410,6 +517,7 @@ function populateBandSelectOptions(sourceBands) {
     bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
   }
 
+  refreshBandEditorOptions();
   refreshQuickBandButtons();
 }
 
@@ -636,6 +744,21 @@ function updateWaterfallModeBadge() {
   waterfallModeBadge.textContent = "LIVE";
   waterfallModeBadge.classList.remove("is-fake");
   waterfallModeBadge.classList.add("is-live");
+}
+
+const waterfallTransition = document.getElementById("waterfallTransition");
+const waterfallTransitionMsg = document.getElementById("waterfallTransitionMsg");
+
+function showWaterfallTransition(message) {
+  if (!waterfallTransition || !waterfallTransitionMsg) return;
+  waterfallTransitionMsg.textContent = message;
+  waterfallTransition.hidden = false;
+}
+
+function hideWaterfallTransition() {
+  if (!waterfallTransition) return;
+  waterfallTransition.hidden = true;
+  if (waterfallTransitionMsg) waterfallTransitionMsg.textContent = "";
 }
 
 function setWaterfallGenericStatus(message = WATERFALL_GENERIC_STATUS) {
@@ -1402,8 +1525,11 @@ updateFullscreenButtonState();
 applyWaterfallExplorerUi();
 
 function logLine(text) {
-  const current = logsEl.textContent === "No logs yet." ? "" : logsEl.textContent;
-  logsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
+  if (!frontendLogsEl) {
+    return;
+  }
+  const current = frontendLogsEl.textContent === "No frontend logs yet." ? "" : frontendLogsEl.textContent;
+  frontendLogsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
 }
 
 function renderToast(message, isError = false) {
@@ -1479,13 +1605,13 @@ function showRetentionToast(info) {
   const msgEl = document.createElement("span");
   msgEl.className = "toast__message";
   const rows = info.export_rows ?? info.purged ?? 0;
-  msgEl.textContent = `Base de dados: ${rows.toLocaleString()} eventos exportados e eliminados automaticamente.`;
+  msgEl.textContent = `Database: ${rows.toLocaleString()} events automatically exported and purged.`;
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "toast__close";
   closeBtn.textContent = "×";
-  closeBtn.setAttribute("aria-label", "Fechar notificação");
+  closeBtn.setAttribute("aria-label", "Close notification");
   closeBtn.addEventListener("click", () => noticeEl.remove());
 
   noticeEl.appendChild(msgEl);
@@ -1495,13 +1621,13 @@ function showRetentionToast(info) {
     dlBtn.className = "toast__download";
     dlBtn.href = info.download_url;
     dlBtn.download = "";
-    dlBtn.textContent = "Descarregar CSV";
+    dlBtn.textContent = "Download CSV";
     noticeEl.appendChild(dlBtn);
   }
 
   noticeEl.appendChild(closeBtn);
   toast.appendChild(noticeEl);
-  logLine(`[Retention] ${rows} eventos exportados e eliminados.`);
+  logLine(`[Retention] ${rows} events exported and purged.`);
 }
 
 function isValidCallsign(value) {
@@ -1680,6 +1806,48 @@ function updateLoginStatus() {
   if (logoutBtn) logoutBtn.classList.toggle("d-none", !user);
 }
 
+function setAuthFields(authConfig = {}) {
+  if (!authUserInput || !authPassInput) {
+    return;
+  }
+
+  const enabled = Boolean(authConfig?.enabled);
+  const user = String(authConfig?.user || "").trim();
+  const hasStoredPassword = Boolean(authConfig?.password_configured);
+
+  authUserInput.value = enabled ? user : "";
+  authPassInput.value = enabled && hasStoredPassword ? AUTH_PASSWORD_MASK : "";
+  authPassInput.dataset.masked = enabled && hasStoredPassword ? "1" : "0";
+  authPassInput.placeholder = enabled && hasStoredPassword
+    ? "Stored password hidden. Type a new one to replace it."
+    : "";
+}
+
+function deriveAuthConfigFromStatus(statusData = {}) {
+  const enabled = Boolean(statusData?.auth_required);
+  const user = String(statusData?.user || window.__authUser || "").trim();
+  return {
+    enabled,
+    user,
+    password_configured: enabled,
+  };
+}
+
+async function refreshAdminAuthFields() {
+  try {
+    const resp = await fetch("/api/auth/status");
+    if (!resp.ok) {
+      return null;
+    }
+    const data = await resp.json();
+    window.__authUser = data.user || "";
+    setAuthFields(deriveAuthConfigFromStatus(data));
+    return data;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function updateAuthStatusBadge() {
   if (!authStatusBadge) return;
   try {
@@ -1687,6 +1855,7 @@ async function updateAuthStatusBadge() {
     const data = await resp.json();
     window.__authUser = data.user || "";
     updateLoginStatus();
+    setAuthFields(deriveAuthConfigFromStatus(data));
     if (data.auth_required) {
       const src = data.env_locked ? " (env)" : "";
       const stateLabel = data.authenticated ? "session" : "login required";
@@ -2407,35 +2576,9 @@ async function fetchEvents() {
   _fetchEventsAbort = controller;
 
   try {
+    // Card Events shows ALL events without filtering
     const params = new URLSearchParams({ offset: String(eventOffset), limit: "200" });
-    const selectedBand = String(bandFilter.value || "").trim();
-    const selectedMode = String(modeFilter.value || "").trim();
-    const selectedCallsign = String(callsignFilter.value || "").trim();
-
-    if (selectedBand) {
-      params.append("band", selectedBand);
-    }
-    if (selectedMode) {
-      params.append("mode", selectedMode);
-    }
-    if (selectedCallsign) {
-      params.append("callsign", selectedCallsign);
-    }
-    if (startFilter.value) {
-      const startDate = new Date(startFilter.value);
-      if (Number.isFinite(startDate.getTime())) {
-        params.append("start", startDate.toISOString());
-      }
-    } else {
-      // Default: last 24 hours
-      params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-    }
-    if (endFilter.value) {
-      const endDate = new Date(endFilter.value);
-      if (Number.isFinite(endDate.getTime())) {
-        params.append("end", endDate.toISOString());
-      }
-    }
+    
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },
       signal: controller.signal
@@ -2453,13 +2596,6 @@ async function fetchEvents() {
     if (myVersion !== _fetchEventsVersion) return;
 
     renderEvents(data);
-    localStorage.setItem("filters", JSON.stringify({
-      band: selectedBand,
-      mode: selectedMode,
-      callsign: selectedCallsign,
-      start: startFilter.value,
-      end: endFilter.value
-    }));
   } catch (err) {
     if (err.name === "AbortError") return; // superseded by newer request
     _fetchEventsAbort = null;
@@ -2469,35 +2605,9 @@ async function fetchEvents() {
 
 async function fetchTotal() {
   try {
+    // Card Events shows ALL events without filtering
     const params = new URLSearchParams({});
-    const selectedBand = String(bandFilter.value || "").trim();
-    const selectedMode = String(modeFilter.value || "").trim();
-    const selectedCallsign = String(callsignFilter.value || "").trim();
-
-    if (selectedBand) {
-      params.append("band", selectedBand);
-    }
-    if (selectedMode) {
-      params.append("mode", selectedMode);
-    }
-    if (selectedCallsign) {
-      params.append("callsign", selectedCallsign);
-    }
-    if (startFilter.value) {
-      const startDate = new Date(startFilter.value);
-      if (Number.isFinite(startDate.getTime())) {
-        params.append("start", startDate.toISOString());
-      }
-    } else {
-      // Default: last 24 hours
-      params.append("start", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-    }
-    if (endFilter.value) {
-      const endDate = new Date(endFilter.value);
-      if (Number.isFinite(endDate.getTime())) {
-        params.append("end", endDate.toISOString());
-      }
-    }
+    
     const resp = await fetch(`/api/events/count?${params.toString()}`, {
       headers: { ...getAuthHeader() }
     });
@@ -2505,7 +2615,7 @@ async function fetchTotal() {
       return;
     }
     const data = await resp.json();
-    totalEventsInDB = Number(data.total || 0);
+    totalEventsInDB = Number(data.count || 0);
   } catch (err) {
     return;
   }
@@ -2600,12 +2710,14 @@ async function fetchPropagationSummary() {
 
 async function fetchLogs() {
   try {
-    const resp = await fetch("/api/logs?limit=50", { headers: { ...getAuthHeader() } });
+    const resp = await fetch("/api/logs?limit=500", { headers: { ...getAuthHeader() } });
     if (!resp.ok) {
       return;
     }
     const data = await resp.json();
-    logsEl.textContent = data.join("\n");
+    if (frontendLogsOpsEl) {
+      frontendLogsOpsEl.textContent = data.length ? data.join("\n") : "No app operations yet.";
+    }
   } catch (err) {
     return;
   }
@@ -2618,7 +2730,9 @@ function connectLogs() {
       try {
         const data = JSON.parse(msg.data);
         if (Array.isArray(data.logs)) {
-          logsEl.textContent = data.logs.join("\n");
+          if (frontendLogsOpsEl) {
+            frontendLogsOpsEl.textContent = data.logs.length ? data.logs.join("\n") : "No app operations yet.";
+          }
         }
       } catch (err) {
         return;
@@ -2628,6 +2742,46 @@ function connectLogs() {
     return;
   }
 }
+
+async function fetchFileLog() {
+  try {
+    const resp = await fetch("/api/logs/file?limit=2000", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    if (serverLogsEl) {
+      serverLogsEl.textContent = data.length ? data.join("\n") : "No server logs yet.";
+    }
+  } catch (err) {
+    return;
+  }
+}
+
+(function initServerLogsExport() {
+  const btn = document.getElementById("exportServerLogsBtn");
+  if (!btn) {
+    return;
+  }
+  btn.addEventListener("click", async () => {
+    try {
+      const resp = await fetch("/api/logs/file?limit=2000", { headers: { ...getAuthHeader() } });
+      if (!resp.ok) {
+        return;
+      }
+      const data = await resp.json();
+      const blob = new Blob([data.join("\n")], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backend_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.log`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      return;
+    }
+  });
+})();
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -2711,7 +2865,7 @@ function normalizeScanSampleRate(deviceId, sampleRate) {
 async function startScan() {
   // Validate decoder mode is selected
   if (!selectedDecoderMode) {
-    showToast("⚠️ Selecione o modo pretendido antes de iniciar o scan");
+    showToast("⚠️ Select the desired mode before starting the scan");
     return;
   }
 
@@ -2721,7 +2875,7 @@ async function startScan() {
   const sampleRate = normalizeScanSampleRate(selectedDeviceId, sampleRateInput.value);
   if (Number(sampleRateInput.value) !== sampleRate) {
     sampleRateInput.value = String(sampleRate);
-    showToast(`Sample rate ajustado automaticamente para ${sampleRate} Hz`);
+    showToast(`Sample rate automatically adjusted to ${sampleRate} Hz`);
   }
   const recordPath = recordPathInput.value || null;
   const selectedBand = bandSelect.value;
@@ -2768,7 +2922,7 @@ async function startScan() {
   // events from this mode appear in the panel.
   if (selectedDecoderMode) {
     recenterWaterfallForMode(selectedDecoderMode);
-    modeFilter.value = selectedDecoderMode;
+    eventsSearchModeInput.value = selectedDecoderMode;
     fetchEvents();
     fetchTotal();
   }
@@ -2827,8 +2981,8 @@ async function syncScanState() {
       recenterWaterfallForMode(backendMode);
       refreshModeButtons();
       // Sync the events panel filter with the restored mode
-      if (modeFilter.value !== backendMode) {
-        modeFilter.value = backendMode;
+      if (eventsSearchModeInput.value !== backendMode) {
+        eventsSearchModeInput.value = backendMode;
         fetchEvents();
         fetchTotal();
       }
@@ -2874,6 +3028,9 @@ async function switchBandLive(selectedBand) {
 
   const previousBand = bandSelect.value;
   if (previousBand === nextBand) {
+    if (bandNameInput && bandNameInput.value !== nextBand) {
+      syncBandEditorFields(nextBand);
+    }
     refreshQuickBandButtons();
     return;
   }
@@ -2886,47 +3043,28 @@ async function switchBandLive(selectedBand) {
   }
 
   if (!isScanRunning) {
-    // Preview mode: retune the SDR to the centre of the new band and
-    // update the ruler immediately — don't wait for the next WS frame.
-    const bandRange = getScanRangeForBand(nextBand);
-    const bandStartHz = Number(bandRange.start_hz);
-    const bandEndHz = Number(bandRange.end_hz);
-    const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
-    // Update ruler straight away so the UI responds instantly.
-    // Use the exact band limits (same as scan mode) not center±span/2.
-    renderWaterfallRuler(bandStartHz, bandEndHz);
-    updateVFODisplay(bandStartHz, bandEndHz);
-    // Clear stale waterfall data from the previous band
-    lastSpectrumFrame = null;
-    clearWaterfallFrame();
-    // Ask the backend to retune the SDR device, passing band boundaries
-    // so the WS frames use the same scan_start/end_hz as scan mode.
-    try {
-      const resp = await fetch("/api/scan/preview/tune", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeader() },
-        body: JSON.stringify({ center_hz: newCenterHz, band: nextBand, start_hz: bandStartHz, end_hz: bandEndHz })
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        showToastError(err?.detail || `Failed to tune to ${nextBand}`);
-      }
-    } catch (err) {
-      showToastError(err?.message || `Failed to tune to ${nextBand}`);
-    }
+    await applyPreviewBandRange(nextBand, { syncInputs: true });
     return;
   }
 
   // Scan running: stop and restart on the new band
   scanActionInFlight = true;
   updateScanButtonState();
+  showWaterfallTransition(`Switching to band ${nextBand}...`);
+
   try {
     await stopScan();
+    // Clear the old band's frame so getWaterfallFullRangeHz() falls back to
+    // the new band's range when recenterWaterfallForMode runs inside startScan()
+    lastSpectrumFrame = null;
+    lastSpectrumFrameTs = 0;
+    clearWaterfallFrame();
     await startScan();
     showToast(`Band switched to ${nextBand}`);
   } catch (err) {
     showToastError(err?.message || "Failed to switch band live");
   } finally {
+    hideWaterfallTransition();
     scanActionInFlight = false;
     updateScanButtonState();
   }
@@ -3049,11 +3187,8 @@ function handleEventsFilterChange() {
   fetchTotal();
 }
 
-bandFilter.addEventListener("change", handleEventsFilterChange);
-modeFilter.addEventListener("change", handleEventsFilterChange);
-callsignFilter.addEventListener("change", handleEventsFilterChange);
-startFilter.addEventListener("change", handleEventsFilterChange);
-endFilter.addEventListener("change", handleEventsFilterChange);
+// REMOVED: Export filters no longer affect Card Events
+// Event listeners for export filters removed
 
 if (eventsSearchCallsignInput) {
   eventsSearchCallsignInput.addEventListener("input", () => {
@@ -3175,37 +3310,59 @@ if (eventsFullscreenModal) {
   });
 }
 
+if (adminModalEl) {
+  adminModalEl.addEventListener("show.bs.modal", () => {
+    loadSettings();
+    refreshAdminAuthFields();
+  });
+}
+
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });
-  if (bandFilter.value) {
-    params.append("band", bandFilter.value);
+  if (exportBandFilter?.value) {
+    params.append("band", exportBandFilter.value);
   }
-  if (modeFilter.value) {
-    params.append("mode", modeFilter.value);
+  if (exportModeFilter?.value) {
+    params.append("mode", exportModeFilter.value);
   }
-  if (callsignFilter.value) {
-    params.append("callsign", callsignFilter.value.trim());
+  if (exportCallsignFilter?.value) {
+    params.append("callsign", exportCallsignFilter.value.trim());
   }
-  if (startFilter.value) {
-    params.append("start", new Date(startFilter.value).toISOString());
+  if (exportStartFilter?.value) {
+    params.append("start", new Date(exportStartFilter.value).toISOString());
   }
-  if (endFilter.value) {
-    params.append("end", new Date(endFilter.value).toISOString());
+  if (exportEndFilter?.value) {
+    params.append("end", new Date(exportEndFilter.value).toISOString());
   }
   return params;
 }
 
 
-exportCsvBtn.addEventListener("click", () => {
+exportCsvBtn.addEventListener("click", async () => {
   exportCsvBtn.disabled = true;
   exportCsvBtn.textContent = "Exporting...";
-  const params = buildEventExportParams();
-  params.set("format", "csv");
-  window.location.href = `/api/export?${params.toString()}`;
-  setTimeout(() => {
+  try {
+    const params = buildEventExportParams();
+    const resp = await fetch(`/api/events/export/csv?${params.toString()}`, { headers: { ...getAuthHeader() } });
+    if (!resp.ok) {
+      throw new Error("csv_export_failed");
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `events-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("CSV exported");
+  } catch (err) {
+    showToastError("CSV export failed");
+  } finally {
     exportCsvBtn.disabled = false;
     exportCsvBtn.textContent = "Export CSV";
-  }, 1500);
+  }
 });
 
 
@@ -3238,23 +3395,38 @@ exportJsonBtn.addEventListener("click", async () => {
 });
 
 
-exportPngBtn.addEventListener("click", () => {
+exportPngBtn.addEventListener("click", async () => {
   exportPngBtn.disabled = true;
   exportPngBtn.textContent = "Exporting...";
   try {
+    // Capture the main scan section (spectrum, waterfall, events, prop map)
+    const mainSection = document.querySelector("section.row.g-3.mb-3");
+    if (!mainSection) {
+      throw new Error("Main section not found");
+    }
+    
+    // Use html2canvas to capture the entire section
+    const canvas = await html2canvas(mainSection, {
+      backgroundColor: "#1a1a1a",
+      scale: 2, // Higher quality
+      logging: false,
+      useCORS: true
+    });
+    
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = url;
-    link.download = `waterfall-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+    link.download = `4ham-scan-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     showToast("PNG exported");
   } catch (err) {
+    console.error("PNG export error:", err);
     showToastError("PNG export failed");
   } finally {
     exportPngBtn.disabled = false;
-    exportPngBtn.textContent = "Export PNG";
+    exportPngBtn.textContent = "Export Waterfall to PNG";
   }
 });
 
@@ -3331,7 +3503,11 @@ function connectSpectrum() {
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
-        setWaterfallGenericStatus("No live spectrum data available. Check SDR device connection and backend status.");
+        if (isScanRunning) {
+          setWaterfallGenericStatus("No live spectrum data available. Check SDR device connection and backend status.");
+        } else {
+          clearWaterfallGenericStatus();
+        }
       }
     };
     ws.onopen = () => {
@@ -3340,13 +3516,21 @@ function connectSpectrum() {
     ws.onclose = () => {
       if (spectrumWs === ws) {
         wsStatus.textContent = "WS: disconnected";
-        setWaterfallGenericStatus();
+        if (isScanRunning) {
+          setWaterfallGenericStatus();
+        } else {
+          clearWaterfallGenericStatus();
+        }
         spectrumWs = null;
       }
     };
   } catch (err) {
     wsStatus.textContent = "WS: disconnected";
-    setWaterfallGenericStatus();
+    if (isScanRunning) {
+      setWaterfallGenericStatus();
+    } else {
+      clearWaterfallGenericStatus();
+    }
   }
 }
 
@@ -3357,7 +3541,11 @@ function ensureWaterfallFallback() {
   spectrumFallbackTimer = setInterval(() => {
     const staleMs = Date.now() - lastSpectrumFrameTs;
     if (lastSpectrumFrameTs === 0 || staleMs > 2500) {
-      setWaterfallGenericStatus();
+      if (isScanRunning) {
+        setWaterfallGenericStatus();
+      } else {
+        clearWaterfallGenericStatus();
+      }
       drawSpectrumIdle();
     }
   }, 400);
@@ -3838,7 +4026,7 @@ async function runAdministrationSetup() {
   const appliedPpm = devicePpmInput.value || "0";
   const appliedOffset = deviceOffsetHzInput.value || "0";
   const appliedGainProfile = deviceGainProfileSelect.value || "auto";
-  showToast(`Configuração automática: classe=${appliedDeviceClass}, PPM=${appliedPpm}, offset=${appliedOffset} Hz, gain=${appliedGainProfile}`);
+  showToast(`Auto setup applied: class=${appliedDeviceClass}, PPM=${appliedPpm}, offset=${appliedOffset} Hz, gain=${appliedGainProfile}`);
   logLine(`Admin setup applied: device=${selected.id}, class=${appliedDeviceClass}, ppm=${appliedPpm}, offset_hz=${appliedOffset}, gain_profile=${appliedGainProfile}`);
   await loadSettings();
 }
@@ -3877,10 +4065,10 @@ async function runAudioAutoDetect() {
 
     const hasDetectedEndpoints = Boolean((audioProfile.input_device || "").trim() || (audioProfile.output_device || "").trim());
     updateAdminAudioStatus(audioProfile, { sourceLabel: "auto-detectado", methods });
-    showToast("Auto-detect áudio concluído");
+    showToast("Audio auto-detect completed");
     logLine(`Audio auto-detect: detected=${hasDetectedEndpoints}, input=${audioProfile.input_device || ""}, output=${audioProfile.output_device || ""}, sample_rate=${audioProfile.sample_rate ?? 48000}, method=${methods}`);
   } catch (err) {
-    showToastError("Falha no auto-detect de áudio");
+    showToastError("Audio auto-detect failed");
   }
 }
 
@@ -3890,6 +4078,7 @@ async function loadBands() {
     const bands = await resp.json();
     if (Array.isArray(bands)) {
       populateBandSelectOptions(bands);
+      syncBandEditorFields(bandNameInput?.value || bandSelect?.value || "20m");
       renderScanContextSummary(latestScanState);
       return;
     }
@@ -3897,13 +4086,11 @@ async function loadBands() {
     logLine("Failed to load bands");
   }
   populateBandSelectOptions([]);
+  syncBandEditorFields(bandNameInput?.value || bandSelect?.value || "20m");
   renderScanContextSummary(latestScanState);
 }
 
 async function loadSettings() {
-  authUserInput.value = "";
-  authPassInput.value = "";
-
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
     const data = await resp.json();
@@ -3927,6 +4114,11 @@ async function loadSettings() {
       stationLocatorInput.value = data.station.locator || "";
       stationQthInput.value = data.station.qth || "";
     }
+    if (data.auth) {
+      setAuthFields(data.auth || {});
+    } else {
+      await refreshAdminAuthFields();
+    }
     applyDeviceConfigToForm(data.device_config || {});
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
@@ -3943,6 +4135,7 @@ async function loadSettings() {
     }
   } catch (err) {
     logLine("Failed to load settings");
+    await refreshAdminAuthFields();
   }
 }
 
@@ -3971,6 +4164,15 @@ if (saveCredentialsBtn) {
   saveCredentialsBtn.addEventListener("click", async () => {
     const user = (authUserInput?.value || "").trim();
     const pass = (authPassInput?.value || "").trim();
+    const passIsMasked = authPassInput?.dataset.masked === "1" && pass === AUTH_PASSWORD_MASK;
+    if (passIsMasked) {
+      if (user === String(window.__authUser || "").trim()) {
+        showToast("Credentials unchanged");
+        return;
+      }
+      showToastError("Type a new password to change credentials");
+      return;
+    }
     if (!user || !pass) {
       showToastError("Both username and password are required");
       return;
@@ -3989,6 +4191,7 @@ if (saveCredentialsBtn) {
       window.__authUser = user;
       showToast("Credentials saved");
       updateLoginStatus();
+      setAuthFields({ enabled: true, user, password_configured: true });
       await updateAuthStatusBadge();
     } catch (err) {
       showToastError("Failed to save credentials");
@@ -4014,8 +4217,7 @@ if (clearCredentialsBtn) {
         return;
       }
       window.__authUser = "";
-      if (authUserInput) authUserInput.value = "";
-      if (authPassInput) authPassInput.value = "";
+      setAuthFields({ enabled: false, user: "", password_configured: false });
       showToast("Credentials cleared — authentication disabled");
       updateLoginStatus();
       await updateAuthStatusBadge();
@@ -4068,11 +4270,11 @@ onboardingNext.addEventListener("click", () => {
 
 function loadFilters() {
   const data = JSON.parse(localStorage.getItem("filters") || "{}")
-  if (data.band) bandFilter.value = data.band;
-  if (data.mode) modeFilter.value = data.mode;
-  if (data.callsign) callsignFilter.value = data.callsign;
-  if (data.start) startFilter.value = data.start;
-  if (data.end) endFilter.value = data.end;
+  if (data.band && exportBandFilter) exportBandFilter.value = data.band;
+  if (data.mode && exportModeFilter) exportModeFilter.value = data.mode;
+  if (data.callsign && exportCallsignFilter) exportCallsignFilter.value = data.callsign;
+  if (data.start && exportStartFilter) exportStartFilter.value = data.start;
+  if (data.end && exportEndFilter) exportEndFilter.value = data.end;
 }
 
 saveSettingsBtn.addEventListener("click", async () => {
@@ -4350,19 +4552,19 @@ if (bandNameInput) {
       }
     }
 
-    const preset = BAND_PRESETS[String(bandNameInput.value)];
-    if (!preset) {
-      return;
-    }
-    bandStartInput.value = String(preset.start_hz);
-    bandEndInput.value = String(preset.end_hz);
+    syncBandEditorFields(bandNameInput.value);
   });
 
-  const initialPreset = BAND_PRESETS[String(bandNameInput.value)];
-  if (initialPreset) {
-    bandStartInput.value = String(initialPreset.start_hz);
-    bandEndInput.value = String(initialPreset.end_hz);
-  }
+  syncBandEditorFields(bandNameInput.value);
+}
+
+if (authPassInput) {
+  authPassInput.addEventListener("focus", () => {
+    if (authPassInput.dataset.masked === "1") {
+      authPassInput.value = "";
+      authPassInput.dataset.masked = "0";
+    }
+  });
 }
 
 if (bandSelect && bandNameInput) {
@@ -4400,7 +4602,7 @@ if (quickModeButtons.length) {
       if (isScanRunning) {
         if (selectedDecoderMode === mode) {
           // Trying to deselect during scan - block it
-          showToast("Não é possível desligar o modo durante o scan. Pare o scan primeiro.");
+          showToast("Cannot deselect mode while scanning. Stop the scan first.");
           return;
         }
         // Changing to different mode during scan - clear caches and notify backend
@@ -4413,20 +4615,25 @@ if (quickModeButtons.length) {
         selectedDecoderMode = mode;
         recenterWaterfallForMode(mode);
         // Sync the events panel filter so only events from this mode are shown
-        modeFilter.value = mode;
+        eventsSearchModeInput.value = mode;
         refreshModeButtons();
-        logLine(`Modo alterado durante scan: ${mode}`);
+        logLine(`Mode changed during scan: ${mode}`);
+        
+        showWaterfallTransition(`Switching to mode ${mode}...`);
+
         try {
           await fetch("/api/scan/mode", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...getAuthHeader() },
             body: JSON.stringify({ decoder_mode: mode.toLowerCase() })
           });
-          showToast(`Modo alterado para ${mode}`);
+          showToast(`Mode switched to ${mode}`);
           fetchEvents();
           fetchTotal();
         } catch (err) {
-          showToastError(`Erro ao mudar modo: ${err.message}`);
+          showToastError(`Failed to switch mode: ${err.message}`);
+        } finally {
+          hideWaterfallTransition();
         }
         return;
       }
@@ -4434,7 +4641,7 @@ if (quickModeButtons.length) {
       // Not scanning: allow toggle (select/deselect)
       if (selectedDecoderMode === mode) {
         selectedDecoderMode = null;
-        modeFilter.value = "";
+        eventsSearchModeInput.value = "";
         refreshModeButtons();
         logLine(`Modo desseleccionado: ${mode}`);
         fetchEvents();
@@ -4442,7 +4649,7 @@ if (quickModeButtons.length) {
       } else {
         selectedDecoderMode = mode;
         recenterWaterfallForMode(mode);
-        modeFilter.value = mode;
+        eventsSearchModeInput.value = mode;
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
         fetchEvents();
@@ -4460,18 +4667,38 @@ saveBandBtn.addEventListener("click", async () => {
       end_hz: Number(bandEndInput.value)
     }
   };
-  const resp = await fetch("/api/bands", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
-    body: JSON.stringify(payload)
-  });
-  if (!resp.ok) {
-    showToast("Band validation failed");
-    return;
+  try {
+    const resp = await fetch("/api/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+      const message = await parseApiError(resp, "Band validation failed");
+      showToastError(message);
+      return;
+    }
+
+    await loadBands();
+    syncBandEditorFields(payload.band.name);
+
+    if (String(bandSelect?.value || "") === String(payload.band.name)) {
+      if (isScanRunning) {
+        renderWaterfallRuler(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        showToast("Band saved. New limits apply fully on next scan restart.");
+      } else {
+        await applyPreviewBandRange(payload.band.name, { syncInputs: true });
+        showToast("Band saved");
+      }
+    } else {
+      showToast("Band saved");
+    }
+
+    logLine(`Band saved: ${payload.band.name}`);
+  } catch (err) {
+    showToastError(err?.message || "Band save failed");
   }
-  logLine("Band saved");
-  showToast("Band saved");
-  loadBands();
 });
 
 let appStarted = false;
@@ -4505,6 +4732,8 @@ async function startApplication() {
   connectLogs();
   fetchLogs();
   setInterval(fetchLogs, 4000);
+  fetchFileLog();
+  setInterval(fetchFileLog, 8000);
   initMenuDropdownModalBehavior();
 
   try {
@@ -4808,7 +5037,7 @@ function updateVFODisplay(startHz, endHz) {
     const fullStartHz  = hasScanRange ? scanStartHz : (centerHz - (spanHz * WATERFALL_SEGMENT_COUNT / 2));
     const fullSpanHz   = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
     if (!fullSpanHz || targetHz < fullStartHz || targetHz > fullStartHz + fullSpanHz) {
-      showToast(`${mhz.toFixed(3)} MHz fora da banda actual`);
+      showToast(`${mhz.toFixed(3)} MHz is outside the current band`);
       return;
     }
     if (!waterfallExplorerEnabled) {
@@ -4827,7 +5056,7 @@ function updateVFODisplay(startHz, endHz) {
     applyWaterfallExplorerUi();
     redrawWaterfallFromHistory();
     if (gotoInput) gotoInput.value = "";
-    showToast(`Centrado em ${mhz.toFixed(3)} MHz`);
+    showToast(`Centred on ${mhz.toFixed(3)} MHz`);
   }
   document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
   gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });

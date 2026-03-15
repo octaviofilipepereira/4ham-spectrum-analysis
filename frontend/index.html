@@ -28,20 +28,21 @@ Last update: 2026-02-22 16:27:19 UTC
         <nav class="card panel menu-toolbar">
           <div class="card-body">
             <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Bands</button>
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#filtersModal">Filters</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Band Config</button>
+            <button class="btn btn-outline-info btn-sm d-none" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
             <div class="dropdown">
               <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 Logs &amp; Reports
               </button>
               <ul class="dropdown-menu dropdown-menu-dark">
                 <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#decoderStatusModal">Decoder Status</button></li>
-                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#logsModal">Logs</button></li>
-                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#summaryModal">Summary</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#summaryModal">Session Summary</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#frontendLogsModal">4ham FrontEnd logs</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#serverLogsModal">4ham Server logs</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#filtersModal">Search &amp; Export Data</button></li>
               </ul>
             </div>
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#adminModal">Administration</button>
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#adminModal">Admin Config</button>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#helpModal">Help</button>
           </div>
           </div>
@@ -131,13 +132,22 @@ Last update: 2026-02-22 16:27:19 UTC
                   <span id="cwSegmentSummary">--</span>
                 </span>
               </div>
-              <!-- Spectrum graph -->
-              <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>
-              <div class="waterfall" id="waterfall">
-                <div class="waterfall-ruler" id="waterfallRuler" aria-hidden="true"></div>
-                <canvas id="waterfallCanvas" width="640" height="240"></canvas>
-                <div class="waterfall-mode-overlay" id="waterfallModeOverlay" aria-hidden="true"></div>
-                <p class="waterfall__status" id="waterfallStatus">Awaiting spectrum stream...</p>
+              <!-- Spectrum graph + Waterfall — wrapped together so the transition overlay covers both -->
+              <div class="waterfall-area" id="waterfallArea">
+                <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>
+                <div class="waterfall" id="waterfall">
+                  <div class="waterfall-ruler" id="waterfallRuler" aria-hidden="true"></div>
+                  <canvas id="waterfallCanvas" width="640" height="240"></canvas>
+                  <div class="waterfall-mode-overlay" id="waterfallModeOverlay" aria-hidden="true"></div>
+                  <p class="waterfall__status" id="waterfallStatus">Awaiting spectrum stream...</p>
+                </div>
+                <!-- Transition overlay covers the full spectrum+waterfall area -->
+                <div class="waterfall__transition" id="waterfallTransition" aria-live="polite" hidden>
+                  <div class="waterfall__transition-inner">
+                    <div class="waterfall__transition-spinner"></div>
+                    <span class="waterfall__transition-msg" id="waterfallTransitionMsg"></span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -354,7 +364,7 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">Administration</h2>
+            <h2 class="modal-title h5">Admin Config</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -392,7 +402,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-warning btn-sm" id="clearCredentials">Clear credentials</button>
                   <span id="authStatusBadge" class="badge bg-secondary ms-1">checking…</span>
                 </div>
-                <small class="text-muted d-block mt-1">Credentials are stored in the server database. Leave blank and click "Clear" to disable authentication.</small>
+                <small class="text-muted d-block mt-1">Credentials are stored in the server database. When authentication is active, the username is shown and the password field is masked. Type a new password to replace it, or click "Clear" to disable authentication.</small>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">Scan parameters</h3></div>
@@ -514,13 +524,13 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">0. Bands</h2>
+            <h2 class="modal-title h5">Band Config</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="card panel">
               <div class="card-body">
-                <h2 class="h5">Bands</h2>
+                <h2 class="h5">Band Config</h2>
                 <div class="filters row g-2 align-items-end">
                   <div class="col-12 col-md-4">
                     <label class="form-label">Band name</label>
@@ -560,7 +570,7 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">1. Presets</h2>
+            <h2 class="modal-title h5">Presets</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -596,17 +606,17 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">2. Filters</h2>
+            <h2 class="modal-title h5">Search &amp; Export Data</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="card panel">
               <div class="card-body">
-                <h2 class="h5">Filters</h2>
+                <h2 class="h5">Search &amp; Export Data</h2>
                 <div class="filters row g-2 align-items-end">
-                  <div class="col-6 col-md-3">
+                  <div class="col-12 col-md-4">
                     <label class="form-label">Band</label>
-                    <select id="bandFilter" class="form-select form-select-sm">
+                    <select id="exportBandFilter" class="form-select form-select-sm">
                       <option value="">All</option>
                       <option value="20m">20m</option>
                       <option value="40m">40m</option>
@@ -614,9 +624,9 @@ Last update: 2026-02-22 16:27:19 UTC
                       <option value="70cm">70cm</option>
                     </select>
                   </div>
-                  <div class="col-6 col-md-3">
+                  <div class="col-12 col-md-4">
                     <label class="form-label">Mode</label>
-                    <select id="modeFilter" class="form-select form-select-sm">
+                    <select id="exportModeFilter" class="form-select form-select-sm">
                       <option value="">All</option>
                       <option value="FT8">FT8</option>
                       <option value="FT4">FT4</option>
@@ -626,22 +636,22 @@ Last update: 2026-02-22 16:27:19 UTC
                       <option value="SSB">SSB</option>
                     </select>
                   </div>
-                  <div class="col-6 col-md-3">
+                  <div class="col-12 col-md-4">
                     <label class="form-label">Callsign</label>
-                    <input type="text" id="callsignFilter" placeholder="CT1ABC" class="form-control form-control-sm" />
+                    <input type="text" id="exportCallsignFilter" placeholder="CT1ABC" class="form-control form-control-sm" />
                   </div>
-                  <div class="col-6 col-md-3">
+                  <div class="col-12 col-md-6">
                     <label class="form-label">Start</label>
-                    <input type="datetime-local" id="startFilter" class="form-control form-control-sm" />
+                    <input type="datetime-local" id="exportStartFilter" class="form-control form-control-sm" />
                   </div>
-                  <div class="col-6 col-md-3">
+                  <div class="col-12 col-md-6">
                     <label class="form-label">End</label>
-                    <input type="datetime-local" id="endFilter" class="form-control form-control-sm" />
+                    <input type="datetime-local" id="exportEndFilter" class="form-control form-control-sm" />
                   </div>
                   <div class="col-12 d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-info" id="exportCsv">Export CSV</button>
                     <button class="btn btn-outline-info" id="exportJson">Export JSON</button>
-                    <button class="btn btn-outline-info" id="exportPng">Export PNG</button>
+                    <button class="btn btn-outline-info" id="exportPng">Export Waterfall to PNG</button>
                   </div>
                 </div>
               </div>
@@ -675,18 +685,46 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
-    <div class="modal fade app-modal" id="logsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade app-modal" id="frontendLogsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">3.1 Logs</h2>
+            <h2 class="modal-title h5">4ham FrontEnd logs</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel mb-3">
+              <div class="card-body">
+                <h2 class="h5">UI Actions</h2>
+                <pre id="frontendLogs">No frontend logs yet.</pre>
+              </div>
+            </div>
+            <div class="card panel">
+              <div class="card-body">
+                <h2 class="h5">App Operations</h2>
+                <pre id="frontendLogsOps">No app operations yet.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal" id="serverLogsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">4ham Server logs</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="card panel">
               <div class="card-body">
-                <h2 class="h5">Logs</h2>
-                <pre id="logs">No logs yet.</pre>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h2 class="h5 mb-0">4ham Server logs</h2>
+                  <button id="exportServerLogsBtn" class="btn btn-sm btn-outline-secondary">Export logs</button>
+                </div>
+                <pre id="serverLogs">No server logs yet.</pre>
               </div>
             </div>
           </div>
@@ -698,13 +736,13 @@ Last update: 2026-02-22 16:27:19 UTC
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <h2 class="modal-title h5">3.2 Summary</h2>
+            <h2 class="modal-title h5">Session Summary</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="card panel">
               <div class="card-body">
-                <h2 class="h5">Summary Matrix (Bands × Modes)</h2>
+                <h2 class="h5">Session Summary</h2>
                 <p class="small text-muted mb-2" id="summaryMatrixCaption"></p>
                 <div class="table-responsive">
                   <table class="table table-sm table-dark align-middle mb-0" id="summaryMatrixTable">
@@ -756,6 +794,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="map.js?v=20260228104050"></script>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script type="module" src="app.js?v=20260301000300"></script>
   </body>
 </html>

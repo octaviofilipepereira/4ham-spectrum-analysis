@@ -42,6 +42,11 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
     }
     if "summary" not in settings:
         settings["summary"] = {"showBand": True, "showMode": True}
+    settings["auth"] = {
+        "enabled": bool(state.auth_required),
+        "user": state.auth_user if state.auth_required else "",
+        "password_configured": bool(state.auth_pass),
+    }
     return settings
 
 

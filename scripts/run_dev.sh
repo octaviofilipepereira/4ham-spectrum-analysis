@@ -125,7 +125,9 @@ start_backend() {
   if [[ -f "$ROOT_DIR/.env" ]]; then
     env_args=(--env-file "$ROOT_DIR/.env")
   fi
-  nohup "$PYTHON_BIN" -m uvicorn app.main:app --app-dir "$BACKEND_DIR" --host 0.0.0.0 --port 8000 "${env_args[@]}" "${reload_args[@]}" >>"$LOG_FILE" 2>&1 &
+  # Logging is now handled internally by app/log_config.py with automatic rotation.
+  # No stdout/stderr redirect needed - logs go to logs/backend.log via RotatingFileHandler.
+  nohup "$PYTHON_BIN" -m uvicorn app.main:app --app-dir "$BACKEND_DIR" --host 0.0.0.0 --port 8000 "${env_args[@]}" "${reload_args[@]}" >/dev/null 2>&1 &
   local pid="$!"
   echo "$pid" > "$PID_FILE"
   echo "Backend started (PID: $pid)"

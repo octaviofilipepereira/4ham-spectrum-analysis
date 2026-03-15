@@ -1,10 +1,11 @@
 # © 2026 Octávio Filipe Gonçalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-# Last update: 2026-02-23 21:30 UTC
+# Last update: 2026-03-15 16:00 UTC
 
 import sqlite3
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 
 
@@ -103,6 +104,7 @@ class Database:
         self.path = path
         self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        self._lock = threading.RLock()  # Thread-safe access to SQLite connection
         self._init_schema()
 
     def _init_schema(self):
@@ -179,24 +181,28 @@ class Database:
         return scans
 
     def save_settings(self, settings):
-        payload = json.dumps(settings or {})
-        self.conn.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-            ("user", payload)
-        )
-        self.conn.commit()
+        """Thread-safe settings storage."""
+        with self._lock:
+            payload = json.dumps(settings or {})
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("user", payload)
+            )
+            self.conn.commit()
 
     def get_settings(self):
-        row = self.conn.execute(
-            "SELECT value FROM settings WHERE key = ?",
-            ("user",)
-        ).fetchone()
-        if not row:
-            return {}
-        try:
-            return json.loads(row[0])
-        except json.JSONDecodeError:
-            return {}
+        """Thread-safe settings retrieval."""
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT value FROM settings WHERE key = ?",
+                ("user",)
+            ).fetchone()
+            if not row:
+                return {}
+            try:
+                return json.loads(row[0])
+            except json.JSONDecodeError:
+                return {}
 
     def get_auth_config(self):
         """Return stored auth credentials and enable flag."""
@@ -396,20 +402,61 @@ class Database:
         self.conn.commit()
 
     def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
-        events = []
+        """Thread-safe event retrieval with proper SQLite synchronization."""
+        with self._lock:
+            events = []
 
-        # occupancy_events has no callsign column — skip entirely when filtering by callsign
-        if not callsign:
+            # occupancy_events has no callsign column — skip entirely when filtering by callsign
+            if not callsign:
+                params = []
+                band_filter = ""
+                mode_filter_occ = ""
+                time_filter = ""
+                if band:
+                    band_filter = "AND UPPER(band) = UPPER(?)"
+                    params.append(band)
+                if mode:
+                    mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
+                    params.append(f"%{mode}%")
+                if start and end:
+                    time_filter = "AND timestamp BETWEEN ? AND ?"
+                    params.append(start)
+                    params.append(end)
+                # LIMIT -1 means no limit in SQLite
+                params.extend([limit if limit is not None else -1, offset])
+
+                for row in self.conn.execute(
+                    """
+                    SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
+                         bandwidth_hz, mode, power_dbm, snr_db, crest_db, threshold_dbm, occupied, confidence,
+                           device
+                    FROM occupancy_events
+                    WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
+                    ORDER BY timestamp DESC
+                    LIMIT ? OFFSET ?
+                    """.format(band_filter=band_filter, mode_filter_occ=mode_filter_occ, time_filter=time_filter),
+                    tuple(params)
+                ):
+                    events.append(dict(row))
+
             params = []
             band_filter = ""
-            mode_filter_occ = ""
+            mode_filter = ""
+            callsign_filter = ""
+            snr_filter = ""
             time_filter = ""
             if band:
                 band_filter = "AND UPPER(band) = UPPER(?)"
                 params.append(band)
             if mode:
-                mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
+                mode_filter = "AND UPPER(mode) LIKE UPPER(?)"
                 params.append(f"%{mode}%")
+            if callsign:
+                callsign_filter = "AND UPPER(callsign) LIKE UPPER(?)"
+                params.append(f"%{callsign}%")
+            if snr_min is not None:
+                snr_filter = "AND snr_db >= ?"
+                params.append(float(snr_min))
             if start and end:
                 time_filter = "AND timestamp BETWEEN ? AND ?"
                 params.append(start)
@@ -419,123 +466,110 @@ class Database:
 
             for row in self.conn.execute(
                 """
-                SELECT 'occupancy' AS type, scan_id, timestamp, band, frequency_hz,
-                     bandwidth_hz, mode, power_dbm, snr_db, crest_db, threshold_dbm, occupied, confidence,
-                       device
-                FROM occupancy_events
-                WHERE 1=1 {band_filter} {mode_filter_occ} {time_filter}
+                 SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
+                     mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
+                     time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
+                FROM callsign_events
+                WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
                 ORDER BY timestamp DESC
                 LIMIT ? OFFSET ?
-                """.format(band_filter=band_filter, mode_filter_occ=mode_filter_occ, time_filter=time_filter),
+                """.format(
+                    band_filter=band_filter,
+                    mode_filter=mode_filter,
+                    callsign_filter=callsign_filter,
+                    snr_filter=snr_filter,
+                    time_filter=time_filter
+                ),
                 tuple(params)
             ):
                 events.append(dict(row))
 
-        params = []
-        band_filter = ""
-        mode_filter = ""
-        callsign_filter = ""
-        snr_filter = ""
-        time_filter = ""
-        if band:
-            band_filter = "AND UPPER(band) = UPPER(?)"
-            params.append(band)
-        if mode:
-            mode_filter = "AND UPPER(mode) LIKE UPPER(?)"
-            params.append(f"%{mode}%")
-        if callsign:
-            callsign_filter = "AND UPPER(callsign) LIKE UPPER(?)"
-            params.append(f"%{callsign}%")
-        if snr_min is not None:
-            snr_filter = "AND snr_db >= ?"
-            params.append(float(snr_min))
-        if start and end:
-            time_filter = "AND timestamp BETWEEN ? AND ?"
-            params.append(start)
-            params.append(end)
-        # LIMIT -1 means no limit in SQLite
-        params.extend([limit if limit is not None else -1, offset])
-
-        for row in self.conn.execute(
-            """
-             SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
-                 mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
-                 time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
-            FROM callsign_events
-            WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """.format(
-                band_filter=band_filter,
-                mode_filter=mode_filter,
-                callsign_filter=callsign_filter,
-                snr_filter=snr_filter,
-                time_filter=time_filter
-            ),
-            tuple(params)
-        ):
-            events.append(dict(row))
-
-        events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-        return events if limit is None else events[:limit]
+            events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+            return events if limit is None else events[:limit]
 
     def count_events(self, band=None, mode=None, callsign=None, start=None, end=None):
-        params = []
-        filters = []
-        if band:
-            filters.append("band = ?")
-            params.append(band)
-        if mode:
-            filters.append("mode = ?")
-            params.append(mode)
-        if callsign:
-            filters.append("callsign = ?")
-            params.append(callsign)
-        if start and end:
-            filters.append("timestamp BETWEEN ? AND ?")
-            params.extend([start, end])
+        """Thread-safe event counting with proper SQLite synchronization."""
+        with self._lock:
+            # occupancy_events has no callsign column — build separate filters for each table
+            occ_count = 0
+            
+            # Count occupancy events (only if not filtering by callsign)
+            if not callsign:
+                params_occ = []
+                filters_occ = []
+                if band:
+                    filters_occ.append("band = ?")
+                    params_occ.append(band)
+                if mode:
+                    filters_occ.append("mode = ?")
+                    params_occ.append(mode)
+                if start and end:
+                    filters_occ.append("timestamp BETWEEN ? AND ?")
+                    params_occ.extend([start, end])
 
-        where_clause = " AND ".join(filters)
-        if where_clause:
-            where_clause = "WHERE " + where_clause
+                where_clause_occ = " AND ".join(filters_occ)
+                if where_clause_occ:
+                    where_clause_occ = "WHERE " + where_clause_occ
 
-        occ = self.conn.execute(
-            f"SELECT COUNT(*) FROM occupancy_events {where_clause}",
-            tuple(params)
-        ).fetchone()[0]
+                occ_count = self.conn.execute(
+                    f"SELECT COUNT(*) FROM occupancy_events {where_clause_occ}",
+                    tuple(params_occ)
+                ).fetchone()[0]
 
-        calls = self.conn.execute(
-            f"SELECT COUNT(*) FROM callsign_events {where_clause}",
-            tuple(params)
-        ).fetchone()[0]
+            # Count callsign events (can use all filters including callsign)
+            params_calls = []
+            filters_calls = []
+            if band:
+                filters_calls.append("band = ?")
+                params_calls.append(band)
+            if mode:
+                filters_calls.append("mode = ?")
+                params_calls.append(mode)
+            if callsign:
+                filters_calls.append("callsign = ?")
+                params_calls.append(callsign)
+            if start and end:
+                filters_calls.append("timestamp BETWEEN ? AND ?")
+                params_calls.extend([start, end])
 
-        return int(occ) + int(calls)
+            where_clause_calls = " AND ".join(filters_calls)
+            if where_clause_calls:
+                where_clause_calls = "WHERE " + where_clause_calls
+
+            calls_count = self.conn.execute(
+                f"SELECT COUNT(*) FROM callsign_events {where_clause_calls}",
+                tuple(params_calls)
+            ).fetchone()[0]
+
+            return int(occ_count) + int(calls_count)
 
     def get_event_stats(self):
-        stats = {"modes": {}, "total": 0}
-        
-        # Count occupancy events
-        occupancy_total = 0
-        for row in self.conn.execute(
-            "SELECT mode, COUNT(*) AS total FROM occupancy_events GROUP BY mode"
-        ):
-            mode = row["mode"] or "Unknown"
-            count = int(row["total"])
-            stats["modes"][mode] = stats["modes"].get(mode, 0) + count
-            occupancy_total += count
+        """Thread-safe event statistics retrieval."""
+        with self._lock:
+            stats = {"modes": {}, "total": 0}
+            
+            # Count occupancy events
+            occupancy_total = 0
+            for row in self.conn.execute(
+                "SELECT mode, COUNT(*) AS total FROM occupancy_events GROUP BY mode"
+            ):
+                mode = row["mode"] or "Unknown"
+                count = int(row["total"])
+                stats["modes"][mode] = stats["modes"].get(mode, 0) + count
+                occupancy_total += count
 
-        # Count callsign events
-        callsign_total = 0
-        for row in self.conn.execute(
-            "SELECT mode, COUNT(*) AS total FROM callsign_events GROUP BY mode"
-        ):
-            mode = row["mode"] or "Unknown"
-            count = int(row["total"])
-            stats["modes"][mode] = stats["modes"].get(mode, 0) + count
-            callsign_total += count
-        
-        stats["total"] = occupancy_total + callsign_total
-        return stats
+            # Count callsign events
+            callsign_total = 0
+            for row in self.conn.execute(
+                "SELECT mode, COUNT(*) AS total FROM callsign_events GROUP BY mode"
+            ):
+                mode = row["mode"] or "Unknown"
+                count = int(row["total"])
+                stats["modes"][mode] = stats["modes"].get(mode, 0) + count
+                callsign_total += count
+            
+            stats["total"] = occupancy_total + callsign_total
+            return stats
 
     def get_decoder_baseline_stats(self):
         baseline = {
@@ -866,6 +900,72 @@ class Database:
             "call_ids": call_ids,
             "count": len(events),
         }
+
+    def get_all_events_and_keep_newest(self, keep: int) -> dict:
+        """
+        Fetch ALL events for export, then identify IDs to delete keeping only
+        the `keep` most recent events across both tables.
+
+        Returns:
+            dict with keys: events (list), occ_ids (list), call_ids (list), count (int)
+        """
+        with self._lock:
+            # Fetch all events from both tables ordered oldest-first for export
+            occ_rows = self.conn.execute(
+                "SELECT id, timestamp, band, frequency_hz, mode, snr_db, power_dbm,"
+                " scan_id, confidence FROM occupancy_events ORDER BY timestamp ASC"
+            ).fetchall()
+            call_rows = self.conn.execute(
+                "SELECT id, timestamp, band, frequency_hz, mode, callsign, snr_db,"
+                " scan_id, confidence FROM callsign_events ORDER BY timestamp ASC"
+            ).fetchall()
+
+            events = []
+            for r in occ_rows:
+                events.append({
+                    "type": "occupancy",
+                    "timestamp": r[1], "band": r[2], "frequency_hz": r[3],
+                    "mode": r[4], "callsign": None, "snr_db": r[5],
+                    "power_dbm": r[6], "scan_id": r[7], "confidence": r[8],
+                })
+            for r in call_rows:
+                events.append({
+                    "type": "callsign",
+                    "timestamp": r[1], "band": r[2], "frequency_hz": r[3],
+                    "mode": r[4], "callsign": r[5], "snr_db": r[6],
+                    "power_dbm": None, "scan_id": r[7], "confidence": r[8],
+                })
+
+            total = len(occ_rows) + len(call_rows)
+            if total <= keep:
+                # Nothing to delete
+                return {"events": events, "occ_ids": [], "call_ids": [], "count": 0}
+
+            # Determine which IDs to DELETE: all except the `keep` most recent.
+            # Merge both tables sorted by timestamp descending, keep first `keep`.
+            all_sorted = sorted(
+                [(r[0], r[1], "occ") for r in occ_rows] +
+                [(r[0], r[1], "call") for r in call_rows],
+                key=lambda x: x[1],
+                reverse=True,
+            )
+            keep_set_occ = set()
+            keep_set_call = set()
+            for row_id, _ts, tbl in all_sorted[:keep]:
+                if tbl == "occ":
+                    keep_set_occ.add(row_id)
+                else:
+                    keep_set_call.add(row_id)
+
+            occ_ids = [r[0] for r in occ_rows if r[0] not in keep_set_occ]
+            call_ids = [r[0] for r in call_rows if r[0] not in keep_set_call]
+
+            return {
+                "events": events,
+                "occ_ids": occ_ids,
+                "call_ids": call_ids,
+                "count": len(occ_ids) + len(call_ids),
+            }
 
     def delete_events_by_ids(self, occ_ids: list, call_ids: list) -> int:
         """

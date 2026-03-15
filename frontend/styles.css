@@ -307,6 +307,12 @@ h1,
   color: var(--text);
 }
 
+.form-select option,
+.form-select optgroup {
+  color: #101726;
+  background-color: #f5f7ff;
+}
+
 .btn-primary {
   background: var(--accent);
   border: none;
@@ -664,11 +670,83 @@ h1,
   display: none;
 }
 
+/* Wrapper covering spectrum canvas + waterfall canvas together */
+.waterfall-area {
+  position: relative;
+}
+.waterfall__transition {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, rgba(6, 10, 22, 0.88) 0%, rgba(15, 23, 42, 0.82) 100%);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-radius: 10px;
+  pointer-events: none;
+  animation: wf-fade-in 0.18s ease-out both;
+}
+.waterfall__transition[hidden] {
+  display: none;
+}
+@keyframes wf-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.waterfall__transition-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+/* Dual-ring spinner */
+.waterfall__transition-spinner {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+.waterfall__transition-spinner::before,
+.waterfall__transition-spinner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+}
+.waterfall__transition-spinner::before {
+  border-top-color: #38bdf8;
+  border-right-color: #38bdf8;
+  animation: wf-spin 0.75s linear infinite;
+}
+.waterfall__transition-spinner::after {
+  border-bottom-color: rgba(56, 189, 248, 0.35);
+  border-left-color: rgba(56, 189, 248, 0.35);
+  animation: wf-spin 1.4s linear infinite reverse;
+}
+@keyframes wf-spin {
+  to { transform: rotate(360deg); }
+}
+.waterfall__transition-msg {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(56, 189, 248, 0.45);
+  animation: wf-pulse-text 1.6s ease-in-out infinite;
+}
+@keyframes wf-pulse-text {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
 .waterfall__status {
   position: absolute;
   inset: auto 16px 16px 16px;
   font-size: 0.85rem;
-  color: var(--muted);
+  color: #facc15;
   margin: 0;
 }
 
@@ -1135,6 +1213,12 @@ h1,
   border-color: rgba(255, 179, 71, 0.6);
   box-shadow: 0 0 0 0.2rem rgba(255, 179, 71, 0.2);
   color: var(--text);
+}
+
+.app-modal .form-select option,
+.app-modal .form-select optgroup {
+  color: #101726;
+  background-color: #f5f7ff;
 }
 
 .app-modal .form-label {

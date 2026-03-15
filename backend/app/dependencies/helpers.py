@@ -281,7 +281,9 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
     weighted_sum = 0.0
 
     for event in events:
-        band = str(event.get("band") or "Unknown")
+        band = str(event.get("band") or "").strip()
+        if not band:
+            continue
         bucket = per_band.setdefault(
             band,
             {

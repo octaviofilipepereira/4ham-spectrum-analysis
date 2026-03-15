@@ -24,10 +24,12 @@ async def run_retention() -> Optional[dict]:
     """
     Execute one retention cycle.
 
-    1. Identifies purgeable events (age + count criteria).
-    2. Exports them to CSV if RETENTION_AUTO_EXPORT=1.
-    3. Deletes them from the database.
-    4. Stores a notification in state for the next ws/status broadcast.
+    Age-based purge (RETENTION_DAYS):
+      Exports and deletes events older than N days.
+
+    Count-based purge (MAX_EVENTS / RETENTION_KEEP_EVENTS):
+      When total events >= MAX_EVENTS, exports ALL events to CSV and
+      deletes everything except the RETENTION_KEEP_EVENTS most recent.
 
     Returns:
         Notification dict if any events were purged, None otherwise.
@@ -36,15 +38,35 @@ async def run_retention() -> Optional[dict]:
 
     days = _state.retention_days
     max_events = _state.retention_max_events
+    keep_events = _state.retention_keep_events
 
     # Both limits disabled — nothing to do
     if days == 0 and max_events == 0:
         return None
 
-    result = _state.db.get_purgeable_events(days=days, max_events=max_events)
+    # --- Count-based: check if threshold reached ---
+    count_result = None
+    if max_events > 0:
+        total_occ = _state.db.conn.execute("SELECT COUNT(*) FROM occupancy_events").fetchone()[0]
+        total_call = _state.db.conn.execute("SELECT COUNT(*) FROM callsign_events").fetchone()[0]
+        total = total_occ + total_call
+        if total >= max_events:
+            _log.info("Retention: count threshold reached (%d >= %d), exporting all and keeping %d", total, max_events, keep_events)
+            count_result = _state.db.get_all_events_and_keep_newest(keep=keep_events)
 
-    if not result["count"]:
-        return None  # nothing to purge
+    # --- Age-based: standard partial purge ---
+    age_result = None
+    if days > 0:
+        age_result = _state.db.get_purgeable_events(days=days, max_events=0)
+        if not age_result["count"]:
+            age_result = None
+
+    # Nothing to do
+    if count_result is None and age_result is None:
+        return None
+
+    # If count-based triggered, it takes priority and covers everything
+    result = count_result if count_result is not None else age_result
 
     # --- Auto-export before deletion ---
     export_meta = None

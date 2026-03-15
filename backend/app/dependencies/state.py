@@ -380,7 +380,10 @@ def reload_auth_from_db() -> None:
 retention_days = int(os.getenv("RETENTION_DAYS", "30"))
 
 # Maximum total events across both tables; 0 disables count-based purge
-retention_max_events = int(os.getenv("MAX_EVENTS", "50000"))
+retention_max_events = int(os.getenv("MAX_EVENTS", "500000"))
+
+# When max_events is reached: export ALL and keep only this many (most recent)
+retention_keep_events = int(os.getenv("RETENTION_KEEP_EVENTS", "50000"))
 
 # Export events to CSV automatically before purging
 _retention_auto_env = os.getenv("RETENTION_AUTO_EXPORT", "1").strip().lower()

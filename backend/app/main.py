@@ -28,6 +28,10 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+# Configure logging with rotation BEFORE any other imports that use logging
+from app.log_config import setup_logging
+setup_logging()
+
 # Import API and WebSocket routers
 from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status

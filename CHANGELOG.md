@@ -2,10 +2,28 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-14 UTC
+Last update: 2026-03-15 UTC
 -->
 
 # Changelog
+
+## v2.0.2 - 2026-03-15
+
+### Added
+- Waterfall transition overlay covering the full spectrum+waterfall area (spectrum canvas and waterfall canvas are now wrapped in a common `waterfall-area` container; the overlay is positioned relative to it).
+- Improved transition overlay visual design: dual-ring counter-rotating spinner, fade-in entry animation, pulsing message text, and a gradient dark backdrop with stronger blur.
+
+### Changed
+- All user-facing strings (toasts, status messages, log lines) translated to English — no more Portuguese in the UI.
+- Retention system: count-based threshold raised to 500,000 events; when triggered, all events are exported and only the 50,000 most recent are kept (`RETENTION_KEEP_EVENTS` env var, default 50 000). Age-based purge (30 days) still runs independently.
+- Waterfall status line colour changed to yellow (`#facc15`) for better contrast against the dark waterfall background.
+- Propagation Map no longer shows an "Unknown" band entry — events without a `band` value are now silently skipped in the summary builder.
+
+### Fixed
+- `modeFilter is not defined` JS error when switching mode during an active scan — the variable was never declared; replaced with the correct `eventsSearchModeInput` in four call sites (`startScan`, `syncScanState`, mode button handler).
+- "No live spectrum data available" error appearing in preview/idle mode (no scan running) — the fallback timer and WebSocket error handlers now only show the error when `isScanRunning` is `true`.
+- Waterfall not centering on the correct mode segment after a live band switch — `lastSpectrumFrame` is now cleared between `stopScan` and `startScan` in `switchBandLive` so `recenterWaterfallForMode` uses the new band's frequency range.
+- Structured log configuration extracted to `backend/app/log_config.py`, fixing log formatting on startup.
 
 ## v2.0.1 - 2026-03-14
 
