@@ -32,6 +32,7 @@ frontend/package-lock.json
 # Session reports and dev-only artefacts
 RELATORIO_*.md
 TRABALHO_REALIZADO_*.md
+ANALISE_PROJETO.md
 STATUS.md
 .dev-notes/
 test_config_deploy.sh
@@ -40,3 +41,14 @@ test_integration.sh
 test_new_endpoints.sh
 validate_api_endpoints.sh
 validate_final.sh
+
+# Internal dev docs (plans, session notes, drafts)
+docs/session_report_*.md
+docs/backlog.md
+docs/facebook_post_summary.md
+docs/refactoring_guide.md
+docs/*_implementation_plan.md
+docs/*_migration_plan.md
+
+# Legacy / superseded code
+backend/app/main_legacy.py
