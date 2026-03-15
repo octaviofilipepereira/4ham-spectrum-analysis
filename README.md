@@ -22,39 +22,50 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
-## Quick Start (3 minutes)
+## Quick Start
 Run from the repository root.
 
-1) Create and activate a virtual environment:
+1) Clone the repository:
+```bash
+git clone https://github.com/octaviofilipepereira/4ham-spectrum-analysis.git
+cd 4ham-spectrum-analysis
+```
+
+2) Install system dependencies (Ubuntu/Debian/Raspberry Pi OS):
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip \
+    soapysdr-tools libsoapysdr-dev python3-soapysdr \
+    soapysdr-module-rtlsdr rtl-sdr
+```
+> **RTL-SDR Blog v4 only** — the standard `rtl-sdr` apt package does not support v4. See [docs/install.md](docs/install.md) for the build-from-source instructions.
+
+3) Add your user to the `plugdev` group for USB access (log out and back in after):
+```bash
+sudo usermod -aG plugdev $USER
+```
+
+4) Create and activate a Python virtual environment:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-2) Install backend dependencies:
+5) Install Python dependencies:
 ```bash
 python -m pip install -r backend/requirements.txt
 ```
 
-3) Start backend + UI (same-origin):
+6) Start the backend (serves the UI at the same origin):
 ```bash
 python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ```
 
-4) Open the app and verify health:
+7) Open in your browser:
 - UI: `http://127.0.0.1:8000/`
-- API health: `http://127.0.0.1:8000/api/health`
+- API health check: `http://127.0.0.1:8000/api/health`
 
-5) Optional smoke test (start/stop scan):
-```bash
-curl -X POST http://127.0.0.1:8000/api/scan/start \
-	-H "Content-Type: application/json" \
-	-d '{"scan":{"band":"20m","start_hz":14000000,"end_hz":14002000,"step_hz":1000,"dwell_ms":200,"mode":"auto","sample_rate":48000,"center_hz":14001000}}'
-
-curl -X POST http://127.0.0.1:8000/api/scan/stop
-```
-
-For full platform-specific installation and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
+For full platform-specific installation, RTL-SDR v4 driver setup, and decoder configuration, see [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
 
