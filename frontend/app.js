@@ -2447,7 +2447,7 @@ function renderEvents(items) {
   if (eventsCardTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
     const titleTarget = eventsCardTitleText || eventsCardTitle;
-    titleTarget.textContent = `Events (${displayTotal.toLocaleString()} total)`;
+    titleTarget.textContent = `Events (${displayTotal.toLocaleString()} — last 24h)`;
   }
   updateEventsPager(cardItems.length);
 
@@ -2581,8 +2581,9 @@ async function fetchEvents() {
   _fetchEventsAbort = controller;
 
   try {
-    // Card Events shows ALL events without filtering
-    const params = new URLSearchParams({ offset: String(eventOffset), limit: "200" });
+    // Card Events shows events from the last 24 hours
+    const start24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const params = new URLSearchParams({ offset: String(eventOffset), limit: "200", start: start24h, end: new Date().toISOString() });
     
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },
@@ -2610,8 +2611,9 @@ async function fetchEvents() {
 
 async function fetchTotal() {
   try {
-    // Card Events shows ALL events without filtering
-    const params = new URLSearchParams({});
+    // Count only events from the last 24 hours
+    const start24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const params = new URLSearchParams({ start: start24h, end: new Date().toISOString() });
     
     const resp = await fetch(`/api/events/count?${params.toString()}`, {
       headers: { ...getAuthHeader() }
@@ -2634,7 +2636,7 @@ async function fetchModeStats() {
     }
     const data = await resp.json();
     modeStatsCache = data.modes || {};
-    // totalEventsInDB is managed by fetchTotal() (counts all events, no time filter)
+    // totalEventsInDB is managed by fetchTotal() (counts events from last 24h)
   } catch (err) {
     return;
   }
@@ -3292,7 +3294,7 @@ function renderEventsFullscreen() {
   
   if (eventsFullscreenTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : cardItems.length;
-    eventsFullscreenTitle.textContent = `Events (${displayTotal.toLocaleString()} total)`;
+    eventsFullscreenTitle.textContent = `Events (${displayTotal.toLocaleString()} — last 24h)`;
   }
   
   if (eventsFullscreenPageInfo) {
