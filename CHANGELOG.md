@@ -7,6 +7,11 @@ Last update: 2026-03-15 UTC
 
 # Changelog
 
+## v0.6.2 - 2026-03-15
+
+### Fixed
+- CI test fragility in `test_storage_db_metrics.py`: replaced hardcoded timestamps from `2026-03-06` with dynamic relative timestamps (`datetime.now(timezone.utc) - timedelta(minutes=X)`) so the SSB metrics tests always fall within the query window regardless of when they run.
+
 ## v0.6.1 - 2026-03-15
 
 ### Added
