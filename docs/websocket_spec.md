@@ -14,12 +14,14 @@ This document defines WebSocket channels, message envelopes, and payloads for re
 - `/ws/spectrum`: FFT and waterfall frames
 - `/ws/events`: occupancy and callsign events
 - `/ws/status`: scan and system status
+- `/ws/logs`: application log streaming
 
 ## Message Envelope
 All messages use a single root object with one top-level key:
 - `spectrum_frame`
 - `event`
 - `status`
+- `log`
 - `error`
 
 ## Spectrum Frames
