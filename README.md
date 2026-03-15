@@ -196,7 +196,7 @@ Frontend skeleton: see [frontend/index.html](frontend/index.html).
 - `storage`: events and history.
 
 ## Callsign identification (design)
-- FT8/FT4: integration via WSJT-X (UDP/decoded files), extract callsigns and SNR.
+- FT8/FT4: integration via `jt9` (direct subprocess on WAV cycles), extract callsigns and SNR.
 - APRS: Direwolf as TNC, read via KISS TCP/AGW, extract callsigns and messages.
 - CW: tone detection, adaptive binarization, Morse decoder, timing correction.
 - SSB (voice): VAD + ASR to suggest callsigns (complex pipeline, lower confidence).
@@ -204,12 +204,12 @@ Frontend skeleton: see [frontend/index.html](frontend/index.html).
 Note: backend supports automated file ingestion (ALL.TXT/logs) via environment variables; see the full manual.
 
 ## Technical decoder pipelines
-### FT8 / FT4 (WSJT-X)
+### FT8 / FT4 (jt9)
 1. Capture IQ and tune to the FT8/FT4 segment of the band.
 2. Downconvert + band filters + gain adjustment.
-3. Route audio to WSJT-X (virtual sound device or file).
-4. Read decoded output via UDP/files (ALL.TXT/decoded).
-5. Normalize callsigns, SNR, DF, time, and frequency.
+3. Write audio to WAV file (15-second cycle for FT8, 7.5 s for FT4).
+4. Run `jt9` decoder subprocess on the WAV file.
+5. Parse decoded text output: callsigns, SNR, DF, time, and frequency.
 6. Emit identification events with high confidence.
 
 ### APRS (Direwolf)
@@ -441,11 +441,10 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 ```
 
 ## Decoder integration (minimum configuration)
-### WSJT-X (FT8/FT4)
-- Use virtual audio (ALSA loopback or PulseAudio).
-- Enable UDP decoded output (configurable port).
-- Read `ALL.TXT` and `decoded` files as fallback.
-- Sync time (NTP) to avoid decode losses.
+### jt9 (FT8/FT4)
+- `jt9` binary must be installed (`apt install wsjtx` or built from source).
+- No GUI or virtual audio required — `jt9` is called directly on WAV files.
+- Sync time (NTP) to avoid decode losses (critical for FT8/FT4 timing cycles).
 
 ### Direwolf (APRS)
 - FM demodulation -> 1200 AFSK audio.
