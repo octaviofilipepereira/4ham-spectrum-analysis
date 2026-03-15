@@ -29,7 +29,7 @@ This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi
 ### 1) System dependencies
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
 ```
 
 Optional utilities:
@@ -38,12 +38,48 @@ sudo apt install -y git python3-venv build-essential
 ```
 
 ### 2) USB permissions
-If RTL-SDR requires root access, add udev rules (example):
+Add your user to the `plugdev` group so the device is accessible without root:
+```
+sudo usermod -aG plugdev $USER
+```
+Log out and back in for the group change to take effect.
+
+If udev rules are needed (older systems), add them manually:
 ```
 sudo tee /etc/udev/rules.d/20-rtl-sdr.rules >/dev/null <<'EOF'
 SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2838", MODE:="0666"
 EOF
 sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### 2a) RTL-SDR v4 — updated driver (required for RTL-SDR Blog v4 only)
+
+The standard `rtl-sdr` apt package does not support the RTL-SDR Blog v4 dongle.
+If you have a v4, remove the system package and build the updated driver:
+
+```
+sudo apt remove -y rtl-sdr librtlsdr0 librtlsdr-dev
+sudo apt install -y cmake libusb-1.0-0-dev build-essential
+git clone https://github.com/rtlsdrblog/rtl-sdr-blog
+cd rtl-sdr-blog && mkdir build && cd build
+cmake ../ -DINSTALL_UDEV_RULES=ON
+make && sudo make install && sudo ldconfig
+```
+
+Blacklist conflicting kernel modules (required — otherwise the kernel claims the device before the driver can):
+```
+sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'EOF'
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+EOF
+sudo modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
+```
+
+Reconnect the dongle and verify:
+```
+rtl_test -t
+SoapySDRUtil --find
 ```
 
 ### 3) Python environment
@@ -66,11 +102,13 @@ Open the backend-served UI in your browser:
 ## Raspberry Pi
 
 ### 1) OS and packages
-Use a 64-bit OS, then install dependencies:
+Use a 64-bit OS (Raspberry Pi OS 64-bit recommended), then install dependencies:
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
 ```
+
+**RTL-SDR v4 only** — follow section 2a from the Linux section above (build from `rtlsdrblog/rtl-sdr-blog` source and apply kernel blacklist). The process is identical on Raspberry Pi.
 
 ### 2) Python environment
 ```
@@ -218,7 +256,8 @@ python backend/cli.py --stop
 - If SoapySDR devices are not found, verify drivers and run `SoapySDRUtil --find`.
 - If Python cannot import SoapySDR, confirm `python3-soapysdr` is installed on Linux.
 - If no FFT frames appear, reduce sample rate or close other SDR applications.
-- For RTL-SDR permissions, confirm udev rules and reconnect the device.
+- For RTL-SDR permissions, confirm `plugdev` group membership (`groups $USER`) and reconnect the device.
+- If the RTL-SDR v4 is not detected after building from source, confirm the kernel blacklist is in place (`cat /etc/modprobe.d/blacklist-rtl.conf`) and reboot.
 - If scan is running and RF is visible but no callsigns appear, confirm WSJT-X `Reporting` is set to `127.0.0.1:2237` and that `/api/decoders/status` updates `wsjtx_udp.last_packet_at`.
 
 ## Uninstall

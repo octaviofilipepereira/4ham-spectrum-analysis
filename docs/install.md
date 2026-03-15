@@ -14,18 +14,37 @@ For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:
 	- `sudo apt update`
-	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr`
-3. Create a virtual environment and install Python dependencies:
+	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr`
+3. **RTL-SDR v4 only** — the standard `rtl-sdr` apt package does not support the RTL-SDR Blog v4. Build the updated driver from source:
+	```bash
+	sudo apt remove -y rtl-sdr librtlsdr0 librtlsdr-dev
+	sudo apt install -y git cmake libusb-1.0-0-dev build-essential
+	git clone https://github.com/rtlsdrblog/rtl-sdr-blog
+	cd rtl-sdr-blog && mkdir build && cd build
+	cmake ../ -DINSTALL_UDEV_RULES=ON
+	make && sudo make install && sudo ldconfig
+	```
+	Blacklist conflicting kernel modules (required for v4):
+	```bash
+	sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'EOF'
+	blacklist dvb_usb_rtl28xxu
+	blacklist rtl2832
+	blacklist rtl2830
+	EOF
+	sudo modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
+	```
+	Verify: `rtl_test -t`
+4. Create a virtual environment and install Python dependencies:
 	- `python3 -m venv .venv`
 	- `source .venv/bin/activate`
 	- `python -m pip install -r backend/requirements.txt`
-4. Run backend with uvicorn:
+5. Run backend with uvicorn:
 	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
 
 ## Raspberry Pi
-1. Use 64-bit OS and update packages.
-2. Install SoapySDR and RTL-SDR.
-3. Reduce sample rate and FFT size for stability.
+1. Use a 64-bit OS and update packages.
+2. Follow the same SDR driver steps as Linux above (including RTL-SDR v4 if applicable).
+3. Reduce sample rate and FFT size for stability (see `installation_manual.md`).
 4. Run backend with uvicorn:
 	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
 
@@ -77,5 +96,6 @@ Ensure `jt9` and `wsprd` are available in `$PATH` (build from WSJT source or ins
 
 ## Troubleshooting
 - If SoapySDR devices are not found, run `SoapySDRUtil --find` to verify driver discovery.
-- On Linux, ensure your user has USB access (plugdev/udev rules) for RTL-SDR devices.
+- On Linux, ensure your user has USB access: add your user to the `plugdev` group (`sudo usermod -aG plugdev $USER`) and reconnect the device.
+- If the RTL-SDR v4 is not detected, confirm kernel blacklist is applied and reboot.
 - If Python cannot import SoapySDR, confirm `python3-soapysdr` is installed from apt.
