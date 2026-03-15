@@ -3298,30 +3298,47 @@ function renderEventsFullscreen() {
   }
   
   if (eventsFullscreenPageInfo) {
-    eventsFullscreenPageInfo.textContent = `Page: ${eventsFullscreenPage + 1}/${totalPages}`;
+    const globalPage = Math.floor(eventOffset / EVENTS_PANEL_PAGE_SIZE) + eventsFullscreenPage + 1;
+    const totalGlobalPages = totalEventsInDB > 0
+      ? Math.ceil(totalEventsInDB / EVENTS_PANEL_PAGE_SIZE)
+      : totalPages;
+    eventsFullscreenPageInfo.textContent = `Page: ${globalPage}/${totalGlobalPages}`;
   }
   
   if (eventsFullscreenPrevBtn) {
-    eventsFullscreenPrevBtn.disabled = eventsFullscreenPage <= 0;
+    eventsFullscreenPrevBtn.disabled = eventsFullscreenPage <= 0 && eventOffset <= 0;
   }
   
   if (eventsFullscreenNextBtn) {
-    eventsFullscreenNextBtn.disabled = eventsFullscreenPage >= totalPages - 1;
+    const moreServerEvents = totalEventsInDB > eventOffset + latestEvents.length;
+    eventsFullscreenNextBtn.disabled = eventsFullscreenPage >= totalPages - 1 && !moreServerEvents;
   }
 }
 
 if (eventsFullscreenPrevBtn) {
   eventsFullscreenPrevBtn.addEventListener("click", () => {
-    eventsFullscreenPage = Math.max(0, eventsFullscreenPage - 1);
-    renderEventsFullscreen();
+    if (eventsFullscreenPage > 0) {
+      eventsFullscreenPage = Math.max(0, eventsFullscreenPage - 1);
+      renderEventsFullscreen();
+    } else if (eventOffset > 0) {
+      eventOffset = Math.max(0, eventOffset - 200);
+      eventsFullscreenPage = 0;
+      fetchEvents();
+    }
   });
 }
 
 if (eventsFullscreenNextBtn) {
   eventsFullscreenNextBtn.addEventListener("click", () => {
-    const totalPages = Math.max(1, Math.ceil(applyEventsCardTypeFilter(orderEventsForDisplay(latestEvents || [])).length / EVENTS_PANEL_PAGE_SIZE));
-    eventsFullscreenPage = Math.min(totalPages - 1, eventsFullscreenPage + 1);
-    renderEventsFullscreen();
+    const totalLocalPages = Math.max(1, Math.ceil(applyEventsCardTypeFilter(orderEventsForDisplay(latestEvents || [])).length / EVENTS_PANEL_PAGE_SIZE));
+    if (eventsFullscreenPage < totalLocalPages - 1) {
+      eventsFullscreenPage = Math.min(totalLocalPages - 1, eventsFullscreenPage + 1);
+      renderEventsFullscreen();
+    } else if (totalEventsInDB > eventOffset + latestEvents.length) {
+      eventOffset += 200;
+      eventsFullscreenPage = 0;
+      fetchEvents();
+    }
   });
 }
 
