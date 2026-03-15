@@ -2447,7 +2447,7 @@ function renderEvents(items) {
   if (eventsCardTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : totalEvents;
     const titleTarget = eventsCardTitleText || eventsCardTitle;
-    titleTarget.textContent = `Events (${displayTotal.toLocaleString()} — last 24h)`;
+    titleTarget.textContent = `Events (Total of ${displayTotal.toLocaleString()} Events - Last 24h)`;
   }
   updateEventsPager(cardItems.length);
 
@@ -3294,7 +3294,7 @@ function renderEventsFullscreen() {
   
   if (eventsFullscreenTitle) {
     const displayTotal = totalEventsInDB > 0 ? totalEventsInDB : cardItems.length;
-    eventsFullscreenTitle.textContent = `Events (${displayTotal.toLocaleString()} — last 24h)`;
+    eventsFullscreenTitle.textContent = `Events (Total of ${displayTotal.toLocaleString()} Events - Last 24h)`;
   }
   
   if (eventsFullscreenPageInfo) {
