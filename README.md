@@ -22,6 +22,24 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
+## Screenshots
+
+![Waterfall with FT8 markers](images/screenshot-waterfall.png)
+*Main panel — VFO, band and mode selection, live waterfall with FT8 markers*
+
+![Waterfall with hover tooltip](images/screenshot-waterfall-tooltip.png)
+*FT8 marker tooltip on mouse hover*
+
+| | |
+|:---:|:---:|
+| ![Propagation map and forecasts](images/screenshot-propagation.png) | ![Events panel fullscreen](images/screenshot-events-fullscreen.png) |
+| *Propagation map and forecasts* | *Events panel — fullscreen view* |
+| ![Propagation map fullscreen](images/screenshot-propagation-fullscreen.png) | ![Events card](images/screenshot-events-card.png) |
+| *Propagation map — fullscreen* | *Events card* |
+
+![Administration — configuration modal](images/screenshot-admin.png)
+*Administration — configuration modal*
+
 ## Quick Start
 
 Clone the repository and run the automatic installer — it handles everything:
