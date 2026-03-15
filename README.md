@@ -32,20 +32,21 @@ cd 4ham-spectrum-analysis
 ./install.sh
 ```
 
-The installer will:
-- Install all system packages (SoapySDR, RTL-SDR drivers, Python tools)
-- Optionally build the RTL-SDR Blog v4 driver from source
-- Create and populate the Python virtual environment
-- Ask for an admin username and password (stored securely in the local database)
-- Install and start the background service (systemd)
+The installer presents a **graphical interactive wizard** (whiptail TUI) that guides you through:
+- Installing all system packages (SoapySDR, RTL-SDR, Python, build tools)
+- Optionally building the RTL-SDR Blog v4 driver from source (asked during setup)
+- Creating the Python virtual environment and installing all dependencies
+- Setting up your admin account (username + password — stored as bcrypt in the local database)
+- Installing and starting the systemd background service (auto-start on boot)
 
-At the end, **just open the printed URL in your browser and log in**.
+At the end, **open the URL shown on screen in your browser and log in**. That's it.
 
-> **RTL-SDR Blog v4** — the installer will ask whether you have a v4 dongle and build the correct driver automatically. See [docs/install.md](docs/install.md) for details.
-
-For full platform-specific installation notes and decoder setup, see [docs/installation_manual.md](docs/installation_manual.md).
+> For full manual installation notes and decoder setup, see [docs/install.md](docs/install.md) and [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
+
+### v0.7.1
+- Graphical installer (`install.sh`) — interactive whiptail TUI for end-to-end setup: system packages, optional RTL-SDR Blog v4 driver, Python venv, admin account (bcrypt/SQLite), systemd service. Single command to go from `git clone` to running application.
 
 ### v0.6.0
 - Added session-based authentication backed by SQLite credentials, with `/api/auth/status`, login, logout, and cookie session validation across reloads and WebSocket streams.

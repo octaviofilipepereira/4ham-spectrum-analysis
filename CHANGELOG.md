@@ -7,6 +7,11 @@ Last update: 2026-03-15 UTC
 
 # Changelog
 
+## v0.7.1 - 2026-03-15
+
+### Added
+- Graphical installer (`install.sh`) — interactive whiptail TUI that guides the user through the full setup: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt, stored in SQLite), and systemd service activation. No manual steps required after `git clone`.
+
 ## v0.7.0 - 2026-03-15
 
 ### Changed

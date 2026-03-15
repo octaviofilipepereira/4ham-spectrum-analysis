@@ -7,10 +7,33 @@ Last update: 2026-02-22 16:27:19 UTC
 
 # Installation Guide
 
+> **Recommended:** use the automatic graphical installer — just run `./install.sh` from the repository root. It handles everything end-to-end with a guided TUI.
+
 For a complete, step-by-step manual, see [docs/installation_manual.md](installation_manual.md).
 For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
 
-## Linux (Ubuntu/Debian)
+## Automatic Installer (recommended)
+
+```bash
+git clone https://github.com/octaviofilipepereira/4ham-spectrum-analysis.git
+cd 4ham-spectrum-analysis
+./install.sh
+```
+
+The installer presents an interactive graphical wizard (whiptail) that:
+1. Installs all system packages via `apt`
+2. Optionally builds the RTL-SDR Blog v4 driver from source
+3. Creates the Python virtual environment and installs Python dependencies
+4. Asks for an admin username and password (stored securely as bcrypt in the local SQLite database)
+5. Installs and starts the systemd background service (auto-start on boot)
+
+At the end, open the printed URL in your browser and log in. No further steps needed.
+
+---
+
+## Manual Installation
+
+### Linux (Ubuntu/Debian)
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:
 	- `sudo apt update`
