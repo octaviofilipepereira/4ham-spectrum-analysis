@@ -7,6 +7,13 @@ Last update: 2026-03-15 UTC
 
 # Changelog
 
+## v0.7.0 - 2026-03-15
+
+### Changed
+- Platform target refined to Linux PC and Raspberry Pi — the software is now focused on native Linux deployments (Ubuntu/Debian, Linux Mint, Raspberry Pi OS 64-bit).
+- Install guides updated with complete RTL-SDR v4 driver instructions (build from `rtlsdrblog/rtl-sdr-blog`, kernel module blacklist, udev rules).
+- Documentation cleanup: removed stale session reports and outdated internal references; corrected `sqlite_schema.sql` (missing columns) and `websocket_spec.md` (missing `/ws/logs` channel).
+
 ## v0.6.3 - 2026-03-15
 
 ### Fixed
