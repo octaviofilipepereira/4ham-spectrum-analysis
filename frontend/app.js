@@ -1172,16 +1172,35 @@ function buildStableWaterfallMarkers(frame) {
   };
 }
 
+let _overlayLastFingerprint = "";
+
+function _buildOverlayFingerprint(modeMarkers, rangeStartHz, rangeEndHz) {
+  if (!Array.isArray(modeMarkers) || !modeMarkers.length) return "";
+  return modeMarkers.map((m) =>
+    `${m.frequency_hz}|${m.mode}|${m.callsign || ""}|${m.snr_db ?? ""}|${rangeStartHz}|${rangeEndHz}`
+  ).join(";");
+}
+
 function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, rangeEndHz = null) {
   if (!waterfallModeOverlay) {
     return;
   }
   const span = Number(spanHz || 0);
   if (!Array.isArray(modeMarkers) || !modeMarkers.length || span <= 0) {
-    waterfallModeOverlay.innerHTML = "";
-    hideWaterfallHoverTooltip();
+    if (waterfallModeOverlay.innerHTML !== "") {
+      waterfallModeOverlay.innerHTML = "";
+      hideWaterfallHoverTooltip();
+    }
+    _overlayLastFingerprint = "";
     return;
   }
+
+  // Skip full DOM rebuild if nothing changed (prevents per-frame flicker)
+  const fingerprint = _buildOverlayFingerprint(modeMarkers, rangeStartHz, rangeEndHz);
+  if (fingerprint === _overlayLastFingerprint) {
+    return;
+  }
+  _overlayLastFingerprint = fingerprint;
 
   waterfallModeOverlay.innerHTML = "";
   // Sort by frequency_hz (decoded markers) or offset_hz (DSP markers)
@@ -2952,6 +2971,7 @@ async function stopScan() {
   waterfallMarkerCache.clear();
   waterfallDecodedMarkerCache.clear();
   waterfallCallsignCache.clear();
+  _overlayLastFingerprint = "";
   latestEvents = []; // Clear events list
   renderEventsPanelFromCache(); // Refresh empty panel
   
@@ -4652,6 +4672,7 @@ if (quickModeButtons.length) {
         waterfallMarkerCache.clear();
         waterfallDecodedMarkerCache.clear();
         waterfallCallsignCache.clear();
+        _overlayLastFingerprint = "";
         latestEvents = []; // Clear events from previous mode
         renderEventsPanelFromCache(); // Refresh empty panel
         
