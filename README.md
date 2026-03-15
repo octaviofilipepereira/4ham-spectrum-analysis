@@ -58,7 +58,7 @@ For full platform-specific installation and decoder setup, see [docs/installatio
 
 ## Changelog (cumulative)
 
-### v2.0.1
+### v0.6.0
 - Added session-based authentication backed by SQLite credentials, with `/api/auth/status`, login, logout, and cookie session validation across reloads and WebSocket streams.
 - Fixed the browser auth-popup problem by removing `WWW-Authenticate` challenges from the in-app auth flow.
 - Corrected the CW decoder segment for 20 m to `14.000-14.070 MHz` while keeping the 20 m scan band at `14.000-14.350 MHz`.

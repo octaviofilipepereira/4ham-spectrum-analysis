@@ -7,7 +7,7 @@ Last update: 2026-03-15 UTC
 
 # Changelog
 
-## v2.0.2 - 2026-03-15
+## v0.6.1 - 2026-03-15
 
 ### Added
 - Waterfall transition overlay covering the full spectrum+waterfall area (spectrum canvas and waterfall canvas are now wrapped in a common `waterfall-area` container; the overlay is positioned relative to it).
@@ -25,7 +25,7 @@ Last update: 2026-03-15 UTC
 - Waterfall not centering on the correct mode segment after a live band switch — `lastSpectrumFrame` is now cleared between `stopScan` and `startScan` in `switchBandLive` so `recenterWaterfallForMode` uses the new band's frequency range.
 - Structured log configuration extracted to `backend/app/log_config.py`, fixing log formatting on startup.
 
-## v2.0.1 - 2026-03-14
+## v0.6.0 - 2026-03-14
 
 ### Added
 - Session-based authentication stored in SQLite, with login, logout, and session validation via cookie instead of browser Basic Auth prompts.
