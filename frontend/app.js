@@ -648,10 +648,14 @@ const waterfallMarkerCache = new Map();
 // Instead we inject ONE marker per known dial frequency per mode, carrying
 // the most-recently decoded callsign.  This avoids flooding the waterfall
 // with one marker per decoded station (can be 50-100 per cycle on busy bands).
-// TTL matches the decoder cycle: FT8(15s)+FT4(7.5s)=22.5s/cycle; 4 cycles = 90s.
-// WSPR has 120s windows; 3 cycles = 360s.
-const WATERFALL_DECODED_MARKER_TTL_MS = 90 * 1000;       // FT8/FT4: 90 s
-const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000; // WSPR: 360 s (3 × 120s)
+// TTL per mode = mode_window × 6 bands (generous scan-list estimate).
+// FT8 window = 15 s → 6 × 15 = 90 s.
+// FT4 window =  7.5 s → 6 × 7.5 = 45 s.
+// WSPR window = 120 s → 3 × 120 = 360 s.
+// Only one mode runs at a time, so TTLs are independent.
+const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  90 * 1000; // 6 × 15 s
+const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  45 * 1000; // 6 × 7.5 s
+const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000; // 3 × 120 s
 // One decoded-marker entry per "<dialHz>_<MODE>" key.
 const waterfallDecodedMarkerCache = new Map();
 const WATERFALL_CALLSIGN_TTL_MS = 90 * 1000;
@@ -1136,10 +1140,12 @@ function buildStableWaterfallMarkers(frame) {
   }
 
   // Expire stale synthetic (jt9-decoded) markers.
-  // WSPR has a 120 s window; use its own longer TTL.
+  // Each mode runs independently, so use its own window-based TTL.
   for (const [key, marker] of waterfallDecodedMarkerCache.entries()) {
-    const isWspr = key.endsWith("_WSPR");
-    const ttl = isWspr ? WATERFALL_DECODED_MARKER_TTL_WSPR_MS : WATERFALL_DECODED_MARKER_TTL_MS;
+    let ttl;
+    if      (key.endsWith("_WSPR")) ttl = WATERFALL_DECODED_MARKER_TTL_WSPR_MS;
+    else if (key.endsWith("_FT4"))  ttl = WATERFALL_DECODED_MARKER_TTL_FT4_MS;
+    else                             ttl = WATERFALL_DECODED_MARKER_TTL_FT8_MS;
     if ((now - Number(marker?.seen_at || 0)) > ttl) {
       waterfallDecodedMarkerCache.delete(key);
     }
