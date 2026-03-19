@@ -648,7 +648,7 @@ class Database:
             """
             SELECT timestamp, callsign, confidence, payload
             FROM callsign_events
-            WHERE UPPER(mode) = 'SSB' AND timestamp >= ?
+            WHERE UPPER(mode) IN ('SSB', 'SSB_TRAFFIC') AND timestamp >= ?
             ORDER BY timestamp DESC
             """,
             (cutoff,),

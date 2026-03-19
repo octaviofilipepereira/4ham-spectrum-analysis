@@ -926,6 +926,9 @@ function normalizeModeLabel(mode) {
   if (text === "CW_CANDIDATE") {
     return "CW TRAFFIC";
   }
+  if (text === "SSB_TRAFFIC") {
+    return "SSB TRAFFIC";
+  }
   return text || "SIG";
 }
 
@@ -937,6 +940,9 @@ function modeMatchesSelectedMode(modeValue, selectedModeValue) {
   }
   if (selectedMode === "CW") {
     return mode === "CW" || mode === "CW_CANDIDATE";
+  }
+  if (selectedMode === "SSB") {
+    return mode === "SSB" || mode === "SSB_TRAFFIC";
   }
   return mode === selectedMode;
 }
@@ -2176,6 +2182,9 @@ function applyEventsCardTypeFilter(items) {
   const selected = String(eventsTypeFilter?.value || "all").trim();
   if (selected === "cw-candidate") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW_CANDIDATE");
+  }
+  if (selected === "ssb-traffic") {
+    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
   }
   if (selected === "cw-only") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW");
