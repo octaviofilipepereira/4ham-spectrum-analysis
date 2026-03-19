@@ -1452,7 +1452,10 @@ function updateCallsignCacheFromEvent(eventItem) {
     }
   }
   
-  const callsign = String(eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "").trim().toUpperCase();
+  const allowRawCallsignInference = eventMode !== "SSB_TRAFFIC";
+  const callsign = String(
+    eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || ""
+  ).trim().toUpperCase();
   const frequencyHz = Number(eventItem.frequency_hz);
   const mode = eventMode;
   const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
@@ -1717,7 +1720,7 @@ function isValidCallsign(value) {
   if (!text) {
     return true;
   }
-  return /^[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
+  return /^(?=.*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
 }
 
 function extractCallsignFromRaw(value) {
@@ -1725,7 +1728,7 @@ function extractCallsignFromRaw(value) {
   if (!text) {
     return "";
   }
-  const match = text.match(/\b[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
+  const match = text.match(/\b(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
   return match ? match[0] : "";
 }
 
@@ -2191,7 +2194,11 @@ function applyEventsCardTypeFilter(items) {
   }
   if (selected === "callsign-only") {
     return source.filter((eventItem) => {
-      const callsignText = String(eventItem?.callsign || extractCallsignFromRaw(eventItem?.raw) || "").trim();
+      const modeText = String(eventItem?.mode || "").trim().toUpperCase();
+      const allowRawCallsignInference = modeText !== "SSB_TRAFFIC";
+      const callsignText = String(
+        eventItem?.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem?.raw) : "") || ""
+      ).trim();
       return callsignText.length > 0;
     });
   }
@@ -2407,7 +2414,9 @@ function renderEventList(targetEl, items, emptyMessage) {
     const frequencyValue = Number(eventItem.frequency_hz);
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
-    const callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "NO CALLSIGN DETECTED";
+    const modeText = String(eventItem.mode || "").trim().toUpperCase();
+    const allowRawCallsignInference = modeText !== "SSB_TRAFFIC";
+    const callsign = eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || "NO CALLSIGN DETECTED";
     const decodedText = extractDecodedText(eventItem);
 
     const frequencyEl = document.createElement("strong");
