@@ -178,7 +178,9 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
     base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
     snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
-    ssb_score = min(0.78, max(0.35, base_confidence + snr_bonus + 0.12))
+    ssb_score = min(0.95, max(0.35, base_confidence + snr_bonus + 0.12))
+    if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78):
+        return
 
     msg = f"SSB traffic candidate @ {frequency_hz / 1_000_000:.3f} MHz"
     payload = {
@@ -305,6 +307,10 @@ async def _run_ssb_detector_loop() -> None:
                 mode_name = "SSB"
                 mode_confidence = max(float(mode_confidence or 0.0), 0.6)
             else:
+                continue
+
+            min_ssb_confidence = float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78)
+            if mode_confidence < min_ssb_confidence:
                 continue
 
             event = {

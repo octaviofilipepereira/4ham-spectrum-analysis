@@ -252,9 +252,13 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                     continue
 
             if decoder_mode == "ssb":
-                min_snr_db = max(6.0, float(state.marker_min_snr_db) - 3.0)
-                min_confidence = max(0.40, float(state.marker_min_confidence) - 0.10)
-                min_hits_required = 1
+                # Keep SSB markers strict: only high-confidence repeated detections.
+                min_snr_db = max(10.0, float(state.marker_min_snr_db))
+                min_confidence = max(
+                    float(state.marker_min_confidence),
+                    float(getattr(state, "ssb_traffic_min_confidence", 0.88) or 0.88),
+                )
+                min_hits_required = max(3, int(state.marker_min_hits))
             else:
                 min_snr_db = float(state.marker_min_snr_db)
                 min_confidence = float(state.marker_min_confidence)
@@ -345,9 +349,16 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "confidence": cw_m["confidence"],
             })
 
-        # Sort markers by offset and limit to 24
+        # Sort markers by offset and cap SSB marker volume aggressively to
+        # avoid flooding the waterfall with weak/transient false positives.
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
-        mode_markers = mode_markers[:24]
+        if decoder_mode == "ssb":
+            _ssb_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() == "SSB_TRAFFIC"]
+            _other_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() != "SSB_TRAFFIC"]
+            _ssb_markers = _ssb_markers[:4]
+            mode_markers = (_ssb_markers + _other_markers)[:24]
+        else:
+            mode_markers = mode_markers[:24]
         
         # Determine scan boundaries
         scan_start_hz = None

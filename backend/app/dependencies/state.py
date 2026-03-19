@@ -172,6 +172,9 @@ marker_min_confidence = _env_float("MARKER_MIN_CONFIDENCE", 0.55)
 marker_min_hits = _env_int("MARKER_MIN_HITS", 2)
 marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 10.0)
 
+# SSB false-positive control: only persist/visualize SSB traffic above this confidence.
+ssb_traffic_min_confidence = _env_float("SSB_TRAFFIC_MIN_CONFIDENCE", 0.88)
+
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Configuration
@@ -262,7 +265,8 @@ decoder_status = {
         "agc_max_gain_db": agc_max_gain_db,
         "agc_alpha": agc_alpha,
         "snr_threshold_db": snr_threshold_db,
-        "min_bw_hz": min_bw_hz
+        "min_bw_hz": min_bw_hz,
+        "ssb_traffic_min_confidence": ssb_traffic_min_confidence,
     },
     "internal_native": {
         "ft_internal_enable": ft_internal_enable,
