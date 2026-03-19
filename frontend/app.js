@@ -656,7 +656,9 @@ const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
 const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
 const WATERFALL_MARKER_TTL_SSB_MS = 30000;  // SSB fallback when pass_count is unavailable
-const WATERFALL_MARKER_TTL_SSB_PASSES = 2;  // keep SSB markers visible across pass boundaries
+const WATERFALL_MARKER_TTL_SSB_PASSES = 0;  // keep SSB markers only during the current scan cycle
+const WATERFALL_MARKER_BUCKET_HZ = 50;
+const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;
 const waterfallMarkerCache = new Map();
 // Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
 // 15-20 dB below the noise floor so DSP quality gates never fire for them.
@@ -1171,8 +1173,9 @@ function buildStableWaterfallMarkers(frame) {
       if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
         return;
       }
-      const key = `${Math.round(frequencyHz / 50) * 50}`;
       const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
+      const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
+      const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
       waterfallMarkerCache.set(key, {
         frequency_hz: frequencyHz,
         mode: markerModeRaw,
@@ -1199,6 +1202,10 @@ function buildStableWaterfallMarkers(frame) {
     if (isSsb && hasCurrentPassCount) {
       const seenPassCount = Number(marker?.seen_pass_count);
       if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) <= WATERFALL_MARKER_TTL_SSB_PASSES) {
+        continue;
+      }
+      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) > WATERFALL_MARKER_TTL_SSB_PASSES) {
+        waterfallMarkerCache.delete(key);
         continue;
       }
     }
@@ -2994,6 +3001,12 @@ async function startScan() {
     showToast("⚠️ Select the desired mode before starting the scan");
     return;
   }
+
+  // Phase 1.4 behavior: markers are tied to the current scan session only.
+  waterfallMarkerCache.clear();
+  waterfallDecodedMarkerCache.clear();
+  waterfallCallsignCache.clear();
+  _overlayLastFingerprint = "";
 
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
