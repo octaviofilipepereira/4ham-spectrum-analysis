@@ -5,6 +5,7 @@
 
 import asyncio
 import os
+import time
 from typing import Optional, Dict, Any, BinaryIO
 import numpy as np
 import numpy.typing as npt
@@ -58,6 +59,18 @@ class ScanEngine:
         self._spectrum_queue: Optional[asyncio.Queue] = None
         self._iq_listeners: list = []
         self._pump_task: Optional[asyncio.Task] = None
+        # SSB candidate focus mode: keep scan dwell short globally, but extend
+        # dwell on frequencies repeatedly flagged as active SSB traffic.
+        self._ssb_focus_enabled: bool = False
+        self._ssb_focus_hold_ms: int = 15000
+        self._ssb_focus_candidate_ttl_s: float = 20.0
+        self._ssb_focus_hits_required: int = 2
+        self._ssb_focus_cooldown_s: float = 20.0
+        self._ssb_focus_bucket_hz: int = 2000
+        self._ssb_focus_max_holds_per_pass: int = 2
+        self._ssb_focus_holds_in_pass: int = 0
+        # bucket_hz -> {hits, last_seen, last_hold_at, max_snr_db, max_confidence}
+        self._ssb_focus_candidates: Dict[int, Dict[str, float]] = {}
 
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
@@ -77,6 +90,33 @@ class ScanEngine:
         self.mode = self.config.get("mode", "auto")
         self.center_hz = int(self.config.get("center_hz", self.start_hz or 0))
         self.current_hz = self.center_hz
+        self._ssb_focus_enabled = bool(self.config.get("ssb_focus_enable", False))
+        self._ssb_focus_hold_ms = max(
+            int(self.config.get("ssb_focus_hold_ms", 15000) or 15000),
+            0,
+        )
+        self._ssb_focus_candidate_ttl_s = max(
+            float(self.config.get("ssb_focus_candidate_ttl_s", 20.0) or 20.0),
+            1.0,
+        )
+        self._ssb_focus_hits_required = max(
+            int(self.config.get("ssb_focus_hits_required", 2) or 2),
+            1,
+        )
+        self._ssb_focus_cooldown_s = max(
+            float(self.config.get("ssb_focus_cooldown_s", 20.0) or 20.0),
+            0.0,
+        )
+        self._ssb_focus_bucket_hz = max(
+            int(self.config.get("ssb_focus_bucket_hz", self.step_hz or 2000) or (self.step_hz or 2000)),
+            250,
+        )
+        self._ssb_focus_max_holds_per_pass = max(
+            int(self.config.get("ssb_focus_max_holds_per_pass", 2) or 2),
+            1,
+        )
+        self._ssb_focus_holds_in_pass = 0
+        self._ssb_focus_candidates.clear()
         # Always reset parked state on new scan — a previous scan may have left
         # the engine parked (e.g. WSPR window was in progress when scan stopped),
         # which would block the new scan loop immediately.
@@ -259,6 +299,88 @@ class ScanEngine:
         self._parked_event.set()
         logger.info(f"scan_engine_unparked")
 
+    def report_ssb_candidate(
+        self,
+        frequency_hz: int,
+        snr_db: float = 0.0,
+        confidence: float = 0.0,
+    ) -> None:
+        """Report a detected SSB candidate frequency to the scan engine."""
+        if not self._ssb_focus_enabled:
+            return
+        try:
+            frequency_hz = int(frequency_hz)
+        except (TypeError, ValueError):
+            return
+        if frequency_hz <= 0:
+            return
+
+        now_ts = time.time()
+        bucket_hz = max(250, int(self._ssb_focus_bucket_hz or self.step_hz or 2000))
+        bucket_key = int(round(frequency_hz / bucket_hz) * bucket_hz)
+
+        stale_before = now_ts - float(self._ssb_focus_candidate_ttl_s)
+        for key, candidate in list(self._ssb_focus_candidates.items()):
+            if float(candidate.get("last_seen", 0.0)) < stale_before:
+                self._ssb_focus_candidates.pop(key, None)
+
+        candidate = self._ssb_focus_candidates.get(bucket_key)
+        if candidate is None:
+            self._ssb_focus_candidates[bucket_key] = {
+                "hits": 1.0,
+                "last_seen": now_ts,
+                "last_hold_at": 0.0,
+                "max_snr_db": float(snr_db or 0.0),
+                "max_confidence": float(confidence or 0.0),
+            }
+            return
+
+        candidate["hits"] = min(float(candidate.get("hits", 0.0)) + 1.0, 1000.0)
+        candidate["last_seen"] = now_ts
+        candidate["max_snr_db"] = max(float(candidate.get("max_snr_db", 0.0)), float(snr_db or 0.0))
+        candidate["max_confidence"] = max(
+            float(candidate.get("max_confidence", 0.0)),
+            float(confidence or 0.0),
+        )
+
+    def _resolve_ssb_focus_extra_dwell_ms(self, frequency_hz: int) -> int:
+        if not self._ssb_focus_enabled:
+            return 0
+        if self._ssb_focus_holds_in_pass >= self._ssb_focus_max_holds_per_pass:
+            return 0
+        if frequency_hz <= 0:
+            return 0
+
+        now_ts = time.time()
+        bucket_hz = max(250, int(self._ssb_focus_bucket_hz or self.step_hz or 2000))
+        bucket_key = int(round(frequency_hz / bucket_hz) * bucket_hz)
+        candidate = self._ssb_focus_candidates.get(bucket_key)
+        if candidate is None:
+            return 0
+
+        last_seen = float(candidate.get("last_seen", 0.0))
+        if (now_ts - last_seen) > float(self._ssb_focus_candidate_ttl_s):
+            self._ssb_focus_candidates.pop(bucket_key, None)
+            return 0
+
+        hits = int(candidate.get("hits", 0.0) or 0)
+        if hits < self._ssb_focus_hits_required:
+            return 0
+
+        last_hold_at = float(candidate.get("last_hold_at", 0.0) or 0.0)
+        if (now_ts - last_hold_at) < float(self._ssb_focus_cooldown_s):
+            return 0
+
+        target_hold_ms = max(int(self._ssb_focus_hold_ms), int(self.dwell_ms))
+        extra_ms = max(0, target_hold_ms - int(self.dwell_ms))
+        if extra_ms <= 0:
+            return 0
+
+        candidate["last_hold_at"] = now_ts
+        candidate["hits"] = 0.0
+        self._ssb_focus_holds_in_pass += 1
+        return extra_ms
+
     async def _scan_loop(self) -> None:
         start_hz = self.start_hz or self.center_hz
         end_hz = self.end_hz or start_hz
@@ -272,6 +394,7 @@ class ScanEngine:
         while self.running:
             freq = start_hz
             self.step_index = 0
+            self._ssb_focus_holds_in_pass = 0
             while freq <= end_hz and self.running:
                 # If parked by the FT decoder, wait until unparked
                 if self._parked:
@@ -285,6 +408,9 @@ class ScanEngine:
                 if settle_ms > 0:
                     await asyncio.sleep(settle_ms / 1000.0)
                 await asyncio.sleep(dwell_ms / 1000.0)
+                extra_dwell_ms = self._resolve_ssb_focus_extra_dwell_ms(freq)
+                if extra_dwell_ms > 0:
+                    await asyncio.sleep(extra_dwell_ms / 1000.0)
                 freq += step_hz
                 self.step_index += 1
             self.pass_count += 1
@@ -396,5 +522,14 @@ class ScanEngine:
             "end_hz": self.end_hz,
             "step_hz": self.step_hz,
             "dwell_ms": self.dwell_ms,
-            "settle_ms": self.settle_ms
+            "settle_ms": self.settle_ms,
+            "ssb_focus_enable": self._ssb_focus_enabled,
+            "ssb_focus_hold_ms": self._ssb_focus_hold_ms,
+            "ssb_focus_hits_required": self._ssb_focus_hits_required,
+            "ssb_focus_candidate_ttl_s": self._ssb_focus_candidate_ttl_s,
+            "ssb_focus_cooldown_s": self._ssb_focus_cooldown_s,
+            "ssb_focus_bucket_hz": self._ssb_focus_bucket_hz,
+            "ssb_focus_max_holds_per_pass": self._ssb_focus_max_holds_per_pass,
+            "ssb_focus_candidates": len(self._ssb_focus_candidates),
+            "ssb_focus_holds_in_pass": self._ssb_focus_holds_in_pass,
         }

@@ -327,6 +327,17 @@ async def _run_ssb_detector_loop() -> None:
             if not is_plausible_occupancy_event(event):
                 continue
 
+            # Feed scan engine candidate-focus logic so SSB scan can hold longer
+            # on repeatedly active frequencies without slowing full-band sweep.
+            try:
+                state.scan_engine.report_ssb_candidate(
+                    frequency_hz=frequency_hz,
+                    snr_db=float(best.get("snr_db") or 0.0),
+                    confidence=float(mode_confidence or 0.0),
+                )
+            except Exception:
+                pass
+
             state.db.insert_occupancy(event)
             _emit_ssb_traffic_event_from_occupancy(event)
 

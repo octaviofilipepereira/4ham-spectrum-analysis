@@ -233,6 +233,15 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         )
         scan["start_hz"] = clipped_start_hz
         scan["end_hz"] = clipped_end_hz
+        # Candidate-focus SSB scanning: keep fast sweep, but hold longer when
+        # repeated occupancy candidates are detected on the current block.
+        scan.setdefault("ssb_focus_enable", True)
+        scan.setdefault("ssb_focus_hold_ms", 15000)
+        scan.setdefault("ssb_focus_hits_required", 2)
+        scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
+        scan.setdefault("ssb_focus_cooldown_s", 20.0)
+        scan.setdefault("ssb_focus_bucket_hz", 2000)
+        scan.setdefault("ssb_focus_max_holds_per_pass", 2)
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 
