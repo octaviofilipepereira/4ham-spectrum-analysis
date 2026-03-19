@@ -655,6 +655,8 @@ const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR dev
 const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
 const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
+const WATERFALL_MARKER_TTL_SSB_MS = 30000;  // SSB fallback when pass_count is unavailable
+const WATERFALL_MARKER_TTL_SSB_PASSES = 2;  // keep SSB markers visible across pass boundaries
 const waterfallMarkerCache = new Map();
 // Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
 // 15-20 dB below the noise floor so DSP quality gates never fire for them.
@@ -1114,6 +1116,8 @@ function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, 
 }
 
 function buildStableWaterfallMarkers(frame) {
+  const currentPassCount = Number(frame?.pass_count);
+  const hasCurrentPassCount = Number.isFinite(currentPassCount) && currentPassCount >= 0;
   const displayStartHz = Number(frame?.band_display_start_hz || 0);
   const displayEndHz = Number(frame?.band_display_end_hz || 0);
   const hasDisplayRange = Number.isFinite(displayStartHz)
@@ -1168,20 +1172,41 @@ function buildStableWaterfallMarkers(frame) {
         return;
       }
       const key = `${Math.round(frequencyHz / 50) * 50}`;
+      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
       waterfallMarkerCache.set(key, {
         frequency_hz: frequencyHz,
         mode: markerModeRaw,
         snr_db: Number(marker?.snr_db),
         crest_db: Number(marker?.crest_db),
-        seen_at: now
+        seen_at: now,
+        seen_pass_count: isSsbMarker && hasCurrentPassCount ? currentPassCount : null
       });
     });
   }
 
   for (const [key, marker] of waterfallMarkerCache.entries()) {
-    const isCw = marker?.mode === "CW" || marker?.mode === "CW_CANDIDATE";
-    const ttl  = isCw ? WATERFALL_MARKER_TTL_CW_MS : WATERFALL_MARKER_TTL_MS;
-    if ((now - Number(marker?.seen_at || 0)) > ttl) {
+    const markerModeText = String(marker?.mode || "").trim().toUpperCase();
+    const isCw = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
+    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
+    const seenAt = Number(marker?.seen_at || 0);
+    if (!Number.isFinite(seenAt) || seenAt <= 0) {
+      waterfallMarkerCache.delete(key);
+      continue;
+    }
+
+    // Phase 1.4: SSB markers are persisted across sweep passes to reduce
+    // flicker and preserve context while the scanner revisits frequencies.
+    if (isSsb && hasCurrentPassCount) {
+      const seenPassCount = Number(marker?.seen_pass_count);
+      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) <= WATERFALL_MARKER_TTL_SSB_PASSES) {
+        continue;
+      }
+    }
+
+    const ttl = isCw
+      ? WATERFALL_MARKER_TTL_CW_MS
+      : (isSsb ? WATERFALL_MARKER_TTL_SSB_MS : WATERFALL_MARKER_TTL_MS);
+    if ((now - seenAt) > ttl) {
       waterfallMarkerCache.delete(key);
     }
   }

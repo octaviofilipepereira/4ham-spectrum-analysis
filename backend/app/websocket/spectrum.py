@@ -410,6 +410,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "noise_floor_db": noise_floor_db,
                 "peaks": peaks,
                 "mode_markers": mode_markers,
+                "pass_count": int(getattr(state.scan_engine, "pass_count", 0) or 0),
                 "scan_start_hz": scan_start_hz,
                 "scan_end_hz": scan_end_hz,
                 "band_display_start_hz": band_display_start_hz,
