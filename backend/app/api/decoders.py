@@ -182,7 +182,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
 
     msg = f"SSB traffic candidate @ {frequency_hz / 1_000_000:.3f} MHz"
     payload = {
-        "mode": "SSB",
+        "mode": "SSB_TRAFFIC",
         "callsign": "",
         "raw": msg,
         "msg": msg,
