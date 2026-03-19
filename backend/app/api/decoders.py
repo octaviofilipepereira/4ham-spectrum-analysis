@@ -273,7 +273,8 @@ async def _run_ssb_detector_loop() -> None:
             candidates = []
             for candidate in occupancy:
                 bw_hz = int(safe_float(candidate.get("bandwidth_hz"), 0) or 0)
-                if bw_hz < 250 or bw_hz > 5000:
+                # SSB standard is 2.7 kHz; accept only 2.4–3.0 kHz to reject AM and distorted signals
+                if bw_hz < 2400 or bw_hz > 3000:
                     continue
                 candidates.append(candidate)
             if not candidates:
