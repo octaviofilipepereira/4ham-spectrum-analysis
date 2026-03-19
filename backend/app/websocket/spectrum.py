@@ -190,6 +190,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             if state.scan_engine.config 
             else None
         )
+        decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
         center_hz = float(state.scan_engine.center_hz or 0.0)
         now_ts = time.time()
         
@@ -235,15 +236,34 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 bandwidth_hz=bandwidth_hz
             ):
                 continue
-            
-            # Filter: only show known digital mode markers (DSP occupancy pipeline)
-            if mode_name not in ("FT8", "FT4", "WSPR"):
-                continue
-            
+
+            # Marker mode selection is decoder-mode aware.
+            marker_mode_name = mode_name
+            if decoder_mode == "ssb":
+                # In SSB mode, occupancy classifier may bounce between SSB and AM
+                # depending on bandwidth. Normalize both to SSB_TRAFFIC so the
+                # frontend can render a single consistent marker class.
+                if mode_name not in ("SSB", "AM"):
+                    continue
+                marker_mode_name = "SSB_TRAFFIC"
+            else:
+                # For non-SSB modes keep existing digital marker behavior.
+                if mode_name not in ("FT8", "FT4", "WSPR"):
+                    continue
+
+            if decoder_mode == "ssb":
+                min_snr_db = max(6.0, float(state.marker_min_snr_db) - 3.0)
+                min_confidence = max(0.40, float(state.marker_min_confidence) - 0.10)
+                min_hits_required = 1
+            else:
+                min_snr_db = float(state.marker_min_snr_db)
+                min_confidence = float(state.marker_min_confidence)
+                min_hits_required = int(state.marker_min_hits)
+
             # Quality gate: filter weak / low-confidence detections
-            if snr_db < state.marker_min_snr_db:
+            if snr_db < min_snr_db:
                 continue
-            if mode_confidence < state.marker_min_confidence:
+            if mode_confidence < min_confidence:
                 continue
             
             # Temporal persistence: require repeated detections
@@ -261,7 +281,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                     "marker": {
                         "offset_hz": offset_hz,
                         "frequency_hz": frequency_hz,
-                        "mode": mode_name,
+                        "mode": marker_mode_name,
                         "snr_db": snr_db,
                         "bandwidth_hz": bandwidth_hz,
                         "confidence": float(mode_confidence),
@@ -269,7 +289,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 }
                 
                 # Show immediately if minimum hits threshold is 1
-                if state.marker_min_hits <= 1:
+                if min_hits_required <= 1:
                     mode_markers.append(
                         state.marker_candidates[bucket_key]["marker"]
                     )
@@ -281,14 +301,14 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             cand["marker"] = {
                 "offset_hz": offset_hz,
                 "frequency_hz": frequency_hz,
-                "mode": mode_name,
+                "mode": marker_mode_name,
                 "snr_db": snr_db,
                 "bandwidth_hz": bandwidth_hz,
                 "confidence": float(mode_confidence),
             }
             
             # Include marker if it has enough hits
-            if cand["hits"] >= state.marker_min_hits:
+            if cand["hits"] >= min_hits_required:
                 mode_markers.append(cand["marker"])
         
         # Merge CW decode markers (come from actual decodes, not DSP occupancy)

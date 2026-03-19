@@ -63,6 +63,22 @@ _SSB_SUBBANDS_HZ = {
     "10m": (28_300_000, 29_700_000),
 }
 
+_DEFAULT_BAND_BOUNDS_HZ = {
+    "160m": (1_810_000, 2_000_000),
+    "80m": (3_500_000, 3_800_000),
+    "60m": (5_250_000, 5_450_000),
+    "40m": (7_000_000, 7_200_000),
+    "30m": (10_100_000, 10_150_000),
+    "20m": (14_000_000, 14_350_000),
+    "17m": (18_068_000, 18_168_000),
+    "15m": (21_000_000, 21_450_000),
+    "12m": (24_890_000, 24_990_000),
+    "10m": (28_000_000, 29_700_000),
+    "6m": (50_000_000, 54_000_000),
+    "2m": (144_000_000, 146_000_000),
+    "70cm": (430_000_000, 440_000_000),
+}
+
 
 def _resolve_cw_sweep_bounds(
     band_name: str,
@@ -114,6 +130,10 @@ def _lookup_band_bounds(band_name: str) -> tuple[Optional[int], Optional[int]]:
         if band_start_hz > 0 and band_end_hz > band_start_hz:
             return band_start_hz, band_end_hz
         break
+
+    default_bounds = _DEFAULT_BAND_BOUNDS_HZ.get(band)
+    if default_bounds:
+        return int(default_bounds[0]), int(default_bounds[1])
 
     return None, None
 
