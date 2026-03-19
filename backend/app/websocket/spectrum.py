@@ -78,6 +78,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 ],
                 "scan_start_hz": 14000000,
                 "scan_end_hz": 14350000,
+                "band_display_start_hz": 14000000,
+                "band_display_end_hz": 14350000,
                 "agc_gain_db": 12.5
             }
         }
@@ -330,6 +332,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         # Determine scan boundaries
         scan_start_hz = None
         scan_end_hz = None
+        band_display_start_hz = None
+        band_display_end_hz = None
         if state.scan_engine.config:
             scan_start_hz = int(
                 safe_float(state.scan_engine.config.get("start_hz"), default=0) or 0
@@ -345,6 +349,20 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             ):
                 scan_start_hz = None
                 scan_end_hz = None
+
+            band_display_start_hz = int(
+                safe_float(state.scan_engine.config.get("band_display_start_hz"), default=0) or 0
+            )
+            band_display_end_hz = int(
+                safe_float(state.scan_engine.config.get("band_display_end_hz"), default=0) or 0
+            )
+            if (
+                band_display_start_hz <= 0
+                or band_display_end_hz <= 0
+                or band_display_end_hz <= band_display_start_hz
+            ):
+                band_display_start_hz = None
+                band_display_end_hz = None
 
         # In preview mode there is no scan config.  Use the explicit band
         # boundaries stored on the engine when the user selected a band
@@ -394,6 +412,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "mode_markers": mode_markers,
                 "scan_start_hz": scan_start_hz,
                 "scan_end_hz": scan_end_hz,
+                "band_display_start_hz": band_display_start_hz,
+                "band_display_end_hz": band_display_end_hz,
                 "agc_gain_db": agc_gain_db
             }
         }

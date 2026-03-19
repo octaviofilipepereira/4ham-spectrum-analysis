@@ -388,14 +388,26 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
 
 function getWaterfallFullRangeHz() {
   const frame = lastSpectrumFrame;
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
   const centerHz = Number(frame?.center_hz || 0);
   const spanHz = Number(frame?.span_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const hasScanRange = Number.isFinite(scanStartHz)
     && Number.isFinite(scanEndHz)
     && scanStartHz > 0
     && scanEndHz > scanStartHz;
+  if (hasDisplayRange) {
+    return {
+      startHz: displayStartHz,
+      spanHz: displayEndHz - displayStartHz,
+    };
+  }
   if (hasScanRange) {
     return {
       startHz: scanStartHz,
@@ -831,8 +843,14 @@ function getWaterfallViewport(frame) {
   const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
   const centerHz = Number(frame?.center_hz || 0);
   const spanHz = Number(frame?.span_hz || 0);
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const hasScanRange = Number.isFinite(scanStartHz)
     && Number.isFinite(scanEndHz)
     && scanStartHz > 0
@@ -865,9 +883,13 @@ function getWaterfallViewport(frame) {
   const startBin = Math.max(0, Math.min(totalBins - visibleBins, Math.round(waterfallExplorerPan * totalBins)));
   const fftDb = stitched.slice(startBin, startBin + visibleBins);
 
-  const fullSpanHz = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
+  const fullSpanHz = hasDisplayRange
+    ? (displayEndHz - displayStartHz)
+    : (hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT));
   const visibleSpanHz = fullSpanHz / zoom;
-  const fullStartHz = hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2));
+  const fullStartHz = hasDisplayRange
+    ? displayStartHz
+    : (hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2)));
   const startHz = fullStartHz + (waterfallExplorerPan * fullSpanHz);
   const endHz = startHz + visibleSpanHz;
 
@@ -1066,6 +1088,12 @@ function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, 
     }
     return { startHz: Number(stableRangeStartHz), endHz: Number(stableRangeEndHz) };
   }
+  if (isValidRange(frame?.band_display_start_hz, frame?.band_display_end_hz)) {
+    return {
+      startHz: Number(frame.band_display_start_hz),
+      endHz: Number(frame.band_display_end_hz)
+    };
+  }
   if (isValidRange(frame?.scan_start_hz, frame?.scan_end_hz)) {
     return { startHz: Number(frame.scan_start_hz), endHz: Number(frame.scan_end_hz) };
   }
@@ -1080,6 +1108,12 @@ function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, 
 }
 
 function buildStableWaterfallMarkers(frame) {
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
   const hasScanRange = Number.isFinite(scanStartHz)
@@ -1088,8 +1122,12 @@ function buildStableWaterfallMarkers(frame) {
     && scanEndHz > scanStartHz;
   const defaultStartHz = Number(frame?.center_hz || 0) - (Number(frame?.span_hz || 0) / 2);
   const defaultEndHz = Number(frame?.center_hz || 0) + (Number(frame?.span_hz || 0) / 2);
-  const rangeStartHz = hasScanRange ? scanStartHz : defaultStartHz;
-  const rangeEndHz = hasScanRange ? scanEndHz : defaultEndHz;
+  const rangeStartHz = hasDisplayRange
+    ? displayStartHz
+    : (hasScanRange ? scanStartHz : defaultStartHz);
+  const rangeEndHz = hasDisplayRange
+    ? displayEndHz
+    : (hasScanRange ? scanEndHz : defaultEndHz);
   
   // Only show markers during active scan with mode selected
   if (!isScanRunning || !selectedDecoderMode) {
@@ -5107,15 +5145,16 @@ function updateVFODisplay(startHz, endHz) {
       return;
     }
     const targetHz = Math.round(mhz * 1_000_000);
-    const frame = lastSpectrumFrame;
-    const scanStartHz = Number(frame?.scan_start_hz || 0);
-    const scanEndHz   = Number(frame?.scan_end_hz   || 0);
-    const centerHz    = Number(frame?.center_hz     || 0);
-    const spanHz      = Number(frame?.span_hz       || 0);
-    const hasScanRange = scanStartHz > 0 && scanEndHz > scanStartHz;
-    const fullStartHz  = hasScanRange ? scanStartHz : (centerHz - (spanHz * WATERFALL_SEGMENT_COUNT / 2));
-    const fullSpanHz   = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
-    if (!fullSpanHz || targetHz < fullStartHz || targetHz > fullStartHz + fullSpanHz) {
+    const fullRange = getWaterfallFullRangeHz();
+    const fullStartHz = Number(fullRange?.startHz || 0);
+    const fullSpanHz = Number(fullRange?.spanHz || 0);
+    if (
+      !Number.isFinite(fullStartHz)
+      || !Number.isFinite(fullSpanHz)
+      || fullSpanHz <= 0
+      || targetHz < fullStartHz
+      || targetHz > fullStartHz + fullSpanHz
+    ) {
       showToast(`${mhz.toFixed(3)} MHz is outside the current band`);
       return;
     }

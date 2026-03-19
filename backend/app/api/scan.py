@@ -53,7 +53,14 @@ _CW_SUBBANDS_HZ = {
 }
 
 _SSB_SUBBANDS_HZ = {
-    "40m": (7_090_000, 7_199_000),
+    "160m": (1_843_000, 2_000_000),
+    "80m": (3_600_000, 4_000_000),
+    "40m": (7_043_000, 7_200_000),
+    "20m": (14_100_000, 14_350_000),
+    "17m": (18_100_000, 18_168_000),
+    "15m": (21_200_000, 21_450_000),
+    "12m": (24_930_000, 24_990_000),
+    "10m": (28_300_000, 29_700_000),
 }
 
 
@@ -89,7 +96,42 @@ def _resolve_ssb_bounds(
     ssb_start, ssb_end = ssb_bounds
     clipped_start = max(int(start_hz), int(ssb_start))
     clipped_end = min(int(end_hz), int(ssb_end))
+    if clipped_end <= clipped_start:
+        return int(start_hz), int(end_hz)
     return int(clipped_start), int(clipped_end)
+
+
+def _lookup_band_bounds(band_name: str) -> tuple[Optional[int], Optional[int]]:
+    band = str(band_name or "").strip().lower()
+    if not band:
+        return None, None
+
+    for band_entry in state.db.get_bands():
+        if str(band_entry.get("name", "")).strip().lower() != band:
+            continue
+        band_start_hz = int(band_entry.get("start_hz", 0) or 0)
+        band_end_hz = int(band_entry.get("end_hz", 0) or 0)
+        if band_start_hz > 0 and band_end_hz > band_start_hz:
+            return band_start_hz, band_end_hz
+        break
+
+    return None, None
+
+
+def _resolve_band_display_bounds(
+    band_name: str,
+    start_hz: int,
+    end_hz: int,
+) -> tuple[Optional[int], Optional[int]]:
+    band_start_hz, band_end_hz = _lookup_band_bounds(band_name)
+    if band_start_hz is not None and band_end_hz is not None:
+        return band_start_hz, band_end_hz
+
+    requested_start_hz = int(start_hz or 0)
+    requested_end_hz = int(end_hz or 0)
+    if requested_start_hz > 0 and requested_end_hz > requested_start_hz:
+        return requested_start_hz, requested_end_hz
+    return None, None
 
 
 @router.post("/start")
@@ -141,15 +183,21 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if scan.get("band"):
         start_hz = int(scan.get("start_hz", 0) or 0)
         end_hz = int(scan.get("end_hz", 0) or 0)
-        
-        if start_hz <= 0 or end_hz <= 0:
-            for band in state.db.get_bands():
-                if str(band.get("name", "")).lower() == str(scan.get("band", "")).lower():
-                    if start_hz <= 0:
-                        scan["start_hz"] = band.get("start_hz")
-                    if end_hz <= 0:
-                        scan["end_hz"] = band.get("end_hz")
-                    break
+        band_start_hz, band_end_hz = _lookup_band_bounds(scan.get("band"))
+
+        if start_hz <= 0 and band_start_hz is not None:
+            scan["start_hz"] = band_start_hz
+        if end_hz <= 0 and band_end_hz is not None:
+            scan["end_hz"] = band_end_hz
+
+    band_display_start_hz, band_display_end_hz = _resolve_band_display_bounds(
+        scan.get("band"),
+        scan.get("start_hz", 0),
+        scan.get("end_hz", 0),
+    )
+    if band_display_start_hz is not None and band_display_end_hz is not None:
+        scan["band_display_start_hz"] = band_display_start_hz
+        scan["band_display_end_hz"] = band_display_end_hz
 
     # Validate frequency range
     start_hz = int(scan.get("start_hz", 0) or 0)
