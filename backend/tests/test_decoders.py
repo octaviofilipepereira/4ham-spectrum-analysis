@@ -72,13 +72,13 @@ def test_ssb_asr_parser_accepts_german_number_words_with_umlaut():
     assert event["callsign"] == "CT5ABC/P"
 
 
-def test_build_callsign_event_allows_ssb_traffic_without_callsign():
+def test_build_callsign_event_allows_ssb_without_callsign():
     event = build_callsign_event(
         {
             "mode": "SSB",
             "raw": "good afternoon all stations",
             "msg": "good afternoon all stations",
-            "ssb_state": "SSB_TRAFFIC",
+            "ssb_state": "SSB",
             "ssb_score": 0.41,
             "ssb_parse_method": "none",
         },
@@ -88,7 +88,7 @@ def test_build_callsign_event_allows_ssb_traffic_without_callsign():
     assert event["mode"] == "SSB"
     assert event["callsign"] == ""
     payload = json.loads(event["payload"])
-    assert payload["ssb_state"] == "SSB_TRAFFIC"
+    assert payload["ssb_state"] == "SSB"
     assert float(payload["ssb_score"]) == 0.41
     assert payload["ssb_parse_method"] == "none"
 

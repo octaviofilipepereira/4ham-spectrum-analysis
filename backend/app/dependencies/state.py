@@ -170,10 +170,10 @@ min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
 marker_min_snr_db = _env_float("MARKER_MIN_SNR_DB", 10.0)
 marker_min_confidence = _env_float("MARKER_MIN_CONFIDENCE", 0.55)
 marker_min_hits = _env_int("MARKER_MIN_HITS", 2)
-marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 10.0)
+marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 30.0)  # Allow markers to persist across 2+ scan cycles
 
 # SSB false-positive control: only persist/visualize SSB traffic above this confidence.
-ssb_traffic_min_confidence = _env_float("SSB_TRAFFIC_MIN_CONFIDENCE", 0.88)
+ssb_traffic_min_confidence = _env_float("SSB_TRAFFIC_MIN_CONFIDENCE", 0.78)
 
 
 # ═══════════════════════════════════════════════════════════════════

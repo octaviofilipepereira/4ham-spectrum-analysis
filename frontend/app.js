@@ -930,8 +930,8 @@ function normalizeModeLabel(mode) {
   if (text === "CW_CANDIDATE") {
     return "CW TRAFFIC";
   }
-  if (text === "SSB_TRAFFIC") {
-    return "SSB TRAFFIC";
+  if (text === "SSB_DETECTED") {
+    return "SSB DETECTED";
   }
   return text || "SIG";
 }
@@ -946,7 +946,7 @@ function modeMatchesSelectedMode(modeValue, selectedModeValue) {
     return mode === "CW" || mode === "CW_CANDIDATE";
   }
   if (selectedMode === "SSB") {
-    return mode === "SSB" || mode === "SSB_TRAFFIC";
+    return mode === "SSB" || mode === "SSB_DETECTED";
   }
   return mode === selectedMode;
 }
@@ -1173,7 +1173,7 @@ function buildStableWaterfallMarkers(frame) {
       if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
         return;
       }
-      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
+      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_DETECTED";
       const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
       const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
       waterfallMarkerCache.set(key, {
@@ -1190,7 +1190,7 @@ function buildStableWaterfallMarkers(frame) {
   for (const [key, marker] of waterfallMarkerCache.entries()) {
     const markerModeText = String(marker?.mode || "").trim().toUpperCase();
     const isCw = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
+    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_DETECTED";
     const seenAt = Number(marker?.seen_at || 0);
     if (!Number.isFinite(seenAt) || seenAt <= 0) {
       waterfallMarkerCache.delete(key);
@@ -1484,7 +1484,7 @@ function updateCallsignCacheFromEvent(eventItem) {
     }
   }
   
-  const allowRawCallsignInference = eventMode !== "SSB_TRAFFIC";
+  const allowRawCallsignInference = eventMode !== "SSB";
   const callsign = String(
     eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || ""
   ).trim().toUpperCase();
@@ -2227,7 +2227,7 @@ function applyEventsCardTypeFilter(items) {
   if (selected === "callsign-only") {
     return source.filter((eventItem) => {
       const modeText = String(eventItem?.mode || "").trim().toUpperCase();
-      const allowRawCallsignInference = modeText !== "SSB_TRAFFIC";
+      const allowRawCallsignInference = modeText !== "SSB";
       const callsignText = String(
         eventItem?.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem?.raw) : "") || ""
       ).trim();
@@ -2447,7 +2447,7 @@ function renderEventList(targetEl, items, emptyMessage) {
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
     const modeText = String(eventItem.mode || "").trim().toUpperCase();
-    const allowRawCallsignInference = modeText !== "SSB_TRAFFIC";
+    const allowRawCallsignInference = modeText !== "SSB";
     const callsign = eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || "NO CALLSIGN DETECTED";
     const decodedText = extractDecodedText(eventItem);
 

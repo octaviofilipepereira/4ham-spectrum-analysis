@@ -72,7 +72,7 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
             "",
             _now_minus(20),
             0.41,
-            '{"ssb_state":"SSB_TRAFFIC","ssb_score":0.41,"ssb_parse_method":"none"}',
+            '{"ssb_state":"SSB","ssb_score":0.41,"ssb_parse_method":"none"}',
         )
     )
     db.insert_callsign(
@@ -88,7 +88,7 @@ def test_ssb_metrics_aggregates_state_score_and_parse_method(tmp_path):
 
     assert metrics["total_events"] == 3
     assert metrics["by_state"]["SSB_CONFIRMED"] == 2
-    assert metrics["by_state"]["SSB_TRAFFIC"] == 1
+    assert metrics["by_state"]["SSB"] == 1
     assert metrics["confirmed_ratio"] == 0.667
     assert metrics["scores"]["count"] == 3
     assert metrics["scores"]["avg"] == 0.663
@@ -106,7 +106,7 @@ def test_ssb_metrics_fallbacks_when_payload_is_missing(tmp_path):
     metrics = db.get_ssb_metrics(window_minutes=1440)
 
     assert metrics["by_state"]["SSB_CONFIRMED"] == 1
-    assert metrics["by_state"]["SSB_TRAFFIC"] == 1
+    assert metrics["by_state"]["SSB"] == 1
     assert metrics["parse_methods"]["unknown"] == 2
     assert metrics["scores"]["count"] == 2
     assert metrics["scores"]["avg"] == 0.44

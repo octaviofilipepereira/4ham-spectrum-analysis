@@ -240,12 +240,11 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             # Marker mode selection is decoder-mode aware.
             marker_mode_name = mode_name
             if decoder_mode == "ssb":
-                # In SSB mode, occupancy classifier may bounce between SSB and AM
-                # depending on bandwidth. Normalize both to SSB_TRAFFIC so the
-                # frontend can render a single consistent marker class.
-                if mode_name not in ("SSB", "AM"):
+                # In SSB mode, occupancy classifier may detect SSB_DETECTED.
+                # Display as "SSB" marker for confirmed traffic.
+                if mode_name not in ("SSB", "SSB_DETECTED", "AM"):
                     continue
-                marker_mode_name = "SSB_TRAFFIC"
+                marker_mode_name = "SSB"  # Confirmed SSB traffic marker
             else:
                 # For non-SSB modes keep existing digital marker behavior.
                 if mode_name not in ("FT8", "FT4", "WSPR"):
@@ -256,9 +255,9 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 min_snr_db = max(10.0, float(state.marker_min_snr_db))
                 min_confidence = max(
                     float(state.marker_min_confidence),
-                    float(getattr(state, "ssb_traffic_min_confidence", 0.88) or 0.88),
+                    float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78),
                 )
-                min_hits_required = max(3, int(state.marker_min_hits))
+                min_hits_required = max(2, int(state.marker_min_hits))
             else:
                 min_snr_db = float(state.marker_min_snr_db)
                 min_confidence = float(state.marker_min_confidence)
@@ -353,8 +352,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         # avoid flooding the waterfall with weak/transient false positives.
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
         if decoder_mode == "ssb":
-            _ssb_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() == "SSB_TRAFFIC"]
-            _other_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() != "SSB_TRAFFIC"]
+            _ssb_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() == "SSB"]
+            _other_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() != "SSB"]
             _ssb_markers = _ssb_markers[:4]
             mode_markers = (_ssb_markers + _other_markers)[:24]
         else:

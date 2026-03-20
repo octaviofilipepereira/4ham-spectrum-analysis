@@ -182,9 +182,9 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
     if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78):
         return
 
-    msg = f"SSB traffic candidate @ {frequency_hz / 1_000_000:.3f} MHz"
+    msg = f"SSB traffic confirmed @ {frequency_hz / 1_000_000:.3f} MHz"
     payload = {
-        "mode": "SSB_TRAFFIC",
+        "mode": "SSB",
         "callsign": "",
         "raw": msg,
         "msg": msg,
@@ -193,7 +193,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
         "snr_db": occupancy_event.get("snr_db"),
         "power_dbm": occupancy_event.get("power_dbm"),
         "confidence": round(ssb_score, 3),
-        "ssb_state": "SSB_TRAFFIC",
+        "ssb_state": "SSB",
         "ssb_score": round(ssb_score, 3),
         "ssb_parse_method": "occupancy",
         "source": "internal_ssb_occupancy",
@@ -305,7 +305,7 @@ async def _run_ssb_detector_loop() -> None:
                 mode_name = freq_hint
 
             if mode_name in {"SSB", "AM"}:
-                mode_name = "SSB"
+                mode_name = "SSB_DETECTED"  # Raw occupancy detection, not yet confirmed
                 mode_confidence = max(float(mode_confidence or 0.0), 0.6)
             else:
                 continue
