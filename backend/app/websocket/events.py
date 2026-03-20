@@ -7,6 +7,7 @@ signal detection, mode classification, and event persistence.
 
 import asyncio
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
@@ -32,25 +33,27 @@ router = APIRouter()
 _ssb_traffic_last_emit = {}
 
 
-def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> None:
-    """Emit SSB_TRAFFIC callsign events from occupancy detections in SSB mode."""
+def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> Optional[dict]:
+    """Emit SSB callsign events from occupancy detections in SSB mode.
+    
+    Returns the created callsign_event (for streaming to client) or None."""
     if not isinstance(occupancy_event, dict):
-        return
+        return None
 
     decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
     if decoder_mode != "ssb":
-        return
+        return None
 
     if not occupancy_event.get("occupied"):
-        return
+        return None
 
     mode_name = str(occupancy_event.get("mode") or "").strip().upper()
     if mode_name not in {"SSB", "AM"}:
-        return
+        return None
 
     frequency_hz = int(safe_float(occupancy_event.get("frequency_hz"), 0.0) or 0)
     if frequency_hz <= 0:
-        return
+        return None
 
     now_ts = datetime.now(timezone.utc).timestamp()
     bucket_key = (
@@ -59,7 +62,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> None:
     )
     last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
     if (now_ts - last_emit_ts) < 8.0:
-        return
+        return None
     _ssb_traffic_last_emit[bucket_key] = now_ts
 
     if len(_ssb_traffic_last_emit) > 4096:
@@ -97,11 +100,12 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> None:
     }
     event = build_callsign_event(payload, state.scan_state)
     if not event:
-        return
+        return None
 
     state.db.insert_callsign(event)
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
+    return event
 
 
 def update_noise_floor(band: str, power_db: float) -> float:
@@ -346,10 +350,14 @@ async def ws_events(websocket: WebSocket) -> None:
         
         # Persist to database
         state.db.insert_occupancy(event)
-        _emit_ssb_traffic_event_from_occupancy(event)
         
-        # Stream to client
+        # Emit confirmed callsign event (if threshold met) and also stream it to client
+        callsign_event = _emit_ssb_traffic_event_from_occupancy(event)
+        
+        # Stream both events to client: raw occupancy + confirmed callsign
         await websocket.send_json({"event": event})
+        if callsign_event:
+            await websocket.send_json({"event": callsign_event})
         
         # Rate limit
         await asyncio.sleep(1.0)
