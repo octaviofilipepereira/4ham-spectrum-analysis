@@ -240,11 +240,11 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             # Marker mode selection is decoder-mode aware.
             marker_mode_name = mode_name
             if decoder_mode == "ssb":
-                # In SSB mode, occupancy classifier may detect SSB_DETECTED.
-                # Display as "SSB" marker for confirmed traffic.
-                if mode_name not in ("SSB", "SSB_DETECTED", "AM"):
+                # In SSB mode, occupancy classifier emits raw SSB_TRAFFIC markers.
+                # We display them as "SSB" mode for clean visualization.
+                if mode_name not in ("SSB", "SSB_TRAFFIC", "AM"):
                     continue
-                marker_mode_name = "SSB"  # Confirmed SSB traffic marker
+                marker_mode_name = "SSB"  # Harmonized display label
             else:
                 # For non-SSB modes keep existing digital marker behavior.
                 if mode_name not in ("FT8", "FT4", "WSPR"):

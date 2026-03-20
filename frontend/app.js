@@ -930,8 +930,8 @@ function normalizeModeLabel(mode) {
   if (text === "CW_CANDIDATE") {
     return "CW TRAFFIC";
   }
-  if (text === "SSB_DETECTED") {
-    return "SSB DETECTED";
+  if (text === "SSB_TRAFFIC") {
+    return "SSB TRAFFIC";
   }
   return text || "SIG";
 }
@@ -946,7 +946,7 @@ function modeMatchesSelectedMode(modeValue, selectedModeValue) {
     return mode === "CW" || mode === "CW_CANDIDATE";
   }
   if (selectedMode === "SSB") {
-    return mode === "SSB" || mode === "SSB_DETECTED";
+    return mode === "SSB" || mode === "SSB_TRAFFIC";
   }
   return mode === selectedMode;
 }
@@ -1173,7 +1173,7 @@ function buildStableWaterfallMarkers(frame) {
       if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
         return;
       }
-      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_DETECTED";
+      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
       const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
       const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
       waterfallMarkerCache.set(key, {
@@ -1190,7 +1190,7 @@ function buildStableWaterfallMarkers(frame) {
   for (const [key, marker] of waterfallMarkerCache.entries()) {
     const markerModeText = String(marker?.mode || "").trim().toUpperCase();
     const isCw = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_DETECTED";
+    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
     const seenAt = Number(marker?.seen_at || 0);
     if (!Number.isFinite(seenAt) || seenAt <= 0) {
       waterfallMarkerCache.delete(key);

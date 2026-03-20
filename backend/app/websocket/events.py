@@ -295,10 +295,10 @@ async def ws_events(websocket: WebSocket) -> None:
         if freq_hint:
             mode_name = freq_hint
 
-        # In explicit SSB scan mode, treat voice-like occupancy classes as SSB_DETECTED
-        # (raw detections before confirmation threshold).
+        # In explicit SSB scan mode, treat voice-like occupancy classes as SSB_TRAFFIC
+        # (raw occupancy candidates, not yet confirmed).
         if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
-            mode_name = "SSB_DETECTED"
+            mode_name = "SSB_TRAFFIC"
             mode_confidence = max(float(mode_confidence or 0.0), 0.6)
         
         # Build event

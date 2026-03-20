@@ -305,7 +305,7 @@ async def _run_ssb_detector_loop() -> None:
                 mode_name = freq_hint
 
             if mode_name in {"SSB", "AM"}:
-                mode_name = "SSB_DETECTED"  # Raw occupancy detection, not yet confirmed
+                mode_name = "SSB_TRAFFIC"
                 mode_confidence = max(float(mode_confidence or 0.0), 0.6)
             else:
                 continue

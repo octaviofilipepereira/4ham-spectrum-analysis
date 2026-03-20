@@ -8,7 +8,7 @@ import json
 import re
 
 
-_ALLOWED_MODES = {"FT8", "FT4", "WSPR", "APRS", "CW", "CW_CANDIDATE", "SSB", "SSB_DETECTED", "Unknown"}
+_ALLOWED_MODES = {"FT8", "FT4", "WSPR", "APRS", "CW", "CW_CANDIDATE", "SSB", "SSB_TRAFFIC", "Unknown"}
 _BAND_RANGES = [
     ("160m", 1800000, 2000000),
     ("80m", 3500000, 4000000),
@@ -41,9 +41,9 @@ def _infer_source(mode):
     if mode in ("CW", "CW_CANDIDATE"):
         return "cw"
     if mode == "SSB":
-        return "internal_ssb_occupancy"  # Confirmed SSB traffic
-    if mode == "SSB_DETECTED":
-        return "dsp"  # Raw occupancy detection
+        return "asr"
+    if mode == "SSB_TRAFFIC":
+        return "internal_ssb_occupancy"
     return "dsp"
 
 
