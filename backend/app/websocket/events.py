@@ -12,6 +12,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.decoders.ingest import build_callsign_event
+from app.decoders.ssb_asr import get_last_transcript_ssb
 from app.dependencies.helpers import (
     safe_float,
     log,
@@ -33,7 +34,7 @@ router = APIRouter()
 _ssb_traffic_last_emit = {}
 
 
-def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> Optional[dict]:
+def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str = "") -> Optional[dict]:
     """Emit SSB callsign events from occupancy detections in SSB mode.
     
     Returns the created callsign_event (for streaming to client) or None."""
@@ -48,7 +49,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> Optional[di
         return None
 
     mode_name = str(occupancy_event.get("mode") or "").strip().upper()
-    if mode_name not in {"SSB", "AM"}:
+    if mode_name not in {"SSB", "SSB_TRAFFIC", "AM"}:
         return None
 
     frequency_hz = int(safe_float(occupancy_event.get("frequency_hz"), 0.0) or 0)
@@ -80,11 +81,32 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict) -> Optional[di
         mode_bonus = 0.04
     ssb_score = min(0.78, max(0.35, base_confidence + snr_bonus + mode_bonus))
 
-    msg = f"SSB traffic confirmed @ {frequency_hz / 1_000_000:.3f} MHz"
+    freq_khz = frequency_hz / 1000.0
+    snr_str = f"+{snr_db:.1f}" if snr_db >= 0 else f"{snr_db:.1f}"
+    conf_pct = int(round(ssb_score * 100))
+    band_str = str(occupancy_event.get("band") or "")
+    msg = f"SSB voice confirmed {freq_khz:.1f} kHz"
+    if band_str:
+        msg += f" ({band_str})"
+    msg += f" | SNR {snr_str} dB | Conf {conf_pct}%"
+
+    bw_hz = occupancy_event.get("bandwidth_hz")
+    power_dbm_val = occupancy_event.get("power_dbm")
+    if asr_text:
+        raw_field = asr_text
+    else:
+        proof_parts = []
+        if bw_hz is not None:
+            proof_parts.append(f"BW {int(bw_hz)} Hz")
+        if power_dbm_val is not None:
+            proof_parts.append(f"PWR {float(power_dbm_val):.1f} dBm")
+        proof_parts.append("Voice spectral signature")
+        raw_field = " · ".join(proof_parts)
+
     payload = {
         "mode": "SSB",
         "callsign": "",
-        "raw": msg,
+        "raw": raw_field,
         "msg": msg,
         "band": occupancy_event.get("band"),
         "frequency_hz": frequency_hz,
@@ -351,8 +373,23 @@ async def ws_events(websocket: WebSocket) -> None:
         # Persist to database
         state.db.insert_occupancy(event)
         
-        # Emit confirmed callsign event (if threshold met) and also stream it to client
-        callsign_event = _emit_ssb_traffic_event_from_occupancy(event)
+        # Feed scan engine SSB candidate-focus logic when in SSB mode
+        if selected_decoder_mode == "ssb" and event.get("occupied"):
+            try:
+                state.scan_engine.report_ssb_candidate(
+                    frequency_hz=frequency_hz,
+                    snr_db=float(best.get("snr_db") or 0.0),
+                    confidence=float(mode_confidence or 0.0),
+                )
+            except Exception:
+                pass
+        
+        # Emit confirmed callsign event only after 15s hold validation
+        callsign_event = None
+        if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
+            _ws_asr_bucket = int(frequency_hz / 2000)
+            _ws_asr_text = get_last_transcript_ssb(_ws_asr_bucket)
+            callsign_event = _emit_ssb_traffic_event_from_occupancy(event, asr_text=_ws_asr_text)
         
         # Stream both events to client: raw occupancy + confirmed callsign
         await websocket.send_json({"event": event})

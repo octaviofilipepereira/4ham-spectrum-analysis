@@ -1649,7 +1649,7 @@ function logLine(text) {
   frontendLogsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
 }
 
-function renderToast(message, isError = false) {
+function renderToast(message, isError = false, detail = "") {
   if (!toast) {
     return;
   }
@@ -1669,9 +1669,20 @@ function renderToast(message, isError = false) {
     noticeEl.classList.add("error");
   }
 
+  const bodyEl = document.createElement("div");
+  bodyEl.className = "toast__body";
+
   const messageEl = document.createElement("span");
   messageEl.className = "toast__message";
   messageEl.textContent = message;
+  bodyEl.appendChild(messageEl);
+
+  if (detail) {
+    const detailEl = document.createElement("span");
+    detailEl.className = "toast__detail";
+    detailEl.textContent = detail;
+    bodyEl.appendChild(detailEl);
+  }
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
@@ -1682,7 +1693,7 @@ function renderToast(message, isError = false) {
     noticeEl.remove();
   });
 
-  noticeEl.appendChild(messageEl);
+  noticeEl.appendChild(bodyEl);
   noticeEl.appendChild(closeBtn);
   toast.appendChild(noticeEl);
 
@@ -2179,6 +2190,20 @@ function addEvent(text) {
 function pushLiveEventToPanel(eventPayload) {
   if (!eventPayload || typeof eventPayload !== "object") {
     return;
+  }
+
+  // Toast notification for confirmed SSB voice detections
+  const _evMode = String(eventPayload.mode || "").toUpperCase();
+  if (
+    (_evMode === "SSB" || _evMode === "SSB_TRAFFIC") &&
+    eventPayload.type === "callsign" &&
+    eventPayload.source === "internal_ssb_occupancy"
+  ) {
+    const _ssbMsg = String(eventPayload.msg || "").trim();
+    const _ssbProof = String(eventPayload.raw || "").trim();
+    if (_ssbMsg) {
+      renderToast(_ssbMsg, false, _ssbProof !== _ssbMsg ? _ssbProof : "");
+    }
   }
 
   updateCallsignCacheFromEvent(eventPayload);

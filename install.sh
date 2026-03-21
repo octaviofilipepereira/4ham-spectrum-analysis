@@ -187,12 +187,13 @@ whiptail --backtitle "$BT" --title "Confirm Installation" \
 Ready to install. Summary:
 
   SDR driver  :  $_rtlv4_label
+  ASR Whisper :  $_whisper_label
   Admin user  :  $_admin_user
   Service     :  systemd (auto-start on boot)
   Install log :  $LOG_FILE
 
 Proceed with installation?" \
-  15 70 || exit 0
+  17 70 || exit 0
 
 # ── installation with progress gauge ──────────────────────────────────────────
 start_gauge "Installing 4ham-spectrum-analysis - please wait..."
@@ -207,6 +208,7 @@ run_sudo apt-get install -y \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
   build-essential cmake libusb-1.0-0-dev \
+  ffmpeg \
   >> "$LOG_FILE" 2>&1 \
   || abort "System package installation failed"
 
@@ -256,6 +258,12 @@ gauge_step 84 "Installing Python dependencies..."
 "$PYTHON_BIN" -m pip install --quiet --upgrade pip >> "$LOG_FILE" 2>&1
 "$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
+
+if [[ $_install_whisper -eq 1 ]]; then
+  gauge_step 88 "Installing OpenAI Whisper (this may take a few minutes)..."
+  "$PYTHON_BIN" -m pip install --quiet openai-whisper \
+    >> "$LOG_FILE" 2>&1 || abort "openai-whisper installation failed"
+fi
 
 gauge_step 91 "Saving admin credentials to database..."
 mkdir -p "$ROOT_DIR/data"

@@ -31,6 +31,7 @@ from app.dependencies.helpers import (
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
+from app.decoders.ssb_asr import feed_iq_ssb, transcribe_bucket_ssb, is_ssb_asr_available
 from app.dsp.pipeline import (
     apply_agc_smoothed,
     compute_power_db,
@@ -144,7 +145,7 @@ def _update_noise_floor_ssb(band: str, power_db: float) -> float:
     return updated
 
 
-def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
+def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str = "") -> None:
     if not isinstance(occupancy_event, dict):
         return
 
@@ -152,7 +153,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
         return
 
     mode_name = str(occupancy_event.get("mode") or "").strip().upper()
-    if mode_name != "SSB":
+    if mode_name not in ("SSB", "SSB_TRAFFIC"):
         return
 
     frequency_hz = int(safe_float(occupancy_event.get("frequency_hz"), 0.0) or 0)
@@ -182,11 +183,32 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict) -> None:
     if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78):
         return
 
-    msg = f"SSB traffic confirmed @ {frequency_hz / 1_000_000:.3f} MHz"
+    freq_khz = frequency_hz / 1000.0
+    snr_str = f"+{snr_db:.1f}" if snr_db >= 0 else f"{snr_db:.1f}"
+    conf_pct = int(round(ssb_score * 100))
+    band_str = str(occupancy_event.get("band") or "")
+    msg = f"SSB voice confirmed {freq_khz:.1f} kHz"
+    if band_str:
+        msg += f" ({band_str})"
+    msg += f" | SNR {snr_str} dB | Conf {conf_pct}%"
+
+    bw_hz = occupancy_event.get("bandwidth_hz")
+    power_dbm_val = occupancy_event.get("power_dbm")
+    if asr_text:
+        raw_field = asr_text
+    else:
+        proof_parts = []
+        if bw_hz is not None:
+            proof_parts.append(f"BW {int(bw_hz)} Hz")
+        if power_dbm_val is not None:
+            proof_parts.append(f"PWR {float(power_dbm_val):.1f} dBm")
+        proof_parts.append("Voice spectral signature")
+        raw_field = " · ".join(proof_parts)
+
     payload = {
         "mode": "SSB",
         "callsign": "",
-        "raw": msg,
+        "raw": raw_field,
         "msg": msg,
         "band": occupancy_event.get("band"),
         "frequency_hz": frequency_hz,
@@ -231,9 +253,12 @@ async def _run_ssb_detector_loop() -> None:
             except asyncio.TimeoutError:
                 continue
 
+            # Collect all queued chunks; keep latest for detection, all for ASR
+            _iq_chunks_asr = [iq]
             while _ssb_iq_queue is not None and not _ssb_iq_queue.empty():
                 try:
                     iq = _ssb_iq_queue.get_nowait()
+                    _iq_chunks_asr.append(iq)
                 except asyncio.QueueEmpty:
                     break
 
@@ -346,7 +371,22 @@ async def _run_ssb_detector_loop() -> None:
                 pass
 
             state.db.insert_occupancy(event)
-            _emit_ssb_traffic_event_from_occupancy(event)
+
+            # Accumulate audio for ASR during hold period
+            if is_ssb_asr_available():
+                _ssb_asr_bucket = int(frequency_hz / 2000)
+                for _chunk in _iq_chunks_asr:
+                    feed_iq_ssb(_ssb_asr_bucket, _chunk, sample_rate,
+                                float(offset_hz or 0.0), frequency_hz)
+
+            # Only emit confirmed callsign/SSB event after 15s hold validation
+            if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
+                _ssb_asr_bucket = int(frequency_hz / 2000)
+                _loop = asyncio.get_event_loop()
+                _asr_text = await _loop.run_in_executor(
+                    None, transcribe_bucket_ssb, _ssb_asr_bucket
+                )
+                _emit_ssb_traffic_event_from_occupancy(event, asr_text=_asr_text)
 
         except asyncio.CancelledError:
             break

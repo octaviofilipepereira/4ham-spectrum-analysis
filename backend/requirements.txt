@@ -28,6 +28,10 @@ slowapi
 # System utilities
 psutil
 
+# SSB Automatic Speech Recognition (optional – install for voice transcription)
+# Requires ffmpeg: sudo apt install ffmpeg
+openai-whisper
+
 # Testing
 pytest
 pytest-asyncio
