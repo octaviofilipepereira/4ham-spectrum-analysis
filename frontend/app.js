@@ -83,6 +83,8 @@ const purgeInvalidEventsBtn = document.getElementById("purgeInvalidEvents");
 const resetDefaultsBtn = document.getElementById("resetDefaults");
 const resetAllConfigBtn = document.getElementById("resetAllConfig");
 const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
+const ssbAsrEnabledCheck = document.getElementById("ssbAsrEnabled");
+const ssbAsrAvailableBadge = document.getElementById("ssbAsrAvailableBadge");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
@@ -4317,6 +4319,20 @@ async function loadSettings() {
       await refreshAdminAuthFields();
     }
     applyDeviceConfigToForm(data.device_config || {});
+    if (data.asr) {
+      if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.checked = data.asr.enabled !== false;
+      if (ssbAsrAvailableBadge) {
+        if (data.asr.available) {
+          ssbAsrAvailableBadge.textContent = "Whisper installed";
+          ssbAsrAvailableBadge.className = "badge bg-success ms-2";
+          if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.disabled = false;
+        } else {
+          ssbAsrAvailableBadge.textContent = "Whisper not installed";
+          ssbAsrAvailableBadge.className = "badge bg-warning text-dark ms-2";
+          if (ssbAsrEnabledCheck) { ssbAsrEnabledCheck.checked = false; ssbAsrEnabledCheck.disabled = true; }
+        }
+      }
+    }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
       audioOutputDeviceInput.value = data.audio_config.output_device || "";
@@ -4494,7 +4510,8 @@ saveSettingsBtn.addEventListener("click", async () => {
       qth: stationQthInput.value.trim(),
     },
     device_config: buildDeviceConfigPayload(),
-    audio_config: buildAudioConfigPayload()
+    audio_config: buildAudioConfigPayload(),
+    asr: { enabled: ssbAsrEnabledCheck ? ssbAsrEnabledCheck.checked : true },
   };
   const response = await fetch("/api/settings", {
     method: "POST",

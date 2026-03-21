@@ -194,6 +194,27 @@ class SsbAsrEngine:
 _engine = SsbAsrEngine(model_size="tiny")
 
 
+# ---------------------------------------------------------------------------
+# Runtime enable / disable
+# ---------------------------------------------------------------------------
+
+_asr_enabled: bool = True
+
+
+def set_asr_enabled(value: bool) -> None:
+    """Enable or disable ASR at runtime (called by the settings API)."""
+    global _asr_enabled
+    _asr_enabled = bool(value)
+
+
+def is_asr_enabled() -> bool:
+    return _asr_enabled
+
+
+# ---------------------------------------------------------------------------
+# Module-level convenience helpers
+# ---------------------------------------------------------------------------
+
 def feed_iq_ssb(
     bucket_key: int,
     iq: np.ndarray,
@@ -201,11 +222,15 @@ def feed_iq_ssb(
     offset_hz: float,
     frequency_hz: int,
 ) -> None:
+    if not _asr_enabled:
+        return
     _engine.feed_iq(bucket_key, iq, sample_rate, offset_hz, frequency_hz)
 
 
 def transcribe_bucket_ssb(bucket_key: int) -> str:
     """Blocking transcription — call via run_in_executor from async code."""
+    if not _asr_enabled:
+        return ""
     return _engine.transcribe_bucket(bucket_key)
 
 
