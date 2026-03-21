@@ -16,6 +16,7 @@ transcription are no-ops and the spectral-proof fallback is used instead.
 
 import math
 import threading
+import time as _time_module
 from typing import Dict, Optional
 
 import numpy as np
@@ -241,3 +242,42 @@ def get_last_transcript_ssb(bucket_key: int) -> str:
 
 def is_ssb_asr_available() -> bool:
     return _engine.is_available
+
+
+# ---------------------------------------------------------------------------
+# Background (fire-and-forget) transcription helper
+# ---------------------------------------------------------------------------
+
+_last_transcribed_at: Dict[int, float] = {}
+_TRANSCRIBE_MIN_INTERVAL_S: float = 10.0  # seconds between transcription attempts per bucket
+
+
+def maybe_transcribe_ssb(bucket_key: int) -> bool:
+    """Schedule a background Whisper transcription if the buffer is ready.
+
+    Non-blocking: submits work to the thread-pool executor and returns
+    immediately.  The transcript is cached inside the engine and readable
+    via ``get_last_transcript_ssb()`` once the thread finishes.
+
+    Returns True if a transcription was scheduled, False otherwise.
+    """
+    import asyncio
+    if not _asr_enabled or not _engine.is_available:
+        return False
+    now = _time_module.time()
+    last = _last_transcribed_at.get(bucket_key, 0.0)
+    if (now - last) < _TRANSCRIBE_MIN_INTERVAL_S:
+        return False
+    # Claim the slot before checking buffer to avoid double-scheduling
+    _last_transcribed_at[bucket_key] = now
+    buf = _engine._buffers.get(bucket_key)
+    if buf is None or len(buf) < _MIN_BUF_SAMPLES:
+        # Not enough audio yet; release the slot
+        _last_transcribed_at.pop(bucket_key, None)
+        return False
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, transcribe_bucket_ssb, bucket_key)
+        return True
+    except Exception:
+        return False

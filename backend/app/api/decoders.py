@@ -31,7 +31,12 @@ from app.dependencies.helpers import (
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
-from app.decoders.ssb_asr import feed_iq_ssb, transcribe_bucket_ssb, is_ssb_asr_available
+from app.decoders.ssb_asr import (
+    feed_iq_ssb,
+    is_ssb_asr_available,
+    get_last_transcript_ssb,
+    maybe_transcribe_ssb,
+)
 from app.dsp.pipeline import (
     apply_agc_smoothed,
     compute_power_db,
@@ -342,6 +347,9 @@ async def _run_ssb_detector_loop() -> None:
                 for _chunk in _iq_chunks_asr:
                     feed_iq_ssb(_ssb_asr_bucket, _chunk, sample_rate,
                                 float(offset_hz or 0.0), frequency_hz)
+                # Fire background Whisper transcription whenever buffer is ready.
+                # Non-blocking: result cached in get_last_transcript_ssb().
+                maybe_transcribe_ssb(_ssb_asr_bucket)
 
             min_ssb_confidence = float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78)
             if mode_confidence < min_ssb_confidence:
@@ -383,10 +391,8 @@ async def _run_ssb_detector_loop() -> None:
             # Only emit confirmed callsign/SSB event after 15s hold validation
             if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
                 _ssb_asr_bucket = int(frequency_hz / 2000)
-                _loop = asyncio.get_event_loop()
-                _asr_text = await _loop.run_in_executor(
-                    None, transcribe_bucket_ssb, _ssb_asr_bucket
-                )
+                # Non-blocking: use cached transcript produced by background task.
+                _asr_text = get_last_transcript_ssb(_ssb_asr_bucket)
                 _emit_ssb_traffic_event_from_occupancy(event, asr_text=_asr_text)
 
         except asyncio.CancelledError:

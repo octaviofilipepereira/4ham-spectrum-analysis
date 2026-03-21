@@ -12,7 +12,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.decoders.ingest import build_callsign_event
-from app.decoders.ssb_asr import get_last_transcript_ssb
+from app.decoders.ssb_asr import get_last_transcript_ssb, maybe_transcribe_ssb
 from app.dependencies.helpers import (
     safe_float,
     log,
@@ -383,7 +383,11 @@ async def ws_events(websocket: WebSocket) -> None:
                 )
             except Exception:
                 pass
-        
+            # Fire background Whisper transcription whenever enough audio is
+            # buffered, independent of the validation hold mechanism.
+            if selected_decoder_mode == "ssb":
+                maybe_transcribe_ssb(int(frequency_hz / 2000))
+
         # Emit confirmed callsign event only after 15s hold validation
         callsign_event = None
         if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
