@@ -136,6 +136,26 @@ will NOT work with the standard apt package." \
   _rtlv4_label="RTL-SDR Blog v4 (build from source)"
 fi
 
+# ── ASR / Whisper ──────────────────────────────────────────────────────────────
+_install_whisper=0
+_whisper_label="No (can be added later: pip install openai-whisper)"
+if whiptail --backtitle "$BT" --title "ASR Voice Transcription (optional)" \
+  --yesno "\
+Install OpenAI Whisper for SSB voice transcription?
+
+Whisper converts SSB audio into readable text, shown in
+the live event Toast and stored in the event log.
+
+WARNING — large download (~700 MB for PyTorch + Whisper).
+On slow internet this may take 20-40 minutes!
+
+  YES  ->  Install Whisper now (recommended if bandwidth allows).
+  NO   ->  Skip for now (install later: pip install openai-whisper)." \
+  16 68; then
+  _install_whisper=1
+  _whisper_label="Yes (OpenAI Whisper tiny model)"
+fi
+
 # ── admin username ─────────────────────────────────────────────────────────────
 _admin_user=""
 while [[ -z "$_admin_user" ]]; do
@@ -260,9 +280,23 @@ gauge_step 84 "Installing Python dependencies..."
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
 
 if [[ $_install_whisper -eq 1 ]]; then
-  gauge_step 88 "Installing OpenAI Whisper (this may take a few minutes)..."
-  "$PYTHON_BIN" -m pip install --quiet openai-whisper \
-    >> "$LOG_FILE" 2>&1 || abort "openai-whisper installation failed"
+  # On x86_64 install CPU-only PyTorch first to avoid pulling CUDA wheels
+  # (~200 MB CPU build vs ~915 MB CUDA build). On ARM (Raspberry Pi) the
+  # ARM torch wheel is already CPU-only so no special handling needed.
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    gauge_step 87 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
+    "$PYTHON_BIN" -m pip install --quiet torch \
+      --index-url https://download.pytorch.org/whl/cpu \
+      >> "$LOG_FILE" 2>&1 || { \
+        echo "[WARN] torch CPU install failed — Whisper ASR will not be available" >> "$LOG_FILE"; \
+        _install_whisper=0; }
+  fi
+  if [[ $_install_whisper -eq 1 ]]; then
+    gauge_step 90 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
+    "$PYTHON_BIN" -m pip install --quiet openai-whisper \
+      >> "$LOG_FILE" 2>&1 || { \
+        echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }
+  fi
 fi
 
 gauge_step 91 "Saving admin credentials to database..."

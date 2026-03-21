@@ -30,7 +30,8 @@ psutil
 
 # SSB Automatic Speech Recognition (optional – install for voice transcription)
 # Requires ffmpeg: sudo apt install ffmpeg
-openai-whisper
+# Install via the installer (./install.sh) or manually: pip install openai-whisper
+# openai-whisper
 
 # Testing
 pytest
