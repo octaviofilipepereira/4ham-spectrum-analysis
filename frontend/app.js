@@ -1782,7 +1782,13 @@ function extractDecodedText(eventItem) {
   if (!eventItem || typeof eventItem !== "object") {
     return "";
   }
-  const candidates = [eventItem.msg, eventItem.text];
+  const mode = String(eventItem.mode || "").toUpperCase();
+  const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
+  // For SSB: raw holds the Whisper ASR transcript (or spectral-proof fallback) — show first.
+  // For other modes: msg is the primary decoded content.
+  const candidates = isSsb
+    ? [eventItem.raw, eventItem.msg, eventItem.text]
+    : [eventItem.msg, eventItem.text, eventItem.raw];
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();
     if (value) {
