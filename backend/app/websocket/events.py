@@ -3,11 +3,20 @@ WebSocket handler for real-time occupancy event detection and streaming.
 
 Provides /ws/events endpoint that performs continuous spectrum monitoring,
 signal detection, mode classification, and event persistence.
+
+Architecture:
+- _run_occupancy_detection_loop() is a singleton background task started at
+  app startup (main.py).  It processes IQ samples, persists events to the DB,
+  and fan-outs serialised JSON messages to all connected WS clients via a set
+  of per-client asyncio.Queue instances.
+- ws_events() simply subscribes a queue, relays messages to the browser, and
+  unsubscribes when the browser disconnects.  Occupancy detection therefore
+  continues uninterrupted even when no browser is connected.
 """
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
@@ -32,6 +41,33 @@ router = APIRouter()
 
 
 _ssb_traffic_last_emit = {}
+
+# ---------------------------------------------------------------------------
+# Broadcast bus – one asyncio.Queue per connected WS client
+# ---------------------------------------------------------------------------
+_event_subscribers: List[asyncio.Queue] = []
+
+
+def _subscribe_events() -> asyncio.Queue:
+    q: asyncio.Queue = asyncio.Queue(maxsize=200)
+    _event_subscribers.append(q)
+    return q
+
+
+def _unsubscribe_events(q: asyncio.Queue) -> None:
+    try:
+        _event_subscribers.remove(q)
+    except ValueError:
+        pass
+
+
+def _broadcast(msg: dict) -> None:
+    """Put msg into every subscriber queue, dropping if a queue is full."""
+    for q in _event_subscribers:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass
 
 
 def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str = "") -> Optional[dict]:
@@ -171,79 +207,62 @@ def update_threshold(band: str, threshold_dbm: float) -> float:
 
 @router.websocket("/ws/events")
 async def ws_events(websocket: WebSocket) -> None:
+    """Subscribe to the occupancy detection broadcast bus and relay to browser.
+
+    Authentication is enforced before accepting the connection.  The actual
+    signal-processing work is done by _run_occupancy_detection_loop() which
+    runs as a server-level background task independent of this connection.
     """
-    Stream real-time occupancy detection events.
-    
-    Performs continuous signal processing on IQ samples from the scan engine:
-    1. AGC (Automatic Gain Control) if enabled
-    2. Power and noise floor estimation
-    3. Occupancy detection with SNR calculation
-    4. Mode classification (FT8, FT4, APRS, CW, SSB, etc.)
-    5. Event validation and filtering
-    6. Database persistence
-    7. Real-time streaming to client
-    
-    Args:
-        websocket: FastAPI WebSocket connection instance
-        
-    Message Format:
-        {
-            "event": {
-                "type": "occupancy",
-                "timestamp": "2026-02-23T12:34:56.789Z",
-                "band": "20m",
-                "frequency_hz": 14074000,
-                "offset_hz": 0.0,
-                "bandwidth_hz": 2500,
-                "power_dbm": -75.5,
-                "snr_db": 12.3,
-                "threshold_dbm": -81.8,
-                "occupied": true,
-                "mode": "FT8",
-                "confidence": 0.95,
-                "device": "rtlsdr://0",
-                "scan_id": "abc123"
-            }
-        }
-        
-    Authentication:
-        - If auth is enabled, verifies 'Authorization' header with Basic Auth
-        - Closes connection with code 1008 if authentication fails
-        
-    Mode Filtering:
-        - Respects user settings for enabled/disabled modes
-        - Skips events if mode is disabled in database settings
-        
-    Processing Pipeline:
-        - Requires scan engine to be running
-        - Processes 2048 IQ samples per iteration
-        - Applies AGC if enabled
-        - Estimates occupancy with adaptive thresholds
-        - Filters implausible events
-        - Only streams occupied signals
-    """
-    # Authenticate before accepting connection
     if state.auth_required and not state.verify_auth_transport(
         websocket.headers.get("authorization"),
         websocket.headers.get("cookie"),
     ):
         await websocket.close(code=1008)
         return
-    
+
     await websocket.accept()
-    
+    q = _subscribe_events()
+    try:
+        while True:
+            try:
+                msg = await asyncio.wait_for(q.get(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send a keep-alive ping so idle connections are not dropped by
+                # reverse-proxies or browsers.
+                try:
+                    await websocket.send_json({"ping": True})
+                except Exception:
+                    break
+                continue
+            try:
+                await websocket.send_json(msg)
+            except Exception:
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _unsubscribe_events(q)
+
+
+async def _run_occupancy_detection_loop() -> None:
+    """Background task: continuous occupancy detection, DB persistence, and fan-out.
+
+    Runs for the lifetime of the server process.  Occupancy detection proceeds
+    even when no WebSocket client is connected so that events are never missed
+    due to a browser disconnect or reload.
+    """
     while True:
         # Wait for scan to be running
         if not state.scan_engine.running or state.scan_state.get("state") != "running":
             await asyncio.sleep(0.5)
             continue
-        
+
         # Read IQ samples
         iq = state.scan_engine.read_iq(2048)
         if iq is None:
             await asyncio.sleep(0.2)
             continue
-        
+
         # Apply AGC if enabled
         if state.agc_enabled:
             iq, gain_db = apply_agc_smoothed(
@@ -254,15 +273,15 @@ async def ws_events(websocket: WebSocket) -> None:
                 alpha=state.agc_alpha
             )
             state.last_agc_gain_db = gain_db
-        
+
         # Get current band
         band = state.scan_engine.config.get("band") if state.scan_engine.config else None
-        
+
         # Compute power and update noise floor
         power_db = compute_power_db(iq)
         noise_floor = update_noise_floor(band, power_db)
         threshold_dbm = noise_floor + 6.0  # 6 dB above noise floor
-        
+
         # Detect occupancy
         selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
         if selected_decoder_mode == "ssb":
@@ -280,38 +299,38 @@ async def ws_events(websocket: WebSocket) -> None:
             snr_threshold_db=snr_threshold_db,
             min_bw_hz=min_bw_hz
         )
-        
+
         if not occupancy:
             await asyncio.sleep(0.5)
             continue
-        
+
         # Select strongest signal
         best = max(occupancy, key=lambda item: item.get("snr_db", 0.0))
-        
+
         # Update noise floor from segment detection
         nf_db = best.get("noise_floor_db")
         if nf_db is not None:
             update_noise_floor(band, nf_db)
-        
+
         # Calculate absolute frequency
         offset_hz = best.get("offset_hz")
         frequency_hz = state.scan_engine.center_hz
         if offset_hz is not None:
             frequency_hz = int(state.scan_engine.center_hz + offset_hz)
-        
+
         if not frequency_hz or frequency_hz <= 0:
             await asyncio.sleep(0.5)
             continue
-        
+
         # Update adaptive threshold
         adaptive_threshold = update_threshold(band, best.get("threshold_dbm"))
-        
+
         # Classify mode using heuristics
         mode_name, mode_confidence = classify_mode_heuristic(
             best.get("bandwidth_hz"),
             best.get("snr_db")
         )
-        
+
         # Refine with frequency-specific mode hint (FT8/FT4/WSPR windows)
         freq_hint = hint_mode_by_frequency(
             frequency_hz,
@@ -326,7 +345,7 @@ async def ws_events(websocket: WebSocket) -> None:
         if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
             mode_name = "SSB_TRAFFIC"
             mode_confidence = max(float(mode_confidence or 0.0), 0.6)
-        
+
         # Build event
         event = {
             "type": "occupancy",
@@ -344,35 +363,35 @@ async def ws_events(websocket: WebSocket) -> None:
             "device": state.scan_state.get("device"),
             "scan_id": state.scan_state.get("scan_id")
         }
-        
+
         # Validate plausibility
         if not is_plausible_occupancy_event(event):
             await asyncio.sleep(0.2)
             continue
-        
+
         # Check if mode is enabled in settings
         settings = state.db.get_settings()
         modes = settings.get("modes") or {}
         mode_key = str(event.get("mode", "")).lower()
-        
+
         if modes and mode_key in modes and not modes.get(mode_key, True):
             # Mode disabled by user
             await asyncio.sleep(1.0)
             continue
-        
-        # Only stream occupied signals
+
+        # Only process occupied signals
         if not event.get("occupied"):
             await asyncio.sleep(0.5)
             continue
-        
+
         # Only save events during active scan (not in preview or stopped mode)
         if state.scan_state.get("state") != "running":
             await asyncio.sleep(0.5)
             continue
-        
+
         # Persist to database
         state.db.insert_occupancy(event)
-        
+
         # Feed scan engine SSB candidate-focus logic when in SSB mode
         if selected_decoder_mode == "ssb" and event.get("occupied"):
             try:
@@ -385,8 +404,7 @@ async def ws_events(websocket: WebSocket) -> None:
                 pass
             # Fire background Whisper transcription whenever enough audio is
             # buffered, independent of the validation hold mechanism.
-            if selected_decoder_mode == "ssb":
-                maybe_transcribe_ssb(int(frequency_hz / 2000))
+            maybe_transcribe_ssb(int(frequency_hz / 2000))
 
         # Emit confirmed callsign event only after 15s hold validation
         callsign_event = None
@@ -394,11 +412,11 @@ async def ws_events(websocket: WebSocket) -> None:
             _ws_asr_bucket = int(frequency_hz / 2000)
             _ws_asr_text = get_last_transcript_ssb(_ws_asr_bucket)
             callsign_event = _emit_ssb_traffic_event_from_occupancy(event, asr_text=_ws_asr_text)
-        
-        # Stream both events to client: raw occupancy + confirmed callsign
-        await websocket.send_json({"event": event})
+
+        # Fan-out both events to all connected WS clients
+        _broadcast({"event": event})
         if callsign_event:
-            await websocket.send_json({"event": callsign_event})
-        
+            _broadcast({"event": callsign_event})
+
         # Rate limit
         await asyncio.sleep(1.0)

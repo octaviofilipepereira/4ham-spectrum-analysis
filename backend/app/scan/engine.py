@@ -64,13 +64,15 @@ class ScanEngine:
         self._ssb_focus_enabled: bool = False
         self._ssb_focus_hold_ms: int = 15000
         self._ssb_focus_candidate_ttl_s: float = 20.0
-        self._ssb_focus_hits_required: int = 2
+        self._ssb_focus_hits_required: int = 1
         self._ssb_focus_cooldown_s: float = 20.0
         self._ssb_focus_bucket_hz: int = 2000
         self._ssb_focus_max_holds_per_pass: int = 2
         self._ssb_focus_holds_in_pass: int = 0
         # bucket_hz -> {hits, last_seen, last_hold_at, max_snr_db, max_confidence}
         self._ssb_focus_candidates: Dict[int, Dict[str, float]] = {}
+        # bucket_hz -> timestamp when the frequency was hold-validated
+        self._ssb_validated_freqs: Dict[int, float] = {}
 
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
@@ -100,7 +102,7 @@ class ScanEngine:
             1.0,
         )
         self._ssb_focus_hits_required = max(
-            int(self.config.get("ssb_focus_hits_required", 2) or 2),
+            int(self.config.get("ssb_focus_hits_required", 1) or 1),
             1,
         )
         self._ssb_focus_cooldown_s = max(
@@ -117,6 +119,7 @@ class ScanEngine:
         )
         self._ssb_focus_holds_in_pass = 0
         self._ssb_focus_candidates.clear()
+        self._ssb_validated_freqs.clear()
         # Always reset parked state on new scan — a previous scan may have left
         # the engine parked (e.g. WSPR window was in progress when scan stopped),
         # which would block the new scan loop immediately.
@@ -381,6 +384,27 @@ class ScanEngine:
         self._ssb_focus_holds_in_pass += 1
         return extra_ms
 
+    def is_ssb_frequency_validated(self, frequency_hz: int, max_age_s: float = 90.0) -> bool:
+        """Check if a frequency has been validated by the SSB focus hold."""
+        if not self._ssb_focus_enabled:
+            return False
+        try:
+            frequency_hz = int(frequency_hz)
+        except (TypeError, ValueError):
+            return False
+        if frequency_hz <= 0:
+            return False
+        bucket_hz = max(250, int(self._ssb_focus_bucket_hz or self.step_hz or 2000))
+        bucket_key = int(round(frequency_hz / bucket_hz) * bucket_hz)
+        validated_at = self._ssb_validated_freqs.get(bucket_key)
+        if validated_at is None:
+            return False
+        now_ts = time.time()
+        if (now_ts - validated_at) > max_age_s:
+            self._ssb_validated_freqs.pop(bucket_key, None)
+            return False
+        return True
+
     async def _scan_loop(self) -> None:
         start_hz = self.start_hz or self.center_hz
         end_hz = self.end_hz or start_hz
@@ -410,6 +434,12 @@ class ScanEngine:
                 await asyncio.sleep(dwell_ms / 1000.0)
                 extra_dwell_ms = self._resolve_ssb_focus_extra_dwell_ms(freq)
                 if extra_dwell_ms > 0:
+                    # Mark validated at hold START so the WS occupancy handler can
+                    # emit callsign events throughout the full hold window (not just
+                    # the final 1.5 s).
+                    bucket_hz = max(250, int(self._ssb_focus_bucket_hz or self.step_hz or 2000))
+                    bucket_key = int(round(freq / bucket_hz) * bucket_hz)
+                    self._ssb_validated_freqs[bucket_key] = time.time()
                     await asyncio.sleep(extra_dwell_ms / 1000.0)
                 freq += step_hz
                 self.step_index += 1
