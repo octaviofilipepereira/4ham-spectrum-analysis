@@ -85,6 +85,7 @@ const resetAllConfigBtn = document.getElementById("resetAllConfig");
 const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
 const ssbAsrEnabledCheck = document.getElementById("ssbAsrEnabled");
 const ssbAsrAvailableBadge = document.getElementById("ssbAsrAvailableBadge");
+const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
@@ -4736,6 +4737,27 @@ if (purgeInvalidEventsBtn) {
 refreshDevicesBtn.addEventListener("click", () => {
   loadDevices();
 });
+
+if (saveAsrSettingsBtn) {
+  saveAsrSettingsBtn.addEventListener("click", async () => {
+    const enabled = ssbAsrEnabledCheck ? ssbAsrEnabledCheck.checked : true;
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ asr: { enabled } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save ASR setting");
+        showToastError(message);
+        return;
+      }
+      showToast(enabled ? "ASR voice transcription enabled" : "ASR voice transcription disabled");
+    } catch (err) {
+      showToastError("Failed to save ASR setting");
+    }
+  });
+}
 
 if (showNonSdrDevicesToggle) {
   showNonSdrDevicesToggle.addEventListener("change", () => {

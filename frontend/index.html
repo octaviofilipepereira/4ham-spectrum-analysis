@@ -449,13 +449,16 @@ Last update: 2026-02-22 16:27:19 UTC
                   <input class="form-check-input" type="checkbox" id="ssbAsrEnabled" />
                   <label class="form-check-label" for="ssbAsrEnabled">Enable automatic voice transcription with OpenAI Whisper</label>
                 </div>
-                <small class="text-muted d-block mt-1">
+                <small class="d-block mt-1">
                   When active, detected SSB voice signals are automatically transcribed and the text is shown in the live
                   notification toast and stored in the event log (<code>raw</code> field). Transcription runs in a
                   background thread and does not affect scanning. On slower hardware (e.g. Raspberry Pi) each 15 s capture
                   takes 2–5 s to process. Requires <code>openai-whisper</code> — install it via the installer or manually:
                   <code>pip install openai-whisper</code>. You can enable/disable this at any time without restarting.
                 </small>
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveAsrSettings">Save ASR setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
