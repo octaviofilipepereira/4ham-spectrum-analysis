@@ -335,6 +335,14 @@ async def _run_ssb_detector_loop() -> None:
             else:
                 continue
 
+            # Accumulate audio for ASR for all SSB detections, regardless of
+            # confidence threshold — the buffer must be ready when validation fires.
+            if is_ssb_asr_available() and frequency_hz > 0:
+                _ssb_asr_bucket = int(frequency_hz / 2000)
+                for _chunk in _iq_chunks_asr:
+                    feed_iq_ssb(_ssb_asr_bucket, _chunk, sample_rate,
+                                float(offset_hz or 0.0), frequency_hz)
+
             min_ssb_confidence = float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78)
             if mode_confidence < min_ssb_confidence:
                 continue
@@ -371,13 +379,6 @@ async def _run_ssb_detector_loop() -> None:
                 pass
 
             state.db.insert_occupancy(event)
-
-            # Accumulate audio for ASR during hold period
-            if is_ssb_asr_available():
-                _ssb_asr_bucket = int(frequency_hz / 2000)
-                for _chunk in _iq_chunks_asr:
-                    feed_iq_ssb(_ssb_asr_bucket, _chunk, sample_rate,
-                                float(offset_hz or 0.0), frequency_hz)
 
             # Only emit confirmed callsign/SSB event after 15s hold validation
             if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
