@@ -2255,6 +2255,29 @@ function applyEventsCardTypeFilter(items) {
   if (selected === "ssb-traffic") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
   }
+  if (selected === "ssb-voice") {
+    // SSB events with Whisper ASR text detected (no callsign required)
+    return source.filter((eventItem) => {
+      const mode = String(eventItem?.mode || "").trim().toUpperCase();
+      if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
+      const raw = String(eventItem?.raw || "").trim();
+      // Exclude spectral-proof fallback strings ("BW ... Hz · PWR ...")
+      if (!raw || raw.startsWith("BW ")) return false;
+      return true;
+    });
+  }
+  if (selected === "ssb-callsign") {
+    // SSB events with a valid amateur callsign detected
+    return source.filter((eventItem) => {
+      const mode = String(eventItem?.mode || "").trim().toUpperCase();
+      if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
+      const cs = String(eventItem?.callsign || "").trim();
+      if (cs) return true;
+      // Try to extract callsign from raw Whisper text
+      const fromRaw = extractCallsignFromRaw(eventItem?.raw);
+      return fromRaw.length > 0;
+    });
+  }
   if (selected === "cw-only") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW");
   }

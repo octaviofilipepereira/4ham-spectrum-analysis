@@ -393,6 +393,15 @@ async def _run_occupancy_detection_loop() -> None:
                 await asyncio.sleep(0.1)
                 continue
 
+            # Minimum SNR gate — suppress marginal detections that flood
+            # the events card.  6 dB is one S-unit above noise and the
+            # practical readability floor on HF SSB.
+            _event_snr = float(best.get("snr_db") or 0.0)
+            _MIN_EVENT_SNR_DB = 6.0
+            if selected_decoder_mode == "ssb" and _event_snr < _MIN_EVENT_SNR_DB:
+                await asyncio.sleep(0.1)
+                continue
+
             # Build event
             event = {
                 "type": "occupancy",
