@@ -51,7 +51,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.6.3 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.0 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -62,6 +62,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#scan-modes">Scan modes</a></li>
       <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
       <li><a href="#events">Events log</a></li>
+      <li><a href="#voice-sig">SSB Voice Signature &amp; Whisper ASR</a></li>
       <li><a href="#metrics">Metrics explained (SNR &amp; Propagation Score)</a></li>
       <li><a href="#export">Export &amp; reports</a></li>
       <li><a href="#admin">Admin &amp; configuration</a></li>
@@ -164,7 +165,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr>
           <td><span class="badge-mode badge-ssb">SSB</span></td>
           <td>continuous</td><td>12 s</td>
-          <td>SSB occupancy detection — detects voice/sideband activity without decoding content. No callsign output.</td>
+          <td>SSB voice detection with optional Whisper ASR transcription. Detected transmissions without a resolved callsign appear as <strong>Voice Signature</strong> events; when Whisper resolves a callsign it appears as a standard callsign event. Enable Whisper in Admin Config.</td>
         </tr>
       </tbody>
     </table>
@@ -222,7 +223,22 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <!-- 5. EVENTS LOG -->
   <section id="events">
     <h2 class="section-title">5 · Events log</h2>
-    <p>All decoded signals and detected occupancy events are stored in the SQLite database and displayed in the Events table in real time.</p>
+    <p>All decoded signals and detected occupancy events are stored in the SQLite database and displayed in the Events card in real time.</p>
+
+    <h3 class="sub-title">Type filter dropdown</h3>
+    <p>The dropdown above the events list controls which events are shown:</p>
+    <table class="manual-table">
+      <thead><tr><th>Option</th><th>Shows</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Show All</strong></td><td>All callsign-type events: FT8/FT4, WSPR, CW, APRS, SSB Voice Signature. Hides raw occupancy noise (default).</td></tr>
+        <tr><td><strong>Callsign Only</strong></td><td>Only events with a decoded callsign (excludes Voice Signature).</td></tr>
+        <tr><td><strong>SSB Callsign Detected</strong></td><td>SSB callsign events resolved by Whisper ASR.</td></tr>
+        <tr><td><strong>SSB Traffic Only</strong></td><td>SSB occupancy events (voice activity detected, no decoded callsign).</td></tr>
+        <tr><td><strong>CW Only</strong></td><td>CW callsign decodes.</td></tr>
+        <tr><td><strong>CW Traffic Only</strong></td><td>CW occupancy/candidate events.</td></tr>
+        <tr><td><strong>All + Occupancy (raw)</strong></td><td>Everything — all events including raw SSB/AM occupancy detections. Useful for diagnostics.</td></tr>
+      </tbody>
+    </table>
 
     <h3 class="sub-title">Event columns</h3>
     <table class="manual-table">
@@ -232,7 +248,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td>Band</td><td>Amateur band (160m, 80m, …, 10m).</td></tr>
         <tr><td>Mode</td><td>Decoder mode that produced the event.</td></tr>
         <tr><td>Frequency</td><td>Centre frequency of the detected signal in MHz.</td></tr>
-        <tr><td>Callsign</td><td>Decoded callsign (FT8/FT4/WSPR/CW), or blank for SSB occupancy.</td></tr>
+        <tr><td>Callsign</td><td>Decoded callsign (FT8/FT4/WSPR/CW/SSB via Whisper), or <em>Voice Signature</em> for SSB detections without a resolved callsign.</td></tr>
         <tr><td>SNR</td><td>Signal-to-noise ratio in dB at time of detection.</td></tr>
         <tr><td>Score</td><td>Propagation score (0–100) for the band at time of event.</td></tr>
         <tr><td>Country / DXCC</td><td>Resolved from callsign prefix (if available).</td></tr>
@@ -254,9 +270,46 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>The band favourite buttons below the events table provide one-click filtering to a specific band without opening the full filter panel.</p>
   </section>
 
-  <!-- 6. METRICS -->
+  <!-- 6. VOICE SIGNATURE -->
+  <section id="voice-sig">
+    <h2 class="section-title">6 · SSB Voice Signature &amp; Whisper ASR</h2>
+    <p>
+      Since v0.8.0, the system can detect and transcribe SSB voice transmissions using VAD (Voice Activity Detection)
+      and OpenAI Whisper automatic speech recognition.
+    </p>
+
+    <h3 class="sub-title">How it works</h3>
+    <ol>
+      <li>During scanning, SSB occupancy is detected by bandwidth and power heuristics.</li>
+      <li>If voice activity is confirmed (VAD), a 15-second audio segment is captured.</li>
+      <li>If Whisper ASR is enabled, the audio is transcribed in a background thread.</li>
+      <li>The transcript is parsed for callsign patterns (NATO phonetics, direct callsigns, "CQ" calls).</li>
+      <li>If a callsign is resolved it appears as a standard <strong>callsign</strong> event; otherwise it appears as a <strong>Voice Signature</strong> event with the raw transcript.</li>
+    </ol>
+
+    <h3 class="sub-title">Voice Signature badge</h3>
+    <p>
+      Events where SSB voice was detected but no callsign could be resolved are shown with a
+      <span class="badge-mode badge-ssb">Voice Signature</span> badge in the Events card.
+      These are included in "Show All" by default.
+    </p>
+
+    <h3 class="sub-title">Enabling Whisper ASR</h3>
+    <p>
+      Open <strong>Admin Config</strong> and scroll to <strong>SSB Voice Transcription (ASR)</strong>.
+      Tick the checkbox and click <strong>Save ASR setting</strong>.
+      Whisper requires the <code>openai-whisper</code> Python package (~700 MB download). You can install it
+      via the interactive installer or manually: <code>pip install openai-whisper</code>.
+    </p>
+    <div class="info-box">
+      💡 On Raspberry Pi or low-end hardware, each 15 s audio segment takes 2–5 s to transcribe.
+      Transcription runs in a background thread and does not block scanning.
+    </div>
+  </section>
+
+  <!-- 7. METRICS -->
   <section id="metrics">
-    <h2 class="section-title">6 · Metrics explained</h2>
+    <h2 class="section-title">7 · Metrics explained</h2>
 
     <h3 class="sub-title">SNR (Signal-to-Noise Ratio)</h3>
     <p>Instantaneous measurement of a single signal relative to the noise floor, in dB.</p>
@@ -291,9 +344,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </div>
   </section>
 
-  <!-- 7. EXPORT -->
+  <!-- 8. EXPORT -->
   <section id="export">
-    <h2 class="section-title">7 · Export &amp; reports</h2>
+    <h2 class="section-title">8 · Export &amp; reports</h2>
 
     <h3 class="sub-title">Search &amp; Export Data</h3>
     <p>Accessed via <strong>Logs &amp; Reports → Search &amp; Export Data</strong>. Apply filters and then export matching events as:</p>
@@ -316,9 +369,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </ul>
   </section>
 
-  <!-- 8. ADMIN -->
+  <!-- 9. ADMIN -->
   <section id="admin">
-    <h2 class="section-title">8 · Admin &amp; configuration</h2>
+    <h2 class="section-title">9 · Admin &amp; configuration</h2>
     <div class="info-box">
       🔒 Admin settings require authentication. Log in with the admin password configured during installation.
     </div>
@@ -334,6 +387,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td>Scan</td><td>Default dwell time, FFT size, overlap.</td></tr>
         <tr><td>Retention</td><td>Maximum event count before auto-export + purge; number of recent events to keep; export directory.</td></tr>
         <tr><td>Authentication</td><td>Change admin password.</td></tr>
+        <tr><td>SSB Voice Transcription</td><td>Enable/disable Whisper ASR for automatic SSB voice-to-text. Requires <code>openai-whisper</code> package.</td></tr>
       </tbody>
     </table>
 
@@ -348,9 +402,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>This runs at most once every 24 hours. You can trigger it manually via the Admin Config panel.</p>
   </section>
 
-  <!-- 9. KEYBOARD SHORTCUTS -->
+  <!-- 10. KEYBOARD SHORTCUTS -->
   <section id="shortcuts">
-    <h2 class="section-title">9 · Keyboard shortcuts</h2>
+    <h2 class="section-title">10 · Keyboard shortcuts</h2>
     <table class="manual-table">
       <thead><tr><th>Key</th><th>Action</th></tr></thead>
       <tbody>
@@ -362,9 +416,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>All shortcuts are case-insensitive and do not fire when focus is inside a text input.</p>
   </section>
 
-  <!-- 10. FAQ -->
+  <!-- 11. FAQ -->
   <section id="faq">
-    <h2 class="section-title">10 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">11 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>
@@ -399,6 +453,20 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <h3 class="sub-title">How do I access the API documentation?</h3>
     <p>The backend exposes an OpenAPI UI at <code>http://&lt;host&gt;:8000/api/docs</code> (SwaggerUI) and <code>/api/redoc</code> (ReDoc).</p>
+
+    <h3 class="sub-title">Voice Signature events appear but no callsign is decoded</h3>
+    <p>
+      Voice Signature means the system detected SSB voice activity but Whisper could not resolve a callsign from the audio.
+      This is normal — SSB callsign extraction depends on audio quality, noise level, operator accent, and whether a callsign was actually spoken.
+      Make sure Whisper ASR is enabled in Admin Config. Even with Whisper active, many transmissions will remain as Voice Signature.
+    </p>
+
+    <h3 class="sub-title">Events card is flooded with occupancy events</h3>
+    <p>
+      Use the default <strong>Show All</strong> filter which only shows callsign-type events.
+      If you selected <strong>All + Occupancy (raw)</strong>, raw occupancy detections from every scan step will appear.
+      Switch back to <strong>Show All</strong> for a clean view of decoded signals.
+    </p>
 
     <h3 class="sub-title">Where is the data stored?</h3>
     <p>All events are stored in <code>data/events.sqlite</code>. Automatic exports go to <code>data/exports/</code>. Manual exports from the Search &amp; Export panel are also saved there.</p>

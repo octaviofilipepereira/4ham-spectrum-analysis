@@ -64,7 +64,7 @@ class ScanEngine:
         self._ssb_focus_enabled: bool = False
         self._ssb_focus_hold_ms: int = 15000
         self._ssb_focus_candidate_ttl_s: float = 20.0
-        self._ssb_focus_hits_required: int = 1
+        self._ssb_focus_hits_required: int = 2
         self._ssb_focus_cooldown_s: float = 20.0
         self._ssb_focus_bucket_hz: int = 2000
         self._ssb_focus_max_holds_per_pass: int = 2
@@ -102,7 +102,7 @@ class ScanEngine:
             1.0,
         )
         self._ssb_focus_hits_required = max(
-            int(self.config.get("ssb_focus_hits_required", 1) or 1),
+            int(self.config.get("ssb_focus_hits_required", 2) or 2),
             1,
         )
         self._ssb_focus_cooldown_s = max(
@@ -384,7 +384,7 @@ class ScanEngine:
         self._ssb_focus_holds_in_pass += 1
         return extra_ms
 
-    def is_ssb_frequency_validated(self, frequency_hz: int, max_age_s: float = 90.0) -> bool:
+    def is_ssb_frequency_validated(self, frequency_hz: int, max_age_s: float = 30.0) -> bool:
         """Check if a frequency has been validated by the SSB focus hold."""
         if not self._ssb_focus_enabled:
             return False
