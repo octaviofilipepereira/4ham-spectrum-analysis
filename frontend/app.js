@@ -2256,27 +2256,24 @@ function applyEventsCardTypeFilter(items) {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
   }
   if (selected === "ssb-voice") {
-    // All SSB voice detections — occupancy (spectral) + callsign events
-    // with ASR text.  Excludes callsign events that have no voice text.
+    // Confirmed SSB voice detections (callsign-type events from the
+    // hold-validation pipeline) — excludes raw occupancy spectrum data.
+    // Shows events with or without Whisper ASR text.
     return source.filter((eventItem) => {
       const mode = String(eventItem?.mode || "").trim().toUpperCase();
       if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
-      const evType = String(eventItem?.type || "").trim();
-      // Occupancy SSB_TRAFFIC = voice spectral detection — always show
-      if (evType === "occupancy") return true;
-      // Callsign events — show only if they carry ASR transcript text
-      const raw = String(eventItem?.raw || "").trim();
-      return raw.length > 0 && !raw.startsWith("BW ");
+      // Only callsign-type = confirmed voice, not occupancy = raw spectrum
+      return String(eventItem?.type || "").trim() === "callsign";
     });
   }
   if (selected === "ssb-callsign") {
-    // SSB events with a valid amateur callsign detected
+    // SSB callsign events where a valid amateur callsign was identified
     return source.filter((eventItem) => {
       const mode = String(eventItem?.mode || "").trim().toUpperCase();
       if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
+      if (String(eventItem?.type || "").trim() !== "callsign") return false;
       const cs = String(eventItem?.callsign || "").trim();
       if (cs) return true;
-      // Try to extract callsign from raw Whisper text
       const fromRaw = extractCallsignFromRaw(eventItem?.raw);
       return fromRaw.length > 0;
     });
