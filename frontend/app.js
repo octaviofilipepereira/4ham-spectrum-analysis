@@ -2280,7 +2280,11 @@ function applyEventsCardTypeFilter(items) {
       return callsignText.length > 0;
     });
   }
-  return source;
+  if (selected === "all-occupancy") {
+    return source;
+  }
+  // Default "all" — show callsign events only (suppress raw occupancy noise)
+  return source.filter((eventItem) => String(eventItem?.type || "").trim() === "callsign");
 }
 
 function hasEventsSearchCriteria() {
