@@ -2,10 +2,36 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-15 UTC
+Last update: 2026-03-22 UTC
 -->
 
 # Changelog
+
+## v0.8.0 - 2026-03-22
+
+### Added
+- **SSB Voice Signature Detection** — real-time SSB voice detection via spectral analysis with 15-second hold validation. Confirmed voice events are displayed as "Voice Signature" in the Events card.
+- **Whisper ASR pipeline** — OpenAI Whisper integration (model "base") for speech-to-text on SSB audio. Includes RMS silence check, `no_speech_prob` filter, and known-hallucination word list. Prepared for transceiver audio input (FT-991A / IC-7300 via USB).
+- **ASR admin controls** — enable/disable ASR from the Admin panel; dedicated Save ASR button.
+- **SNR minimum gate** — events below 6 dB SNR are suppressed (one S-unit above noise floor, practical readability threshold).
+- **SSB Callsign Detected filter** — Events card dropdown option to show only events with a valid amateur callsign identified.
+- **IARU Region 1 band calibration tests** — automated validation of SSB+CW scan bounds for all HF bands.
+- **SSB candidate-focus hold mode** — 15-second frequency hold to confirm persistent SSB activity before emitting an event.
+
+### Changed
+- **SSB occupancy events suppressed** — in SSB decoder mode, raw occupancy events are no longer saved or broadcast; only confirmed Voice Signature events from the hold-validation pipeline are emitted. Reduces event noise from ~100/min to ~5/90s.
+- Propagation score and band summary moved above the globe map in the Propagation Map card for better visibility.
+- SSB events without an identified callsign now display a "Voice Signature" badge instead of "callsign".
+- Waterfall marker semantics corrected: occupancy shown as SSB_TRAFFIC, confirmed callsign as SSB.
+- Persistent Butterworth filter state (`sosfilt_zi`) for continuous SSB demodulation across chunks.
+
+### Fixed
+- Occupancy detection decoupled from WebSocket connections — events are generated even when no browser is connected.
+- Mega-segment pre-filter prevents occupancy detections outside scan band boundaries.
+- Missing import crash in occupancy detection loop resolved.
+- FSK/PSK filter added to prevent false SSB detections on digital mode frequencies.
+- Whisper ASR decoupled from `ssb_focus` validation — fire-and-forget audio feed.
+- Dual occupancy insertion path (events.py + decoders.py) unified — eliminated duplicate event flood.
 
 ## v0.7.1 - 2026-03-15
 
