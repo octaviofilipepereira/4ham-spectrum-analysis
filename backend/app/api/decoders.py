@@ -289,6 +289,21 @@ async def _run_ssb_detector_loop() -> None:
                 await asyncio.sleep(0.2)
                 continue
 
+            center_hz = int(state.scan_engine.center_hz or 0)
+
+            # During an active SSB focus hold, bypass occupancy detection
+            # and feed ALL IQ chunks directly to ASR.  The hold already
+            # validates the frequency — requiring per-burst SSB detection
+            # drops audio whenever FFT noise causes a classification miss.
+            if center_hz > 0 and state.scan_engine.is_ssb_frequency_validated(center_hz):
+                if is_ssb_asr_available():
+                    _hold_bucket = int(center_hz / 2000)
+                    for _chunk in _iq_chunks_asr:
+                        feed_iq_ssb(_hold_bucket, _chunk, sample_rate,
+                                    0.0, center_hz)
+                    maybe_transcribe_ssb(_hold_bucket)
+                continue
+
             occupancy = estimate_occupancy(
                 iq,
                 sample_rate,
@@ -313,7 +328,6 @@ async def _run_ssb_detector_loop() -> None:
 
             best = max(candidates, key=lambda item: item.get("snr_db", 0.0))
             offset_hz = best.get("offset_hz")
-            center_hz = int(state.scan_engine.center_hz or 0)
             if center_hz <= 0:
                 continue
             if offset_hz is not None:
@@ -415,7 +429,7 @@ async def _start_ssb_detector(force: bool = False) -> Dict:
         return {"started": False, "reason": "scan_engine_unavailable"}
 
     if _ssb_iq_queue is None:
-        _ssb_iq_queue = asyncio.Queue(maxsize=1024)
+        _ssb_iq_queue = asyncio.Queue(maxsize=8192)
         state.scan_engine.register_iq_listener(_ssb_iq_queue)
 
     if _ssb_detector_task is not None and not _ssb_detector_task.done():

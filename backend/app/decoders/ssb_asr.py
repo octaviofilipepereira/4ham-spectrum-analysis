@@ -86,13 +86,16 @@ def _demodulate_ssb(iq: np.ndarray, sample_rate: int, offset_hz: float,
 class SsbAsrEngine:
     """Per-frequency audio accumulator and Whisper transcription engine."""
 
-    def __init__(self, model_size: str = "tiny"):
+    def __init__(self, model_size: str = "base"):
         self._model_size = model_size
         self._model = None
         self._model_lock = threading.Lock()
         self._buf_lock = threading.Lock()
         self._buffers: Dict[int, np.ndarray] = {}
         self._transcripts: Dict[int, str] = {}
+        # Persistent filter state per bucket for continuous demodulation
+        self._filter_zi: Dict[int, np.ndarray] = {}
+        self._filter_sos_cache: Dict[int, np.ndarray] = {}  # keyed by sample_rate
 
     @property
     def is_available(self) -> bool:
@@ -118,20 +121,55 @@ class SsbAsrEngine:
         offset_hz: float,
         frequency_hz: int,
     ) -> None:
-        """Demodulate *iq* and append resulting audio to the bucket buffer."""
+        """Demodulate *iq* and append resulting audio to the bucket buffer.
+
+        Maintains Butterworth filter state across calls for the same bucket
+        to ensure continuous, artefact-free audio demodulation.
+        """
         if not self.is_available or iq is None or len(iq) == 0:
             return
         try:
-            audio = _demodulate_ssb(iq, sample_rate, float(offset_hz), frequency_hz)
-            if len(audio) == 0:
+            from scipy.signal import butter, sosfilt, sosfilt_zi, resample_poly
+
+            # --- frequency shift + LSB flip ---
+            n = np.arange(len(iq), dtype=np.float64)
+            iq_shifted = iq * np.exp(-2j * np.pi * offset_hz / sample_rate * n)
+            if frequency_hz < _FREQ_LSB_THRESHOLD_HZ:
+                iq_shifted = np.conj(iq_shifted)
+            real_signal = np.real(iq_shifted).astype(np.float32)
+
+            # --- Low-pass filter with persistent state ---
+            sr_int = int(sample_rate)
+            if sr_int not in self._filter_sos_cache:
+                nyq = sr_int / 2.0
+                self._filter_sos_cache[sr_int] = butter(
+                    6, min(3200.0 / nyq, 0.999), btype="low", output="sos"
+                )
+            sos = self._filter_sos_cache[sr_int]
+
+            zi = self._filter_zi.get(bucket_key)
+            if zi is None:
+                zi = sosfilt_zi(sos) * real_signal[0]
+            audio, zo = sosfilt(sos, real_signal, zi=zi)
+            self._filter_zi[bucket_key] = zo
+
+            audio = audio.astype(np.float32)
+
+            # --- Resample to 16 kHz ---
+            gcd = math.gcd(sr_int, _TARGET_SR)
+            up = _TARGET_SR // gcd
+            down = sr_int // gcd
+            audio_16k = resample_poly(audio, up, down).astype(np.float32)
+
+            if len(audio_16k) == 0:
                 return
+
             with self._buf_lock:
                 buf = self._buffers.get(bucket_key)
                 if buf is None:
-                    buf = audio
+                    buf = audio_16k
                 else:
-                    buf = np.concatenate([buf, audio])
-                # Rolling window: keep only the most recent _MAX_BUF_SAMPLES
+                    buf = np.concatenate([buf, audio_16k])
                 if len(buf) > _MAX_BUF_SAMPLES:
                     buf = buf[-_MAX_BUF_SAMPLES:]
                 self._buffers[bucket_key] = buf
@@ -145,6 +183,8 @@ class SsbAsrEngine:
         stall the event loop.  Clears the buffer after transcription and
         caches the result for retrieval via ``get_last_transcript``.
         """
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
         if not self.is_available:
             return ""
 
@@ -156,6 +196,11 @@ class SsbAsrEngine:
             return ""
 
         try:
+            # Check audio RMS — skip near-silent buffers (pure noise)
+            rms = float(np.sqrt(np.mean(buf ** 2)))
+            if rms < 1e-4:
+                return ""
+
             # Normalise audio to ±0.95
             peak = float(np.max(np.abs(buf)))
             if peak > 1e-6:
@@ -172,7 +217,28 @@ class SsbAsrEngine:
                 )
 
             text = str(result.get("text") or "").strip()
+
+            # Reject segments where Whisper thinks there is no speech
+            segments = result.get("segments") or []
+            if segments:
+                avg_no_speech = sum(
+                    float(s.get("no_speech_prob", 0.0)) for s in segments
+                ) / len(segments)
+                if avg_no_speech > 0.6:
+                    return ""
+
+            # Filter known Whisper hallucinations on silent/noise audio
+            _hallucinations = {
+                "thank you", "thanks for watching", "thanks for listening",
+                "please subscribe", "see you next time", "bye",
+                "you", "the end", "subtitles by",
+            }
+            if text.rstrip(".!?,").lower() in _hallucinations:
+                return ""
+
             if text:
+                _log.info("asr_transcript bucket=%d text=%r lang=%s",
+                          bucket_key, text[:120], result.get('language', '?'))
                 self._transcripts[bucket_key] = text
             return text
         except Exception:
@@ -186,6 +252,7 @@ class SsbAsrEngine:
         with self._buf_lock:
             self._buffers.pop(bucket_key, None)
         self._transcripts.pop(bucket_key, None)
+        self._filter_zi.pop(bucket_key, None)
 
 
 # ---------------------------------------------------------------------------

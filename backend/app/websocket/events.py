@@ -21,7 +21,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.decoders.ingest import build_callsign_event
-from app.decoders.ssb_asr import get_last_transcript_ssb, maybe_transcribe_ssb
+from app.decoders.ssb_asr import get_last_transcript_ssb
 from app.dependencies.helpers import (
     safe_float,
     log,
@@ -387,6 +387,12 @@ async def _run_occupancy_detection_loop() -> None:
                 mode_name = "SSB_TRAFFIC"
                 mode_confidence = max(float(mode_confidence or 0.0), 0.6)
 
+            # In SSB mode, discard non-SSB events (FSK/PSK, CW, FM, Unknown)
+            # — they are artefacts of narrow FFT bins, not useful SSB data.
+            if selected_decoder_mode == "ssb" and mode_name != "SSB_TRAFFIC":
+                await asyncio.sleep(0.1)
+                continue
+
             # Build event
             event = {
                 "type": "occupancy",
@@ -448,9 +454,6 @@ async def _run_occupancy_detection_loop() -> None:
                     )
                 except Exception:
                     pass
-                # Fire background Whisper transcription whenever enough audio is
-                # buffered, independent of the validation hold mechanism.
-                maybe_transcribe_ssb(int(frequency_hz / 2000))
 
             # Emit confirmed callsign event only after 15s hold validation
             callsign_event = None
