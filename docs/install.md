@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 16:27:19 UTC
+Last update: 2026-03-22 UTC
 -->
 
 # Installation Guide
@@ -23,9 +23,10 @@ cd 4ham-spectrum-analysis
 The installer presents an interactive graphical wizard (whiptail) that:
 1. Installs all system packages via `apt`
 2. Optionally builds the RTL-SDR Blog v4 driver from source
-3. Creates the Python virtual environment and installs Python dependencies
-4. Asks for an admin username and password (stored securely as bcrypt in the local SQLite database)
-5. Installs and starts the systemd background service (auto-start on boot)
+3. Optionally installs OpenAI Whisper for SSB voice transcription (~700 MB download, asked during setup)
+4. Creates the Python virtual environment and installs Python dependencies
+5. Asks for an admin username and password (stored securely as bcrypt in the local SQLite database)
+6. Installs and starts the systemd background service (auto-start on boot)
 
 At the end, open the printed URL in your browser and log in. No further steps needed.
 
@@ -102,6 +103,7 @@ Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 - Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
 - To auto-start Direwolf at backend startup, install the binary and set:
 	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
+- **SSB Voice Signature (Whisper ASR):** to enable real-time SSB voice transcription after installation, activate the venv and run `pip install openai-whisper`, then enable ASR in Admin → Settings. The `tiny` model is auto-downloaded on first use. Full transcription pipeline requires `ffmpeg` (installed by the auto-installer).
 
 ## Waterfall tooltip
 - Hovering mode labels (FT8/CW/SSB) in the waterfall shows mode, frequency, callsign, last-seen time, and SNR.

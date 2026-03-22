@@ -110,9 +110,10 @@ Welcome to the 4ham Spectrum Analysis installer!
 This wizard will:
   1. Install system packages (SoapySDR, RTL-SDR, Python)
   2. Optionally build the RTL-SDR Blog v4 driver from source
-  3. Create the Python virtual environment
-  4. Set up your admin account (stored securely in the local DB)
-  5. Install and start the background service (systemd)
+  3. Optionally install OpenAI Whisper for SSB voice transcription
+  4. Create the Python virtual environment
+  5. Set up your admin account (stored securely in the local DB)
+  6. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
 

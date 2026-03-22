@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-02-22 16:27:19 UTC
+Last update: 2026-03-22 UTC
 -->
 
 # Installation Manual
@@ -122,6 +122,31 @@ python -m pip install -r backend/requirements.txt
 - Reduce FFT size if CPU usage is high
 
 ## Decoder Integrations
+
+### SSB ASR / Whisper (optional)
+As of v0.8.0, real-time SSB voice demodulation and Whisper ASR are fully integrated. SSB transmissions detected without a resolved callsign appear as **Voice Signature** events in the UI.
+
+**Installation (if skipped during `./install.sh`):**
+```
+source .venv/bin/activate
+# x86_64 — CPU-only PyTorch to avoid the 915 MB CUDA build:
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install openai-whisper
+```
+The `tiny` Whisper model (~75 MB) is auto-downloaded on first use. The `base` model is also supported and offers better accuracy.
+
+**Requirements:**
+- `ffmpeg` must be installed (included by the auto-installer: `sudo apt install -y ffmpeg`)
+- Minimum ~1 GB free disk for model cache, ~500 MB RAM at runtime (tiny)
+- On Raspberry Pi 4/5: supported but expect ~2–4 s transcription latency per segment
+
+**Enable in Admin panel:**
+1. Open the web UI and log in.
+2. Go to **Admin** → **Settings**.
+3. Enable **SSB ASR** and select the Whisper model (`tiny` recommended for low-power hardware).
+
+**Audio source:**
+By default, ASR uses the audio demodulated from the RTL-SDR IQ stream. For higher quality, use a hardware transceiver (Yaesu FT-991A, ICOM IC-7300) connected via USB audio. The transceiver's built-in sound card provides better receiver front-end sensitivity and filtering than an RTL-SDR on busy HF bands.
 
 ### File watchers (automatic ingest)
 The backend can tail decoder output files and ingest callsigns automatically. Configure paths via environment variables before starting the backend:

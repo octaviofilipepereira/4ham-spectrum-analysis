@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-14 UTC
+Last update: 2026-03-22 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -20,7 +20,7 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
 
-> **Note on SSB:** SSB mode is partially implemented — the UI, scan integration, and event structure are in place, but full voice demodulation and ASR-based callsign identification are still under development and will be available in a future release.
+> **SSB Voice Signature (v0.8.0):** SSB voice demodulation and ASR-based identification are fully implemented. Detected SSB transmissions without a resolved callsign are shown as **Voice Signature** events; when Whisper ASR resolves a callsign it appears as a standard callsign event. Enable Whisper in the Admin panel; install with `pip install openai-whisper` (optional — large download, ~700 MB).
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
@@ -58,6 +58,7 @@ cd 4ham-spectrum-analysis
 The installer presents a **graphical interactive wizard** (whiptail TUI) that guides you through:
 - Installing all system packages (SoapySDR, RTL-SDR, Python, build tools)
 - Optionally building the RTL-SDR Blog v4 driver from source (asked during setup)
+- Optionally installing OpenAI Whisper for SSB voice transcription (asked during setup — ~700 MB download)
 - Creating the Python virtual environment and installing all dependencies
 - Setting up your admin account (username + password — stored as bcrypt in the local database)
 - Installing and starting the systemd background service (auto-start on boot)
@@ -67,6 +68,14 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 > For full manual installation notes and decoder setup, see [docs/install.md](docs/install.md) and [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
+
+### v0.8.0
+- **SSB Voice Signature Detection**: real-time SSB voice demodulation with VAD and Whisper ASR transcription.
+- **Voice Signature badge**: SSB events without a resolved callsign display as "Voice Signature" in the events card.
+- **Whisper ASR integration**: optional OpenAI Whisper model (tiny/base) for real-time speech-to-text on SSB segments; asked during `./install.sh` setup.
+- **Occupancy flood protection**: adaptive gate suppresses burst occupancy events during sustained SSB transmissions.
+- **Events card cleanup**: removed redundant "SSB Voice Detected" filter; Show All now presents only callsign-type and Voice Signature events.
+- **Propagation map**: score and band activity moved above the globe for immediate visibility.
 
 ### v0.7.1
 - Graphical installer (`install.sh`) — interactive whiptail TUI for end-to-end setup: system packages, optional RTL-SDR Blog v4 driver, Python venv, admin account (bcrypt/SQLite), systemd service. Single command to go from `git clone` to running application.
@@ -458,11 +467,12 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] Analog mode identification (heuristic classifier).
 - [x] Digital decoding pipeline (FT8/FT4/APRS/CW) and SSB ASR baseline.
 - [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
+- [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
 
 ### Next milestones
 1. Occupancy alerts and analytics dashboards.
 2. Multi-node aggregation (multiple receivers feeding one backend).
-3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness).
+3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
 4. Deployment hardening (service templates + operational monitoring/retention defaults).
 
 ## Performance notes
@@ -482,7 +492,7 @@ Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
 - Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
 - Add occupancy alerts and analytics API/UI endpoints.
 - Add multi-node aggregation support (multiple receivers feeding one backend).
-- Improve SSB ASR confidence calibration and noisy-channel robustness.
+- Improve SSB ASR confidence calibration for noisy channels and transceiver audio sources (FT-991A/IC-7300).
 - Add packaged operational defaults (retention, log rotation, service health checks).
 
 ## References
