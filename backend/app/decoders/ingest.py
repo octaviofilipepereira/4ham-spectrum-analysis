@@ -8,7 +8,7 @@ import json
 import re
 
 
-_ALLOWED_MODES = {"FT8", "FT4", "WSPR", "APRS", "CW", "SSB", "Unknown"}
+_ALLOWED_MODES = {"FT8", "FT4", "WSPR", "APRS", "CW", "CW_CANDIDATE", "SSB", "SSB_TRAFFIC", "Unknown"}
 _BAND_RANGES = [
     ("160m", 1800000, 2000000),
     ("80m", 3500000, 4000000),
@@ -38,10 +38,12 @@ def _infer_source(mode):
         return "external_ft"
     if mode == "APRS":
         return "direwolf"
-    if mode == "CW":
+    if mode in ("CW", "CW_CANDIDATE"):
         return "cw"
     if mode == "SSB":
         return "asr"
+    if mode == "SSB_TRAFFIC":
+        return "internal_ssb_occupancy"
     return "dsp"
 
 
@@ -75,7 +77,9 @@ def build_callsign_event(payload, scan_state):
         # text and occupancy data are still recorded (callsign stored as "").
         if mode == "CW" and payload.get("msg"):
             callsign = ""
-        elif mode == "SSB" and (payload.get("msg") or payload.get("raw")):
+        elif mode == "CW_CANDIDATE" and payload.get("msg"):
+            callsign = ""
+        elif mode in ("SSB", "SSB_TRAFFIC") and (payload.get("msg") or payload.get("raw")):
             callsign = ""
         else:
             return None

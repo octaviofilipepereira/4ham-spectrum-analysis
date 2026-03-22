@@ -83,6 +83,9 @@ const purgeInvalidEventsBtn = document.getElementById("purgeInvalidEvents");
 const resetDefaultsBtn = document.getElementById("resetDefaults");
 const resetAllConfigBtn = document.getElementById("resetAllConfig");
 const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
+const ssbAsrEnabledCheck = document.getElementById("ssbAsrEnabled");
+const ssbAsrAvailableBadge = document.getElementById("ssbAsrAvailableBadge");
+const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
@@ -388,14 +391,26 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
 
 function getWaterfallFullRangeHz() {
   const frame = lastSpectrumFrame;
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
   const centerHz = Number(frame?.center_hz || 0);
   const spanHz = Number(frame?.span_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const hasScanRange = Number.isFinite(scanStartHz)
     && Number.isFinite(scanEndHz)
     && scanStartHz > 0
     && scanEndHz > scanStartHz;
+  if (hasDisplayRange) {
+    return {
+      startHz: displayStartHz,
+      spanHz: displayEndHz - displayStartHz,
+    };
+  }
   if (hasScanRange) {
     return {
       startHz: scanStartHz,
@@ -643,6 +658,10 @@ const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR dev
 const WATERFALL_SIMULATE_MODE_MARKERS = false;
 const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
 const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
+const WATERFALL_MARKER_TTL_SSB_MS = 30000;  // SSB fallback when pass_count is unavailable
+const WATERFALL_MARKER_TTL_SSB_PASSES = 2;  // keep SSB markers across scan passes so they stay visible
+const WATERFALL_MARKER_BUCKET_HZ = 50;
+const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;
 const waterfallMarkerCache = new Map();
 // Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
 // 15-20 dB below the noise floor so DSP quality gates never fire for them.
@@ -831,8 +850,14 @@ function getWaterfallViewport(frame) {
   const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
   const centerHz = Number(frame?.center_hz || 0);
   const spanHz = Number(frame?.span_hz || 0);
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const hasScanRange = Number.isFinite(scanStartHz)
     && Number.isFinite(scanEndHz)
     && scanStartHz > 0
@@ -865,9 +890,13 @@ function getWaterfallViewport(frame) {
   const startBin = Math.max(0, Math.min(totalBins - visibleBins, Math.round(waterfallExplorerPan * totalBins)));
   const fftDb = stitched.slice(startBin, startBin + visibleBins);
 
-  const fullSpanHz = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
+  const fullSpanHz = hasDisplayRange
+    ? (displayEndHz - displayStartHz)
+    : (hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT));
   const visibleSpanHz = fullSpanHz / zoom;
-  const fullStartHz = hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2));
+  const fullStartHz = hasDisplayRange
+    ? displayStartHz
+    : (hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2)));
   const startHz = fullStartHz + (waterfallExplorerPan * fullSpanHz);
   const endHz = startHz + visibleSpanHz;
 
@@ -904,6 +933,9 @@ function normalizeModeLabel(mode) {
   if (text === "CW_CANDIDATE") {
     return "CW TRAFFIC";
   }
+  if (text === "SSB_TRAFFIC") {
+    return "SSB TRAFFIC";
+  }
   return text || "SIG";
 }
 
@@ -915,6 +947,9 @@ function modeMatchesSelectedMode(modeValue, selectedModeValue) {
   }
   if (selectedMode === "CW") {
     return mode === "CW" || mode === "CW_CANDIDATE";
+  }
+  if (selectedMode === "SSB") {
+    return mode === "SSB" || mode === "SSB_TRAFFIC";
   }
   return mode === selectedMode;
 }
@@ -1066,6 +1101,12 @@ function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, 
     }
     return { startHz: Number(stableRangeStartHz), endHz: Number(stableRangeEndHz) };
   }
+  if (isValidRange(frame?.band_display_start_hz, frame?.band_display_end_hz)) {
+    return {
+      startHz: Number(frame.band_display_start_hz),
+      endHz: Number(frame.band_display_end_hz)
+    };
+  }
   if (isValidRange(frame?.scan_start_hz, frame?.scan_end_hz)) {
     return { startHz: Number(frame.scan_start_hz), endHz: Number(frame.scan_end_hz) };
   }
@@ -1080,6 +1121,14 @@ function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, 
 }
 
 function buildStableWaterfallMarkers(frame) {
+  const currentPassCount = Number(frame?.pass_count);
+  const hasCurrentPassCount = Number.isFinite(currentPassCount) && currentPassCount >= 0;
+  const displayStartHz = Number(frame?.band_display_start_hz || 0);
+  const displayEndHz = Number(frame?.band_display_end_hz || 0);
+  const hasDisplayRange = Number.isFinite(displayStartHz)
+    && Number.isFinite(displayEndHz)
+    && displayStartHz > 0
+    && displayEndHz > displayStartHz;
   const scanStartHz = Number(frame?.scan_start_hz || 0);
   const scanEndHz = Number(frame?.scan_end_hz || 0);
   const hasScanRange = Number.isFinite(scanStartHz)
@@ -1088,8 +1137,12 @@ function buildStableWaterfallMarkers(frame) {
     && scanEndHz > scanStartHz;
   const defaultStartHz = Number(frame?.center_hz || 0) - (Number(frame?.span_hz || 0) / 2);
   const defaultEndHz = Number(frame?.center_hz || 0) + (Number(frame?.span_hz || 0) / 2);
-  const rangeStartHz = hasScanRange ? scanStartHz : defaultStartHz;
-  const rangeEndHz = hasScanRange ? scanEndHz : defaultEndHz;
+  const rangeStartHz = hasDisplayRange
+    ? displayStartHz
+    : (hasScanRange ? scanStartHz : defaultStartHz);
+  const rangeEndHz = hasDisplayRange
+    ? displayEndHz
+    : (hasScanRange ? scanEndHz : defaultEndHz);
   
   // Only show markers during active scan with mode selected
   if (!isScanRunning || !selectedDecoderMode) {
@@ -1123,21 +1176,47 @@ function buildStableWaterfallMarkers(frame) {
       if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
         return;
       }
-      const key = `${Math.round(frequencyHz / 50) * 50}`;
+      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
+      const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
+      const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
       waterfallMarkerCache.set(key, {
         frequency_hz: frequencyHz,
         mode: markerModeRaw,
         snr_db: Number(marker?.snr_db),
         crest_db: Number(marker?.crest_db),
-        seen_at: now
+        seen_at: now,
+        seen_pass_count: isSsbMarker && hasCurrentPassCount ? currentPassCount : null
       });
     });
   }
 
   for (const [key, marker] of waterfallMarkerCache.entries()) {
-    const isCw = marker?.mode === "CW" || marker?.mode === "CW_CANDIDATE";
-    const ttl  = isCw ? WATERFALL_MARKER_TTL_CW_MS : WATERFALL_MARKER_TTL_MS;
-    if ((now - Number(marker?.seen_at || 0)) > ttl) {
+    const markerModeText = String(marker?.mode || "").trim().toUpperCase();
+    const isCw = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
+    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
+    const seenAt = Number(marker?.seen_at || 0);
+    if (!Number.isFinite(seenAt) || seenAt <= 0) {
+      waterfallMarkerCache.delete(key);
+      continue;
+    }
+
+    // Phase 1.4: SSB markers are persisted across sweep passes to reduce
+    // flicker and preserve context while the scanner revisits frequencies.
+    if (isSsb && hasCurrentPassCount) {
+      const seenPassCount = Number(marker?.seen_pass_count);
+      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) <= WATERFALL_MARKER_TTL_SSB_PASSES) {
+        continue;
+      }
+      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) > WATERFALL_MARKER_TTL_SSB_PASSES) {
+        waterfallMarkerCache.delete(key);
+        continue;
+      }
+    }
+
+    const ttl = isCw
+      ? WATERFALL_MARKER_TTL_CW_MS
+      : (isSsb ? WATERFALL_MARKER_TTL_SSB_MS : WATERFALL_MARKER_TTL_MS);
+    if ((now - seenAt) > ttl) {
       waterfallMarkerCache.delete(key);
     }
   }
@@ -1408,7 +1487,10 @@ function updateCallsignCacheFromEvent(eventItem) {
     }
   }
   
-  const callsign = String(eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "").trim().toUpperCase();
+  const allowRawCallsignInference = eventMode !== "SSB";
+  const callsign = String(
+    eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || ""
+  ).trim().toUpperCase();
   const frequencyHz = Number(eventItem.frequency_hz);
   const mode = eventMode;
   const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
@@ -1570,7 +1652,7 @@ function logLine(text) {
   frontendLogsEl.textContent = `${new Date().toISOString()} ${text}\n${current}`.trim();
 }
 
-function renderToast(message, isError = false) {
+function renderToast(message, isError = false, detail = "") {
   if (!toast) {
     return;
   }
@@ -1590,9 +1672,20 @@ function renderToast(message, isError = false) {
     noticeEl.classList.add("error");
   }
 
+  const bodyEl = document.createElement("div");
+  bodyEl.className = "toast__body";
+
   const messageEl = document.createElement("span");
   messageEl.className = "toast__message";
   messageEl.textContent = message;
+  bodyEl.appendChild(messageEl);
+
+  if (detail) {
+    const detailEl = document.createElement("span");
+    detailEl.className = "toast__detail";
+    detailEl.textContent = detail;
+    bodyEl.appendChild(detailEl);
+  }
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
@@ -1603,7 +1696,7 @@ function renderToast(message, isError = false) {
     noticeEl.remove();
   });
 
-  noticeEl.appendChild(messageEl);
+  noticeEl.appendChild(bodyEl);
   noticeEl.appendChild(closeBtn);
   toast.appendChild(noticeEl);
 
@@ -1673,7 +1766,7 @@ function isValidCallsign(value) {
   if (!text) {
     return true;
   }
-  return /^[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
+  return /^(?=.*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
 }
 
 function extractCallsignFromRaw(value) {
@@ -1681,7 +1774,7 @@ function extractCallsignFromRaw(value) {
   if (!text) {
     return "";
   }
-  const match = text.match(/\b[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
+  const match = text.match(/\b(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
   return match ? match[0] : "";
 }
 
@@ -1689,7 +1782,13 @@ function extractDecodedText(eventItem) {
   if (!eventItem || typeof eventItem !== "object") {
     return "";
   }
-  const candidates = [eventItem.msg, eventItem.text];
+  const mode = String(eventItem.mode || "").toUpperCase();
+  const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
+  // For SSB: raw holds the Whisper ASR transcript (or spectral-proof fallback) — show first.
+  // For other modes: msg is the primary decoded content.
+  const candidates = isSsb
+    ? [eventItem.raw, eventItem.msg, eventItem.text]
+    : [eventItem.msg, eventItem.text, eventItem.raw];
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();
     if (value) {
@@ -2102,6 +2201,20 @@ function pushLiveEventToPanel(eventPayload) {
     return;
   }
 
+  // Toast notification for confirmed SSB voice detections
+  const _evMode = String(eventPayload.mode || "").toUpperCase();
+  if (
+    (_evMode === "SSB" || _evMode === "SSB_TRAFFIC") &&
+    eventPayload.type === "callsign" &&
+    eventPayload.source === "internal_ssb_occupancy"
+  ) {
+    const _ssbMsg = String(eventPayload.msg || "").trim();
+    const _ssbProof = String(eventPayload.raw || "").trim();
+    if (_ssbMsg) {
+      renderToast(_ssbMsg, false, _ssbProof !== _ssbMsg ? _ssbProof : "");
+    }
+  }
+
   updateCallsignCacheFromEvent(eventPayload);
   latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
@@ -2139,12 +2252,31 @@ function applyEventsCardTypeFilter(items) {
   if (selected === "cw-candidate") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW_CANDIDATE");
   }
+  if (selected === "ssb-traffic") {
+    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
+  }
+  if (selected === "ssb-callsign") {
+    // SSB callsign events where a valid amateur callsign was identified
+    return source.filter((eventItem) => {
+      const mode = String(eventItem?.mode || "").trim().toUpperCase();
+      if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
+      if (String(eventItem?.type || "").trim() !== "callsign") return false;
+      const cs = String(eventItem?.callsign || "").trim();
+      if (cs) return true;
+      const fromRaw = extractCallsignFromRaw(eventItem?.raw);
+      return fromRaw.length > 0;
+    });
+  }
   if (selected === "cw-only") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW");
   }
   if (selected === "callsign-only") {
     return source.filter((eventItem) => {
-      const callsignText = String(eventItem?.callsign || extractCallsignFromRaw(eventItem?.raw) || "").trim();
+      const modeText = String(eventItem?.mode || "").trim().toUpperCase();
+      const allowRawCallsignInference = modeText !== "SSB";
+      const callsignText = String(
+        eventItem?.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem?.raw) : "") || ""
+      ).trim();
       return callsignText.length > 0;
     });
   }
@@ -2339,8 +2471,9 @@ function renderEventList(targetEl, items, emptyMessage) {
     header.className = "event-item__meta";
 
     const typeBadge = document.createElement("span");
+    const _isSSBVoice = eventItem.type === "callsign" && /^SSB/i.test(eventItem.mode || "") && !eventItem.callsign;
     typeBadge.className = `badge ${eventItem.type === "callsign" ? "bg-info" : "bg-secondary"}`;
-    typeBadge.textContent = eventItem.type || "event";
+    typeBadge.textContent = _isSSBVoice ? "Voice Signature" : (eventItem.type || "event");
 
     const modeBadge = document.createElement("span");
     modeBadge.className = "badge bg-primary";
@@ -2360,7 +2493,9 @@ function renderEventList(targetEl, items, emptyMessage) {
     const frequencyValue = Number(eventItem.frequency_hz);
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
-    const callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "NO CALLSIGN DETECTED";
+    const modeText = String(eventItem.mode || "").trim().toUpperCase();
+    const allowRawCallsignInference = modeText !== "SSB";
+    const callsign = eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || "NO CALLSIGN DETECTED";
     const decodedText = extractDecodedText(eventItem);
 
     const frequencyEl = document.createElement("strong");
@@ -2913,6 +3048,12 @@ async function startScan() {
     showToast("⚠️ Select the desired mode before starting the scan");
     return;
   }
+
+  // Phase 1.4 behavior: markers are tied to the current scan session only.
+  waterfallMarkerCache.clear();
+  waterfallDecodedMarkerCache.clear();
+  waterfallCallsignCache.clear();
+  _overlayLastFingerprint = "";
 
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
@@ -4198,6 +4339,20 @@ async function loadSettings() {
       await refreshAdminAuthFields();
     }
     applyDeviceConfigToForm(data.device_config || {});
+    if (data.asr) {
+      if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.checked = data.asr.enabled !== false;
+      if (ssbAsrAvailableBadge) {
+        if (data.asr.available) {
+          ssbAsrAvailableBadge.textContent = "Whisper installed";
+          ssbAsrAvailableBadge.className = "badge bg-success ms-2";
+          if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.disabled = false;
+        } else {
+          ssbAsrAvailableBadge.textContent = "Whisper not installed";
+          ssbAsrAvailableBadge.className = "badge bg-warning text-dark ms-2";
+          if (ssbAsrEnabledCheck) { ssbAsrEnabledCheck.checked = false; ssbAsrEnabledCheck.disabled = true; }
+        }
+      }
+    }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
       audioOutputDeviceInput.value = data.audio_config.output_device || "";
@@ -4375,7 +4530,8 @@ saveSettingsBtn.addEventListener("click", async () => {
       qth: stationQthInput.value.trim(),
     },
     device_config: buildDeviceConfigPayload(),
-    audio_config: buildAudioConfigPayload()
+    audio_config: buildAudioConfigPayload(),
+    asr: { enabled: ssbAsrEnabledCheck ? ssbAsrEnabledCheck.checked : true },
   };
   const response = await fetch("/api/settings", {
     method: "POST",
@@ -4600,6 +4756,27 @@ if (purgeInvalidEventsBtn) {
 refreshDevicesBtn.addEventListener("click", () => {
   loadDevices();
 });
+
+if (saveAsrSettingsBtn) {
+  saveAsrSettingsBtn.addEventListener("click", async () => {
+    const enabled = ssbAsrEnabledCheck ? ssbAsrEnabledCheck.checked : true;
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ asr: { enabled } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save ASR setting");
+        showToastError(message);
+        return;
+      }
+      showToast(enabled ? "ASR voice transcription enabled" : "ASR voice transcription disabled");
+    } catch (err) {
+      showToastError("Failed to save ASR setting");
+    }
+  });
+}
 
 if (showNonSdrDevicesToggle) {
   showNonSdrDevicesToggle.addEventListener("change", () => {
@@ -5107,15 +5284,16 @@ function updateVFODisplay(startHz, endHz) {
       return;
     }
     const targetHz = Math.round(mhz * 1_000_000);
-    const frame = lastSpectrumFrame;
-    const scanStartHz = Number(frame?.scan_start_hz || 0);
-    const scanEndHz   = Number(frame?.scan_end_hz   || 0);
-    const centerHz    = Number(frame?.center_hz     || 0);
-    const spanHz      = Number(frame?.span_hz       || 0);
-    const hasScanRange = scanStartHz > 0 && scanEndHz > scanStartHz;
-    const fullStartHz  = hasScanRange ? scanStartHz : (centerHz - (spanHz * WATERFALL_SEGMENT_COUNT / 2));
-    const fullSpanHz   = hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT);
-    if (!fullSpanHz || targetHz < fullStartHz || targetHz > fullStartHz + fullSpanHz) {
+    const fullRange = getWaterfallFullRangeHz();
+    const fullStartHz = Number(fullRange?.startHz || 0);
+    const fullSpanHz = Number(fullRange?.spanHz || 0);
+    if (
+      !Number.isFinite(fullStartHz)
+      || !Number.isFinite(fullSpanHz)
+      || fullSpanHz <= 0
+      || targetHz < fullStartHz
+      || targetHz > fullStartHz + fullSpanHz
+    ) {
       showToast(`${mhz.toFixed(3)} MHz is outside the current band`);
       return;
     }

@@ -78,6 +78,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 ],
                 "scan_start_hz": 14000000,
                 "scan_end_hz": 14350000,
+                "band_display_start_hz": 14000000,
+                "band_display_end_hz": 14350000,
                 "agc_gain_db": 12.5
             }
         }
@@ -172,13 +174,21 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         )
         
         # Detect occupancy segments
+        # In SSB mode, relax thresholds to detect voice signals (wider BW, lower SNR)
+        _spec_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+        if _spec_decoder_mode == "ssb":
+            _spec_snr_thr = min(float(state.snr_threshold_db), 3.0)
+            _spec_min_bw = min(int(state.min_bw_hz), 250)
+        else:
+            _spec_snr_thr = state.snr_threshold_db
+            _spec_min_bw = state.min_bw_hz
         occupancy_segments = estimate_occupancy(
             iq,
             state.scan_engine.sample_rate,
             threshold_dbm=threshold_dbm,
             adapt=False,
-            snr_threshold_db=state.snr_threshold_db,
-            min_bw_hz=state.min_bw_hz
+            snr_threshold_db=_spec_snr_thr,
+            min_bw_hz=_spec_min_bw
         )
         
         # Process mode markers with temporal persistence
@@ -188,6 +198,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             if state.scan_engine.config 
             else None
         )
+        decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
         center_hz = float(state.scan_engine.center_hz or 0.0)
         now_ts = time.time()
         
@@ -233,15 +244,34 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 bandwidth_hz=bandwidth_hz
             ):
                 continue
-            
-            # Filter: only show known digital mode markers (DSP occupancy pipeline)
-            if mode_name not in ("FT8", "FT4", "WSPR"):
-                continue
-            
+
+            # Marker mode selection is decoder-mode aware.
+            marker_mode_name = mode_name
+            if decoder_mode == "ssb":
+                # In SSB mode, occupancy classifier detections are raw candidates.
+                # Mark them as SSB_TRAFFIC (not yet confirmed as traffic).
+                if mode_name not in ("SSB", "AM"):
+                    continue
+                marker_mode_name = "SSB_TRAFFIC"  # Raw occupancy - candidate, not confirmed
+            else:
+                # For non-SSB modes keep existing digital marker behavior.
+                if mode_name not in ("FT8", "FT4", "WSPR"):
+                    continue
+
+            if decoder_mode == "ssb":
+                # SSB markers: lower threshold to show voice-like signals.
+                min_snr_db = min(6.0, float(state.marker_min_snr_db))
+                min_confidence = min(0.55, float(state.marker_min_confidence))
+                min_hits_required = 1
+            else:
+                min_snr_db = float(state.marker_min_snr_db)
+                min_confidence = float(state.marker_min_confidence)
+                min_hits_required = int(state.marker_min_hits)
+
             # Quality gate: filter weak / low-confidence detections
-            if snr_db < state.marker_min_snr_db:
+            if snr_db < min_snr_db:
                 continue
-            if mode_confidence < state.marker_min_confidence:
+            if mode_confidence < min_confidence:
                 continue
             
             # Temporal persistence: require repeated detections
@@ -259,7 +289,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                     "marker": {
                         "offset_hz": offset_hz,
                         "frequency_hz": frequency_hz,
-                        "mode": mode_name,
+                        "mode": marker_mode_name,
                         "snr_db": snr_db,
                         "bandwidth_hz": bandwidth_hz,
                         "confidence": float(mode_confidence),
@@ -267,7 +297,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 }
                 
                 # Show immediately if minimum hits threshold is 1
-                if state.marker_min_hits <= 1:
+                if min_hits_required <= 1:
                     mode_markers.append(
                         state.marker_candidates[bucket_key]["marker"]
                     )
@@ -279,14 +309,14 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             cand["marker"] = {
                 "offset_hz": offset_hz,
                 "frequency_hz": frequency_hz,
-                "mode": mode_name,
+                "mode": marker_mode_name,
                 "snr_db": snr_db,
                 "bandwidth_hz": bandwidth_hz,
                 "confidence": float(mode_confidence),
             }
             
             # Include marker if it has enough hits
-            if cand["hits"] >= state.marker_min_hits:
+            if cand["hits"] >= min_hits_required:
                 mode_markers.append(cand["marker"])
         
         # Merge CW decode markers (come from actual decodes, not DSP occupancy)
@@ -323,13 +353,19 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "confidence": cw_m["confidence"],
             })
 
-        # Sort markers by offset and limit to 24
+        # Sort markers by offset and cap SSB marker volume aggressively to
+        # avoid flooding the waterfall with weak/transient false positives.
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
-        mode_markers = mode_markers[:24]
+        if decoder_mode == "ssb":
+            mode_markers = mode_markers[:24]
+        else:
+            mode_markers = mode_markers[:24]
         
         # Determine scan boundaries
         scan_start_hz = None
         scan_end_hz = None
+        band_display_start_hz = None
+        band_display_end_hz = None
         if state.scan_engine.config:
             scan_start_hz = int(
                 safe_float(state.scan_engine.config.get("start_hz"), default=0) or 0
@@ -345,6 +381,20 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             ):
                 scan_start_hz = None
                 scan_end_hz = None
+
+            band_display_start_hz = int(
+                safe_float(state.scan_engine.config.get("band_display_start_hz"), default=0) or 0
+            )
+            band_display_end_hz = int(
+                safe_float(state.scan_engine.config.get("band_display_end_hz"), default=0) or 0
+            )
+            if (
+                band_display_start_hz <= 0
+                or band_display_end_hz <= 0
+                or band_display_end_hz <= band_display_start_hz
+            ):
+                band_display_start_hz = None
+                band_display_end_hz = None
 
         # In preview mode there is no scan config.  Use the explicit band
         # boundaries stored on the engine when the user selected a band
@@ -392,8 +442,11 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "noise_floor_db": noise_floor_db,
                 "peaks": peaks,
                 "mode_markers": mode_markers,
+                "pass_count": int(getattr(state.scan_engine, "pass_count", 0) or 0),
                 "scan_start_hz": scan_start_hz,
                 "scan_end_hz": scan_end_hz,
+                "band_display_start_hz": band_display_start_hz,
+                "band_display_end_hz": band_display_end_hz,
                 "agc_gain_db": agc_gain_db
             }
         }

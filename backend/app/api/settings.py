@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
+from app.decoders.ssb_asr import is_ssb_asr_available, set_asr_enabled
 
 
 router = APIRouter()
@@ -42,6 +43,11 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
     }
     if "summary" not in settings:
         settings["summary"] = {"showBand": True, "showMode": True}
+    asr_cfg = settings.get("asr") or {}
+    settings["asr"] = {
+        "enabled": bool(asr_cfg.get("enabled", True)),
+        "available": is_ssb_asr_available(),
+    }
     settings["auth"] = {
         "enabled": bool(state.auth_required),
         "user": state.auth_user if state.auth_required else "",
@@ -105,7 +111,12 @@ def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
         existing["device_config"] = payload.get("device_config") or {}
     if "audio_config" in payload:
         existing["audio_config"] = payload.get("audio_config") or {}
-    
+    if "asr" in payload:
+        asr = payload.get("asr") or {}
+        enabled = bool(asr.get("enabled", True))
+        existing["asr"] = {"enabled": enabled}
+        set_asr_enabled(enabled)
+
     state.db.save_settings(existing)
     return {"status": "ok"}
 

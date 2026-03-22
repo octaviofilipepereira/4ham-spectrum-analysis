@@ -130,6 +130,10 @@ async def lifespan(app_instance: FastAPI):
     # Start retention background task
     asyncio.create_task(_retention_loop())
 
+    # Start occupancy detection background task (independent of WS connections)
+    from app.websocket.events import _run_occupancy_detection_loop
+    asyncio.create_task(_run_occupancy_detection_loop())
+
     yield
 
     # Graceful shutdown

@@ -46,14 +46,37 @@ _CW_SUBBANDS_HZ = {
     "40m": (7_000_000, 7_040_000),
     "30m": (10_100_000, 10_130_000),
     "20m": (14_000_000, 14_070_000),
-    "17m": (18_068_000, 18_110_000),
+    "17m": (18_068_000, 18_095_000),  # exclusive CW ends at 18.095; 18.095-18.111 is narrow/all-modes
     "15m": (21_000_000, 21_150_000),
     "12m": (24_890_000, 24_930_000),
     "10m": (28_000_000, 28_300_000),
 }
 
 _SSB_SUBBANDS_HZ = {
-    "40m": (7_090_000, 7_199_000),
+    "160m": (1_843_000, 2_000_000),
+    "80m": (3_600_000, 3_800_000),
+    "40m": (7_090_000, 7_200_000),
+    "20m": (14_140_000, 14_350_000),
+    "17m": (18_100_000, 18_168_000),
+    "15m": (21_160_000, 21_450_000),
+    "12m": (24_930_000, 24_990_000),
+    "10m": (28_300_000, 29_700_000),
+}
+
+_DEFAULT_BAND_BOUNDS_HZ = {
+    "160m": (1_810_000, 2_000_000),
+    "80m": (3_500_000, 3_800_000),
+    "60m": (5_250_000, 5_450_000),
+    "40m": (7_000_000, 7_200_000),
+    "30m": (10_100_000, 10_150_000),
+    "20m": (14_000_000, 14_350_000),
+    "17m": (18_068_000, 18_168_000),
+    "15m": (21_000_000, 21_450_000),
+    "12m": (24_890_000, 24_990_000),
+    "10m": (28_000_000, 29_700_000),
+    "6m": (50_000_000, 54_000_000),
+    "2m": (144_000_000, 146_000_000),
+    "70cm": (430_000_000, 440_000_000),
 }
 
 
@@ -89,7 +112,46 @@ def _resolve_ssb_bounds(
     ssb_start, ssb_end = ssb_bounds
     clipped_start = max(int(start_hz), int(ssb_start))
     clipped_end = min(int(end_hz), int(ssb_end))
+    if clipped_end <= clipped_start:
+        return int(start_hz), int(end_hz)
     return int(clipped_start), int(clipped_end)
+
+
+def _lookup_band_bounds(band_name: str) -> tuple[Optional[int], Optional[int]]:
+    band = str(band_name or "").strip().lower()
+    if not band:
+        return None, None
+
+    for band_entry in state.db.get_bands():
+        if str(band_entry.get("name", "")).strip().lower() != band:
+            continue
+        band_start_hz = int(band_entry.get("start_hz", 0) or 0)
+        band_end_hz = int(band_entry.get("end_hz", 0) or 0)
+        if band_start_hz > 0 and band_end_hz > band_start_hz:
+            return band_start_hz, band_end_hz
+        break
+
+    default_bounds = _DEFAULT_BAND_BOUNDS_HZ.get(band)
+    if default_bounds:
+        return int(default_bounds[0]), int(default_bounds[1])
+
+    return None, None
+
+
+def _resolve_band_display_bounds(
+    band_name: str,
+    start_hz: int,
+    end_hz: int,
+) -> tuple[Optional[int], Optional[int]]:
+    band_start_hz, band_end_hz = _lookup_band_bounds(band_name)
+    if band_start_hz is not None and band_end_hz is not None:
+        return band_start_hz, band_end_hz
+
+    requested_start_hz = int(start_hz or 0)
+    requested_end_hz = int(end_hz or 0)
+    if requested_start_hz > 0 and requested_end_hz > requested_start_hz:
+        return requested_start_hz, requested_end_hz
+    return None, None
 
 
 @router.post("/start")
@@ -141,15 +203,21 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     if scan.get("band"):
         start_hz = int(scan.get("start_hz", 0) or 0)
         end_hz = int(scan.get("end_hz", 0) or 0)
-        
-        if start_hz <= 0 or end_hz <= 0:
-            for band in state.db.get_bands():
-                if str(band.get("name", "")).lower() == str(scan.get("band", "")).lower():
-                    if start_hz <= 0:
-                        scan["start_hz"] = band.get("start_hz")
-                    if end_hz <= 0:
-                        scan["end_hz"] = band.get("end_hz")
-                    break
+        band_start_hz, band_end_hz = _lookup_band_bounds(scan.get("band"))
+
+        if start_hz <= 0 and band_start_hz is not None:
+            scan["start_hz"] = band_start_hz
+        if end_hz <= 0 and band_end_hz is not None:
+            scan["end_hz"] = band_end_hz
+
+    band_display_start_hz, band_display_end_hz = _resolve_band_display_bounds(
+        scan.get("band"),
+        scan.get("start_hz", 0),
+        scan.get("end_hz", 0),
+    )
+    if band_display_start_hz is not None and band_display_end_hz is not None:
+        scan["band_display_start_hz"] = band_display_start_hz
+        scan["band_display_end_hz"] = band_display_end_hz
 
     # Validate frequency range
     start_hz = int(scan.get("start_hz", 0) or 0)
@@ -165,6 +233,15 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         )
         scan["start_hz"] = clipped_start_hz
         scan["end_hz"] = clipped_end_hz
+        # Candidate-focus SSB scanning: keep fast sweep, but hold longer when
+        # repeated occupancy candidates are detected on the current block.
+        scan.setdefault("ssb_focus_enable", True)
+        scan.setdefault("ssb_focus_hold_ms", 15000)
+        scan.setdefault("ssb_focus_hits_required", 1)
+        scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
+        scan.setdefault("ssb_focus_cooldown_s", 20.0)
+        scan.setdefault("ssb_focus_bucket_hz", 2000)
+        scan.setdefault("ssb_focus_max_holds_per_pass", 2)
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 

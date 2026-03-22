@@ -576,7 +576,7 @@ def is_plausible_occupancy_event(event: Dict[str, Any]) -> bool:
         return False
     if bw is None or bw <= 0:
         return False
-    if snr is None or snr < 0:
+    if snr is None:
         return False
     
     # Band-specific bandwidth checks

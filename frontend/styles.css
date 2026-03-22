@@ -1068,7 +1068,7 @@ h1,
   padding: 10px 12px;
   border-radius: 10px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   pointer-events: auto;
 }
@@ -1078,10 +1078,22 @@ h1,
   color: #ffd6d6;
 }
 
-.toast__message {
+.toast__body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.toast__message {
   font-size: 0.92rem;
+}
+
+.toast__detail {
+  font-size: 0.80rem;
+  opacity: 0.72;
+  word-break: break-word;
 }
 
 .toast__close {

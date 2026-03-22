@@ -170,7 +170,10 @@ min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
 marker_min_snr_db = _env_float("MARKER_MIN_SNR_DB", 10.0)
 marker_min_confidence = _env_float("MARKER_MIN_CONFIDENCE", 0.55)
 marker_min_hits = _env_int("MARKER_MIN_HITS", 2)
-marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 10.0)
+marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 30.0)  # Allow markers to persist across 2+ scan cycles
+
+# SSB false-positive control: only persist/visualize SSB traffic above this confidence.
+ssb_traffic_min_confidence = _env_float("SSB_TRAFFIC_MIN_CONFIDENCE", 0.55)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -223,7 +226,7 @@ cw_sweep_settle_ms = _env_int("CW_SWEEP_SETTLE_MS", 100)
 cw_marker_ttl_s = _env_float("CW_MARKER_TTL_S", 45.0)
 
 # Other decoders
-ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", False)
+ssb_internal_enable = _env_bool("SSB_INTERNAL_ENABLE", True)
 psk_internal_enable = _env_bool("PSK_INTERNAL_ENABLE", False)
 
 
@@ -262,7 +265,8 @@ decoder_status = {
         "agc_max_gain_db": agc_max_gain_db,
         "agc_alpha": agc_alpha,
         "snr_threshold_db": snr_threshold_db,
-        "min_bw_hz": min_bw_hz
+        "min_bw_hz": min_bw_hz,
+        "ssb_traffic_min_confidence": ssb_traffic_min_confidence,
     },
     "internal_native": {
         "ft_internal_enable": ft_internal_enable,

@@ -656,7 +656,7 @@ class Database:
 
         by_state = {
             "SSB_CONFIRMED": 0,
-            "SSB_TRAFFIC": 0,
+            "SSB": 0,
             "SSB_UNKNOWN": 0,
         }
         by_parse_method = {}
@@ -677,7 +677,7 @@ class Database:
             callsign_value = str(row["callsign"] or "").strip()
             state = payload.get("ssb_state")
             if not state:
-                state = "SSB_CONFIRMED" if callsign_value else "SSB_TRAFFIC"
+                state = "SSB_CONFIRMED" if callsign_value else "SSB"
             state = str(state).strip().upper()
             if state not in by_state:
                 state = "SSB_UNKNOWN"

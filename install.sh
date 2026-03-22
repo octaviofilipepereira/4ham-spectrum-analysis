@@ -136,6 +136,26 @@ will NOT work with the standard apt package." \
   _rtlv4_label="RTL-SDR Blog v4 (build from source)"
 fi
 
+# ── ASR / Whisper ──────────────────────────────────────────────────────────────
+_install_whisper=0
+_whisper_label="No (can be added later: pip install openai-whisper)"
+if whiptail --backtitle "$BT" --title "ASR Voice Transcription (optional)" \
+  --yesno "\
+Install OpenAI Whisper for SSB voice transcription?
+
+Whisper converts SSB audio into readable text, shown in
+the live event Toast and stored in the event log.
+
+WARNING — large download (~700 MB for PyTorch + Whisper).
+On slow internet this may take 20-40 minutes!
+
+  YES  ->  Install Whisper now (recommended if bandwidth allows).
+  NO   ->  Skip for now (install later: pip install openai-whisper)." \
+  16 68; then
+  _install_whisper=1
+  _whisper_label="Yes (OpenAI Whisper tiny model)"
+fi
+
 # ── admin username ─────────────────────────────────────────────────────────────
 _admin_user=""
 while [[ -z "$_admin_user" ]]; do
@@ -187,12 +207,13 @@ whiptail --backtitle "$BT" --title "Confirm Installation" \
 Ready to install. Summary:
 
   SDR driver  :  $_rtlv4_label
+  ASR Whisper :  $_whisper_label
   Admin user  :  $_admin_user
   Service     :  systemd (auto-start on boot)
   Install log :  $LOG_FILE
 
 Proceed with installation?" \
-  15 70 || exit 0
+  17 70 || exit 0
 
 # ── installation with progress gauge ──────────────────────────────────────────
 start_gauge "Installing 4ham-spectrum-analysis - please wait..."
@@ -207,6 +228,7 @@ run_sudo apt-get install -y \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
   build-essential cmake libusb-1.0-0-dev \
+  ffmpeg \
   >> "$LOG_FILE" 2>&1 \
   || abort "System package installation failed"
 
@@ -256,6 +278,26 @@ gauge_step 84 "Installing Python dependencies..."
 "$PYTHON_BIN" -m pip install --quiet --upgrade pip >> "$LOG_FILE" 2>&1
 "$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
+
+if [[ $_install_whisper -eq 1 ]]; then
+  # On x86_64 install CPU-only PyTorch first to avoid pulling CUDA wheels
+  # (~200 MB CPU build vs ~915 MB CUDA build). On ARM (Raspberry Pi) the
+  # ARM torch wheel is already CPU-only so no special handling needed.
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    gauge_step 87 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
+    "$PYTHON_BIN" -m pip install --quiet torch \
+      --index-url https://download.pytorch.org/whl/cpu \
+      >> "$LOG_FILE" 2>&1 || { \
+        echo "[WARN] torch CPU install failed — Whisper ASR will not be available" >> "$LOG_FILE"; \
+        _install_whisper=0; }
+  fi
+  if [[ $_install_whisper -eq 1 ]]; then
+    gauge_step 90 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
+    "$PYTHON_BIN" -m pip install --quiet openai-whisper \
+      >> "$LOG_FILE" 2>&1 || { \
+        echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }
+  fi
+fi
 
 gauge_step 91 "Saving admin credentials to database..."
 mkdir -p "$ROOT_DIR/data"

@@ -181,6 +181,8 @@ Last update: 2026-02-22 16:27:19 UTC
                 <select class="form-select form-select-sm" id="eventsTypeFilter" aria-label="Events type filter">
                   <option value="all" selected>Show All</option>
                   <option value="cw-candidate">CW Traffic Only</option>
+                  <option value="ssb-traffic">SSB Traffic Only</option>
+                  <option value="ssb-callsign">SSB Callsign Detected</option>
                   <option value="cw-only">CW Only</option>
                   <option value="callsign-only">Callsign Only</option>
                 </select>
@@ -194,11 +196,11 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="card panel h-100">
             <div class="card-body d-flex flex-column">
               <h2 class="h5">Propagation Map</h2>
-              <div id="propagationMap" style="width:100%;flex:1 1 0;min-height:0;overflow:hidden;"></div>
-              <p id="propagationScore" class="mt-2 mb-0" style="font-size:1.125rem;">Score: --</p>
-              <ul class="summary" id="propagationBands">
+              <p id="propagationScore" class="mb-1" style="font-size:1.125rem;">Score: --</p>
+              <ul class="summary mb-3" id="propagationBands">
                 <li>No propagation data yet.</li>
               </ul>
+              <div id="propagationMap" style="width:100%;flex:1 1 0;min-height:0;overflow:hidden;"></div>
             </div>
           </div>
         </div>
@@ -438,6 +440,26 @@ Last update: 2026-02-22 16:27:19 UTC
                   <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
                   <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
                 </div>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12">
+                <h3 class="h6 mb-1">SSB Voice Transcription (ASR) <span id="ssbAsrAvailableBadge" class="badge bg-secondary ms-2">checking…</span></h3>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="ssbAsrEnabled" />
+                  <label class="form-check-label" for="ssbAsrEnabled">Enable automatic voice transcription with OpenAI Whisper</label>
+                </div>
+                <small class="d-block mt-1">
+                  When active, detected SSB voice signals are automatically transcribed and the text is shown in the live
+                  notification toast and stored in the event log (<code>raw</code> field). Transcription runs in a
+                  background thread and does not affect scanning. On slower hardware (e.g. Raspberry Pi) each 15 s capture
+                  takes 2–5 s to process. Requires <code>openai-whisper</code> — install it via the installer or manually:
+                  <code>pip install openai-whisper</code>. You can enable/disable this at any time without restarting.
+                </small>
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveAsrSettings">Save ASR setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
