@@ -2256,14 +2256,17 @@ function applyEventsCardTypeFilter(items) {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
   }
   if (selected === "ssb-voice") {
-    // SSB events with Whisper ASR text detected (no callsign required)
+    // All SSB voice detections — occupancy (spectral) + callsign events
+    // with ASR text.  Excludes callsign events that have no voice text.
     return source.filter((eventItem) => {
       const mode = String(eventItem?.mode || "").trim().toUpperCase();
       if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
+      const evType = String(eventItem?.type || "").trim();
+      // Occupancy SSB_TRAFFIC = voice spectral detection — always show
+      if (evType === "occupancy") return true;
+      // Callsign events — show only if they carry ASR transcript text
       const raw = String(eventItem?.raw || "").trim();
-      // Exclude spectral-proof fallback strings ("BW ... Hz · PWR ...")
-      if (!raw || raw.startsWith("BW ")) return false;
-      return true;
+      return raw.length > 0 && !raw.startsWith("BW ");
     });
   }
   if (selected === "ssb-callsign") {
