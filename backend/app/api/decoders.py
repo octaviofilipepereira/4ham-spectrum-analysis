@@ -165,6 +165,11 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     if frequency_hz <= 0:
         return
 
+    # SNR gate — reject noise detections below 10 dB on dead bands
+    snr_db_check = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    if snr_db_check < 10.0:
+        return
+
     now_ts = datetime.now(timezone.utc).timestamp()
     bucket_key = (
         str(occupancy_event.get("band") or ""),

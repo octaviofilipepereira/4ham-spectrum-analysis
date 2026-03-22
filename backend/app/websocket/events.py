@@ -94,6 +94,11 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     if frequency_hz <= 0:
         return None
 
+    # SNR gate — reject noise detections below 10 dB on dead bands
+    snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    if snr_db < 10.0:
+        return None
+
     now_ts = datetime.now(timezone.utc).timestamp()
     bucket_key = (
         str(occupancy_event.get("band") or ""),
@@ -402,10 +407,10 @@ async def _run_occupancy_detection_loop() -> None:
                 continue
 
             # Minimum SNR gate — suppress marginal detections that flood
-            # the events card.  6 dB is one S-unit above noise and the
-            # practical readability floor on HF SSB.
+            # the events card.  10 dB gives a comfortable margin above
+            # the RTL-SDR noise floor to avoid false positives on dead bands.
             _event_snr = float(best.get("snr_db") or 0.0)
-            _MIN_EVENT_SNR_DB = 6.0
+            _MIN_EVENT_SNR_DB = 10.0
             if selected_decoder_mode == "ssb" and _event_snr < _MIN_EVENT_SNR_DB:
                 await asyncio.sleep(0.1)
                 continue
