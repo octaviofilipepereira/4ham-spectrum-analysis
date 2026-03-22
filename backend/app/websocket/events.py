@@ -15,6 +15,7 @@ Architecture:
 """
 
 import asyncio
+import time as _time_mod
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -261,12 +262,18 @@ async def _run_occupancy_detection_loop() -> None:
     _diag_not_occupied = 0
     _diag_not_running = 0
     _diag_saved = 0
+    _diag_occ_throttled = 0
+
+    # Per-frequency-bucket rate limiter for occupancy events.
+    # Key: frequency bucket (freq_hz // 5000), Value: last emit timestamp.
+    _occ_last_emit: dict[int, float] = {}
+    _OCC_MIN_INTERVAL_S = 10.0  # max one occupancy event per 5 kHz bucket per 10 s
     while True:
         try:
             _diag_counter += 1
             # Periodically log diagnostic summary (every ~1000 iterations ≈ 250s)
             if _diag_counter % 1000 == 0:
-                log(f"events_loop_diag: iter={_diag_counter} iq_none={_diag_iq_none} no_occ={_diag_no_occ} no_freq={_diag_no_freq} implausible={_diag_implausible} mode_disabled={_diag_mode_disabled} not_occupied={_diag_not_occupied} not_running={_diag_not_running} saved={_diag_saved}")
+                log(f"events_loop_diag: iter={_diag_counter} iq_none={_diag_iq_none} no_occ={_diag_no_occ} no_freq={_diag_no_freq} implausible={_diag_implausible} mode_disabled={_diag_mode_disabled} not_occupied={_diag_not_occupied} not_running={_diag_not_running} occ_throttled={_diag_occ_throttled} saved={_diag_saved}")
             # Wait for scan to be running
             if not state.scan_engine.running or state.scan_state.get("state") != "running":
                 _diag_not_running += 1
@@ -369,7 +376,8 @@ async def _run_occupancy_detection_loop() -> None:
             # Classify mode using heuristics
             mode_name, mode_confidence = classify_mode_heuristic(
                 best.get("bandwidth_hz"),
-                best.get("snr_db")
+                best.get("snr_db"),
+                frequency_hz=frequency_hz,
             )
 
             # Refine with frequency-specific mode hint (FT8/FT4/WSPR windows)
@@ -478,6 +486,26 @@ async def _run_occupancy_detection_loop() -> None:
                     _broadcast({"event": callsign_event})
                 await asyncio.sleep(0.25)
                 continue
+
+            # ── Per-frequency rate limiter for occupancy events ────────────
+            # Prevents DB/UI flood from broadband noise detections.
+            # Callsign events from decoders are NOT throttled — only raw
+            # occupancy.  Digital-mode windows (FT8/FT4/WSPR) use a shorter
+            # cooldown so real activity is not hidden.
+            _occ_bucket = int(frequency_hz) // 5000
+            _now_mono = _time_mod.monotonic()
+            _is_digital = mode_name in {"FT8", "FT4", "WSPR"}
+            _cooldown = 3.0 if _is_digital else _OCC_MIN_INTERVAL_S
+            _last = _occ_last_emit.get(_occ_bucket, 0.0)
+            if (_now_mono - _last) < _cooldown:
+                _diag_occ_throttled += 1
+                await asyncio.sleep(0.15)
+                continue
+            _occ_last_emit[_occ_bucket] = _now_mono
+            # Prune stale buckets every 500 iterations to avoid memory leak
+            if _diag_counter % 500 == 0:
+                _cutoff = _now_mono - 60.0
+                _occ_last_emit = {k: v for k, v in _occ_last_emit.items() if v > _cutoff}
 
             # Persist to database
             _diag_saved += 1

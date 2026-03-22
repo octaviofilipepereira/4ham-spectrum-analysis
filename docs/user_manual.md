@@ -2,8 +2,46 @@
 
 ## Índice
 
-1. [Compreender as Métricas](#compreender-as-métricas)
+1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
+2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
+
+---
+
+## Eventos SSB — Voice Signature
+
+### O que é um evento Voice Signature?
+
+A partir da **v0.8.0**, o sistema deteta e transcreve transmissões SSB em tempo real usando demodulação de voz e ASR (Automatic Speech Recognition — Whisper).
+
+Existem dois tipos de resultado para sinais SSB:
+
+| Badge | Significado |
+|-------|------------|
+| **Voice Signature** (azul) | SSB detetado, sem indicativo resolvido — Whisper não identificou um indicativo válido na transcrição |
+| **callsign** (azul) | SSB detetado **e** indicativo resolvido com sucesso pelo ASR |
+
+### Pipeline de deteção SSB
+
+1. O scanner deteta ocupação de banda com largura de banda típica de SSB (2,4–3 kHz).
+2. O bloco DSP demódula USB ou LSB conforme a banda e segmento de frequência.
+3. O VAD (Voice Activity Detection) segmenta a transmissão em trechos de voz.
+4. O Whisper transcreve o áudio — todos os tokens que correspondam a um indicativo válido (regex IARU) são extraídos.
+5. Se um indicativo for encontrado → evento `callsign` com `source: asr`.
+6. Se nenhum indicativo for encontrado → evento `callsign` com `_is_ssb_voice: true` → badge **Voice Signature**.
+
+### Proteção contra flood de ocupação
+
+Durante transmissões SSB longas, o sistema aplica um gate adaptativo que suprime eventos de ocupação repetidos para o mesmo segmento. Isto evita que o painel de eventos fique saturado de entradas de ocupação enquanto a mesma estação está a transmitir.
+
+### Configuração ASR no painel Admin
+
+1. Abrir a interface web e iniciar sessão.
+2. Ir a **Admin** → **Settings**.
+3. Ativar **SSB ASR** e selecionar o modelo Whisper (`tiny` recomendado, `base` para maior precisão).
+4. O modelo é descarregado automaticamente na primeira utilização (~75 MB para `tiny`).
+
+> **Nota:** O Whisper requer `openai-whisper` instalado (incluído se selecionado durante `./install.sh`, ou instalável manualmente: `pip install openai-whisper`).
 
 ---
 
@@ -146,7 +184,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 Este manual será expandido com mais secções sobre:
 - Configuração inicial
-- Interface do utilizador
+- Interface do utilizador (painel de eventos, waterfall, propagação)
 - Interpretação do espectrograma
 - Exportação de dados
 - Resolução de problemas

@@ -20,7 +20,7 @@ def _find_segments(mask):
     return segments
 
 
-def classify_mode_heuristic(bandwidth_hz, snr_db=None):
+def classify_mode_heuristic(bandwidth_hz, snr_db=None, frequency_hz=None):
     if bandwidth_hz is None:
         return "Unknown", 0.25
 
@@ -37,6 +37,15 @@ def classify_mode_heuristic(bandwidth_hz, snr_db=None):
         mode = "FM"
     else:
         mode = "Unknown"
+
+    # On HF amateur bands (< 30 MHz) AM is virtually unused — reclassify
+    # bandwidth-only "AM" as "SSB".  The only HF AM allocation is a small
+    # 10 m window (29.0-29.7 MHz) which we preserve.
+    if mode == "AM" and frequency_hz is not None:
+        freq = float(frequency_hz)
+        _is_10m_am_window = 29_000_000 <= freq <= 29_700_000
+        if freq < 30_000_000 and not _is_10m_am_window:
+            mode = "SSB"
 
     snr = 0.0 if snr_db is None else float(max(0.0, snr_db))
     snr_factor = min(1.0, snr / 20.0)
