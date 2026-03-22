@@ -174,13 +174,21 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         )
         
         # Detect occupancy segments
+        # In SSB mode, relax thresholds to detect voice signals (wider BW, lower SNR)
+        _spec_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+        if _spec_decoder_mode == "ssb":
+            _spec_snr_thr = min(float(state.snr_threshold_db), 3.0)
+            _spec_min_bw = min(int(state.min_bw_hz), 250)
+        else:
+            _spec_snr_thr = state.snr_threshold_db
+            _spec_min_bw = state.min_bw_hz
         occupancy_segments = estimate_occupancy(
             iq,
             state.scan_engine.sample_rate,
             threshold_dbm=threshold_dbm,
             adapt=False,
-            snr_threshold_db=state.snr_threshold_db,
-            min_bw_hz=state.min_bw_hz
+            snr_threshold_db=_spec_snr_thr,
+            min_bw_hz=_spec_min_bw
         )
         
         # Process mode markers with temporal persistence
@@ -251,13 +259,10 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                     continue
 
             if decoder_mode == "ssb":
-                # Keep SSB markers strict: only high-confidence repeated detections.
-                min_snr_db = max(10.0, float(state.marker_min_snr_db))
-                min_confidence = max(
-                    float(state.marker_min_confidence),
-                    float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78),
-                )
-                min_hits_required = max(2, int(state.marker_min_hits))
+                # SSB markers: lower threshold to show voice-like signals.
+                min_snr_db = min(6.0, float(state.marker_min_snr_db))
+                min_confidence = min(0.55, float(state.marker_min_confidence))
+                min_hits_required = 1
             else:
                 min_snr_db = float(state.marker_min_snr_db)
                 min_confidence = float(state.marker_min_confidence)
@@ -352,10 +357,7 @@ async def ws_spectrum(websocket: WebSocket) -> None:
         # avoid flooding the waterfall with weak/transient false positives.
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))
         if decoder_mode == "ssb":
-            _ssb_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() == "SSB"]
-            _other_markers = [m for m in mode_markers if str(m.get("mode", "")).upper() != "SSB"]
-            _ssb_markers = _ssb_markers[:4]
-            mode_markers = (_ssb_markers + _other_markers)[:24]
+            mode_markers = mode_markers[:24]
         else:
             mode_markers = mode_markers[:24]
         

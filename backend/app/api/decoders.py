@@ -185,7 +185,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
     snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
     ssb_score = min(0.95, max(0.35, base_confidence + snr_bonus + 0.12))
-    if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78):
+    if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.55) or 0.55):
         return
 
     freq_khz = frequency_hz / 1000.0
@@ -303,8 +303,9 @@ async def _run_ssb_detector_loop() -> None:
             candidates = []
             for candidate in occupancy:
                 bw_hz = int(safe_float(candidate.get("bandwidth_hz"), 0) or 0)
-                # SSB standard is 2.7 kHz; accept only 2.4–3.0 kHz to reject AM and distorted signals
-                if bw_hz < 2400 or bw_hz > 3000:
+                # Accept voice-like bandwidths: 1200–5000 Hz covers SSB, AM,
+                # and most voice modes seen on HF.
+                if bw_hz < 1200 or bw_hz > 5000:
                     continue
                 candidates.append(candidate)
             if not candidates:
@@ -351,7 +352,7 @@ async def _run_ssb_detector_loop() -> None:
                 # Non-blocking: result cached in get_last_transcript_ssb().
                 maybe_transcribe_ssb(_ssb_asr_bucket)
 
-            min_ssb_confidence = float(getattr(state, "ssb_traffic_min_confidence", 0.78) or 0.78)
+            min_ssb_confidence = float(getattr(state, "ssb_traffic_min_confidence", 0.55) or 0.55)
             if mode_confidence < min_ssb_confidence:
                 continue
 

@@ -27,6 +27,7 @@ from app.dependencies.helpers import (
     log,
     hint_mode_by_frequency,
     is_plausible_occupancy_event,
+    frequency_within_scan_band,
     touch_decoder_source,
     record_decoder_event_saved,
 )
@@ -251,172 +252,220 @@ async def _run_occupancy_detection_loop() -> None:
     even when no WebSocket client is connected so that events are never missed
     due to a browser disconnect or reload.
     """
+    _diag_counter = 0
+    _diag_iq_none = 0
+    _diag_no_occ = 0
+    _diag_no_freq = 0
+    _diag_implausible = 0
+    _diag_mode_disabled = 0
+    _diag_not_occupied = 0
+    _diag_not_running = 0
+    _diag_saved = 0
     while True:
-        # Wait for scan to be running
-        if not state.scan_engine.running or state.scan_state.get("state") != "running":
-            await asyncio.sleep(0.5)
-            continue
+        try:
+            _diag_counter += 1
+            # Periodically log diagnostic summary (every ~1000 iterations ≈ 250s)
+            if _diag_counter % 1000 == 0:
+                log(f"events_loop_diag: iter={_diag_counter} iq_none={_diag_iq_none} no_occ={_diag_no_occ} no_freq={_diag_no_freq} implausible={_diag_implausible} mode_disabled={_diag_mode_disabled} not_occupied={_diag_not_occupied} not_running={_diag_not_running} saved={_diag_saved}")
+            # Wait for scan to be running
+            if not state.scan_engine.running or state.scan_state.get("state") != "running":
+                _diag_not_running += 1
+                await asyncio.sleep(0.5)
+                continue
 
-        # Read IQ samples
-        iq = state.scan_engine.read_iq(2048)
-        if iq is None:
-            await asyncio.sleep(0.2)
-            continue
+            # Read IQ samples
+            iq = state.scan_engine.read_iq(2048)
+            if iq is None:
+                _diag_iq_none += 1
+                await asyncio.sleep(0.2)
+                continue
 
-        # Apply AGC if enabled
-        if state.agc_enabled:
-            iq, gain_db = apply_agc_smoothed(
-                iq,
-                state.agc_state,
-                target_rms=state.agc_target_rms,
-                max_gain_db=state.agc_max_gain_db,
-                alpha=state.agc_alpha
-            )
-            state.last_agc_gain_db = gain_db
-
-        # Get current band
-        band = state.scan_engine.config.get("band") if state.scan_engine.config else None
-
-        # Compute power and update noise floor
-        power_db = compute_power_db(iq)
-        noise_floor = update_noise_floor(band, power_db)
-        threshold_dbm = noise_floor + 6.0  # 6 dB above noise floor
-
-        # Detect occupancy
-        selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
-        if selected_decoder_mode == "ssb":
-            snr_threshold_db = min(float(state.snr_threshold_db), 3.0)
-            min_bw_hz = min(int(state.min_bw_hz), 250)
-        else:
-            snr_threshold_db = state.snr_threshold_db
-            min_bw_hz = state.min_bw_hz
-
-        occupancy = estimate_occupancy(
-            iq,
-            state.scan_engine.sample_rate,
-            threshold_dbm=threshold_dbm,
-            adapt=False,
-            snr_threshold_db=snr_threshold_db,
-            min_bw_hz=min_bw_hz
-        )
-
-        if not occupancy:
-            await asyncio.sleep(0.5)
-            continue
-
-        # Select strongest signal
-        best = max(occupancy, key=lambda item: item.get("snr_db", 0.0))
-
-        # Update noise floor from segment detection
-        nf_db = best.get("noise_floor_db")
-        if nf_db is not None:
-            update_noise_floor(band, nf_db)
-
-        # Calculate absolute frequency
-        offset_hz = best.get("offset_hz")
-        frequency_hz = state.scan_engine.center_hz
-        if offset_hz is not None:
-            frequency_hz = int(state.scan_engine.center_hz + offset_hz)
-
-        if not frequency_hz or frequency_hz <= 0:
-            await asyncio.sleep(0.5)
-            continue
-
-        # Update adaptive threshold
-        adaptive_threshold = update_threshold(band, best.get("threshold_dbm"))
-
-        # Classify mode using heuristics
-        mode_name, mode_confidence = classify_mode_heuristic(
-            best.get("bandwidth_hz"),
-            best.get("snr_db")
-        )
-
-        # Refine with frequency-specific mode hint (FT8/FT4/WSPR windows)
-        freq_hint = hint_mode_by_frequency(
-            frequency_hz,
-            band_name=band,
-            bandwidth_hz=best.get("bandwidth_hz")
-        )
-        if freq_hint:
-            mode_name = freq_hint
-
-        # In explicit SSB scan mode, treat voice-like occupancy classes as SSB_TRAFFIC
-        # (raw occupancy candidates, not yet confirmed).
-        if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
-            mode_name = "SSB_TRAFFIC"
-            mode_confidence = max(float(mode_confidence or 0.0), 0.6)
-
-        # Build event
-        event = {
-            "type": "occupancy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "band": band,
-            "frequency_hz": frequency_hz,
-            "offset_hz": offset_hz,
-            "bandwidth_hz": best["bandwidth_hz"],
-            "power_dbm": power_db,
-            "snr_db": best.get("snr_db"),
-            "threshold_dbm": adaptive_threshold or best.get("threshold_dbm", threshold_dbm),
-            "occupied": best["occupied"],
-            "mode": mode_name,
-            "confidence": mode_confidence,
-            "device": state.scan_state.get("device"),
-            "scan_id": state.scan_state.get("scan_id")
-        }
-
-        # Validate plausibility
-        if not is_plausible_occupancy_event(event):
-            await asyncio.sleep(0.2)
-            continue
-
-        # Check if mode is enabled in settings
-        settings = state.db.get_settings()
-        modes = settings.get("modes") or {}
-        mode_key = str(event.get("mode", "")).lower()
-
-        if modes and mode_key in modes and not modes.get(mode_key, True):
-            # Mode disabled by user
-            await asyncio.sleep(1.0)
-            continue
-
-        # Only process occupied signals
-        if not event.get("occupied"):
-            await asyncio.sleep(0.5)
-            continue
-
-        # Only save events during active scan (not in preview or stopped mode)
-        if state.scan_state.get("state") != "running":
-            await asyncio.sleep(0.5)
-            continue
-
-        # Persist to database
-        state.db.insert_occupancy(event)
-
-        # Feed scan engine SSB candidate-focus logic when in SSB mode
-        if selected_decoder_mode == "ssb" and event.get("occupied"):
-            try:
-                state.scan_engine.report_ssb_candidate(
-                    frequency_hz=frequency_hz,
-                    snr_db=float(best.get("snr_db") or 0.0),
-                    confidence=float(mode_confidence or 0.0),
+            # Apply AGC if enabled
+            if state.agc_enabled:
+                iq, gain_db = apply_agc_smoothed(
+                    iq,
+                    state.agc_state,
+                    target_rms=state.agc_target_rms,
+                    max_gain_db=state.agc_max_gain_db,
+                    alpha=state.agc_alpha
                 )
-            except Exception:
-                pass
-            # Fire background Whisper transcription whenever enough audio is
-            # buffered, independent of the validation hold mechanism.
-            maybe_transcribe_ssb(int(frequency_hz / 2000))
+                state.last_agc_gain_db = gain_db
 
-        # Emit confirmed callsign event only after 15s hold validation
-        callsign_event = None
-        if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
-            _ws_asr_bucket = int(frequency_hz / 2000)
-            _ws_asr_text = get_last_transcript_ssb(_ws_asr_bucket)
-            callsign_event = _emit_ssb_traffic_event_from_occupancy(event, asr_text=_ws_asr_text)
+            # Get current band
+            band = state.scan_engine.config.get("band") if state.scan_engine.config else None
 
-        # Fan-out both events to all connected WS clients
-        _broadcast({"event": event})
-        if callsign_event:
-            _broadcast({"event": callsign_event})
+            # Compute power and update noise floor
+            power_db = compute_power_db(iq)
+            noise_floor = update_noise_floor(band, power_db)
+            threshold_dbm = noise_floor + 6.0  # 6 dB above noise floor
 
-        # Rate limit
-        await asyncio.sleep(1.0)
+            # Detect occupancy
+            selected_decoder_mode = str(state.scan_state.get("decoder_mode") or "").strip().lower()
+            if selected_decoder_mode == "ssb":
+                snr_threshold_db = min(float(state.snr_threshold_db), 3.0)
+                min_bw_hz = min(int(state.min_bw_hz), 250)
+            else:
+                snr_threshold_db = state.snr_threshold_db
+                min_bw_hz = state.min_bw_hz
+
+            occupancy = estimate_occupancy(
+                iq,
+                state.scan_engine.sample_rate,
+                threshold_dbm=threshold_dbm,
+                adapt=False,
+                snr_threshold_db=snr_threshold_db,
+                min_bw_hz=min_bw_hz
+            )
+
+            if not occupancy:
+                _diag_no_occ += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Pre-filter: keep only segments whose absolute frequency falls
+            # within the scan band and whose bandwidth is plausible for HF
+            # voice/data modes.  With sample_rate 2.048 MHz the FFT covers
+            # ±1 MHz around center_hz — the segmenter will merge wide RFI or
+            # roll-off artefacts into mega-segments that must be discarded.
+            _center = state.scan_engine.center_hz or 0
+            _valid = []
+            for seg in occupancy:
+                bw = int(seg.get("bandwidth_hz") or 0)
+                if bw > 5000 or bw < min_bw_hz:
+                    continue
+                _off = seg.get("offset_hz")
+                _freq = int(_center + float(_off)) if _off is not None else _center
+                if not frequency_within_scan_band(_freq, bandwidth_hz=bw):
+                    continue
+                seg["_abs_freq"] = _freq
+                _valid.append(seg)
+            if not _valid:
+                _diag_implausible += 1
+                await asyncio.sleep(0.25)
+                continue
+
+            # Select strongest valid signal
+            best = max(_valid, key=lambda item: item.get("snr_db", 0.0))
+
+            # Update noise floor from segment detection
+            nf_db = best.get("noise_floor_db")
+            if nf_db is not None:
+                update_noise_floor(band, nf_db)
+
+            # Calculate absolute frequency (pre-computed during filtering)
+            offset_hz = best.get("offset_hz")
+            frequency_hz = best.get("_abs_freq") or state.scan_engine.center_hz
+            if offset_hz is not None and not best.get("_abs_freq"):
+                frequency_hz = int(state.scan_engine.center_hz + offset_hz)
+
+            if not frequency_hz or frequency_hz <= 0:
+                _diag_no_freq += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Update adaptive threshold
+            adaptive_threshold = update_threshold(band, best.get("threshold_dbm"))
+
+            # Classify mode using heuristics
+            mode_name, mode_confidence = classify_mode_heuristic(
+                best.get("bandwidth_hz"),
+                best.get("snr_db")
+            )
+
+            # Refine with frequency-specific mode hint (FT8/FT4/WSPR windows)
+            freq_hint = hint_mode_by_frequency(
+                frequency_hz,
+                band_name=band,
+                bandwidth_hz=best.get("bandwidth_hz")
+            )
+            if freq_hint:
+                mode_name = freq_hint
+
+            # In explicit SSB scan mode, treat voice-like occupancy classes as SSB_TRAFFIC
+            # (raw occupancy candidates, not yet confirmed).
+            if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
+                mode_name = "SSB_TRAFFIC"
+                mode_confidence = max(float(mode_confidence or 0.0), 0.6)
+
+            # Build event
+            event = {
+                "type": "occupancy",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "band": band,
+                "frequency_hz": frequency_hz,
+                "offset_hz": offset_hz,
+                "bandwidth_hz": best["bandwidth_hz"],
+                "power_dbm": power_db,
+                "snr_db": best.get("snr_db"),
+                "threshold_dbm": adaptive_threshold or best.get("threshold_dbm", threshold_dbm),
+                "occupied": best["occupied"],
+                "mode": mode_name,
+                "confidence": mode_confidence,
+                "device": state.scan_state.get("device"),
+                "scan_id": state.scan_state.get("scan_id")
+            }
+
+            # Validate plausibility
+            if not is_plausible_occupancy_event(event):
+                _diag_implausible += 1
+                await asyncio.sleep(0.2)
+                continue
+
+            # Check if mode is enabled in settings
+            settings = state.db.get_settings()
+            modes = settings.get("modes") or {}
+            mode_key = str(event.get("mode", "")).lower()
+
+            if modes and mode_key in modes and not modes.get(mode_key, True):
+                # Mode disabled by user
+                _diag_mode_disabled += 1
+                await asyncio.sleep(1.0)
+                continue
+
+            # Only process occupied signals
+            if not event.get("occupied"):
+                _diag_not_occupied += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Only save events during active scan (not in preview or stopped mode)
+            if state.scan_state.get("state") != "running":
+                _diag_not_running += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Persist to database
+            _diag_saved += 1
+            state.db.insert_occupancy(event)
+
+            # Feed scan engine SSB candidate-focus logic when in SSB mode
+            if selected_decoder_mode == "ssb" and event.get("occupied"):
+                try:
+                    state.scan_engine.report_ssb_candidate(
+                        frequency_hz=frequency_hz,
+                        snr_db=float(best.get("snr_db") or 0.0),
+                        confidence=float(mode_confidence or 0.0),
+                    )
+                except Exception:
+                    pass
+                # Fire background Whisper transcription whenever enough audio is
+                # buffered, independent of the validation hold mechanism.
+                maybe_transcribe_ssb(int(frequency_hz / 2000))
+
+            # Emit confirmed callsign event only after 15s hold validation
+            callsign_event = None
+            if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
+                _ws_asr_bucket = int(frequency_hz / 2000)
+                _ws_asr_text = get_last_transcript_ssb(_ws_asr_bucket)
+                callsign_event = _emit_ssb_traffic_event_from_occupancy(event, asr_text=_ws_asr_text)
+
+            # Fan-out both events to all connected WS clients
+            _broadcast({"event": event})
+            if callsign_event:
+                _broadcast({"event": callsign_event})
+
+            # Rate limit — keep pace with scan dwell (250ms typical)
+            await asyncio.sleep(0.25)
+        except Exception as _exc:
+            log(f"events_loop_crash: {type(_exc).__name__}: {_exc}")
+            await asyncio.sleep(1.0)
