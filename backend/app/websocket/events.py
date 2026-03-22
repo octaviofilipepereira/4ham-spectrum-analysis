@@ -369,7 +369,8 @@ async def _run_occupancy_detection_loop() -> None:
             # Classify mode using heuristics
             mode_name, mode_confidence = classify_mode_heuristic(
                 best.get("bandwidth_hz"),
-                best.get("snr_db")
+                best.get("snr_db"),
+                frequency_hz=frequency_hz,
             )
 
             # Refine with frequency-specific mode hint (FT8/FT4/WSPR windows)

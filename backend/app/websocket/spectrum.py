@@ -225,7 +225,8 @@ async def ws_spectrum(websocket: WebSocket) -> None:
             # Classify mode
             mode_name, mode_confidence = classify_mode_heuristic(
                 bandwidth_hz,
-                segment.get("snr_db")
+                segment.get("snr_db"),
+                frequency_hz=frequency_hz,
             )
             
             # Refine generic DSP mode with specific digital protocol

@@ -340,6 +340,7 @@ async def _run_ssb_detector_loop() -> None:
             mode_name, mode_confidence = classify_mode_heuristic(
                 best.get("bandwidth_hz"),
                 best.get("snr_db"),
+                frequency_hz=frequency_hz,
             )
             freq_hint = hint_mode_by_frequency(
                 frequency_hz,
