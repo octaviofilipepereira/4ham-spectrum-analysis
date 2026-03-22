@@ -73,8 +73,9 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 - **SSB Voice Signature Detection**: real-time SSB voice demodulation with VAD and Whisper ASR transcription.
 - **Voice Signature badge**: SSB events without a resolved callsign display as "Voice Signature" in the events card.
 - **Whisper ASR integration**: optional OpenAI Whisper model (tiny/base) for real-time speech-to-text on SSB segments; asked during `./install.sh` setup.
-- **Occupancy flood protection**: adaptive gate suppresses burst occupancy events during sustained SSB transmissions.
-- **Events card cleanup**: removed redundant "SSB Voice Detected" filter; Show All now presents only callsign-type and Voice Signature events.
+- **HF mode classification fix**: signals below 30 MHz no longer misclassified as AM; bandwidth-based AM is reclassified to SSB on HF bands (except 10 m AM window 29.0–29.7 MHz).
+- **Occupancy flood protection**: per-frequency rate limiter (5 kHz buckets, 10 s cooldown; 3 s for digital modes) prevents DB/WebSocket flood from broadband noise during scanning.
+- **Events card cleanup**: "Show All" filter now presents only callsign-type events (FT8/FT4, CW, APRS, Voice Signature); new "All + Occupancy (raw)" option for advanced users who need raw detections.
 - **Propagation map**: score and band activity moved above the globe for immediate visibility.
 
 ### v0.7.1
@@ -168,8 +169,9 @@ Regional profile schema: see [config/region_profile.schema.json](config/region_p
 	- FFT, windowing, noise floor, peak detection.
 	- Bandwidth and occupancy estimation.
 3. **Identification Layer**
-	- Mode classification (AM/FM/SSB/FSK/PSK).
-	- Digital decoding (e.g., FT8/FT4, APRS) and CW.
+	- Mode classification (CW/FSK/PSK/SSB/AM/FM) with HF-aware heuristics.
+	- Digital decoding (FT8/FT4/WSPR, APRS) and CW.
+	- SSB Voice Signature detection (VAD + Whisper ASR).
 4. **Backend API**
 	- REST + WebSocket for spectrum and event streaming.
 5. **Web Frontend**
@@ -177,11 +179,11 @@ Regional profile schema: see [config/region_profile.schema.json](config/region_p
 6. **Persistence**
 	- SQLite for history, events, and settings.
 
-## Suggested stack
-- **Backend/DSP**: Python + GNU Radio + SoapySDR + NumPy/SciPy.
+## Stack
+- **Backend/DSP**: Python + SoapySDR + NumPy/SciPy.
 - **API**: FastAPI (REST + WebSocket).
-- **Frontend**: React + Vite + TypeScript, WebGL for waterfall.
-- **Storage**: SQLite + files for export (CSV/PNG/JSON).
+- **Frontend**: Vanilla JavaScript + Bootstrap 5, 2D Canvas for waterfall.
+- **Storage**: SQLite + files for export (CSV/JSON).
 
 Backend skeleton: see [backend/app/main.py](backend/app/main.py).
 Frontend skeleton: see [frontend/index.html](frontend/index.html).
@@ -383,8 +385,10 @@ Per-mode contract: see [docs/events_contract.md](docs/events_contract.md).
 	- Includes per-band noise floor when available.
 
 ### Authentication (optional)
-- Set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` to protect REST and WS.
-- Frontend uses Basic Auth and sends credentials in the header.
+- **Primary method**: session-based login with SQLite-stored credentials (bcrypt hashed). Admin account is created during `./install.sh` setup.
+- Endpoints: `/api/auth/login`, `/api/auth/logout`, `/api/auth/status`.
+- Session cookie with 24-hour expiration; validated across page reloads and WebSocket streams.
+- **Fallback**: set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` environment variables for simple Basic Auth.
 
 ### Main payloads
 Scan schema: see [config/scan_config.schema.json](config/scan_config.schema.json).
