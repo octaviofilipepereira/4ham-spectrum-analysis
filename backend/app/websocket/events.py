@@ -449,11 +449,9 @@ async def _run_occupancy_detection_loop() -> None:
                 await asyncio.sleep(0.5)
                 continue
 
-            # Persist to database
-            _diag_saved += 1
-            state.db.insert_occupancy(event)
-
             # Feed scan engine SSB candidate-focus logic when in SSB mode
+            # (always — even for throttled events, so the hold mechanism
+            # sees every detection).
             if selected_decoder_mode == "ssb" and event.get("occupied"):
                 try:
                     state.scan_engine.report_ssb_candidate(
@@ -463,6 +461,27 @@ async def _run_occupancy_detection_loop() -> None:
                     )
                 except Exception:
                     pass
+
+            # In SSB mode, suppress raw occupancy events entirely — only the
+            # confirmed callsign events (from 15 s hold validation) are saved
+            # and broadcast.  The scan engine still gets report_ssb_candidate()
+            # above so the hold mechanism works normally.
+            if selected_decoder_mode == "ssb" and mode_name == "SSB_TRAFFIC":
+                # Still emit callsign event if frequency is validated
+                callsign_event = None
+                if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
+                    _ws_asr_bucket = int(frequency_hz / 2000)
+                    _ws_asr_text = get_last_transcript_ssb(_ws_asr_bucket)
+                    callsign_event = _emit_ssb_traffic_event_from_occupancy(event, asr_text=_ws_asr_text)
+                if callsign_event:
+                    _diag_saved += 1
+                    _broadcast({"event": callsign_event})
+                await asyncio.sleep(0.25)
+                continue
+
+            # Persist to database
+            _diag_saved += 1
+            state.db.insert_occupancy(event)
 
             # Emit confirmed callsign event only after 15s hold validation
             callsign_event = None

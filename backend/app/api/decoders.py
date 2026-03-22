@@ -401,7 +401,9 @@ async def _run_ssb_detector_loop() -> None:
             except Exception:
                 pass
 
-            state.db.insert_occupancy(event)
+            # Do NOT insert occupancy events here — this loop runs at full
+            # dwell rate and would flood the Events card.  The events.py loop
+            # handles callsign event emission for validated frequencies.
 
             # Only emit confirmed callsign/SSB event after 15s hold validation
             if state.scan_engine.is_ssb_frequency_validated(frequency_hz):
