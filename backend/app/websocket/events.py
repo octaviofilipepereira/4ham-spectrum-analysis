@@ -94,11 +94,6 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     if frequency_hz <= 0:
         return None
 
-    # SNR gate — reject noise detections below 10 dB on dead bands
-    snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
-    if snr_db < 10.0:
-        return None
-
     now_ts = datetime.now(timezone.utc).timestamp()
     bucket_key = (
         str(occupancy_event.get("band") or ""),
@@ -406,11 +401,28 @@ async def _run_occupancy_detection_loop() -> None:
                 await asyncio.sleep(0.1)
                 continue
 
+            # Feed scan engine SSB candidate-focus logic BEFORE the SNR
+            # gate so the hold mechanism sees every occupied detection
+            # regardless of SNR.  Without this the focus never validates
+            # frequencies and no callsign events are emitted.
+            if selected_decoder_mode == "ssb":
+                _cand_snr = float(best.get("snr_db") or 0.0)
+                _cand_conf = float(mode_confidence or 0.0)
+                if best.get("occupied") and frequency_hz > 0:
+                    try:
+                        state.scan_engine.report_ssb_candidate(
+                            frequency_hz=frequency_hz,
+                            snr_db=_cand_snr,
+                            confidence=_cand_conf,
+                        )
+                    except Exception:
+                        pass
+
             # Minimum SNR gate — suppress marginal detections that flood
-            # the events card.  10 dB gives a comfortable margin above
-            # the RTL-SDR noise floor to avoid false positives on dead bands.
+            # the events card.  6 dB is one S-unit above noise and the
+            # practical readability floor on HF SSB.
             _event_snr = float(best.get("snr_db") or 0.0)
-            _MIN_EVENT_SNR_DB = 10.0
+            _MIN_EVENT_SNR_DB = 6.0
             if selected_decoder_mode == "ssb" and _event_snr < _MIN_EVENT_SNR_DB:
                 await asyncio.sleep(0.1)
                 continue
@@ -461,19 +473,6 @@ async def _run_occupancy_detection_loop() -> None:
                 _diag_not_running += 1
                 await asyncio.sleep(0.5)
                 continue
-
-            # Feed scan engine SSB candidate-focus logic when in SSB mode
-            # (always — even for throttled events, so the hold mechanism
-            # sees every detection).
-            if selected_decoder_mode == "ssb" and event.get("occupied"):
-                try:
-                    state.scan_engine.report_ssb_candidate(
-                        frequency_hz=frequency_hz,
-                        snr_db=float(best.get("snr_db") or 0.0),
-                        confidence=float(mode_confidence or 0.0),
-                    )
-                except Exception:
-                    pass
 
             # In SSB mode, suppress raw occupancy events entirely — only the
             # confirmed callsign events (from 15 s hold validation) are saved

@@ -384,7 +384,7 @@ class ScanEngine:
         self._ssb_focus_holds_in_pass += 1
         return extra_ms
 
-    def is_ssb_frequency_validated(self, frequency_hz: int, max_age_s: float = 30.0) -> bool:
+    def is_ssb_frequency_validated(self, frequency_hz: int, max_age_s: float = 60.0) -> bool:
         """Check if a frequency has been validated by the SSB focus hold."""
         if not self._ssb_focus_enabled:
             return False
