@@ -2255,17 +2255,6 @@ function applyEventsCardTypeFilter(items) {
   if (selected === "ssb-traffic") {
     return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
   }
-  if (selected === "ssb-voice") {
-    // Confirmed SSB voice detections (callsign-type events from the
-    // hold-validation pipeline) — excludes raw occupancy spectrum data.
-    // Shows events with or without Whisper ASR text.
-    return source.filter((eventItem) => {
-      const mode = String(eventItem?.mode || "").trim().toUpperCase();
-      if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
-      // Only callsign-type = confirmed voice, not occupancy = raw spectrum
-      return String(eventItem?.type || "").trim() === "callsign";
-    });
-  }
   if (selected === "ssb-callsign") {
     // SSB callsign events where a valid amateur callsign was identified
     return source.filter((eventItem) => {
@@ -2482,8 +2471,9 @@ function renderEventList(targetEl, items, emptyMessage) {
     header.className = "event-item__meta";
 
     const typeBadge = document.createElement("span");
+    const _isSSBVoice = eventItem.type === "callsign" && /^SSB/i.test(eventItem.mode || "") && !eventItem.callsign;
     typeBadge.className = `badge ${eventItem.type === "callsign" ? "bg-info" : "bg-secondary"}`;
-    typeBadge.textContent = eventItem.type || "event";
+    typeBadge.textContent = _isSSBVoice ? "Voice Signature" : (eventItem.type || "event");
 
     const modeBadge = document.createElement("span");
     modeBadge.className = "badge bg-primary";

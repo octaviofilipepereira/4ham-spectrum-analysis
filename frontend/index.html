@@ -182,7 +182,6 @@ Last update: 2026-02-22 16:27:19 UTC
                   <option value="all" selected>Show All</option>
                   <option value="cw-candidate">CW Traffic Only</option>
                   <option value="ssb-traffic">SSB Traffic Only</option>
-                  <option value="ssb-voice">SSB Voice Detected</option>
                   <option value="ssb-callsign">SSB Callsign Detected</option>
                   <option value="cw-only">CW Only</option>
                   <option value="callsign-only">Callsign Only</option>
@@ -197,11 +196,11 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="card panel h-100">
             <div class="card-body d-flex flex-column">
               <h2 class="h5">Propagation Map</h2>
-              <div id="propagationMap" style="width:100%;flex:1 1 0;min-height:0;overflow:hidden;"></div>
-              <p id="propagationScore" class="mt-2 mb-0" style="font-size:1.125rem;">Score: --</p>
-              <ul class="summary" id="propagationBands">
+              <p id="propagationScore" class="mb-1" style="font-size:1.125rem;">Score: --</p>
+              <ul class="summary mb-3" id="propagationBands">
                 <li>No propagation data yet.</li>
               </ul>
+              <div id="propagationMap" style="width:100%;flex:1 1 0;min-height:0;overflow:hidden;"></div>
             </div>
           </div>
         </div>
