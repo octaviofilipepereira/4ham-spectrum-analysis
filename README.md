@@ -69,6 +69,10 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 
 ## Changelog (cumulative)
 
+### v0.8.1
+- **SDR enumerate segfault fix**: `SoapySDR.Device.enumerate()` was called on every HTTP request, occasionally triggering a segfault in `libuhd.so` on unstable USB hardware. Added a 30 s TTL cache in `SDRController` — reduces native USB calls and returns stale cache on failure.
+- **SSB threshold fixes**: `focus_hits` default mismatch (1 vs 2), SNR threshold lowered 10→8 dB, hardcoded `max(2,...)` in spectrum pipeline removed, frontend marker TTL raised 15→20 s.
+
 ### v0.8.0
 - **SSB Voice Signature Detection**: real-time SSB voice demodulation with VAD and Whisper ASR transcription.
 - **Voice Signature badge**: SSB events without a resolved callsign display as "Voice Signature" in the events card.
