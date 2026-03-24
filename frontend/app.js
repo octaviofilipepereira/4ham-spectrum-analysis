@@ -1778,16 +1778,22 @@ function extractCallsignFromRaw(value) {
   return match ? match[0] : "";
 }
 
+function _isSsbSpectralProof(text) {
+  if (!text) return false;
+  return /Voice spectral signature/i.test(text)
+      || /^BW \d/.test(text)
+      || /^SSB voice confirmed/i.test(text);
+}
+
 function extractDecodedText(eventItem) {
   if (!eventItem || typeof eventItem !== "object") {
     return "";
   }
   const mode = String(eventItem.mode || "").toUpperCase();
   const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
-  // For SSB: raw holds the Whisper ASR transcript (or spectral-proof fallback) — show first.
-  // For other modes: msg is the primary decoded content.
+  // For SSB: prioritise raw (Whisper transcript) over msg (spectral summary)
   const candidates = isSsb
-    ? [eventItem.raw, eventItem.msg, eventItem.text]
+    ? [eventItem.raw, eventItem.text, eventItem.msg]
     : [eventItem.msg, eventItem.text, eventItem.raw];
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();
@@ -2203,15 +2209,17 @@ function pushLiveEventToPanel(eventPayload) {
 
   // Toast notification for confirmed SSB voice detections
   const _evMode = String(eventPayload.mode || "").toUpperCase();
+  const _evSrc = String(eventPayload.source || "");
   if (
     (_evMode === "SSB" || _evMode === "SSB_TRAFFIC") &&
     eventPayload.type === "callsign" &&
-    eventPayload.source === "internal_ssb_occupancy"
+    (_evSrc === "internal_ssb_occupancy" || _evSrc === "internal_ssb_asr")
   ) {
     const _ssbMsg = String(eventPayload.msg || "").trim();
     const _ssbProof = String(eventPayload.raw || "").trim();
+    const _ssbSub = (_ssbProof !== _ssbMsg && !_isSsbSpectralProof(_ssbProof)) ? _ssbProof : "";
     if (_ssbMsg) {
-      renderToast(_ssbMsg, false, _ssbProof !== _ssbMsg ? _ssbProof : "");
+      renderToast(_ssbMsg, false, _ssbSub);
     }
   }
 
@@ -2498,8 +2506,19 @@ function renderEventList(targetEl, items, emptyMessage) {
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
     const modeText = String(eventItem.mode || "").trim().toUpperCase();
-    const allowRawCallsignInference = modeText !== "SSB";
-    const callsign = eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || "NO CALLSIGN DETECTED";
+    const isSsbMode = modeText === "SSB" || modeText === "SSB_TRAFFIC";
+    let callsign;
+    if (isSsbMode) {
+      if (eventItem.callsign) {
+        callsign = eventItem.callsign;
+      } else {
+        const rawText = String(eventItem.raw || "").trim();
+        const hasRealTranscript = rawText && !_isSsbSpectralProof(rawText);
+        callsign = hasRealTranscript ? "Voice Transcript" : "Voice Confirmed";
+      }
+    } else {
+      callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "NO CALLSIGN DETECTED";
+    }
     const decodedText = extractDecodedText(eventItem);
 
     const frequencyEl = document.createElement("strong");
@@ -5346,4 +5365,43 @@ function updateVFODisplay(startHz, endHz) {
   eventsSearchNextBtn?.addEventListener("click", () => { _searchPage++; renderSearchPage(); });
   document.getElementById("eventsSearchModal")
     ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
+})();
+
+// ---------------------------------------------------------------------------
+// Global delegated tooltip for TXT (event-decoded-help) buttons
+// Renders a fixed-position overlay so it escapes overflow:hidden containers.
+// ---------------------------------------------------------------------------
+(function () {
+  let _tipEl = null;
+  function _ensureTip() {
+    if (_tipEl) return _tipEl;
+    _tipEl = document.createElement("div");
+    _tipEl.className = "event-decoded-tooltip-overlay";
+    _tipEl.style.display = "none";
+    document.body.appendChild(_tipEl);
+    return _tipEl;
+  }
+  document.addEventListener("mouseover", (e) => {
+    const btn = e.target.closest(".event-decoded-help[data-tooltip]");
+    if (!btn) return;
+    const text = btn.getAttribute("data-tooltip");
+    if (!text) return;
+    const tip = _ensureTip();
+    tip.textContent = text;
+    tip.style.display = "";
+    const r = btn.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    let left = r.left + r.width / 2 - tipW / 2;
+    if (left < 8) left = 8;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    let top = r.top - tip.offsetHeight - 6;
+    if (top < 4) top = r.bottom + 6;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  });
+  document.addEventListener("mouseout", (e) => {
+    const btn = e.target.closest(".event-decoded-help[data-tooltip]");
+    if (!btn || !_tipEl) return;
+    _tipEl.style.display = "none";
+  });
 })();

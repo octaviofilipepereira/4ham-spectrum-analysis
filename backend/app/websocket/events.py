@@ -22,6 +22,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.decoders.ingest import build_callsign_event
+from app.decoders.parsers import parse_ssb_asr_text
 from app.decoders.ssb_asr import get_last_transcript_ssb
 from app.dependencies.helpers import (
     safe_float,
@@ -130,8 +131,14 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
 
     bw_hz = occupancy_event.get("bandwidth_hz")
     power_dbm_val = occupancy_event.get("power_dbm")
+    resolved_callsign = ""
+    parse_method = "occupancy"
     if asr_text:
         raw_field = asr_text
+        parsed = parse_ssb_asr_text(asr_text)
+        if parsed and parsed.get("callsign"):
+            resolved_callsign = parsed["callsign"]
+            parse_method = parsed.get("parse_method", "asr")
     else:
         proof_parts = []
         if bw_hz is not None:
@@ -143,7 +150,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
 
     payload = {
         "mode": "SSB",
-        "callsign": "",
+        "callsign": resolved_callsign,
         "raw": raw_field,
         "msg": msg,
         "band": occupancy_event.get("band"),
@@ -153,8 +160,8 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
         "confidence": round(ssb_score, 3),
         "ssb_state": "SSB",
         "ssb_score": round(ssb_score, 3),
-        "ssb_parse_method": "occupancy",
-        "source": "internal_ssb_occupancy",
+        "ssb_parse_method": parse_method,
+        "source": "internal_ssb_asr" if resolved_callsign else "internal_ssb_occupancy",
         "device": occupancy_event.get("device"),
         "scan_id": occupancy_event.get("scan_id"),
     }

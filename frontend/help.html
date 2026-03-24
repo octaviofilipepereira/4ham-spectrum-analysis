@@ -165,7 +165,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr>
           <td><span class="badge-mode badge-ssb">SSB</span></td>
           <td>continuous</td><td>20 s</td>
-          <td>SSB voice detection with optional Whisper ASR transcription. Detected transmissions without a resolved callsign appear as <strong>Voice Signature</strong> events; when Whisper resolves a callsign it appears as a standard callsign event. Enable Whisper in Admin Config.</td>
+          <td>SSB voice detection with optional Whisper ASR transcription. Events show <strong>Voice Confirmed</strong> (voice only), <strong>Voice Transcript</strong> (has transcript, no callsign — click <strong>TXT</strong> to see it), or the resolved <strong>callsign</strong>. Enable Whisper in Admin Config.</td>
         </tr>
       </tbody>
     </table>
@@ -230,8 +230,8 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <table class="manual-table">
       <thead><tr><th>Option</th><th>Shows</th></tr></thead>
       <tbody>
-        <tr><td><strong>Show All</strong></td><td>All callsign-type events: FT8/FT4, WSPR, CW, APRS, SSB Voice Signature. Hides raw occupancy noise (default).</td></tr>
-        <tr><td><strong>Callsign Only</strong></td><td>Only events with a decoded callsign (excludes Voice Signature).</td></tr>
+        <tr><td><strong>Show All</strong></td><td>All callsign-type events: FT8/FT4, WSPR, CW, APRS, SSB (Voice Confirmed / Voice Transcript / Callsign). Hides raw occupancy noise (default).</td></tr>
+        <tr><td><strong>Callsign Only</strong></td><td>Only events with a decoded callsign (excludes Voice Confirmed and Voice Transcript).</td></tr>
         <tr><td><strong>SSB Callsign Detected</strong></td><td>SSB callsign events resolved by Whisper ASR.</td></tr>
         <tr><td><strong>SSB Traffic Only</strong></td><td>SSB occupancy events (voice activity detected, no decoded callsign).</td></tr>
         <tr><td><strong>CW Only</strong></td><td>CW callsign decodes.</td></tr>
@@ -248,7 +248,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td>Band</td><td>Amateur band (160m, 80m, …, 10m).</td></tr>
         <tr><td>Mode</td><td>Decoder mode that produced the event.</td></tr>
         <tr><td>Frequency</td><td>Centre frequency of the detected signal in MHz.</td></tr>
-        <tr><td>Callsign</td><td>Decoded callsign (FT8/FT4/WSPR/CW/SSB via Whisper), or <em>Voice Signature</em> for SSB detections without a resolved callsign.</td></tr>
+        <tr><td>Callsign</td><td>Decoded callsign (FT8/FT4/WSPR/CW/SSB via Whisper), <em>Voice Transcript</em> (SSB with transcript but no callsign), or <em>Voice Confirmed</em> (SSB voice detected, no transcript).</td></tr>
         <tr><td>SNR</td><td>Signal-to-noise ratio in dB at time of detection.</td></tr>
         <tr><td>Score</td><td>Propagation score (0–100) for the band at time of event.</td></tr>
         <tr><td>Country / DXCC</td><td>Resolved from callsign prefix (if available).</td></tr>
@@ -284,15 +284,22 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li>If voice activity is confirmed (VAD), a 15-second audio segment is captured.</li>
       <li>If Whisper ASR is enabled, the audio is transcribed in a background thread.</li>
       <li>The transcript is parsed for callsign patterns (NATO phonetics, direct callsigns, "CQ" calls).</li>
-      <li>If a callsign is resolved it appears as a standard <strong>callsign</strong> event; otherwise it appears as a <strong>Voice Signature</strong> event with the raw transcript.</li>
+      <li>If a callsign is resolved it appears with the callsign; if a transcript exists but no callsign, it appears as <strong>Voice Transcript</strong> (click <strong>TXT</strong> to see the text); otherwise it appears as <strong>Voice Confirmed</strong>.</li>
     </ol>
 
-    <h3 class="sub-title">Voice Signature badge</h3>
+    <h3 class="sub-title">SSB event labels</h3>
     <p>
-      Events where SSB voice was detected but no callsign could be resolved are shown with a
-      <span class="badge-mode badge-ssb">Voice Signature</span> badge in the Events card.
-      These are included in "Show All" by default.
+      SSB events are shown with one of three labels depending on the detection result:
     </p>
+    <table class="manual-table">
+      <thead><tr><th>Label</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Voice Confirmed</strong></td><td>Voice activity detected by VAD but no Whisper transcript available.</td></tr>
+        <tr><td><strong>Voice Transcript</strong></td><td>Whisper produced a transcript (shown via the <strong>TXT</strong> button) but no valid callsign was resolved.</td></tr>
+        <tr><td><strong>Callsign</strong></td><td>Whisper transcript contained a valid callsign — shown directly in the callsign column.</td></tr>
+      </tbody>
+    </table>
+    <p>All three types are included in the "Show All" filter by default.</p>
 
     <h3 class="sub-title">Enabling Whisper ASR</h3>
     <p>
