@@ -1,14 +1,14 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-02-23
+Last update: 2026-03-24
 -->
 
 # 🗺️ ROADMAP - 4ham-spectrum-analysis
 ## Estrutura de Trabalhos Seguintes
 
-**Versão Atual**: v0.3.1  
-**Última Atualização**: 2026-02-23  
+**Versão Atual**: v0.8.0  
+**Última Atualização**: 2026-03-24  
 **Status**: 🟢 Produção-Ready
 
 ---
@@ -16,21 +16,54 @@ Last update: 2026-02-23
 ## 📊 VISÃO GERAL DO PROJETO
 
 ### Estado Atual
-- ✅ Backend modular e funcional (FastAPI)
+- ✅ Backend modular e funcional (FastAPI, 55 módulos Python)
 - ✅ Frontend funcional (Vanilla JS + WebGL)
-- ✅ 47 rotas API implementadas
-- ✅ 54 testes (100% sucesso)
-- ✅ CI/CD pipeline completo
-- ✅ Documentação abrangente
-- ⚠️ Frontend monolítico (3744 linhas em app.js)
-- ⚠️ main_legacy.py ainda presente (2000+ linhas)
+- ✅ 56 rotas API implementadas
+- ✅ 184 testes (100% sucesso)
+- ✅ Instalador interactivo TUI (whiptail)
+- ✅ Documentação abrangente (install, user manual, help.html)
+- ✅ SSB Voice Signature Detection com hold-validation pipeline
+- ✅ Whisper ASR pipeline preparado (FT-991A / IC-7300 USB)
+- ✅ Propagation Map com globo 3D
+- ✅ Decoders FT8/FT4/WSPR/CW/SSB integrados
+- ✅ main_legacy.py removido (arquitetura limpa)
+- ⚠️ Frontend monolítico (5349 linhas em app.js)
+- ⚠️ Middleware placeholder (apenas __init__.py)
+
+### Histórico de Versões Relevantes
+| Versão | Data | Milestone |
+|--------|------|-----------|
+| v0.3.1 | 2026-02-23 | Backend modular, 54 testes, CI/CD |
+| v0.6.0 | 2026-03-14 | Waterfall WebGL, retention, i18n EN |
+| v0.7.0 | 2026-03-15 | Linux-only target, instalador TUI |
+| v0.8.0 | 2026-03-22 | SSB Voice Signature, Whisper ASR, SNR gate |
+
+---
+
+## ✅ CONCLUÍDO (desde v0.3.1)
+
+### ~~Remoção de main_legacy.py~~ ✅
+- Ficheiro removido. Funcionalidade útil migrada para `main.py` (250 linhas).
+- Testes revalidados.
+
+### SSB Voice Signature Detection ✅ (v0.8.0)
+- Hold-validation pipeline com 15 s de confirmação
+- SSB candidate-focus mode com bucket/cooldown
+- SNR gate a 6 dB (eventos) / 8 dB (markers)
+- Alinhamento de defaults `ssb_focus_hits_required=2` (API + engine)
+
+### Hotfixes v0.8.0 ✅
+- AM→SSB reclassification em HF <30 MHz
+- Occupancy flood suppression (rate limiter backend)
+- False-positive marker fix + event restoration
+- SSB threshold tuning para sinais curtos (unstable branch)
 
 ---
 
 ## 🎯 PRIORIDADES ESTRATÉGICAS
 
 ### 🔴 Prioridade ALTA (Próximos 1-2 sprints)
-Trabalhos críticos para melhoria de manutenibilidade
+Trabalhos críticos para manutenibilidade e qualidade
 
 ### 🟡 Prioridade MÉDIA (2-4 sprints)
 Melhorias importantes mas não bloqueantes
@@ -43,56 +76,54 @@ Features nice-to-have e otimizações
 ## 🔴 PRIORIDADE ALTA
 
 ### 1. Migração Frontend para Módulos ES6 📦
-**Objetivo**: Refatorar app.js monolítico (3744 linhas) para arquitetura modular
+**Objetivo**: Refatorar app.js monolítico (5349 linhas) para arquitetura modular
 
 **Tarefas**:
 - [ ] 1.1. Criar módulo `waterfall.js` (renderização WebGL)
 - [ ] 1.2. Criar módulo `events.js` (gestão de eventos e tabela)
 - [ ] 1.3. Criar módulo `controls.js` (painel de controlo de scan)
 - [ ] 1.4. Criar módulo `charts.js` (gráficos e visualizações)
-- [ ] 1.5. Criar módulo `presets.js` (gestão de presets de banda)
-- [ ] 1.6. Atualizar `index.html` com imports ES6
-- [ ] 1.7. Migrar lógica de `app.js` para módulos
-- [ ] 1.8. Manter `app.js` como orchestrator minimalista (<200 linhas)
-- [ ] 1.9. Atualizar testes frontend
-- [ ] 1.10. Validar funcionalidade completa pós-migração
+- [ ] 1.5. Criar módulo `websocket.js` (gestão de conexões WS)
+- [ ] 1.6. Criar módulo `propagation.js` (mapa e propagação)
+- [ ] 1.7. Atualizar `index.html` com imports ES6
+- [ ] 1.8. Migrar lógica de `app.js` para módulos
+- [ ] 1.9. Manter `app.js` como orchestrator minimalista (<300 linhas)
+- [ ] 1.10. Atualizar testes frontend
+- [ ] 1.11. Validar funcionalidade completa pós-migração
 
-**Estimativa**: 8-12 horas  
 **Benefícios**: Manutenibilidade +80%, Testabilidade +60%, Legibilidade +90%
 
 ---
 
-### 2. Remoção de main_legacy.py 🗑️
-**Objetivo**: Eliminar código legacy e simplificar arquitetura
-
-**Tarefas**:
-- [ ] 2.1. Auditar funcionalidades em `main_legacy.py`
-- [ ] 2.2. Verificar se alguma funcionalidade está em uso
-- [ ] 2.3. Migrar código útil para `main.py` (se necessário)
-- [ ] 2.4. Remover `main_legacy.py`
-- [ ] 2.5. Atualizar referências e imports
-- [ ] 2.6. Executar suite completa de testes
-- [ ] 2.7. Atualizar documentação
-
-**Estimativa**: 2-3 horas  
-**Benefícios**: -2000 linhas de código, clareza arquitetural
-
----
-
-### 3. Implementação de Middleware Customizado 🛡️
+### 2. Implementação de Middleware Customizado 🛡️
 **Objetivo**: Adicionar middleware para logging, metrics e security
 
 **Tarefas**:
-- [ ] 3.1. RequestLoggingMiddleware (logs estruturados)
-- [ ] 3.2. MetricsMiddleware (prometheus/statsd)
-- [ ] 3.3. SecurityHeadersMiddleware (HSTS, CSP, X-Frame-Options)
-- [ ] 3.4. CORSMiddleware refinado (production-ready)
-- [ ] 3.5. Configuração por ambiente (dev/staging/prod)
-- [ ] 3.6. Testes de middleware
-- [ ] 3.7. Documentação
+- [ ] 2.1. RequestLoggingMiddleware (logs estruturados por request)
+- [ ] 2.2. SecurityHeadersMiddleware (HSTS, CSP, X-Frame-Options)
+- [ ] 2.3. CORSMiddleware refinado (production-ready, origin whitelist)
+- [ ] 2.4. RateLimitMiddleware (protecção contra abuse)
+- [ ] 2.5. Configuração por ambiente (dev/staging/prod)
+- [ ] 2.6. Testes de middleware
+- [ ] 2.7. Documentação
 
-**Estimativa**: 4-6 horas  
 **Benefícios**: Observabilidade, segurança, compliance
+
+---
+
+### 3. Validação Real-Band SSB (unstable) 🎙️
+**Objetivo**: Validar os novos limiares SSB com testes de antena em banda real
+
+**Tarefas**:
+- [ ] 3.1. Scan SSB 40m durante período de actividade (18h-22h UTC)
+- [ ] 3.2. Scan SSB 20m durante período de actividade (10h-16h UTC)
+- [ ] 3.3. Medir taxa de markers por minuto (falsos vs legítimos)
+- [ ] 3.4. Medir tempo até primeiro evento confirmado
+- [ ] 3.5. Testar detecção de QSOs curtos (3-5 s)
+- [ ] 3.6. Ajustar `MARKER_MIN_SNR_DB` via env var se necessário
+- [ ] 3.7. Merge unstable → main quando validado
+
+**Benefícios**: Confiança nos limiares, merge seguro
 
 ---
 
@@ -111,7 +142,6 @@ Features nice-to-have e otimizações
 - [ ] 4.7. Integração no CI/CD
 - [ ] 4.8. Screenshots em caso de falha
 
-**Estimativa**: 8-10 horas  
 **Benefícios**: Confiança em releases, detecção precoce de bugs
 
 ---
@@ -127,9 +157,7 @@ Features nice-to-have e otimizações
 - [ ] 5.5. Métricas de SDR (sample rate, overflows)
 - [ ] 5.6. Alertas automáticos (email/webhook)
 - [ ] 5.7. Dashboard Grafana personalizado
-- [ ] 5.8. Documentação de métricas
 
-**Estimativa**: 6-8 horas  
 **Benefícios**: Visibilidade operacional, diagnóstico rápido
 
 ---
@@ -144,110 +172,66 @@ Features nice-to-have e otimizações
 - [ ] 6.4. Compressão de respostas HTTP (gzip/brotli)
 - [ ] 6.5. WebSocket message batching
 - [ ] 6.6. Lazy loading de dados históricos
-- [ ] 6.7. Code splitting frontend
-- [ ] 6.8. Benchmarks antes/depois
+- [ ] 6.7. Benchmarks antes/depois
 
-**Estimativa**: 8-12 horas  
 **Benefícios**: Latência -30%, throughput +50%, UX melhorada
-
----
-
-### 7. Documentação de Utilizador 📚
-**Objetivo**: Manual completo para operadores
-
-**Tarefas**:
-- [ ] 7.1. Guia de instalação simplificado
-- [ ] 7.2. Tutorial de primeiro scan
-- [ ] 7.3. Guia de configuração avançada
-- [ ] 7.4. Troubleshooting FAQ
-- [ ] 7.5. Guia de interpretação de resultados
-- [ ] 7.6. Vídeos/screenshots ilustrativos
-- [ ] 7.7. Glossário de termos RF
-- [ ] 7.8. API documentation refinada
-
-**Estimativa**: 6-8 horas  
-**Benefícios**: Onboarding rápido, redução de suporte
 
 ---
 
 ## 🟢 PRIORIDADE BAIXA
 
-### 8. Features Novas 🎁
+### 7. Features Novas 🎁
 
-#### 8.1. Multi-Device Support
+#### 7.1. Multi-Device Support
 - [ ] Scan simultâneo em múltiplos SDRs
 - [ ] Agregação de dados multi-device
 - [ ] UI para gestão de múltiplos dispositivos
 
-**Estimativa**: 12-16 horas
-
-#### 8.2. Integração com PSKReporter
+#### 7.2. Integração com PSKReporter
 - [ ] Envio automático de spots para PSKReporter
 - [ ] Configuração de callsign e locator
 - [ ] Rate limiting e validação
 
-**Estimativa**: 4-6 horas
-
-#### 8.3. Scheduler de Scans
+#### 7.3. Scheduler de Scans
 - [ ] Agendamento de scans por hora/dia
 - [ ] Perfis de scan programáveis
 - [ ] Notificações de eventos importantes
 
-**Estimativa**: 6-8 horas
-
-#### 8.4. Mobile-Responsive UI
+#### 7.4. Mobile-Responsive UI
 - [ ] Layout responsivo para tablets
 - [ ] UI otimizada para smartphones
 - [ ] Touch-friendly controls
 
-**Estimativa**: 8-12 horas
-
-#### 8.5. Themes e Customização
+#### 7.5. Themes e Customização
 - [ ] Dark/Light theme switcher
 - [ ] Customização de cores do waterfall
 - [ ] Layout configurável (drag-and-drop panels)
 
-**Estimativa**: 4-6 horas
-
 ---
 
-### 9. Otimizações de Infraestrutura 🏗️
+### 8. Otimizações de Infraestrutura 🏗️
 
-#### 9.1. Docker Compose Stack
+#### 8.1. Docker Compose Stack
 - [ ] Dockerfile multi-stage otimizado
 - [ ] docker-compose.yml completo
 - [ ] Volumes para persistência
 - [ ] Health checks
 
-**Estimativa**: 3-4 horas
-
-#### 9.2. Kubernetes Manifests
-- [ ] Deployment, Service, ConfigMap
-- [ ] Horizontal Pod Autoscaling
-- [ ] Ingress configuration
-- [ ] Helm chart
-
-**Estimativa**: 6-8 horas
-
-#### 9.3. Automated Backups
+#### 8.2. Automated Backups
 - [ ] Backup automático de SQLite
 - [ ] Rotação de backups (7 dias, 4 semanas)
 - [ ] Restore scripts
 - [ ] Verificação de integridade
 
-**Estimativa**: 3-4 horas
-
 ---
 
-### 10. Melhorias de Segurança 🔒
+### 9. Melhorias de Segurança 🔒
 
-#### 10.1. OAuth2/JWT Authentication
+#### 9.1. OAuth2/JWT Authentication
 - [ ] Substituir Basic Auth por JWT
 - [ ] Refresh tokens
 - [ ] Role-based access control (RBAC)
 - [ ] Session management
-
-**Estimativa**: 8-10 horas
 
 #### 10.2. Security Audit
 - [ ] Scan de vulnerabilidades (OWASP Top 10)
