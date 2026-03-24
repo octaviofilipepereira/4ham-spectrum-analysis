@@ -14,12 +14,13 @@
 
 A partir da **v0.8.0**, o sistema deteta e transcreve transmissões SSB em tempo real usando demodulação de voz e ASR (Automatic Speech Recognition — Whisper).
 
-Existem dois tipos de resultado para sinais SSB:
+Existem três tipos de resultado para sinais SSB:
 
-| Badge | Significado |
+| Label | Significado |
 |-------|------------|
-| **Voice Signature** (azul) | SSB detetado, sem indicativo resolvido — Whisper não identificou um indicativo válido na transcrição |
-| **callsign** (azul) | SSB detetado **e** indicativo resolvido com sucesso pelo ASR |
+| **Voice Confirmed** | SSB detetado, sem transcrição disponível — apenas confirmação de atividade de voz |
+| **Voice Transcript** | SSB detetado com transcrição Whisper, mas sem indicativo resolvido — o botão **TXT** mostra o texto transcrito |
+| **Callsign** (indicativo) | SSB detetado **e** indicativo resolvido com sucesso pelo ASR |
 
 ### Pipeline de deteção SSB
 
@@ -27,8 +28,9 @@ Existem dois tipos de resultado para sinais SSB:
 2. O bloco DSP demódula USB ou LSB conforme a banda e segmento de frequência.
 3. O VAD (Voice Activity Detection) segmenta a transmissão em trechos de voz.
 4. O Whisper transcreve o áudio — todos os tokens que correspondam a um indicativo válido (regex IARU) são extraídos.
-5. Se um indicativo for encontrado → evento `callsign` com `source: asr`.
-6. Se nenhum indicativo for encontrado → evento `callsign` com `_is_ssb_voice: true` → badge **Voice Signature**.
+5. Se um indicativo for encontrado → evento com o indicativo resolvido.
+6. Se houver transcrição mas sem indicativo → label **Voice Transcript** com botão **TXT** mostrando o texto.
+7. Se só houver deteção de voz sem transcrição → label **Voice Confirmed**.
 
 ### Proteção contra flood de ocupação
 

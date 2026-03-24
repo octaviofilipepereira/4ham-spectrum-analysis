@@ -20,7 +20,7 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
 
-> **SSB Voice Signature (v0.8.0):** SSB voice demodulation and ASR-based identification are fully implemented. Detected SSB transmissions without a resolved callsign are shown as **Voice Signature** events; when Whisper ASR resolves a callsign it appears as a standard callsign event. Enable Whisper in the Admin panel; install with `pip install openai-whisper` (optional — large download, ~700 MB).
+> **SSB Voice Detection & ASR (v0.8.0+):** SSB voice demodulation and ASR-based identification are fully implemented. Each SSB event shows one of three labels: **Voice Confirmed** (voice detected, no transcript), **Voice Transcript** (Whisper produced a transcript but no callsign resolved), or the **resolved callsign**. The **TXT** button on each event shows the decoded text (Whisper transcript or spectral proof). Enable Whisper in the Admin panel; install with `pip install openai-whisper` (optional — large download, ~700 MB).
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
@@ -70,12 +70,15 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 ## Changelog (cumulative)
 
 ### v0.8.1
+- **SSB ASR pipeline activation**: `parse_ssb_asr_text()` wired into the live SSB event pipeline — Whisper transcripts are now parsed for callsigns (direct and NATO phonetic) in real time.
+- **SSB event labels**: events now show **Voice Confirmed** (voice only), **Voice Transcript** (has transcript, no callsign), or the **resolved callsign** — replaces the old generic "NO CALLSIGN DETECTED".
+- **TXT button & tooltip**: every SSB event shows a TXT button with decoded text (transcript or spectral proof). Tooltip uses a fixed overlay that works inside modals and overflow-clipped panels.
 - **SDR enumerate segfault fix**: `SoapySDR.Device.enumerate()` was called on every HTTP request, occasionally triggering a segfault in `libuhd.so` on unstable USB hardware. Added a 30 s TTL cache in `SDRController` — reduces native USB calls and returns stale cache on failure.
 - **SSB threshold fixes**: `focus_hits` default mismatch (1 vs 2), SNR threshold lowered 10→8 dB, hardcoded `max(2,...)` in spectrum pipeline removed, frontend marker TTL raised 15→20 s.
 
 ### v0.8.0
 - **SSB Voice Signature Detection**: real-time SSB voice demodulation with VAD and Whisper ASR transcription.
-- **Voice Signature badge**: SSB events without a resolved callsign display as "Voice Signature" in the events card.
+- **SSB event labels**: SSB events display as "Voice Confirmed" (voice only), "Voice Transcript" (has ASR text), or the resolved callsign.
 - **Whisper ASR integration**: optional OpenAI Whisper model (tiny/base) for real-time speech-to-text on SSB segments; asked during `./install.sh` setup.
 - **HF mode classification fix**: signals below 30 MHz no longer misclassified as AM; bandwidth-based AM is reclassified to SSB on HF bands (except 10 m AM window 29.0–29.7 MHz).
 - **Occupancy flood protection**: per-frequency rate limiter (5 kHz buckets, 10 s cooldown; 3 s for digital modes) prevents DB/WebSocket flood from broadband noise during scanning.

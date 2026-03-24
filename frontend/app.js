@@ -1791,16 +1791,13 @@ function extractDecodedText(eventItem) {
   }
   const mode = String(eventItem.mode || "").toUpperCase();
   const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
-  // For SSB: only show TXT when raw holds an actual Whisper ASR transcript,
-  // not the spectral-proof fallback ("BW … · Voice spectral signature").
-  // For other modes: msg is the primary decoded content.
+  // For SSB: prioritise raw (Whisper transcript) over msg (spectral summary)
   const candidates = isSsb
-    ? [eventItem.raw, eventItem.msg, eventItem.text]
+    ? [eventItem.raw, eventItem.text, eventItem.msg]
     : [eventItem.msg, eventItem.text, eventItem.raw];
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();
     if (value) {
-      if (isSsb && _isSsbSpectralProof(value)) continue;
       return value.length > 220 ? `${value.slice(0, 220)}…` : value;
     }
   }
@@ -2509,8 +2506,19 @@ function renderEventList(targetEl, items, emptyMessage) {
     const freq = Number.isFinite(frequencyValue) && frequencyValue > 0 ? frequencyValue.toLocaleString() : "-";
     const band = eventItem.band || inferBandFromFrequency(frequencyValue) || "-";
     const modeText = String(eventItem.mode || "").trim().toUpperCase();
-    const allowRawCallsignInference = modeText !== "SSB";
-    const callsign = eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || "NO CALLSIGN DETECTED";
+    const isSsbMode = modeText === "SSB" || modeText === "SSB_TRAFFIC";
+    let callsign;
+    if (isSsbMode) {
+      if (eventItem.callsign) {
+        callsign = eventItem.callsign;
+      } else {
+        const rawText = String(eventItem.raw || "").trim();
+        const hasRealTranscript = rawText && !_isSsbSpectralProof(rawText);
+        callsign = hasRealTranscript ? "Voice Transcript" : "Voice Confirmed";
+      }
+    } else {
+      callsign = eventItem.callsign || extractCallsignFromRaw(eventItem.raw) || "NO CALLSIGN DETECTED";
+    }
     const decodedText = extractDecodedText(eventItem);
 
     const frequencyEl = document.createElement("strong");
