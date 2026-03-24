@@ -2,10 +2,19 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-22 UTC
+Last update: 2026-03-24 UTC
 -->
 
 # Changelog
+
+## v0.8.1 - 2026-03-24
+
+### Fixed
+- **SDR enumerate segfault** — `SoapySDR.Device.enumerate()` was called on every HTTP health/status request, triggering native USB code (`libuhd.so`) that segfaulted on unstable USB hardware (SIGSEGV, no Python exception possible). Added a 30 s TTL cache in `SDRController._enumerate_devices()`; returns stale cache on failure instead of crashing. `open()` uses `force=True` to refresh when actually opening the device.
+- **SSB focus_hits default mismatch** — `ssb_focus_hits_required` API default was 1 while the engine expected 2, causing premature SSB event emission on weak signals. Fixed default to 2 in `scan.py`.
+- **SSB SNR threshold too conservative** — `MARKER_MIN_SNR_DB` was 10.0 dB, suppressing valid SSB detections on typical HF noise floors. Lowered to 8.0 dB (one S-unit above noise floor).
+- **SSB spectrum hardcoded min hits** — `max(2, state.marker_min_hits)` in `spectrum.py` overrode the configured threshold; removed the hardcode so the configured value is used directly.
+- **SSB marker TTL too short** — frontend TTL was 15 s (too fast for conversational SSB); raised to 20 s. Focus-validation passes also corrected from 1 to 2 in `app.js`.
 
 ## v0.8.0 - 2026-03-22
 
