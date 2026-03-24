@@ -260,12 +260,12 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                     continue
 
             if decoder_mode == "ssb":
-                # SSB markers: use the same quality gates as other modes.
-                # Previous values (6 dB / 1 hit) were too permissive and
-                # caused hundreds of false-positive markers on dead bands.
+                # SSB markers: use configurable quality gates.
+                # Defaults (8 dB / 2 hits) balance false-positive reduction
+                # with detection of short legitimate SSB activity.
                 min_snr_db = float(state.marker_min_snr_db)
                 min_confidence = float(state.marker_min_confidence)
-                min_hits_required = max(2, int(state.marker_min_hits))
+                min_hits_required = int(state.marker_min_hits)
             else:
                 min_snr_db = float(state.marker_min_snr_db)
                 min_confidence = float(state.marker_min_confidence)
