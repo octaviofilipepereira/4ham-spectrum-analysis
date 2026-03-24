@@ -4,9 +4,13 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 import importlib
+import logging
 import re
 import sys
+import time
 from typing import Optional
+
+_log = logging.getLogger(__name__)
 
 
 def _import_soapy_sdr():
@@ -216,12 +220,31 @@ def _target_direct_sampling_mode(center_hz: int, rtl_generation: Optional[int]) 
 
 
 class SDRController:
-    def _find_first_rtlsdr_details(self) -> dict:
+    _ENUM_CACHE_TTL: float = 30.0  # seconds
+
+    def __init__(self):
+        self._enum_cache: list = []
+        self._enum_cache_ts: float = 0.0
+
+    def _enumerate_devices(self, force: bool = False) -> list:
+        """Cached SoapySDR.Device.enumerate() — avoids repeated calls into
+        native USB code (libuhd/libusb) that can segfault on flaky hardware."""
+        now = time.monotonic()
+        if not force and self._enum_cache and (now - self._enum_cache_ts) < self._ENUM_CACHE_TTL:
+            return self._enum_cache
         SoapySDR = _import_soapy_sdr()
         if SoapySDR is None:
-            return {}
-        for args in SoapySDR.Device.enumerate():
-            details = _kwargs_to_dict(args)
+            return []
+        try:
+            raw = SoapySDR.Device.enumerate()
+            self._enum_cache = [_kwargs_to_dict(a) for a in raw]
+            self._enum_cache_ts = now
+        except Exception:
+            _log.warning("SoapySDR.Device.enumerate() failed, returning cached")
+        return self._enum_cache
+
+    def _find_first_rtlsdr_details(self) -> dict:
+        for details in self._enumerate_devices():
             if str(details.get("driver") or "").strip().lower() == "rtlsdr":
                 return details
         return {}
@@ -243,13 +266,8 @@ class SDRController:
         }
 
     def list_devices(self):
-        SoapySDR = _import_soapy_sdr()
-        if SoapySDR is None:
-            return []
-
         devices = []
-        for args in SoapySDR.Device.enumerate():
-            details = _kwargs_to_dict(args)
+        for details in self._enumerate_devices():
             devices.append({
                 "id": details.get("driver", "unknown"),
                 "type": details.get("driver", "unknown"),
@@ -277,19 +295,15 @@ class SDRController:
 
         device_args = {}
         selected_details = {}
+        all_devices = self._enumerate_devices(force=True)
         if device_id:
-            for args in SoapySDR.Device.enumerate():
-                details = _kwargs_to_dict(args)
+            for details in all_devices:
                 if details.get("driver") == device_id:
                     device_args = details
                     selected_details = details
                     break
         else:
-            # No specific device requested: pick the first non-audio device
-            # (the SoapySDR audio plugin opens host sound cards via PulseAudio/
-            # ALSA and should never be used as the SDR receiver).
-            for args in SoapySDR.Device.enumerate():
-                details = _kwargs_to_dict(args)
+            for details in all_devices:
                 if details.get("driver", "").lower() not in ("audio",):
                     device_args = details
                     selected_details = details
@@ -301,8 +315,6 @@ class SDRController:
 
         # Detect V4 BEFORE applying any settings — critical for HF reception
         _is_rtlsdr_v4 = _detect_rtlsdr_v4(device, device_args)
-        import logging as _logging
-        _log = _logging.getLogger(__name__)
         if _is_rtlsdr_v4:
             _log.info("RTL-SDR Blog V4 detected — using upconverter (direct_samp disabled)")
         else:

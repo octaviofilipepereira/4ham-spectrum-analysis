@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-22 UTC
+Last update: 2026-03-24 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -479,17 +479,58 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
 4. Deployment hardening (service templates + operational monitoring/retention defaults).
 
-## Performance notes
-- Raspberry Pi: limit sample rate, batch FFT processing, use WebGL rendering.
-- Compression/downsampling for efficient streaming.
+## System requirements
 
-## Resource requirements (estimate)
-Hardware and performance details: see [docs/hardware_requirements.md](docs/hardware_requirements.md).
-- **Raspberry Pi 4 (4 GB)**: FT8/FT4 + APRS + CW simultaneously; limited SSB/ASR.
-- **Raspberry Pi 5 (8 GB)**: light SSB/ASR, better for fast scanning.
-- **Dual-core PC**: all decoders at moderate rate.
+Full hardware and performance details: see [docs/hardware_requirements.md](docs/hardware_requirements.md).
 
-Note: SSB ASR requires stronger CPU/GPU; recommended as optional.
+### Operating system
+- **Linux** (Debian 11+ / Ubuntu 22.04+ / Raspberry Pi OS Bookworm) — primary and recommended.
+- **Windows 10/11**: supported via WSL2 or native Python; SoapySDR driver support varies.
+- **Python**: 3.10 or later.
+- **Browser**: any modern browser (Chrome, Firefox, Edge) to access the web UI.
+
+### Hardware — minimum by scenario
+
+| | **Without ASR** | **With Whisper ASR** |
+|---|---|---|
+| **CPU** | 2 cores (RPi 4 or x86) | 4 cores x86 |
+| **RAM** | 2 GB | 4 GB |
+| **Disk** | 2 GB free | 10 GB free |
+| **USB** | 1 x USB 2.0 | 1 x USB 2.0 |
+
+### SDR devices
+- **Primary**: RTL-SDR Blog v3 / v4 (via SoapySDR).
+- **Supported**: HackRF, Airspy, and any SoapySDR-compatible device.
+- **Planned**: transceiver SDR interfaces (FT-991A, IC-7300 via CAT/audio).
+
+### Disk breakdown
+- Python venv (without Whisper): ~500 MB.
+- Python venv (with Whisper + PyTorch/CUDA): ~7.3 GB.
+- SQLite database at 500k events (configured limit): ~100 MB.
+- Logs with rotation (10 MB x 5 backups): ~50 MB max.
+- IQ recording (configurable limit): up to 512 MB.
+
+### Measured resource usage (v0.8.0, active scan)
+- **RAM (RSS)**: ~640 MB with scan + FFT + decoders running.
+- **CPU**: ~30% of one core during continuous HF scan.
+- **Database**: ~5 MB at 25k events.
+
+### Platform guidance
+- **Raspberry Pi 4 (4 GB)**: scan + FT8/FT4 + APRS + CW — no Whisper ASR.
+- **Raspberry Pi 5 (8 GB)**: adds light Whisper (tiny/base model, CPU only).
+- **PC (4+ cores, 4 GB+)**: all decoders including Whisper at moderate scan rates.
+- **GPU PC**: Whisper medium/large models for better noise/accent handling.
+
+### Network and time
+- Local access via browser (default: `http://localhost:8000`).
+- **NTP strongly recommended** for FT8/FT4 decode accuracy (timing-critical modes).
+- Optional remote access requires network hardening (see [docs/security.md](docs/security.md)).
+
+### Performance tips
+- Raspberry Pi: limit sample rate, batch FFT processing.
+- Use compression/downsampling for efficient WebSocket streaming.
+- Disable Whisper ASR on memory-constrained systems to save ~1.5 GB RAM.
+- Stop unnecessary system services (databases, IDEs) on dedicated stations.
 
 ## Next steps
 - Map exact frequencies per band and region (IARU).
