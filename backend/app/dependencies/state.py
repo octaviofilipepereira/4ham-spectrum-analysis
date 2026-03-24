@@ -167,7 +167,7 @@ snr_threshold_db = _env_float("DSP_SNR_THRESHOLD_DB", 6.0)
 min_bw_hz = _env_int("DSP_MIN_BW_HZ", 500)
 
 # Mode marker quality gate
-marker_min_snr_db = _env_float("MARKER_MIN_SNR_DB", 10.0)
+marker_min_snr_db = _env_float("MARKER_MIN_SNR_DB", 8.0)
 marker_min_confidence = _env_float("MARKER_MIN_CONFIDENCE", 0.55)
 marker_min_hits = _env_int("MARKER_MIN_HITS", 2)
 marker_max_age_s = _env_float("MARKER_MAX_AGE_S", 30.0)  # Allow markers to persist across 2+ scan cycles
