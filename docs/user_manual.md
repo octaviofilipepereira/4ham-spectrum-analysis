@@ -180,11 +180,165 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ---
 
-## [Em desenvolvimento]
+---
 
-Este manual será expandido com mais secções sobre:
-- Configuração inicial
-- Interface do utilizador (painel de eventos, waterfall, propagação)
-- Interpretação do espectrograma
-- Exportação de dados
-- Resolução de problemas
+## Configuração Inicial
+
+### Pré-requisitos
+- SDR: RTL-SDR (recomendado), HackRF, Airspy ou outro hardware compatível com SoapySDR
+- Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Raspberry Pi OS 64-bit
+- Python 3.10+
+- Sincronização de tempo NTP (obrigatório para FT8/FT4)
+
+### Instalação rápida (instalador gráfico)
+A partir da v0.7.1, o projeto inclui um instalador TUI interativo:
+
+```bash
+git clone https://github.com/octaviofilipepereira/4ham-spectrum-analysis.git
+cd 4ham-spectrum-analysis
+chmod +x install.sh && ./install.sh
+```
+
+O instalador configura: pacotes do sistema, driver RTL-SDR Blog v4 (opcional), ambiente Python virtual, conta de administrador (password bcrypt em SQLite) e serviço systemd.
+
+### Iniciar o servidor
+```bash
+source .venv/bin/activate
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+```
+
+Ou via script de desenvolvimento:
+```bash
+./run_dev.sh
+```
+
+Abrir a interface no browser: `http://localhost:8000/`
+
+---
+
+## Interface do Utilizador
+
+### Barra de ferramentas (toolbar)
+
+| Botão | Função |
+|-------|--------|
+| **Band Config** | Configurar bandas, intervalos de frequência, ativar/desativar individualmente |
+| **Logs & Reports** | Estado dos decoders, Resumo de sessão, Logs, Painel de pesquisa/exportação |
+| **Admin Config** | SDR, ganho, retenção de dados, autenticação. Requer login de administrador |
+| **Help** | Manual do utilizador (este documento) |
+
+### Controlos de scan
+- **Start scanning / Stop scanning** — inicia ou para o scan ativo
+- **Botões de banda** (160m … 10m) — mudam de banda imediatamente, mesmo com scan em curso
+- **Botões de modo** (CW / WSPR / FT4 / FT8 / SSB) — selecionam o decoder ou mudam o scan em tempo real
+
+### Filtro de eventos (dropdown)
+
+| Opção | Mostra |
+|-------|--------|
+| **Show All** | Todos os eventos com indicativo: FT8/FT4, WSPR, CW, APRS, SSB Voice Signature |
+| **Callsign Only** | Apenas eventos com indicativo descodificado (exclui Voice Signature) |
+| **SSB Callsign Detected** | SSB com indicativo resolvido por Whisper ASR |
+| **SSB Traffic Only** | Ocupação SSB (voz detetada, sem indicativo) |
+| **CW Only** | Decodes CW |
+| **All + Occupancy (raw)** | Tudo, incluindo ocupação bruta — útil para diagnóstico |
+
+---
+
+## Interpretação do Espectrograma
+
+### Cascata (Waterfall)
+- **Eixo horizontal**: frequência em MHz
+- **Eixo vertical**: tempo (mais recente no topo, flui para baixo)
+- **Cor**: intensidade do sinal — azul escuro = ruído de fundo, amarelo/vermelho = sinal forte
+- **Marcadores de modo**: etiquetas coloridas fixas nas frequências dial conhecidas (ex.: FT8 14.074 MHz)
+
+### Cores dos marcadores
+
+| Cor | Modo |
+|-----|------|
+| Azul | FT8 |
+| Verde | FT4 |
+| Laranja | WSPR |
+| Rosa/Púrpura | CW |
+| Azul claro | SSB / Voice Signature |
+
+### TTL dos marcadores
+
+| Modo | TTL | Janela de decode |
+|------|-----|-----------------|
+| FT8  | 45 s | 15 s |
+| FT4  | 23 s | 7,5 s |
+| WSPR | 360 s | 120 s |
+| CW   | 45 s | dwell 30 s |
+| SSB  | 20 s | contínuo |
+
+### Interação com a cascata
+- **Drag horizontal** — pan quando zoom > ×1
+- **Slider de zoom** — zoom horizontal de ×1 (banda completa) a ×16
+- **Hover** — VFO bar mostra a frequência sob o cursor e o SNR em tempo real
+- **Campo "Go to"** — escrever a frequência em MHz e premir `Enter` para centrar a vista
+
+---
+
+## Exportação de Dados
+
+### Painel Search & Export Data
+Acedido via **Logs & Reports → Search & Export Data**.
+
+**Filtros disponíveis:**
+- Intervalo de datas/horas (de / até)
+- Banda
+- Modo
+- Indicativo (pesquisa parcial)
+- País / prefixo DXCC
+- SNR mínimo
+
+**Formatos de exportação:**
+- **CSV** — compatível com Excel, LibreOffice Calc
+- **JSON** — dados estruturados para processamento programático
+- **PNG** — captura do estado atual da tabela de eventos
+
+Os ficheiros são guardados em `data/exports/`.
+
+### Exportação automática (retenção)
+Quando o total de eventos excede o limite configurado (padrão: 500.000), o sistema:
+1. Exporta todos os eventos para CSV em `data/exports/`
+2. Mantém apenas os 50.000 eventos mais recentes (configurável)
+
+A retenção corre no máximo uma vez por dia e pode ser acionada manualmente no painel Admin.
+
+---
+
+## Resolução de Problemas
+
+### A cascata está em branco / "No live spectrum data"
+Aparece apenas quando o scan está ativo mas não chegam frames FFT. Verificar:
+- O SDR está ligado e reconhecido (`rtl_test` ou `SoapySDRUtil --find`)
+- Nenhum outro programa (GQRX, SDR#) está a usar o dispositivo
+- O backend está a correr — verificar em **Logs & Reports → Server logs**
+
+### Não aparecem callsigns FT8/FT4
+- Verificar se `jt9` (do pacote WSJT-X) está instalado e no PATH do sistema
+- Em **Decoder Status**: o pipeline jt9 deve mostrar "running"
+- Propagação fraca pode resultar em zero decodes mesmo com espectro visível
+
+### O RTL-SDR v4 não é detectado
+- Confirmar que o driver `rtlsdrblog/rtl-sdr-blog` foi compilado (o pacote `apt rtl-sdr` não suporta a versão v4)
+- Verificar blacklist dos módulos do kernel: `cat /etc/modprobe.d/blacklist-rtl.conf`
+- Reiniciar e reconectar o dongle USB
+
+### Muitos eventos SSB_TRAFFIC / Voice Signature no painel
+Comportamento normal durante scan SSB em bandas com atividade de voz. Para uma vista mais limpa:
+- Usar filtro **Callsign Only** para mostrar apenas eventos com indicativo resolvido
+- Usar filtro **SSB Callsign Detected** para apenas eventos Whisper com callsign confirmado
+
+### O servidor parou / não responde
+- Verificar logs do sistema: `journalctl -u 4ham-spectrum-analysis -n 50`
+- Se o RTL-SDR estava com USB instável, reconectar o dongle e reiniciar o serviço
+- O sistema usa cache de enumeração de dispositivos (TTL 30 s) para reduzir chamadas USB em condições de hardware instável
+
+### Onde estão os dados guardados?
+- Eventos: `data/events.sqlite`
+- Exportações automáticas e manuais: `data/exports/`
+- Logs do servidor: `logs/`

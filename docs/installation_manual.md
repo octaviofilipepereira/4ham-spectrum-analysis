@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-22 UTC
+Last update: 2026-03-24 UTC
 -->
 
 # Installation Manual
@@ -10,6 +10,8 @@ Last update: 2026-03-22 UTC
 This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi, including optional decoder integrations.
 
 ## Contents
+- System Requirements
+- Quick Start (graphical installer)
 - Prerequisites
 - Linux (Ubuntu/Debian)
 - Raspberry Pi
@@ -18,11 +20,40 @@ This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi
 - Troubleshooting
 - Uninstall
 
+## System Requirements
+
+| Component  | Minimum (no ASR)                                       | With Whisper ASR              |
+|------------|--------------------------------------------------------|-------------------------------|
+| OS         | Ubuntu 20.04+ / Debian 11+ / Raspberry Pi OS 64-bit    | Same                          |
+| CPU        | 2 cores, 1.5 GHz                                       | 4 cores, 2 GHz                |
+| RAM        | 2 GB                                                   | 4 GB                          |
+| Disk       | 2 GB                                                   | 10 GB (PyTorch/Whisper ~6.8 GB) |
+| Python     | 3.10+                                                  | 3.10+                         |
+| Time sync  | NTP — required for FT8/FT4 timing                      | NTP required                  |
+| SDR        | RTL-SDR, HackRF, Airspy or any SoapySDR device         | Same                          |
+
+> **Measured at v0.8.0**: ~637 MB RSS, ~30% of one CPU core during continuous HF scan.
+> **Windows**: partial support via WSL2 only — native Windows is not recommended.
+
 ## Prerequisites
 - SDR hardware: RTL-SDR (primary), HackRF, Airspy, or SDR transceiver with SoapySDR support.
 - Python 3.10+
 - Basic build tools (Linux)
 - Accurate system time (NTP) for FT8/FT4
+
+## Quick Start (graphical installer)
+
+Since v0.7.1, a guided TUI installer handles the full setup for Linux and Raspberry Pi:
+
+```
+git clone https://github.com/octaviofilipepereira/4ham-spectrum-analysis.git
+cd 4ham-spectrum-analysis
+chmod +x install.sh && ./install.sh
+```
+
+The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), and optional systemd service activation. No manual steps are required after `git clone`.
+
+For manual or customised setups, follow the sections below.
 
 ## Linux (Ubuntu/Debian)
 
