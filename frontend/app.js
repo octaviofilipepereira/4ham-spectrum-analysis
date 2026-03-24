@@ -1780,7 +1780,9 @@ function extractCallsignFromRaw(value) {
 
 function _isSsbSpectralProof(text) {
   if (!text) return false;
-  return /Voice spectral signature/i.test(text) || /^BW \d/.test(text);
+  return /Voice spectral signature/i.test(text)
+      || /^BW \d/.test(text)
+      || /^SSB voice confirmed/i.test(text);
 }
 
 function extractDecodedText(eventItem) {
@@ -5355,4 +5357,43 @@ function updateVFODisplay(startHz, endHz) {
   eventsSearchNextBtn?.addEventListener("click", () => { _searchPage++; renderSearchPage(); });
   document.getElementById("eventsSearchModal")
     ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
+})();
+
+// ---------------------------------------------------------------------------
+// Global delegated tooltip for TXT (event-decoded-help) buttons
+// Renders a fixed-position overlay so it escapes overflow:hidden containers.
+// ---------------------------------------------------------------------------
+(function () {
+  let _tipEl = null;
+  function _ensureTip() {
+    if (_tipEl) return _tipEl;
+    _tipEl = document.createElement("div");
+    _tipEl.className = "event-decoded-tooltip-overlay";
+    _tipEl.style.display = "none";
+    document.body.appendChild(_tipEl);
+    return _tipEl;
+  }
+  document.addEventListener("mouseover", (e) => {
+    const btn = e.target.closest(".event-decoded-help[data-tooltip]");
+    if (!btn) return;
+    const text = btn.getAttribute("data-tooltip");
+    if (!text) return;
+    const tip = _ensureTip();
+    tip.textContent = text;
+    tip.style.display = "";
+    const r = btn.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    let left = r.left + r.width / 2 - tipW / 2;
+    if (left < 8) left = 8;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    let top = r.top - tip.offsetHeight - 6;
+    if (top < 4) top = r.bottom + 6;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  });
+  document.addEventListener("mouseout", (e) => {
+    const btn = e.target.closest(".event-decoded-help[data-tooltip]");
+    if (!btn || !_tipEl) return;
+    _tipEl.style.display = "none";
+  });
 })();
