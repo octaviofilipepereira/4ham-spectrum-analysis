@@ -1778,13 +1778,19 @@ function extractCallsignFromRaw(value) {
   return match ? match[0] : "";
 }
 
+function _isSsbSpectralProof(text) {
+  if (!text) return false;
+  return /Voice spectral signature/i.test(text) || /^BW \d/.test(text);
+}
+
 function extractDecodedText(eventItem) {
   if (!eventItem || typeof eventItem !== "object") {
     return "";
   }
   const mode = String(eventItem.mode || "").toUpperCase();
   const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
-  // For SSB: raw holds the Whisper ASR transcript (or spectral-proof fallback) — show first.
+  // For SSB: only show TXT when raw holds an actual Whisper ASR transcript,
+  // not the spectral-proof fallback ("BW … · Voice spectral signature").
   // For other modes: msg is the primary decoded content.
   const candidates = isSsb
     ? [eventItem.raw, eventItem.msg, eventItem.text]
@@ -1792,6 +1798,7 @@ function extractDecodedText(eventItem) {
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();
     if (value) {
+      if (isSsb && _isSsbSpectralProof(value)) continue;
       return value.length > 220 ? `${value.slice(0, 220)}…` : value;
     }
   }
@@ -2203,15 +2210,17 @@ function pushLiveEventToPanel(eventPayload) {
 
   // Toast notification for confirmed SSB voice detections
   const _evMode = String(eventPayload.mode || "").toUpperCase();
+  const _evSrc = String(eventPayload.source || "");
   if (
     (_evMode === "SSB" || _evMode === "SSB_TRAFFIC") &&
     eventPayload.type === "callsign" &&
-    eventPayload.source === "internal_ssb_occupancy"
+    (_evSrc === "internal_ssb_occupancy" || _evSrc === "internal_ssb_asr")
   ) {
     const _ssbMsg = String(eventPayload.msg || "").trim();
     const _ssbProof = String(eventPayload.raw || "").trim();
+    const _ssbSub = (_ssbProof !== _ssbMsg && !_isSsbSpectralProof(_ssbProof)) ? _ssbProof : "";
     if (_ssbMsg) {
-      renderToast(_ssbMsg, false, _ssbProof !== _ssbMsg ? _ssbProof : "");
+      renderToast(_ssbMsg, false, _ssbSub);
     }
   }
 
