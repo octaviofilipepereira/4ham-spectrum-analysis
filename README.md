@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-24 UTC
+Last update: 2026-03-25 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -69,10 +69,12 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 
 ## Changelog (cumulative)
 
-### v0.8.1
+### v0.8.2
 - **SSB ASR pipeline activation**: `parse_ssb_asr_text()` wired into the live SSB event pipeline — Whisper transcripts are now parsed for callsigns (direct and NATO phonetic) in real time.
 - **SSB event labels**: events now show **Voice Confirmed** (voice only), **Voice Transcript** (has transcript, no callsign), or the **resolved callsign** — replaces the old generic "NO CALLSIGN DETECTED".
 - **TXT button & tooltip**: every SSB event shows a TXT button with decoded text (transcript or spectral proof). Tooltip uses a fixed overlay that works inside modals and overflow-clipped panels.
+
+### v0.8.1
 - **SDR enumerate segfault fix**: `SoapySDR.Device.enumerate()` was called on every HTTP request, occasionally triggering a segfault in `libuhd.so` on unstable USB hardware. Added a 30 s TTL cache in `SDRController` — reduces native USB calls and returns stale cache on failure.
 - **SSB threshold fixes**: `focus_hits` default mismatch (1 vs 2), SNR threshold lowered 10→8 dB, hardcoded `max(2,...)` in spectrum pipeline removed, frontend marker TTL raised 15→20 s.
 
