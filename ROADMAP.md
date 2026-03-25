@@ -1,14 +1,14 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-03-24
+Last update: 2026-03-25
 -->
 
 # 🗺️ ROADMAP - 4ham-spectrum-analysis
 ## Estrutura de Trabalhos Seguintes
 
-**Versão Atual**: v0.8.0  
-**Última Atualização**: 2026-03-24  
+**Versão Atual**: v0.8.2  
+**Última Atualização**: 2026-03-25  
 **Status**: 🟢 Produção-Ready
 
 ---
