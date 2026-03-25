@@ -33,7 +33,7 @@ def health(_: None = Depends(verify_basic_auth)) -> Dict:
     ]
     return {
         "status": "ok",
-        "version": "2.0.1",
+        "version": "2.0.2",
         "devices": len(sdr_devices)
     }
 

@@ -155,7 +155,7 @@ python -m pip install -r backend/requirements.txt
 ## Decoder Integrations
 
 ### SSB ASR / Whisper (optional)
-As of v0.8.0, real-time SSB voice demodulation and Whisper ASR are fully integrated. SSB transmissions detected without a resolved callsign appear as **Voice Signature** events in the UI.
+As of v0.8.0, real-time SSB voice demodulation and Whisper ASR are fully integrated. SSB transmissions now appear as **Voice Confirmed** (no transcript), **Voice Transcript** (with Whisper text), or with the **resolved callsign** when one is detected.
 
 **Installation (if skipped during `./install.sh`):**
 ```
