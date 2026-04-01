@@ -3313,8 +3313,10 @@ if (quickModeButtons.length) {
       }
       const mode = String(button.dataset.quickMode || "").trim();
       
-      // During active scan: allow mode change but prevent deselection
-      if (isScanRunning) {
+      // During active scan: allow mode change but prevent deselection.
+      // Also check latestScanState as a fallback in case isScanRunning was
+      // briefly set false by a syncScanState race between polls.
+      if (isScanRunning || latestScanState?.state === "running") {
         if (selectedDecoderMode === mode) {
           // Trying to deselect during scan - block it
           showToast("Cannot deselect mode while scanning. Stop the scan first.");

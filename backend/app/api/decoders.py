@@ -253,9 +253,14 @@ async def _run_ssb_detector_loop() -> None:
                 await asyncio.sleep(0.5)
                 continue
 
+            # Use non-blocking get_nowait + sleep instead of wait_for(queue.get(), timeout)
+            # to avoid the Python 3.10 asyncio.wait_for cancellation propagation bug
+            # (CPython issue #32751) where task.cancel() can be silently absorbed inside
+            # wait_for, preventing _stop_ssb_detector from completing in bounded time.
             try:
-                iq = await asyncio.wait_for(_ssb_iq_queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+                iq = _ssb_iq_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                await asyncio.sleep(0.05)
                 continue
 
             # Collect all queued chunks; keep latest for detection, all for ASR
@@ -464,8 +469,11 @@ async def _stop_ssb_detector() -> Dict:
 
     _ssb_detector_task.cancel()
     try:
-        await _ssb_detector_task
-    except asyncio.CancelledError:
+        # Use shield so the timeout firing does not issue a second cancel on the
+        # task.  The task already received cancel() above; shield lets us bound
+        # how long we wait without interfering.  Maximum wait: 2 s.
+        await asyncio.wait_for(asyncio.shield(_ssb_detector_task), timeout=2.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
     _ssb_detector_task = None
 
