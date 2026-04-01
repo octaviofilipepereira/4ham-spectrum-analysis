@@ -366,7 +366,7 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
     }
 
 
-def touch_decoder_source(source: str) -> None:
+def touch_decoder_source(source: Optional[str]) -> None:
     """
     Update last seen timestamp for decoder source.
     

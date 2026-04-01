@@ -175,7 +175,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     return event
 
 
-def update_noise_floor(band: str, power_db: float) -> float:
+def update_noise_floor(band: Optional[str], power_db: float) -> float:
     """
     Update exponential moving average of noise floor for a band.
     
@@ -199,7 +199,7 @@ def update_noise_floor(band: str, power_db: float) -> float:
     return updated
 
 
-def update_threshold(band: str, threshold_dbm: float) -> float:
+def update_threshold(band: Optional[str], threshold_dbm: float) -> float:
     """
     Update adaptive threshold for a band.
     

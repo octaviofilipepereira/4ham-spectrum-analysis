@@ -68,7 +68,7 @@ def _demodulate_ssb(iq: np.ndarray, sample_rate: int, offset_hz: float,
     # Low-pass filter to keep only the audio band
     nyq = sample_rate / 2.0
     sos = butter(6, min(3200.0 / nyq, 0.999), btype="low", output="sos")
-    audio = sosfilt(sos, np.real(iq_shifted)).astype(np.float32)
+    audio = sosfilt(sos, np.real(iq_shifted)).astype(np.float32)  # type: ignore[union-attr]
 
     # Resample from SDR sample rate to 16 kHz
     gcd = math.gcd(int(sample_rate), _TARGET_SR)
@@ -142,7 +142,7 @@ class SsbAsrEngine:
             sr_int = int(sample_rate)
             if sr_int not in self._filter_sos_cache:
                 nyq = sr_int / 2.0
-                self._filter_sos_cache[sr_int] = butter(
+                self._filter_sos_cache[sr_int] = butter(  # type: ignore[assignment]
                     6, min(3200.0 / nyq, 0.999), btype="low", output="sos"
                 )
             sos = self._filter_sos_cache[sr_int]
@@ -209,7 +209,7 @@ class SsbAsrEngine:
             with self._model_lock:
                 if not self._ensure_model():
                     return ""
-                result = self._model.transcribe(
+                result = self._model.transcribe(  # type: ignore[union-attr]
                     buf,
                     fp16=False,
                     language=None,          # auto-detect language
@@ -222,7 +222,7 @@ class SsbAsrEngine:
             segments = result.get("segments") or []
             if segments:
                 avg_no_speech = sum(
-                    float(s.get("no_speech_prob", 0.0)) for s in segments
+                    float(s.get("no_speech_prob", 0.0)) for s in segments  # type: ignore[union-attr]
                 ) / len(segments)
                 if avg_no_speech > 0.6:
                     return ""
