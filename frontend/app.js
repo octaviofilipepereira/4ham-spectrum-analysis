@@ -6,6 +6,54 @@ Last update: 2026-02-24 18:30 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
+import {
+  EVENTS_PANEL_PAGE_SIZE,
+  SEARCH_PAGE_SIZE,
+  AUTH_PASSWORD_MASK,
+  _SPEC_SMOOTH_ALPHA,
+  FFT_HISTORY_MAX,
+  SHOW_NON_SDR_DEVICES_KEY,
+  WATERFALL_EXPLORER_KEY,
+  WATERFALL_EXPLORER_ZOOM_KEY,
+  WATERFALL_GENERIC_STATUS,
+  WATERFALL_SIMULATE_MODE_MARKERS,
+  WATERFALL_MARKER_TTL_MS,
+  WATERFALL_MARKER_TTL_CW_MS,
+  WATERFALL_MARKER_TTL_SSB_MS,
+  WATERFALL_MARKER_TTL_SSB_PASSES,
+  WATERFALL_MARKER_BUCKET_HZ,
+  WATERFALL_MARKER_BUCKET_SSB_HZ,
+  WATERFALL_DECODED_MARKER_TTL_FT8_MS,
+  WATERFALL_DECODED_MARKER_TTL_FT4_MS,
+  WATERFALL_DECODED_MARKER_TTL_WSPR_MS,
+  WATERFALL_CALLSIGN_TTL_MS,
+  WATERFALL_CALLSIGN_MAX_DELTA_HZ,
+  WATERFALL_DIAL_SNAP_HZ,
+  WATERFALL_SEGMENT_COUNT,
+  WATERFALL_DIAL_FREQUENCIES,
+  WATERFALL_CW_FOCUS_FREQUENCIES,
+  BAND_PRESETS,
+  DEFAULT_BAND_OPTIONS,
+  CW_DECODER_SUBBANDS,
+  DEVICE_AUTO_PROFILES,
+} from "./modules/constants.js";
+import {
+  normalizeNumberInputValue,
+  formatRulerFrequencyLabel,
+  formatScanRangeSummary,
+  findDialFrequency,
+  inferBandFromFrequency,
+  normalizeModeLabel,
+  modeMatchesSelectedMode,
+  formatLastSeenTime,
+  isValidCallsign,
+  extractCallsignFromRaw,
+  isValidLocator,
+  _isSsbSpectralProof,
+  extractDecodedText,
+  getAuthHeader,
+  wsUrl,
+} from "./modules/utils.js";
 
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
@@ -45,7 +93,6 @@ const canvas = document.getElementById("waterfallCanvas");
 const spectrumCanvas = document.getElementById("spectrumCanvas");
 const spectrumCtx = spectrumCanvas ? spectrumCanvas.getContext("2d") : null;
 let _specSmooth = null;
-const _SPEC_SMOOTH_ALPHA = 0.2;
 let ctx = null;
 let webglWaterfall = null;
 let waterfallRenderer = "2d";
@@ -73,7 +120,6 @@ const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
 const authPassInput = document.getElementById("authPass");
-const AUTH_PASSWORD_MASK = "********";
 const saveSettingsBtn = document.getElementById("saveSettings");
 const testConfigBtn = document.getElementById("testConfig");
 const refreshDevicesBtn = document.getElementById("refreshDevices");
@@ -109,18 +155,6 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 let selectedDecoderMode = null;
 let latestScanState = null;
 
-const CW_DECODER_SUBBANDS = {
-  "160m": { start_hz: 1_800_000, end_hz: 1_840_000 },
-  "80m": { start_hz: 3_500_000, end_hz: 3_600_000 },
-  "40m": { start_hz: 7_000_000, end_hz: 7_040_000 },
-  "30m": { start_hz: 10_100_000, end_hz: 10_130_000 },
-  "20m": { start_hz: 14_000_000, end_hz: 14_070_000 },
-  "17m": { start_hz: 18_068_000, end_hz: 18_110_000 },
-  "15m": { start_hz: 21_000_000, end_hz: 21_150_000 },
-  "12m": { start_hz: 24_890_000, end_hz: 24_930_000 },
-  "10m": { start_hz: 28_000_000, end_hz: 28_300_000 },
-};
-
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
     return;
@@ -141,11 +175,6 @@ function updateAdminAudioStatus(audioProfile, options = {}) {
     adminSetupStatus.classList.add("alert-warning");
     adminSetupStatus.textContent = `Audio not automatically detected: input/output not set | sample rate=${sampleRate} Hz. Configure manually or run Auto-detect Device again.`;
   }
-}
-
-function normalizeNumberInputValue(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function applyDeviceConfigToForm(deviceConfig) {
@@ -238,36 +267,6 @@ const externalFtStatusModalEl = document.getElementById("externalFtStatusModal")
 const kissStatusModalEl = document.getElementById("kissStatusModal");
 const decoderLastEventModalEl = document.getElementById("decoderLastEventModal");
 const agcStatusModalEl = document.getElementById("agcStatusModal");
-const DEVICE_AUTO_PROFILES = {
-  rtl: { sample_rate: 2048000, gain: 30, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  hackrf: { sample_rate: 2000000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  airspy: { sample_rate: 2500000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  other: { sample_rate: 48000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" }
-};
-const BAND_PRESETS = {
-  "160m": { start_hz: 1810000, end_hz: 2000000 },
-  "80m": { start_hz: 3500000, end_hz: 3800000 },
-  "40m": { start_hz: 7000000, end_hz: 7200000 },
-  "20m": { start_hz: 14000000, end_hz: 14350000 },
-  "17m": { start_hz: 18068000, end_hz: 18168000 },
-  "15m": { start_hz: 21000000, end_hz: 21450000 },
-  "12m": { start_hz: 24890000, end_hz: 24990000 },
-  "10m": { start_hz: 28000000, end_hz: 29700000 },
-  "2m": { start_hz: 144000000, end_hz: 146000000 },
-  "70cm": { start_hz: 430000000, end_hz: 440000000 },
-};
-const DEFAULT_BAND_OPTIONS = [
-  { name: "160m", label: "160 m" },
-  { name: "80m", label: "80 m" },
-  { name: "40m", label: "40 m" },
-  { name: "20m", label: "20 m" },
-  { name: "17m", label: "17 m" },
-  { name: "15m", label: "15 m" },
-  { name: "12m", label: "12 m" },
-  { name: "10m", label: "10 m" },
-  { name: "2m", label: "2 m" },
-  { name: "70cm", label: "70 cm" },
-];
 const bandRangesByName = new Map(
   Object.entries(BAND_PRESETS).map(([name, range]) => [
     name,
@@ -571,15 +570,6 @@ function refreshModeButtons() {
   renderScanContextSummary(latestScanState);
 }
 
-function formatScanRangeSummary(startHz, endHz) {
-  const start = Number(startHz || 0);
-  const end = Number(endHz || 0);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end <= start) {
-    return "--";
-  }
-  return `${formatRulerFrequencyLabel(start)} - ${formatRulerFrequencyLabel(end)}`;
-}
-
 function resolveActiveBandName(scanState) {
   const stateBand = String(scanState?.scan?.band || "").trim();
   if (stateBand) {
@@ -637,7 +627,6 @@ function renderScanContextSummary(scanState) {
     : "full band";
 }
 
-const EVENTS_PANEL_PAGE_SIZE = 50;
 let eventOffset = 0;
 let eventsPanelPage = 0;
 let latestEvents = [];
@@ -646,93 +635,14 @@ let lastSpectrumFrameTs = 0;
 let spectrumFallbackTimer = null;
 // Circular history buffer — stores raw WS frames so pan/zoom/goto can
 // replay the full waterfall instead of resetting to a blank canvas.
-const FFT_HISTORY_MAX = 300;
 const fftHistoryFrames = [];
 let waterfallDragRafPending = false; // rAF gate for drag replay
 let spectrumWs = null;
 let isScanRunning = false;
 let scanActionInFlight = false;
-const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
 let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
-const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR device connection and scan status.";
-const WATERFALL_SIMULATE_MODE_MARKERS = false;
-const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
-const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
-const WATERFALL_MARKER_TTL_SSB_MS = 20000;  // SSB fallback when pass_count is unavailable
-const WATERFALL_MARKER_TTL_SSB_PASSES = 2;  // expire SSB markers after 2 passes for short-signal tolerance
-const WATERFALL_MARKER_BUCKET_HZ = 50;
-const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;
 const waterfallMarkerCache = new Map();
-// Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
-// 15-20 dB below the noise floor so DSP quality gates never fire for them.
-// Instead we inject ONE marker per known dial frequency per mode, carrying
-// the most-recently decoded callsign.  This avoids flooding the waterfall
-// with one marker per decoded station (can be 50-100 per cycle on busy bands).
-// TTL = 3 × mode_window: allows 2 consecutive missed decode cycles before
-// the marker disappears.  Only 1 band + 1 mode runs at a time.
-// FT8:  3 × 15 s  =  45 s
-// FT4:  3 × 7.5 s =  23 s (rounded up)
-// WSPR: 3 × 120 s = 360 s
-const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  45 * 1000; // 3 × 15 s
-const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  23 * 1000; // 3 × 7.5 s
-const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000; // 3 × 120 s
-// One decoded-marker entry per "<dialHz>_<MODE>" key.
 const waterfallDecodedMarkerCache = new Map();
-const WATERFALL_CALLSIGN_TTL_MS = 45 * 1000; // match FT8 TTL (dominant mode)
-// Used for DSP-marker to callsign proximity matching (non-decoded modes).
-const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
-
-// Standard dial frequencies for FT8 / FT4 / WSPR, mirrored from the backend.
-// Used to snap decoded callsigns to a single marker position per band/mode.
-const WATERFALL_DIAL_FREQUENCIES = {
-  "160m": { FT8: 1_840_000, FT4: 1_840_000, WSPR: 1_836_600 },
-  "80m":  { FT8: 3_573_000, FT4: 3_575_500, WSPR: 3_592_600 },
-  "60m":  { FT8: 5_357_000, FT4: 5_357_000, WSPR: 5_287_200 },
-  "40m":  { FT8: 7_074_000, FT4: 7_047_500, WSPR: 7_040_100 },
-  "30m":  { FT8: 10_136_000, FT4: 10_140_000, WSPR: 10_140_200 },
-  "20m":  { FT8: 14_074_000, FT4: 14_080_000, WSPR: 14_095_600 },
-  "17m":  { FT8: 18_100_000, FT4: 18_104_000, WSPR: 18_104_600 },
-  "15m":  { FT8: 21_074_000, FT4: 21_140_000, WSPR: 21_094_600 },
-  "12m":  { FT8: 24_915_000, FT4: 24_919_000, WSPR: 24_924_600 },
-  "10m":  { FT8: 28_074_000, FT4: 28_180_000, WSPR: 28_124_600 },
-  "6m":   { FT8: 50_313_000, FT4: 50_318_000, WSPR: 50_293_000 },
-  "2m":   { FT8: 144_174_000, FT4: 144_170_000, WSPR: 144_489_000 },
-};
-
-const WATERFALL_CW_FOCUS_FREQUENCIES = {
-  "160m": 1_830_000,
-  "80m": 3_530_000,
-  "60m": 5_355_000,
-  "40m": 7_030_000,
-  "30m": 10_120_000,
-  "20m": 14_050_000,
-  "17m": 18_086_000,
-  "15m": 21_050_000,
-  "12m": 24_900_000,
-  "10m": 28_050_000,
-  "6m": 50_100_000,
-  "2m": 144_050_000,
-};
-// Maximum distance from a decoded freq to a known dial freq for the signal
-// to be considered "on that dial".  FT8 audio range is 0-3000 Hz; add 1 kHz
-// margin for direct-sampling frequency offset.
-const WATERFALL_DIAL_SNAP_HZ = 4000;
-
-function findDialFrequency(frequencyHz, mode) {
-  const normMode = String(mode || "").toUpperCase();
-  let best = null;
-  let bestDelta = Infinity;
-  for (const bandFreqs of Object.values(WATERFALL_DIAL_FREQUENCIES)) {
-    const dialHz = bandFreqs[normMode];
-    if (!dialHz) continue;
-    const delta = Math.abs(Number(frequencyHz) - dialHz);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = dialHz;
-    }
-  }
-  return bestDelta <= WATERFALL_DIAL_SNAP_HZ ? best : null;
-}
 const waterfallCallsignCache = new Map();
 let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
 let waterfallHoverTooltip = null;
@@ -741,9 +651,6 @@ let _waterfallHoverActive = false;
 let _waterfallLastTooltipText = "";
 let _waterfallLastTooltipX = 0;
 let _waterfallLastTooltipY = 0;
-const WATERFALL_EXPLORER_KEY = "waterfallExplorerEnabled";
-const WATERFALL_EXPLORER_ZOOM_KEY = "waterfallExplorerZoom";
-const WATERFALL_SEGMENT_COUNT = 12;
 let waterfallExplorerEnabled = localStorage.getItem(WATERFALL_EXPLORER_KEY) !== "0";
 let waterfallExplorerZoom = Number(localStorage.getItem(WATERFALL_EXPLORER_ZOOM_KEY) || 1);
 if (!Number.isFinite(waterfallExplorerZoom)) {
@@ -926,52 +833,6 @@ function clearWaterfallFrame() {
   const width = canvas.width / window.devicePixelRatio;
   const height = canvas.height / window.devicePixelRatio;
   ctx.clearRect(0, 0, width, height);
-}
-
-function normalizeModeLabel(mode) {
-  const text = String(mode || "").trim().toUpperCase();
-  if (text === "CW_CANDIDATE") {
-    return "CW TRAFFIC";
-  }
-  if (text === "SSB_TRAFFIC") {
-    return "SSB TRAFFIC";
-  }
-  return text || "SIG";
-}
-
-function modeMatchesSelectedMode(modeValue, selectedModeValue) {
-  const mode = String(modeValue || "").trim().toUpperCase();
-  const selectedMode = String(selectedModeValue || "").trim().toUpperCase();
-  if (!selectedMode) {
-    return true;
-  }
-  if (selectedMode === "CW") {
-    return mode === "CW" || mode === "CW_CANDIDATE";
-  }
-  if (selectedMode === "SSB") {
-    return mode === "SSB" || mode === "SSB_TRAFFIC";
-  }
-  return mode === selectedMode;
-}
-
-function formatRulerFrequencyLabel(frequencyHz) {
-  const mhz = Number(frequencyHz) / 1_000_000;
-  if (!Number.isFinite(mhz)) {
-    return "-";
-  }
-  return `${mhz.toFixed(3)} MHz`;
-}
-
-function formatLastSeenTime(seenAtMs) {
-  const timestamp = Number(seenAtMs);
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return "-";
-  }
-  const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleTimeString();
 }
 
 function ensureWaterfallHoverTooltip() {
@@ -1761,57 +1622,6 @@ function showRetentionToast(info) {
   logLine(`[Retention] ${rows} events exported and purged.`);
 }
 
-function isValidCallsign(value) {
-  const text = String(value || "").trim().toUpperCase();
-  if (!text) {
-    return true;
-  }
-  return /^(?=.*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
-}
-
-function extractCallsignFromRaw(value) {
-  const text = String(value || "").toUpperCase();
-  if (!text) {
-    return "";
-  }
-  const match = text.match(/\b(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
-  return match ? match[0] : "";
-}
-
-function _isSsbSpectralProof(text) {
-  if (!text) return false;
-  return /Voice spectral signature/i.test(text)
-      || /^BW \d/.test(text)
-      || /^SSB voice confirmed/i.test(text);
-}
-
-function extractDecodedText(eventItem) {
-  if (!eventItem || typeof eventItem !== "object") {
-    return "";
-  }
-  const mode = String(eventItem.mode || "").toUpperCase();
-  const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
-  // For SSB: prioritise raw (Whisper transcript) over msg (spectral summary)
-  const candidates = isSsb
-    ? [eventItem.raw, eventItem.text, eventItem.msg]
-    : [eventItem.msg, eventItem.text, eventItem.raw];
-  for (const candidate of candidates) {
-    const value = String(candidate || "").trim();
-    if (value) {
-      return value.length > 220 ? `${value.slice(0, 220)}…` : value;
-    }
-  }
-  return "";
-}
-
-function isValidLocator(value) {
-  const text = String(value || "").trim().toUpperCase();
-  if (!text) {
-    return true;
-  }
-  return /^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(text);
-}
-
 function loadPresets() {
   const data = JSON.parse(localStorage.getItem("presets") || "[]");
   presetSelect.innerHTML = "";
@@ -1938,10 +1748,6 @@ presetSelect.addEventListener("change", () => {
   logLine("Preset applied");
 });
 
-function getAuthHeader() {
-  return {};
-}
-
 function updateLoginStatus() {
   const user = window.__authUser || "";
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
@@ -2026,11 +1832,6 @@ function updateQuality(minDb, maxDb) {
   const pct = Math.min(100, Math.round((snr / 30) * 100));
   qualityBar.style.setProperty("--quality", `${pct}%`);
   qualityLabel.textContent = `SNR: ${snr.toFixed(1)} dB`;
-}
-
-function wsUrl(path) {
-  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${protocol}://${window.location.host}${path}`;
 }
 
 function createWebglWaterfallRenderer(targetCanvas) {
@@ -2309,7 +2110,6 @@ let _eventsSearchAbort = null;
 
 let _searchResultsCache = [];
 let _searchPage = 0;
-const SEARCH_PAGE_SIZE = 50;
 
 function renderSearchPage() {
   const totalPages = Math.max(1, Math.ceil(_searchResultsCache.length / SEARCH_PAGE_SIZE));
@@ -2436,30 +2236,6 @@ function orderEventsForDisplay(items) {
     return 0;
   });
   return source;
-}
-
-function inferBandFromFrequency(frequencyHz) {
-  const value = Number(frequencyHz);
-  if (!Number.isFinite(value) || value <= 0) {
-    return null;
-  }
-  const bandRanges = [
-    { name: "160m", min: 1800000, max: 2000000 },
-    { name: "80m", min: 3500000, max: 4000000 },
-    { name: "60m", min: 5250000, max: 5450000 },
-    { name: "40m", min: 7000000, max: 7300000 },
-    { name: "30m", min: 10100000, max: 10150000 },
-    { name: "20m", min: 14000000, max: 14350000 },
-    { name: "17m", min: 18068000, max: 18168000 },
-    { name: "15m", min: 21000000, max: 21450000 },
-    { name: "12m", min: 24890000, max: 24990000 },
-    { name: "10m", min: 28000000, max: 29700000 },
-    { name: "6m", min: 50000000, max: 54000000 },
-    { name: "2m", min: 144000000, max: 148000000 },
-    { name: "70cm", min: 430000000, max: 440000000 }
-  ];
-  const match = bandRanges.find((range) => value >= range.min && value <= range.max);
-  return match ? match.name : null;
 }
 
 function renderEventList(targetEl, items, emptyMessage) {
