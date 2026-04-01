@@ -270,6 +270,10 @@ async def _run_ssb_detector_loop() -> None:
             if iq is None or len(iq) == 0:
                 continue
 
+            # Yield to the event loop before heavy synchronous DSP work so that
+            # incoming HTTP requests (e.g. POST /api/scan/mode) are not starved.
+            await asyncio.sleep(0)
+
             if state.agc_enabled:
                 iq, gain_db = apply_agc_smoothed(
                     iq,

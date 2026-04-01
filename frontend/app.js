@@ -3334,17 +3334,26 @@ if (quickModeButtons.length) {
         
         wfc.showTransition(`Switching to mode ${mode}...`);
 
+        const _modeAbort = new AbortController();
+        const _modeTimeout = setTimeout(() => _modeAbort.abort(), 15000);
         try {
-          await fetch("/api/scan/mode", {
+          const response = await fetch("/api/scan/mode", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...getAuthHeader() },
-            body: JSON.stringify({ decoder_mode: mode.toLowerCase() })
+            body: JSON.stringify({ decoder_mode: mode.toLowerCase() }),
+            signal: _modeAbort.signal
           });
-          showToast(`Mode switched to ${mode}`);
-          fetchEvents();
-          fetchTotal();
+          clearTimeout(_modeTimeout);
+          if (!response.ok) {
+            showToastError(`Failed to switch mode: HTTP ${response.status}`);
+          } else {
+            showToast(`Mode switched to ${mode}`);
+            fetchEvents();
+            fetchTotal();
+          }
         } catch (err) {
-          showToastError(`Failed to switch mode: ${err.message}`);
+          clearTimeout(_modeTimeout);
+          showToastError(`Failed to switch mode: ${err.name === "AbortError" ? "timeout" : err.message}`);
         } finally {
           wfc.hideTransition();
         }
