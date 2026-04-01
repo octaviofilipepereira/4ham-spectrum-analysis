@@ -73,6 +73,29 @@ def _broadcast(msg: dict) -> None:
             pass
 
 
+def broadcast_event(event: dict) -> None:
+    """Public API — broadcast a decoded event to all WS /ws/events clients.
+
+    Thread-safe: uses ``call_soon_threadsafe`` when called from a worker
+    thread (e.g. the jt9 decode thread in ft_external).
+    """
+    msg = {"event": event}
+    try:
+        loop = asyncio.get_running_loop()
+        # We are inside the event-loop — safe to call directly.
+        _broadcast(msg)
+    except RuntimeError:
+        # Called from a non-asyncio thread (ft_external decode thread).
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(_broadcast, msg)
+            else:
+                _broadcast(msg)
+        except RuntimeError:
+            _broadcast(msg)
+
+
 def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str = "") -> Optional[dict]:
     """Emit SSB callsign events from occupancy detections in SSB mode.
     

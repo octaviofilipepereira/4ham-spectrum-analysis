@@ -235,6 +235,14 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
 
+    # Broadcast to WS /ws/events clients so the frontend Events panel and
+    # waterfall markers update immediately (not only via 5 s HTTP poll).
+    try:
+        from app.websocket.events import broadcast_event
+        broadcast_event(event)
+    except Exception:
+        pass  # best-effort — DB persistence already succeeded
+
 
 async def _run_ssb_detector_loop() -> None:
     global _ssb_iq_queue
@@ -623,8 +631,21 @@ async def _stop_ft_internal_decoder() -> Dict:
 
 
 def _handle_ft_external_event(payload: Dict) -> Dict:
-    """Handle event from external FT decoder."""
-    return _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
+    """Handle event from external FT decoder.
+
+    Saves to DB via _ingest_callsign_payloads AND broadcasts the event
+    to all connected /ws/events clients so waterfall markers appear
+    immediately instead of waiting for the 5 s HTTP polling cycle.
+    """
+    result = _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
+    # Broadcast to WS clients only when the event was actually saved.
+    if result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(payload)
+        except Exception:
+            pass  # best-effort — DB persistence already succeeded
+    return result
 
 
 def _ft_external_flush_iq() -> None:

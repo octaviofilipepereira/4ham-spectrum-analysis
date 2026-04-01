@@ -3318,45 +3318,25 @@ if (quickModeButtons.length) {
       // briefly set false by a syncScanState race between polls.
       if (isScanRunning || latestScanState?.state === "running") {
         if (selectedDecoderMode === mode) {
-          // Trying to deselect during scan - block it
           showToast("Cannot deselect mode while scanning. Stop the scan first.");
           return;
         }
-        // Changing to different mode during scan - clear caches and notify backend
-        wfc.clearMarkerCaches();
-        latestEvents = []; // Clear events from previous mode
-        renderEventsPanelFromCache(); // Refresh empty panel
-        
-        selectedDecoderMode = mode;
-        wfc.recenterForMode(mode);
-        // Sync the events panel filter so only events from this mode are shown
-        eventsSearchModeInput.value = mode;
-        refreshModeButtons();
-        logLine(`Mode changed during scan: ${mode}`);
-        
+        // Stop → change mode → start: avoids all hot-swap race conditions.
+        scanActionInFlight = true;
         wfc.showTransition(`Switching to mode ${mode}...`);
-
-        const _modeAbort = new AbortController();
-        const _modeTimeout = setTimeout(() => _modeAbort.abort(), 15000);
+        updateScanButtonState();
         try {
-          const response = await fetch("/api/scan/mode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...getAuthHeader() },
-            body: JSON.stringify({ decoder_mode: mode.toLowerCase() }),
-            signal: _modeAbort.signal
-          });
-          clearTimeout(_modeTimeout);
-          if (!response.ok) {
-            showToastError(`Failed to switch mode: HTTP ${response.status}`);
-          } else {
-            showToast(`Mode switched to ${mode}`);
-            fetchEvents();
-            fetchTotal();
-          }
+          await stopScan();
+          selectedDecoderMode = mode;
+          wfc.selectedDecoderMode = mode;
+          refreshModeButtons();
+          await startScan();
+          showToast(`Mode switched to ${mode}`);
         } catch (err) {
-          clearTimeout(_modeTimeout);
-          showToastError(`Failed to switch mode: ${err.name === "AbortError" ? "timeout" : err.message}`);
+          showToastError(`Failed to switch mode: ${err.message}`);
         } finally {
+          scanActionInFlight = false;
+          updateScanButtonState();
           wfc.hideTransition();
         }
         return;
