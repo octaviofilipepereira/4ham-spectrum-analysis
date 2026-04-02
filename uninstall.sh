@@ -13,6 +13,7 @@ ENV_FILE="/etc/default/${SERVICE_NAME}"
 
 PURGE_DATA=0
 PURGE_SYSTEM_PACKAGES=0
+PURGE_ALL=0
 ASSUME_YES=0
 
 usage() {
@@ -22,6 +23,7 @@ Usage: $(basename "$0") [options]
 Options:
   --purge-data             Remove local runtime data (data/, logs/, exports/)
   --purge-system-packages  Remove system packages installed for this app
+  --purge-all              Full wipe: data + system packages + project folder
   --yes                    Non-interactive mode (assume yes)
   -h, --help               Show this help
 
@@ -35,6 +37,7 @@ Examples:
   ./uninstall.sh
   ./uninstall.sh --purge-data
   ./uninstall.sh --purge-data --purge-system-packages --yes
+  ./uninstall.sh --purge-all --yes
 EOF
 }
 
@@ -61,6 +64,11 @@ for arg in "$@"; do
       PURGE_DATA=1
       ;;
     --purge-system-packages)
+      PURGE_SYSTEM_PACKAGES=1
+      ;;
+    --purge-all)
+      PURGE_ALL=1
+      PURGE_DATA=1
       PURGE_SYSTEM_PACKAGES=1
       ;;
     --yes)
@@ -143,6 +151,27 @@ if [[ "$PURGE_SYSTEM_PACKAGES" -eq 1 ]]; then
   fi
 else
   echo "[5/5] System package purge not requested."
+fi
+
+if [[ "$PURGE_ALL" -eq 1 ]]; then
+  if [[ -z "${ROOT_DIR}" || "${ROOT_DIR}" == "/" || "${ROOT_DIR}" == "." ]]; then
+    echo "Refusing to remove unsafe project directory path: '${ROOT_DIR}'" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "${ROOT_DIR}" ]]; then
+    echo "Project directory not found: ${ROOT_DIR}" >&2
+    exit 1
+  fi
+
+  if confirm "FINAL WARNING: remove the entire project directory '${ROOT_DIR}'?"; then
+    echo "[extra] Removing project directory..."
+    rm -rf "${ROOT_DIR}"
+    echo "Project directory removed."
+    exit 0
+  else
+    echo "Project directory removal skipped."
+  fi
 fi
 
 echo "Uninstall completed."
