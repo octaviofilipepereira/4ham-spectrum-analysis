@@ -76,6 +76,15 @@ const cwStepHzInput = document.getElementById("cwStepHz");
 const cwDwellSInput = document.getElementById("cwDwellS");
 const ssbScanParamsRow = document.getElementById("ssbScanParamsRow");
 const ssbMaxHoldsInput = document.getElementById("ssbMaxHolds");
+// Ensure "(Max 12)" hint is always present next to the input, even if
+// the browser served a cached index.html that pre-dates the HTML change.
+if (ssbMaxHoldsInput && !ssbMaxHoldsInput.nextElementSibling?.classList?.contains("ssb-max-hint")) {
+  const hint = document.createElement("small");
+  hint.className = "text-muted mb-0 ssb-max-hint";
+  hint.style.whiteSpace = "nowrap";
+  hint.textContent = "(Max 12)";
+  ssbMaxHoldsInput.insertAdjacentElement("afterend", hint);
+}
 const scanRangeSummaryEl = document.getElementById("scanRangeSummary");
 const cwSegmentSummaryWrapEl = document.getElementById("cwSegmentSummaryWrap");
 const cwSegmentSummaryEl = document.getElementById("cwSegmentSummary");
