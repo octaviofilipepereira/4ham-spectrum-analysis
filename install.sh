@@ -264,6 +264,20 @@ On slow internet this may take 20-40 minutes!
   _whisper_label="Yes (OpenAI Whisper tiny model)"
 fi
 
+# ── installation mode ──────────────────────────────────────────────────────────
+_install_mode="systemd"
+_install_mode_label="systemd (auto-start on boot)"
+_mode_choice=$(whiptail --backtitle "$BT" --title "Installation Mode" \
+  --menu "How do you want to run 4ham-spectrum-analysis?" \
+  14 78 2 \
+  "systemd" "Install as a systemd service (recommended for production)" \
+  "manual" "Manual start/stop by the user (no systemd service install)" \
+  3>&1 1>&2 2>&3) || exit 0
+if [[ "${_mode_choice}" == "manual" ]]; then
+  _install_mode="manual"
+  _install_mode_label="manual start/stop (no systemd)"
+fi
+
 # ── admin username ─────────────────────────────────────────────────────────────
 _admin_user=""
 while [[ -z "$_admin_user" ]]; do
@@ -316,8 +330,8 @@ Ready to install. Summary:
 
   SDR driver  :  $_rtlv4_label
   ASR Whisper :  $_whisper_label
+  Install mode:  $_install_mode_label
   Admin user  :  $_admin_user
-  Service     :  systemd (auto-start on boot)
   Install log :  $LOG_FILE
 
 Proceed with installation?" \
@@ -468,9 +482,13 @@ if ! _missing_deps="$(validate_runtime_dependencies)"; then
   abort "Missing required runtime dependencies after install: ${_missing_deps}"
 fi
 
-gauge_step 98 "Installing and enabling systemd service..."
-bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
-  || abort "Service installation failed"
+if [[ "$_install_mode" == "systemd" ]]; then
+  gauge_step 98 "Installing and enabling systemd service..."
+  bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
+    || abort "Service installation failed"
+else
+  gauge_step 98 "Skipping systemd service install (manual mode selected)..."
+fi
 
 close_gauge
 
@@ -485,8 +503,9 @@ if [[ $_rtlv4 -eq 1 ]]; then
   _extra_notes="${_extra_notes}\n\nRTL-SDR v4: a reboot is recommended to fully\nactivate the kernel module blacklist."
 fi
 
-whiptail --backtitle "$BT" --title "Installation Complete!" \
-  --msgbox "\
+if [[ "$_install_mode" == "systemd" ]]; then
+  whiptail --backtitle "$BT" --title "Installation Complete!" \
+    --msgbox "\
 4ham-spectrum-analysis is installed and running!
 
 Open in your browser:
@@ -503,4 +522,25 @@ Service management:
   Restart  ./scripts/install_systemd_service.sh restart
   Remove   ./scripts/install_systemd_service.sh uninstall
 ${_extra_notes}" \
-  24 70
+    24 70
+else
+  whiptail --backtitle "$BT" --title "Installation Complete!" \
+    --msgbox "\
+4ham-spectrum-analysis is installed (manual mode).
+
+Start manually:
+  source .venv/bin/activate
+  python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+
+Open in your browser:
+  http://${_local_ip}:8000/
+  http://127.0.0.1:8000/
+
+Login with:
+  Username : $_admin_user
+  Password : (the one you set)
+
+Tip: use Ctrl+C in the terminal to stop the backend.
+${_extra_notes}" \
+    24 70
+fi
