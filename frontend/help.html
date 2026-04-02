@@ -378,7 +378,6 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <h3 class="sub-title">Decoder Status</h3>
     <p>Shows the live status of all decoder pipelines:</p>
     <ul>
-      <li><strong>Internal FT</strong> — built-in FT8/FT4 decoder (running/stopped, active modes)</li>
       <li><strong>External FT</strong> — jt9/wsprd external processes (requires <code>FT_EXTERNAL_ENABLE=1</code>)</li>
       <li><strong>CW decoder</strong> — Morse code internal decoder</li>
       <li><strong>SSB / Voice ASR</strong> — voice occupancy detector + Whisper ASR pipeline (queue depth shown)</li>
@@ -466,7 +465,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <h3 class="sub-title">No callsigns decoded in FT8/FT4</h3>
     <ul>
-      <li>The internal FT decoder is built-in and requires no external binary. Check <strong>Decoder Status</strong> — <em>Internal FT</em> should show "Running".</li>
+      <li>The internal FT decoder is built-in and requires no external binary. Enable it with <code>FT_INTERNAL_ENABLE=1</code>.</li>
       <li>If using the external decoder (<code>FT_EXTERNAL_ENABLE=1</code>), ensure <code>jt9</code> (from WSJT-X) is installed and on the system <code>PATH</code>.</li>
       <li>Weak propagation conditions may result in zero decodes even with a clear spectrum.</li>
     </ul>
