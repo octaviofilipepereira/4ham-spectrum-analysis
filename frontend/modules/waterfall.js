@@ -822,7 +822,7 @@ export class WaterfallController {
     this.#callsignCache.set(String(bucketHz), {
       callsign: normalizedCallsign,
       frequency_hz: numericFrequency,
-      seen_at: Date.now(),
+      seen_at: seenAtMs,  // Use original event timestamp
       seenAtMs,
       mode: normalizedMode,
     });
@@ -837,7 +837,7 @@ export class WaterfallController {
         frequency_hz: dialHz,
         mode: normalizedMode,
         snr_db: null,
-        seen_at: Date.now(),
+        seen_at: seenAtMs,  // Use original event timestamp
         callsign: normalizedCallsign,
         seenAtMs: ts,
         decoded: true,
@@ -931,7 +931,7 @@ export class WaterfallController {
           frequency_hz: frequencyHz,
           mode: "SSB_VOICE",
           snr_db: eventItem.snr_db ?? null,
-          seen_at: Date.now(),
+          seen_at: seenAtMs,  // Use original event timestamp, not current time
           callsign: "",
           seenAtMs: ts,
           decoded: true,
