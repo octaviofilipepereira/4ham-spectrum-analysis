@@ -673,6 +673,11 @@ export class WaterfallController {
     this.#overlayFingerprint = "";
   }
 
+  clearDecodedMarkerCache() {
+    this.#decodedMarkerCache.clear();
+    this.#overlayFingerprint = "";
+  }
+
   // ── Simulated markers ────────────────────────────────────────────────────
 
   buildSimulatedMarkers(spanHz, rangeStartHz = null, rangeEndHz = null) {
@@ -773,7 +778,7 @@ export class WaterfallController {
       const crest = Number(marker?.crest_db);
       const markerKey = String(Math.round(markerFreq / 50) * 50);
       const embeddedCallsign = String(marker?.callsign || "");
-      const embeddedSeenAtMs = marker?.seenAtMs || null;
+      const embeddedSeenAtMs = marker?.seenAtMs || marker?.seen_at || null;
       const proximityMatch   = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
       const markerCallsign   = embeddedCallsign || proximityMatch?.callsign || "";
       const markerModeText   = String(marker?.mode || "").trim().toUpperCase();
@@ -817,7 +822,7 @@ export class WaterfallController {
     this.#callsignCache.set(String(bucketHz), {
       callsign: normalizedCallsign,
       frequency_hz: numericFrequency,
-      seen_at: Date.now(),
+      seen_at: seenAtMs,  // Use original event timestamp
       seenAtMs,
       mode: normalizedMode,
     });
@@ -832,7 +837,7 @@ export class WaterfallController {
         frequency_hz: dialHz,
         mode: normalizedMode,
         snr_db: null,
-        seen_at: Date.now(),
+        seen_at: seenAtMs,  // Use original event timestamp
         callsign: normalizedCallsign,
         seenAtMs: ts,
         decoded: true,
@@ -912,8 +917,11 @@ export class WaterfallController {
     this.#cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs, eventMode);
 
     // SSB Voice Signature: confirmed SSB event with no callsign → waterfall marker
+    // Only create markers for recent events (≤60 s old) to prevent historical
+    // events from flooding the waterfall with stale VOICE DETECTED markers.
     const isVoiceSignature = /^SSB/i.test(eventMode) && !callsign;
-    if (isVoiceSignature && Number.isFinite(frequencyHz) && frequencyHz > 0) {
+    const eventAgeMs = Date.now() - seenAtMs;
+    if (isVoiceSignature && Number.isFinite(frequencyHz) && frequencyHz > 0 && eventAgeMs <= 60_000) {
       const bucketHz  = Math.round(frequencyHz / WATERFALL_MARKER_BUCKET_SSB_HZ) * WATERFALL_MARKER_BUCKET_SSB_HZ;
       const markerKey = `${bucketHz}_SSB_VOICE`;
       const existing  = this.#decodedMarkerCache.get(markerKey);
@@ -923,7 +931,7 @@ export class WaterfallController {
           frequency_hz: frequencyHz,
           mode: "SSB_VOICE",
           snr_db: eventItem.snr_db ?? null,
-          seen_at: Date.now(),
+          seen_at: seenAtMs,  // Use original event timestamp, not current time
           callsign: "",
           seenAtMs: ts,
           decoded: true,

@@ -4,8 +4,10 @@
 # Last update: 2026-02-22 16:27:19 UTC
 
 import importlib
+import json
 import logging
 import re
+import subprocess
 import sys
 import time
 from typing import Optional
@@ -219,28 +221,61 @@ def _target_direct_sampling_mode(center_hz: int, rtl_generation: Optional[int]) 
     return "2" if freq < _DIRECT_SAMPLING_THRESHOLD_HZ else "0"
 
 
+def _enumerate_via_subprocess(timeout: float = 10.0) -> "list | None":
+    """Run SoapySDR.Device.enumerate() in a child process.
+
+    If libuhd.so segfaults (SIGSEGV) the child dies but the main server
+    survives.  Returns a list of dicts on success, or None on crash/timeout.
+    """
+    script = (
+        "import json, sys\n"
+        "sys.path.extend(['/usr/lib/python3/dist-packages',"
+        "'/usr/local/lib/python3/dist-packages'])\n"
+        "import SoapySDR\n"
+        "raw = SoapySDR.Device.enumerate()\n"
+        "print(json.dumps([dict(a) for a in raw]))\n"
+    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        if proc.returncode != 0:
+            _log.warning(
+                "SoapySDR enumerate subprocess crashed (exit=%d)",
+                proc.returncode,
+            )
+            return None
+        return json.loads(proc.stdout.strip() or "[]")
+    except subprocess.TimeoutExpired:
+        _log.warning("SoapySDR enumerate subprocess timed out")
+        return None
+    except Exception:
+        _log.warning("SoapySDR enumerate subprocess error", exc_info=True)
+        return None
+
+
 class SDRController:
-    _ENUM_CACHE_TTL: float = 30.0  # seconds
+    _ENUM_CACHE_TTL: float = 300.0  # seconds (was 30 — raised to survive libuhd segfaults)
 
     def __init__(self):
         self._enum_cache: list = []
         self._enum_cache_ts: float = 0.0
 
     def _enumerate_devices(self, force: bool = False) -> list:
-        """Cached SoapySDR.Device.enumerate() — avoids repeated calls into
-        native USB code (libuhd/libusb) that can segfault on flaky hardware."""
+        """Cached SoapySDR.Device.enumerate() — runs in a subprocess to
+        isolate SIGSEGV crashes in libuhd.so / libusb."""
         now = time.monotonic()
         if not force and self._enum_cache and (now - self._enum_cache_ts) < self._ENUM_CACHE_TTL:
             return self._enum_cache
-        SoapySDR = _import_soapy_sdr()
-        if SoapySDR is None:
-            return []
-        try:
-            raw = SoapySDR.Device.enumerate()
-            self._enum_cache = [_kwargs_to_dict(a) for a in raw]
+        result = _enumerate_via_subprocess()
+        if result is not None:
+            self._enum_cache = result
             self._enum_cache_ts = now
-        except Exception:
-            _log.warning("SoapySDR.Device.enumerate() failed, returning cached")
+        elif not self._enum_cache:
+            _log.warning("SoapySDR enumerate failed and no cached data available")
+        else:
+            _log.info("SoapySDR enumerate failed, using cached data (%d devices)", len(self._enum_cache))
         return self._enum_cache
 
     def _find_first_rtlsdr_details(self) -> dict:

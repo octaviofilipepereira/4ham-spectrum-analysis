@@ -1,6 +1,6 @@
 {
   "name": "4ham-spectrum-analysis-frontend",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Frontend for 4ham Spectrum Analysis",
   "type": "module",
   "scripts": {

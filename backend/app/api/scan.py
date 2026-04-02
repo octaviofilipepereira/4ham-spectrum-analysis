@@ -419,6 +419,9 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     await _stop_ssb_detector()
     state.scan_state["state"] = "stopped"
     state.scan_state["decoder_mode"] = ""  # clear so frontend doesn't auto-select the button
+    # Clear voice marker cache to prevent stale SSB VOICE DETECTED markers
+    # from polluting the waterfall when switching modes (e.g., CW → SSB)
+    state.voice_marker_cache.clear()
     # Drop stale scan bounds from the previous run. Keeping this payload while
     # entering preview can make the spectrum ruler use an old narrow test range
     # (for example 7.073-7.075 MHz) instead of the preview band limits.
