@@ -179,6 +179,17 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       </tbody>
     </table>
 
+    <h3 class="sub-title">SSB-specific parameters</h3>
+    <table class="manual-table">
+      <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>SSB Max Holds</td><td>0 (auto)</td>
+          <td>Maximum number of times per sweep pass the scanner may pause (hold) on an active SSB frequency. <code>0</code> = auto-adaptive (~1 hold per 50 kHz of band span, min 4, max 12). Setting a fixed value limits how long the scanner can be &ldquo;stuck&rdquo; on busy frequencies before completing the full band pass. Applied at scan start only &mdash; has no effect while a scan is already running.</td>
+        </tr>
+      </tbody>
+    </table>
+
     <div class="info-box">
       💡 <strong>FT8/FT4 dial frequency</strong> — the decoder locks onto the standard dial frequency for each band (e.g. 14.074 MHz for FT8 20m). A single waterfall marker represents the last decoded callsign for that band/mode combination.
     </div>

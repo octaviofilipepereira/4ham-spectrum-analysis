@@ -237,6 +237,7 @@ Abrir a interface no browser: `http://localhost:8000/`
 - **Start scanning / Stop scanning** — inicia ou para o scan ativo
 - **Botões de banda** (160m … 10m) — mudam de banda imediatamente, mesmo com scan em curso
 - **Botões de modo** (CW / WSPR / FT4 / FT8 / SSB) — selecionam o decoder ou mudam o scan em tempo real; o painel de eventos sincroniza imediatamente ao mudar de modo (v0.8.4)
+- **SSB Max Holds** (modo SSB, padrão `0` = auto) — número máximo de *pauses* por passagem completa da banda em frequências SSB ativas. `0` = cálculo adaptivo (~1 hold por 50 kHz de largura, mín. 4, máx. 12). Apenas aplicado ao iniciar o scan; não tem efeito com scan em curso.
 
 ### Filtro de eventos (dropdown)
 
