@@ -104,7 +104,7 @@ export function normalizeModeLabel(mode) {
     return "SSB TRAFFIC";
   }
   if (text === "SSB_VOICE") {
-    return "Voice Signature";
+    return "VOICE SIGNATURE";
   }
   return text || "SIG";
 }

@@ -1148,7 +1148,7 @@ function renderEventList(targetEl, items, emptyMessage) {
     const typeBadge = document.createElement("span");
     const _isSSBVoice = eventItem.type === "callsign" && /^SSB/i.test(eventItem.mode || "") && !eventItem.callsign;
     typeBadge.className = `badge ${eventItem.type === "callsign" ? "bg-info" : "bg-secondary"}`;
-    typeBadge.textContent = _isSSBVoice ? "Voice Signature" : (eventItem.type || "event");
+    typeBadge.textContent = _isSSBVoice ? "VOICE SIGNATURE" : (eventItem.type || "event");
 
     const modeBadge = document.createElement("span");
     modeBadge.className = "badge bg-primary";

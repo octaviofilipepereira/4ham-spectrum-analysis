@@ -771,7 +771,7 @@ export class WaterfallController {
       const markerModeText   = String(marker?.mode || "").trim().toUpperCase();
       const missingCallsignLabel = markerModeText === "CW_CANDIDATE"
         ? "CW TRAFFIC" : markerModeText === "CW" ? "CW"
-        : markerModeText === "SSB_VOICE" ? "Voice Signature" : "-";
+        : markerModeText === "SSB_VOICE" ? "VOICE SIGNATURE" : "-";
       const markerSeenAtText = formatLastSeenTime(embeddedSeenAtMs || proximityMatch?.seenAtMs);
       const isCwMarker       = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
       const freqText         = Number.isFinite(markerFreq) && markerFreq > 0
