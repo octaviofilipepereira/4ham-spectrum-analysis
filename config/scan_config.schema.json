@@ -26,7 +26,14 @@
         "sample_rate": { "type": "integer", "minimum": 1 },
         "gain": { "type": "number" },
         "mode": { "type": "string", "enum": ["auto", "fixed"] },
-        "record_path": { "type": "string" }
+        "record_path": { "type": "string" },
+        "ssb_focus_enable": { "type": "boolean" },
+        "ssb_focus_hold_ms": { "type": "integer", "minimum": 0 },
+        "ssb_focus_hits_required": { "type": "integer", "minimum": 1 },
+        "ssb_focus_candidate_ttl_s": { "type": "number", "minimum": 1 },
+        "ssb_focus_cooldown_s": { "type": "number", "minimum": 0 },
+        "ssb_focus_bucket_hz": { "type": "integer", "minimum": 250 },
+        "ssb_focus_max_holds_per_pass": { "type": "integer", "minimum": 1, "maximum": 12 }
       }
     }
   }
