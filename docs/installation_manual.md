@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-24 UTC
+Last update: 2026-04-02 UTC
 -->
 
 # Installation Manual
@@ -52,6 +52,13 @@ chmod +x install.sh && ./install.sh
 ```
 
 The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), and optional systemd service activation. No manual steps are required after `git clone`.
+
+To remove the installation:
+```
+./uninstall.sh                           # safe: removes service, venv, node_modules
+./uninstall.sh --purge-data             # also removes data/, logs/, exports/
+./uninstall.sh --purge-all --yes        # full wipe
+```
 
 For manual or customised setups, follow the sections below.
 
