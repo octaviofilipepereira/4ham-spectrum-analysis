@@ -103,6 +103,9 @@ export function normalizeModeLabel(mode) {
   if (text === "SSB_TRAFFIC") {
     return "SSB TRAFFIC";
   }
+  if (text === "SSB_VOICE") {
+    return "Voice Signature";
+  }
   return text || "SIG";
 }
 
@@ -116,7 +119,7 @@ export function modeMatchesSelectedMode(modeValue, selectedModeValue) {
     return mode === "CW" || mode === "CW_CANDIDATE";
   }
   if (selectedMode === "SSB") {
-    return mode === "SSB" || mode === "SSB_TRAFFIC";
+    return mode === "SSB" || mode === "SSB_TRAFFIC" || mode === "SSB_VOICE";
   }
   return mode === selectedMode;
 }

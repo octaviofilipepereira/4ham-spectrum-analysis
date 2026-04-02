@@ -26,6 +26,7 @@ import {
   WATERFALL_DECODED_MARKER_TTL_FT8_MS,
   WATERFALL_DECODED_MARKER_TTL_FT4_MS,
   WATERFALL_DECODED_MARKER_TTL_WSPR_MS,
+  WATERFALL_DECODED_MARKER_TTL_SSB_VOICE_MS,
   WATERFALL_CALLSIGN_TTL_MS,
   WATERFALL_CALLSIGN_MAX_DELTA_HZ,
 } from "./constants.js";
@@ -619,7 +620,7 @@ export class WaterfallController {
     for (const [key, marker] of this.#markerCache.entries()) {
       const markerModeText = String(marker?.mode || "").trim().toUpperCase();
       const isCw  = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-      const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
+      const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC" || markerModeText === "SSB_VOICE";
       const seenAt = Number(marker?.seen_at || 0);
       if (!Number.isFinite(seenAt) || seenAt <= 0) { this.#markerCache.delete(key); continue; }
       if (isSsb && hasCurrentPassCount) {
@@ -635,9 +636,10 @@ export class WaterfallController {
 
     for (const [key, marker] of this.#decodedMarkerCache.entries()) {
       let ttl;
-      if      (key.endsWith("_WSPR")) ttl = WATERFALL_DECODED_MARKER_TTL_WSPR_MS;
-      else if (key.endsWith("_FT4"))  ttl = WATERFALL_DECODED_MARKER_TTL_FT4_MS;
-      else                             ttl = WATERFALL_DECODED_MARKER_TTL_FT8_MS;
+      if      (key.endsWith("_WSPR"))      ttl = WATERFALL_DECODED_MARKER_TTL_WSPR_MS;
+      else if (key.endsWith("_FT4"))       ttl = WATERFALL_DECODED_MARKER_TTL_FT4_MS;
+      else if (key.endsWith("_SSB_VOICE")) ttl = WATERFALL_DECODED_MARKER_TTL_SSB_VOICE_MS;
+      else                                  ttl = WATERFALL_DECODED_MARKER_TTL_FT8_MS;
       if ((now - Number(marker?.seen_at || 0)) > ttl) this.#decodedMarkerCache.delete(key);
     }
 
@@ -768,7 +770,8 @@ export class WaterfallController {
       const markerCallsign   = embeddedCallsign || proximityMatch?.callsign || "";
       const markerModeText   = String(marker?.mode || "").trim().toUpperCase();
       const missingCallsignLabel = markerModeText === "CW_CANDIDATE"
-        ? "CW TRAFFIC" : markerModeText === "CW" ? "CW" : "-";
+        ? "CW TRAFFIC" : markerModeText === "CW" ? "CW"
+        : markerModeText === "SSB_VOICE" ? "Voice Signature" : "-";
       const markerSeenAtText = formatLastSeenTime(embeddedSeenAtMs || proximityMatch?.seenAtMs);
       const isCwMarker       = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
       const freqText         = Number.isFinite(markerFreq) && markerFreq > 0
@@ -899,6 +902,27 @@ export class WaterfallController {
     const seenAtMs     = Number.isFinite(timestampMs) ? timestampMs : Date.now();
     this.#cacheLatestCallsign(callsign, seenAtMs);
     this.#cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs, eventMode);
+
+    // SSB Voice Signature: confirmed SSB event with no callsign → waterfall marker
+    const isVoiceSignature = /^SSB/i.test(eventMode) && !callsign;
+    if (isVoiceSignature && Number.isFinite(frequencyHz) && frequencyHz > 0) {
+      const bucketHz  = Math.round(frequencyHz / WATERFALL_MARKER_BUCKET_SSB_HZ) * WATERFALL_MARKER_BUCKET_SSB_HZ;
+      const markerKey = `${bucketHz}_SSB_VOICE`;
+      const existing  = this.#decodedMarkerCache.get(markerKey);
+      const ts = Number(seenAtMs);
+      if (!existing || ts >= Number(existing.seenAtMs || 0)) {
+        this.#decodedMarkerCache.set(markerKey, {
+          frequency_hz: frequencyHz,
+          mode: "SSB_VOICE",
+          snr_db: eventItem.snr_db ?? null,
+          seen_at: Date.now(),
+          callsign: "",
+          seenAtMs: ts,
+          decoded: true,
+        });
+      }
+    }
+
     this.#cleanupCallsignCache();
   }
 

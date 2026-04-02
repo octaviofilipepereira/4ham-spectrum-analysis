@@ -47,6 +47,7 @@ export const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;
 export const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  45 * 1000;
 export const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  23 * 1000;
 export const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000;
+export const WATERFALL_DECODED_MARKER_TTL_SSB_VOICE_MS = 30 * 1000;
 
 export const WATERFALL_CALLSIGN_TTL_MS = 45 * 1000;       // match FT8 TTL (dominant mode)
 export const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;       // DSP-marker to callsign proximity
