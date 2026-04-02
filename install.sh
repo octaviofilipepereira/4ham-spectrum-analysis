@@ -528,9 +528,12 @@ else
     --msgbox "\
 4ham-spectrum-analysis is installed (manual mode).
 
-Start manually:
-  source .venv/bin/activate
-  python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+Server control:
+  Start    ./scripts/server_control.sh start
+  Stop     ./scripts/server_control.sh stop
+  Restart  ./scripts/server_control.sh restart
+  Status   ./scripts/server_control.sh status
+  Logs     ./scripts/server_control.sh logs
 
 Open in your browser:
   http://${_local_ip}:8000/
@@ -539,8 +542,6 @@ Open in your browser:
 Login with:
   Username : $_admin_user
   Password : (the one you set)
-
-Tip: use Ctrl+C in the terminal to stop the backend.
 ${_extra_notes}" \
     24 70
 fi
