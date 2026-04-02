@@ -222,7 +222,7 @@ case "$command" in
   restart)  do_restart ;;
   status)   do_status ;;
   logs)     do_logs ;;
-  -h|--help|help) usage ;;
+  ""|help|-h|--help) usage ;;
   *)
     echo "Error: unknown command '${command}'" >&2
     usage
