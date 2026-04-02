@@ -2,12 +2,15 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-02 UTC
+Last update: 2026-04-03 UTC
 -->
 
 # Changelog
 
-## v0.8.4 - 2026-04-02
+## v0.8.4 - 2026-04-03
+
+### Added
+- **Decoder Status modal** — now shows all active decoders (CW, SSB/ASR, PSK) with running/stopped status. The redundant Internal FT row was removed. PSK shows a static "Not available" label (decoder not yet implemented). SSB queue depth is hidden when 0 (shown only when there are pending segments).
 
 ### Fixed
 - **VOICE DETECTED marker flood on mode switch** — switching modes (e.g. CW → SSB) was flooding the waterfall with historical "VOICE DETECTED" markers. Root cause: markers created from historical events used `Date.now()` instead of the original event timestamp, making old events appear fresh and survive their full TTL. Fixed by using `seenAtMs` (original event time) in all three marker creation paths in `waterfall.js`.
@@ -17,6 +20,11 @@ Last update: 2026-04-02 UTC
 - **SSB Traffic event spam** — debounce interval increased from 8 s to 30 s per 2 kHz bucket; added SNR floor gate (rejects signals below `snr_threshold_db`, default 8 dB); SSB_VOICE markers now only injected when ASR confirms actual voice (not on occupancy-only detections).
 - **libuhd SIGSEGV crash** — `SoapySDR.Device.enumerate()` now runs in a subprocess so a native crash in `libuhd.so` kills only the child process, not the main server.
 - **Waterfall tooltip "last" field empty** — added `|| marker?.seen_at` fallback for `embeddedSeenAtMs` in tooltip rendering.
+
+### Documentation
+- **SSB Max Holds parameter** — documented `ssb_max_holds` in `help.html` and `user_manual.md`; corrected SSB marker TTL and description in the Help panel.
+- **Operational scripts** — `uninstall.sh` and `server_control.sh` documented in `docs/install.md` and `docs/installation_manual.md`.
+- **Help panel updated to v0.8.4** — SSB flood protection, marker behaviour, FT decoder details, and FAQ entries added.
 
 ## v0.8.3 - 2026-04-02
 

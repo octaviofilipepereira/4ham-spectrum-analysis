@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-02 UTC
+Last update: 2026-04-03 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -75,6 +75,8 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 - **SSB Traffic spam reduced**: debounce 8 s → 30 s, SNR gate added (rejects below threshold), SSB_VOICE markers only on ASR-confirmed voice.
 - **libuhd crash protection**: `SoapySDR.Device.enumerate()` runs in a subprocess to survive SIGSEGV from `libuhd.so`.
 - **Waterfall tooltip "last" field fix**: added fallback for empty timestamp in marker tooltips.
+- **Decoder Status modal**: now shows all active decoders (CW, SSB/ASR, PSK) with running/stopped status. Internal FT row removed (redundant). PSK shows "Not available" (not yet implemented). SSB queue depth hidden when 0.
+- **Documentation**: SSB Max Holds parameter documented in help and user manual; `uninstall.sh` and `server_control.sh` documented in install guides.
 
 ### v0.8.3
 - **VOICE DETECTED waterfall markers**: SSB Voice Signature events now produce real-time markers on the waterfall overlay, labeled "VOICE DETECTED" with a distinctive black-and-gold style (45 s TTL). Injected from both the occupancy detector and the ASR/Whisper pipeline.
