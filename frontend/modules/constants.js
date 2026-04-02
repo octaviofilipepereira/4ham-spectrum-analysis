@@ -36,6 +36,7 @@ export const WATERFALL_SIMULATE_MODE_MARKERS = false;
 export const WATERFALL_MARKER_TTL_MS = 12000;        // generic DSP markers
 export const WATERFALL_MARKER_TTL_CW_MS = 45000;     // CW: matches backend cw_sweep_dwell_s(30) × 1.5
 export const WATERFALL_MARKER_TTL_SSB_MS = 20000;    // SSB fallback when pass_count is unavailable
+export const WATERFALL_MARKER_TTL_SSB_VOICE_MS = 45000; // SSB VOICE: Whisper-confirmed voice markers (45 s)
 export const WATERFALL_MARKER_TTL_SSB_PASSES = 2;    // expire SSB markers after 2 passes
 export const WATERFALL_MARKER_BUCKET_HZ = 50;
 export const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;

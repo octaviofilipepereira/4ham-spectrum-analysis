@@ -1450,6 +1450,10 @@ async function fetchEvents() {
     // Card Events shows events from the last 24 hours
     const start24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const params = new URLSearchParams({ offset: String(eventOffset), limit: "200", start: start24h, end: new Date().toISOString() });
+    const _modeFilter = (eventsSearchModeInput?.value || "").trim();
+    if (_modeFilter) {
+      params.set("mode", _modeFilter);
+    }
     
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },

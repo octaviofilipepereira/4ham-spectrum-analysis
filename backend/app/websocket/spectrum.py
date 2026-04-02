@@ -356,6 +356,22 @@ async def ws_spectrum(websocket: WebSocket) -> None:
                 "confidence": cw_m["confidence"],
             })
 
+        # Merge Voice Signature markers (from ASR/Whisper confirmed voice, 45 s TTL)
+        _voice_marker_ttl_s = 45.0
+        for bucket, vm in list(state.voice_marker_cache.items()):
+            _age = now_ts - float(vm.get("seen_at", 0))
+            if _age > _voice_marker_ttl_s:
+                state.voice_marker_cache.pop(bucket, None)
+                continue
+            mode_markers.append({
+                "offset_hz": vm.get("offset_hz", 0.0),
+                "frequency_hz": vm["frequency_hz"],
+                "mode": "SSB_VOICE",
+                "snr_db": vm.get("snr_db", 0.0),
+                "bandwidth_hz": vm.get("bandwidth_hz", 2800.0),
+                "confidence": vm.get("confidence", 0.5),
+            })
+
         # Sort markers by offset and cap SSB marker volume aggressively to
         # avoid flooding the waterfall with weak/transient false positives.
         mode_markers.sort(key=lambda item: item.get("offset_hz", 0.0))

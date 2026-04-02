@@ -195,6 +195,22 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     state.db.insert_callsign(event)
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
+
+    # Inject SSB VOICE marker into spectrum frame waterfall markers
+    try:
+        _bucket = str(round(frequency_hz / 1000) * 1000)
+        state.voice_marker_cache[_bucket] = {
+            "frequency_hz": float(frequency_hz),
+            "offset_hz": 0.0,
+            "mode": "SSB_VOICE",
+            "snr_db": float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0),
+            "bandwidth_hz": float(safe_float(occupancy_event.get("bandwidth_hz"), 2800.0) or 2800.0),
+            "confidence": round(ssb_score, 3),
+            "seen_at": _time_mod.time(),
+        }
+    except Exception:
+        pass
+
     return event
 
 

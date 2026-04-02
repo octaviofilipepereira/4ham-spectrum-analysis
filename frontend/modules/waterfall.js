@@ -20,6 +20,7 @@ import {
   WATERFALL_MARKER_TTL_MS,
   WATERFALL_MARKER_TTL_CW_MS,
   WATERFALL_MARKER_TTL_SSB_MS,
+  WATERFALL_MARKER_TTL_SSB_VOICE_MS,
   WATERFALL_MARKER_TTL_SSB_PASSES,
   WATERFALL_MARKER_BUCKET_HZ,
   WATERFALL_MARKER_BUCKET_SSB_HZ,
@@ -604,8 +605,11 @@ export class WaterfallController {
         if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return;
         if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) return;
         const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
-        const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
-        const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
+        const isSsbVoice  = markerModeRaw === "SSB_VOICE";
+        const bucketHz = (isSsbMarker || isSsbVoice) ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
+        const key = isSsbVoice
+          ? `${Math.round(frequencyHz / bucketHz) * bucketHz}_VOICE`
+          : `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
         this.#markerCache.set(key, {
           frequency_hz: frequencyHz,
           mode: markerModeRaw,
@@ -620,7 +624,8 @@ export class WaterfallController {
     for (const [key, marker] of this.#markerCache.entries()) {
       const markerModeText = String(marker?.mode || "").trim().toUpperCase();
       const isCw  = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-      const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC" || markerModeText === "SSB_VOICE";
+      const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
+      const isSsbVoice = markerModeText === "SSB_VOICE";
       const seenAt = Number(marker?.seen_at || 0);
       if (!Number.isFinite(seenAt) || seenAt <= 0) { this.#markerCache.delete(key); continue; }
       if (isSsb && hasCurrentPassCount) {
@@ -630,7 +635,9 @@ export class WaterfallController {
           this.#markerCache.delete(key); continue;
         }
       }
-      const ttl = isCw ? WATERFALL_MARKER_TTL_CW_MS : (isSsb ? WATERFALL_MARKER_TTL_SSB_MS : WATERFALL_MARKER_TTL_MS);
+      const ttl = isCw ? WATERFALL_MARKER_TTL_CW_MS
+        : isSsbVoice ? WATERFALL_MARKER_TTL_SSB_VOICE_MS
+        : (isSsb ? WATERFALL_MARKER_TTL_SSB_MS : WATERFALL_MARKER_TTL_MS);
       if ((now - seenAt) > ttl) this.#markerCache.delete(key);
     }
 
@@ -757,6 +764,7 @@ export class WaterfallController {
 
       const label = document.createElement("span");
       label.className = "waterfall-mode-label";
+      if (String(marker?.mode || "").toUpperCase() === "SSB_VOICE") label.classList.add("is-ssb-voice");
       label.style.left = `${(normalized * 100).toFixed(2)}%`;
       label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
       label.textContent = normalizeModeLabel(marker?.mode);

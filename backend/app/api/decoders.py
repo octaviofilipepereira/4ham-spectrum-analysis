@@ -235,6 +235,23 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
 
+    # Inject SSB VOICE marker into spectrum frame waterfall markers
+    try:
+        import time as _t
+        _freq = float(frequency_hz)
+        _bucket = str(round(_freq / 1000) * 1000)
+        state.voice_marker_cache[_bucket] = {
+            "frequency_hz": _freq,
+            "offset_hz": 0.0,
+            "mode": "SSB_VOICE",
+            "snr_db": float(occupancy_event.get("snr_db") or 0.0),
+            "bandwidth_hz": float(occupancy_event.get("bandwidth_hz") or 2800.0),
+            "confidence": round(ssb_score, 3),
+            "seen_at": _t.time(),
+        }
+    except Exception:
+        pass
+
     # Broadcast to WS /ws/events clients so the frontend Events panel and
     # waterfall markers update immediately (not only via 5 s HTTP poll).
     try:

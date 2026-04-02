@@ -153,6 +153,9 @@ marker_candidates = {}
 # CW decode markers: bucket_key (500 Hz) -> {frequency_hz, offset_hz, mode, snr_db, crest_db, bandwidth_hz, confidence, seen_at}
 cw_marker_cache: dict = {}
 
+# Voice Signature markers: bucket_key (1 kHz) -> {frequency_hz, offset_hz, mode, snr_db, bandwidth_hz, confidence, seen_at}
+voice_marker_cache: dict = {}
+
 threshold_state = {}
 
 
