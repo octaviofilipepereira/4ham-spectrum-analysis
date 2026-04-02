@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-25 UTC
+Last update: 2026-04-02 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -20,7 +20,7 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
 
-> **SSB Voice Detection & ASR (v0.8.0+):** SSB voice demodulation and ASR-based identification are fully implemented. Each SSB event shows one of three labels: **Voice Confirmed** (voice detected, no transcript), **Voice Transcript** (Whisper produced a transcript but no callsign resolved), or the **resolved callsign**. The **TXT** button on each event shows the decoded text (Whisper transcript or spectral proof). Enable Whisper in the Admin panel; install with `pip install openai-whisper` (optional — large download, ~700 MB).
+> **SSB Voice Detection & ASR (v0.8.0+):** SSB voice demodulation and ASR-based identification are fully implemented. Each SSB event shows one of three labels: **Voice Confirmed** (voice detected, no transcript), **Voice Transcript** (Whisper produced a transcript but no callsign resolved), or the **resolved callsign**. The **TXT** button on each event shows the decoded text (Whisper transcript or spectral proof). Since **v0.8.3**, confirmed voice activity produces real-time **VOICE DETECTED** markers on the waterfall (black-and-gold style, 45 s TTL). Enable Whisper in the Admin panel; install with `pip install openai-whisper` (optional — large download, ~700 MB).
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
@@ -68,6 +68,12 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 > For full manual installation notes and decoder setup, see [docs/install.md](docs/install.md) and [docs/installation_manual.md](docs/installation_manual.md).
 
 ## Changelog (cumulative)
+
+### v0.8.3
+- **VOICE DETECTED waterfall markers**: SSB Voice Signature events now produce real-time markers on the waterfall overlay, labeled "VOICE DETECTED" with a distinctive black-and-gold style (45 s TTL). Injected from both the occupancy detector and the ASR/Whisper pipeline.
+- **Mode-filtered event fetch**: switching modes (SSB → CW → SSB) no longer loses events — the frontend sends the active mode filter to the API so the 200-event limit returns only relevant results.
+- **ASR startup fix**: ASR configuration is now restored from the database at application startup, preventing a crash when the scan resumes with ASR enabled.
+- **Marker thresholds**: `MARKER_MIN_SNR_DB` lowered 10 → 8 dB; `MARKER_MAX_AGE_S` raised 10 → 30 s for better SSB sensitivity.
 
 ### v0.8.2
 - **SSB ASR pipeline activation**: `parse_ssb_asr_text()` wired into the live SSB event pipeline — Whisper transcripts are now parsed for callsigns (direct and NATO phonetic) in real time.
