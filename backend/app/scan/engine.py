@@ -67,7 +67,7 @@ class ScanEngine:
         self._ssb_focus_hits_required: int = 2
         self._ssb_focus_cooldown_s: float = 20.0
         self._ssb_focus_bucket_hz: int = 2000
-        self._ssb_focus_max_holds_per_pass: int = 2
+        self._ssb_focus_max_holds_per_pass: int = 4
         self._ssb_focus_holds_in_pass: int = 0
         # bucket_hz -> {hits, last_seen, last_hold_at, max_snr_db, max_confidence}
         self._ssb_focus_candidates: Dict[int, Dict[str, float]] = {}
@@ -114,7 +114,7 @@ class ScanEngine:
             250,
         )
         self._ssb_focus_max_holds_per_pass = max(
-            int(self.config.get("ssb_focus_max_holds_per_pass", 2) or 2),
+            int(self.config.get("ssb_focus_max_holds_per_pass", 4) or 4),
             1,
         )
         self._ssb_focus_holds_in_pass = 0
