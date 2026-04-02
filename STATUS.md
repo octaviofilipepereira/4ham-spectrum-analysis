@@ -1,13 +1,13 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-03-25
+Last update: 2026-04-02
 -->
 
 # 📊 QUICK STATUS - Trabalhos Pendentes
 
-**Atualização**: 2026-03-25  
-**Versão**: v0.8.2
+**Atualização**: 2026-04-02  
+**Versão**: v0.8.3
 
 ---
 
@@ -31,7 +31,21 @@ Hold-validation pipeline, Whisper ASR, SNR gate
 Concluído em unstable (e9c4b87)
 focus_hits alinhado (API=2, engine=2)
 MARKER_MIN_SNR_DB 10→8 dB
-Aguarda validação real-band antes de merge → main
+Merge → main concluído em v0.8.3
+```
+
+### VOICE DETECTED Waterfall Markers ✅ (v0.8.3)
+```
+Concluído em v0.8.3 (2026-04-02)
+Markers SSB_VOICE no waterfall (black+gold, 45 s TTL)
+Mode-filtered event fetch (eventos persistem ao trocar modo)
+ASR startup fix (config restaurada da DB ao arrancar)
+```
+
+### Migração Frontend ES6 Modules (parcial) ✅
+```
+Concluído parcialmente em v0.8.3
+waterfall.js, utils.js, constants.js extraídos de app.js
 ```
 
 ---
@@ -40,37 +54,31 @@ Aguarda validação real-band antes de merge → main
 
 ### 1️⃣ Validação Real-Band SSB (unstable → main)
 ```
-Status: 🔄 EM VALIDAÇÃO
-Prioridade: 🔴 ALTA
-Progresso: ██░░░░░░░░ 20%
+Status: ✅ CONCLUÍDO
+Prioridade: 🟢 RESOLVIDO
+Progresso: ██████████ 100%
 
-Objetivo: Testar novos limiares SSB com antena em 40m/20m
-
-Tarefas:
-[x] Aplicar correcções (e9c4b87)
-[ ] Scan SSB 40m (18h-22h UTC)
-[ ] Scan SSB 20m (10h-16h UTC)
-[ ] Medir false-positive rate
-[ ] Ajustar MARKER_MIN_SNR_DB se necessário
-[ ] Merge unstable → main
+Limiares SSB aplicados e merge para main em v0.8.3
 ```
 
 ### 2️⃣ Migração Frontend ES6 Modules
 ```
-Status: 📋 TODO
+Status: 🟡 EM PROGRESSO
 Prioridade: 🔴 ALTA
-Progresso: ░░░░░░░░░░ 0%
+Progresso: ████░░░░░░ 40%
 
-Objetivo: Refatorar app.js (5349 linhas) → estrutura modular
+Objetivo: Refatorar app.js → estrutura modular
 
 Tarefas:
-[ ] Criar waterfall.js
+[x] Criar waterfall.js
+[x] Criar constants.js
+[x] Criar utils.js
 [ ] Criar events.js
 [ ] Criar controls.js
 [ ] Criar charts.js
 [ ] Criar websocket.js
 [ ] Criar propagation.js
-[ ] Migrar lógica
+[ ] Migrar lógica restante
 [ ] Testes
 ```
 
