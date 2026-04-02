@@ -171,7 +171,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
         int(frequency_hz / 2000),
     )
     last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
-    if (now_ts - last_emit_ts) < 8.0:
+    if (now_ts - last_emit_ts) < 30.0:
         return
     _ssb_traffic_last_emit[bucket_key] = now_ts
 
@@ -183,8 +183,14 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
 
     base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+
+    # Gate: reject weak signals below the global SNR threshold
+    _snr_floor = float(getattr(state, "snr_threshold_db", 8.0) or 8.0)
+    if snr_db < _snr_floor:
+        return
+
     snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
-    ssb_score = min(0.95, max(0.35, base_confidence + snr_bonus + 0.12))
+    ssb_score = min(0.95, max(0.35, base_confidence + snr_bonus))
     if ssb_score < float(getattr(state, "ssb_traffic_min_confidence", 0.55) or 0.55):
         return
 
@@ -235,22 +241,25 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
 
-    # Inject SSB VOICE marker into spectrum frame waterfall markers
-    try:
-        import time as _t
-        _freq = float(frequency_hz)
-        _bucket = str(round(_freq / 1000) * 1000)
-        state.voice_marker_cache[_bucket] = {
-            "frequency_hz": _freq,
-            "offset_hz": 0.0,
-            "mode": "SSB_VOICE",
-            "snr_db": float(occupancy_event.get("snr_db") or 0.0),
-            "bandwidth_hz": float(occupancy_event.get("bandwidth_hz") or 2800.0),
-            "confidence": round(ssb_score, 3),
-            "seen_at": _t.time(),
-        }
-    except Exception:
-        pass
+    # Inject SSB VOICE marker ONLY when ASR text confirms actual voice.
+    # Occupancy-only detections (no asr_text) fire too often and flood the
+    # waterfall with false VOICE DETECTED markers across the whole band.
+    if asr_text:
+        try:
+            import time as _t
+            _freq = float(frequency_hz)
+            _bucket = str(round(_freq / 1000) * 1000)
+            state.voice_marker_cache[_bucket] = {
+                "frequency_hz": _freq,
+                "offset_hz": 0.0,
+                "mode": "SSB_VOICE",
+                "snr_db": float(occupancy_event.get("snr_db") or 0.0),
+                "bandwidth_hz": float(occupancy_event.get("bandwidth_hz") or 2800.0),
+                "confidence": round(ssb_score, 3),
+                "seen_at": _t.time(),
+            }
+        except Exception:
+            pass
 
     # Broadcast to WS /ws/events clients so the frontend Events panel and
     # waterfall markers update immediately (not only via 5 s HTTP poll).
