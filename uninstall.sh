@@ -15,6 +15,7 @@ PURGE_DATA=0
 PURGE_SYSTEM_PACKAGES=0
 PURGE_ALL=0
 ASSUME_YES=0
+MODE_SELECTED_BY_FLAG=0
 
 usage() {
   cat <<EOF
@@ -58,18 +59,79 @@ confirm() {
   [[ "${ans:-}" =~ ^[Yy]$ ]]
 }
 
+select_uninstall_mode() {
+  if [[ "$ASSUME_YES" -eq 1 || "$MODE_SELECTED_BY_FLAG" -eq 1 ]]; then
+    return 0
+  fi
+
+  local mode=""
+
+  if command -v whiptail >/dev/null 2>&1; then
+    mode=$(whiptail --title "4ham-spectrum-analysis Uninstaller" \
+      --menu "How do you want to uninstall?" 18 80 6 \
+      "safe" "Safe uninstall (service + local environments)" \
+      "data" "Safe + purge local data (data/, logs/, exports/)" \
+      "packages" "Safe + purge system packages" \
+      "all" "Full wipe (data + packages + project directory)" \
+      3>&1 1>&2 2>&3) || {
+      echo "Cancelled."
+      exit 0
+    }
+  else
+    echo "How do you want to uninstall?"
+    echo "  1) Safe uninstall"
+    echo "  2) Safe + purge local data"
+    echo "  3) Safe + purge system packages"
+    echo "  4) Full wipe"
+    read -r -p "Choose an option [1-4] (Enter cancels): " option
+    case "${option:-}" in
+      1) mode="safe" ;;
+      2) mode="data" ;;
+      3) mode="packages" ;;
+      4) mode="all" ;;
+      *)
+        echo "Cancelled."
+        exit 0
+        ;;
+    esac
+  fi
+
+  case "$mode" in
+    safe)
+      ;;
+    data)
+      PURGE_DATA=1
+      ;;
+    packages)
+      PURGE_SYSTEM_PACKAGES=1
+      ;;
+    all)
+      PURGE_ALL=1
+      PURGE_DATA=1
+      PURGE_SYSTEM_PACKAGES=1
+      ;;
+    *)
+      echo "Invalid uninstall mode: $mode" >&2
+      exit 1
+      ;;
+  esac
+}
+
 for arg in "$@"; do
   case "$arg" in
     --purge-data)
       PURGE_DATA=1
+      MODE_SELECTED_BY_FLAG=1
       ;;
     --purge-system-packages)
       PURGE_SYSTEM_PACKAGES=1
+      MODE_SELECTED_BY_FLAG=1
       ;;
     --purge-all)
       PURGE_ALL=1
       PURGE_DATA=1
       PURGE_SYSTEM_PACKAGES=1
+      MODE_SELECTED_BY_FLAG=1
       ;;
     --yes)
       ASSUME_YES=1
@@ -85,6 +147,8 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+select_uninstall_mode
 
 echo "Uninstalling ${SERVICE_NAME} from: ${ROOT_DIR}"
 
