@@ -203,6 +203,11 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     
+    # Prevent browser caching of HTML pages so UI updates are always picked up.
+    content_type = response.headers.get("content-type", "")
+    if "text/html" in content_type:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    
     # Remove server header to avoid information disclosure
     if "server" in response.headers:
         del response.headers["server"]
