@@ -25,6 +25,82 @@ declare -a _TMPFILES=()
 
 run_sudo() { [[ "${EUID}" -eq 0 ]] && "$@" || sudo "$@"; }
 
+version_ge() {
+  local current="$1"
+  local minimum="$2"
+  [[ "$(printf '%s\n%s\n' "$minimum" "$current" | sort -V | head -n1)" == "$minimum" ]]
+}
+
+OS_ID=""
+OS_VERSION_ID=""
+OS_PRETTY_NAME=""
+
+detect_linux_compatibility() {
+  if [[ ! -f /etc/os-release ]]; then
+    echo "Unsupported Linux distribution: missing /etc/os-release" >&2
+    return 1
+  fi
+
+  # shellcheck disable=SC1091
+  source /etc/os-release
+
+  OS_ID="${ID:-unknown}"
+  OS_VERSION_ID="${VERSION_ID:-0}"
+  OS_PRETTY_NAME="${PRETTY_NAME:-$OS_ID}"
+
+  local id_lower="${OS_ID,,}"
+  case "$id_lower" in
+    ubuntu)
+      version_ge "$OS_VERSION_ID" "20.04"
+      return
+      ;;
+    debian)
+      version_ge "$OS_VERSION_ID" "11"
+      return
+      ;;
+    linuxmint)
+      version_ge "$OS_VERSION_ID" "20"
+      return
+      ;;
+    raspbian)
+      version_ge "$OS_VERSION_ID" "11"
+      return
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+validate_runtime_dependencies() {
+  local -a missing_cmds=()
+  local -a required_cmds=(
+    SoapySDRUtil
+    rtl_test
+    ffmpeg
+    direwolf
+    jt9
+    wsprd
+  )
+
+  for cmd in "${required_cmds[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing_cmds+=("$cmd")
+    fi
+  done
+
+  if ! "$PYTHON_BIN" -c "import SoapySDR" >/dev/null 2>&1; then
+    missing_cmds+=("python:SoapySDR")
+  fi
+
+  if [[ ${#missing_cmds[@]} -gt 0 ]]; then
+    printf '%s\n' "${missing_cmds[@]}" | paste -sd ', ' -
+    return 1
+  fi
+
+  return 0
+}
+
 # ── cleanup on exit ────────────────────────────────────────────────────────────
 cleanup() {
   exec 3>&- 2>/dev/null || true
@@ -69,24 +145,50 @@ abort() {
   exit 1
 }
 
+# ── sanity checks ──────────────────────────────────────────────────────────────
+if [[ "${EUID}" -eq 0 ]]; then
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Error" \
+      --msgbox "Do not run this installer as root.\n\nRun as a normal user with sudo access:\n\n  ./install.sh" 11 62
+  else
+    echo "Do not run this installer as root."
+    echo "Run as a normal user with sudo access: ./install.sh"
+  fi
+  exit 1
+fi
+
+if ! command -v apt-get &>/dev/null; then
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Unsupported OS" \
+      --msgbox "This installer requires apt.\nSupported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS." 9 66
+  else
+    echo "Unsupported OS: this installer requires apt."
+    echo "Supported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS."
+  fi
+  exit 1
+fi
+
+if ! detect_linux_compatibility; then
+  local_msg="Detected Linux: ${OS_PRETTY_NAME:-unknown} (version ${OS_VERSION_ID:-unknown})\n\n"
+  local_msg+="Minimum supported versions:\n"
+  local_msg+="- Ubuntu 20.04+\n"
+  local_msg+="- Debian 11+\n"
+  local_msg+="- Linux Mint 20+\n"
+  local_msg+="- Raspberry Pi OS (Raspbian) 11+\n\n"
+  local_msg+="This installer cannot continue on the detected system."
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Unsupported Linux Version" --msgbox "$local_msg" 16 72
+  else
+    printf '%b\n' "$local_msg"
+  fi
+  exit 1
+fi
+
 # ── ensure whiptail is available ───────────────────────────────────────────────
 if ! command -v whiptail &>/dev/null; then
   echo "Installing whiptail for graphical interface..."
   run_sudo apt-get update -qq
   run_sudo apt-get install -y whiptail
-fi
-
-# ── sanity checks ──────────────────────────────────────────────────────────────
-if [[ "${EUID}" -eq 0 ]]; then
-  whiptail --backtitle "$BT" --title "Error" \
-    --msgbox "Do not run this installer as root.\n\nRun as a normal user with sudo access:\n\n  ./install.sh" 11 62
-  exit 1
-fi
-
-if ! command -v apt-get &>/dev/null; then
-  whiptail --backtitle "$BT" --title "Unsupported OS" \
-    --msgbox "This installer requires apt.\nSupported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS." 9 66
-  exit 1
 fi
 
 if ! command -v python3 &>/dev/null; then
@@ -108,14 +210,16 @@ whiptail --backtitle "$BT" --title "Welcome" \
 Welcome to the 4ham Spectrum Analysis installer!
 
 This wizard will:
-  1. Install system packages (SoapySDR, RTL-SDR, Python)
+  1. Install system packages (SoapySDR, RTL-SDR, Python, third-party decoders)
   2. Optionally build the RTL-SDR Blog v4 driver from source
   3. Optionally install OpenAI Whisper for SSB voice transcription
   4. Create the Python virtual environment
   5. Set up your admin account (stored securely in the local DB)
-  6. Install and start the background service (systemd)
+  6. Validate critical runtime dependencies
+  7. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
+Detected Linux: ${OS_PRETTY_NAME} (supported).
 
 Press Enter to continue." \
   19 68
@@ -223,11 +327,12 @@ gauge_step 3 "Updating package lists..."
 run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
   || abort "apt-get update failed"
 
-gauge_step 18 "Installing system packages (SoapySDR, Python, build tools)..."
+gauge_step 18 "Installing system packages (SoapySDR, Python, decoders, build tools)..."
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
+  direwolf wsjtx usbutils \
   build-essential cmake libusb-1.0-0-dev \
   ffmpeg \
   >> "$LOG_FILE" 2>&1 \
@@ -348,6 +453,12 @@ printf '%s' "$_admin_pass" \
 
 rm -f "$_tmp_py"
 unset _admin_pass
+
+gauge_step 95 "Validating required runtime dependencies..."
+_missing_deps=""
+if ! _missing_deps="$(validate_runtime_dependencies)"; then
+  abort "Missing required runtime dependencies after install: ${_missing_deps}"
+fi
 
 gauge_step 97 "Installing and enabling systemd service..."
 bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
