@@ -81,6 +81,8 @@ validate_runtime_dependencies() {
     direwolf
     jt9
     wsprd
+    node
+    npm
   )
 
   for cmd in "${required_cmds[@]}"; do
@@ -210,13 +212,14 @@ whiptail --backtitle "$BT" --title "Welcome" \
 Welcome to the 4ham Spectrum Analysis installer!
 
 This wizard will:
-  1. Install system packages (SoapySDR, RTL-SDR, Python, third-party decoders)
+  1. Install system packages (SoapySDR, RTL-SDR, Python, Node.js, third-party decoders)
   2. Optionally build the RTL-SDR Blog v4 driver from source
   3. Optionally install OpenAI Whisper for SSB voice transcription
   4. Create the Python virtual environment
-  5. Set up your admin account (stored securely in the local DB)
-  6. Validate critical runtime dependencies
-  7. Install and start the background service (systemd)
+  5. Install frontend JavaScript dependencies (npm)
+  6. Set up your admin account (stored securely in the local DB)
+  7. Validate critical runtime dependencies
+  8. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
 Detected Linux: ${OS_PRETTY_NAME} (supported).
@@ -327,9 +330,10 @@ gauge_step 3 "Updating package lists..."
 run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
   || abort "apt-get update failed"
 
-gauge_step 18 "Installing system packages (SoapySDR, Python, decoders, build tools)..."
+gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, decoders, build tools)..."
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
+  nodejs npm \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
   direwolf wsjtx usbutils \
@@ -385,12 +389,16 @@ gauge_step 84 "Installing Python dependencies..."
 "$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
 
+gauge_step 88 "Installing frontend JavaScript dependencies (npm)..."
+npm --prefix "$ROOT_DIR/frontend" install --no-fund --no-audit \
+  >> "$LOG_FILE" 2>&1 || abort "npm install failed for frontend"
+
 if [[ $_install_whisper -eq 1 ]]; then
   # On x86_64 install CPU-only PyTorch first to avoid pulling CUDA wheels
   # (~200 MB CPU build vs ~915 MB CUDA build). On ARM (Raspberry Pi) the
   # ARM torch wheel is already CPU-only so no special handling needed.
   if [[ "$(uname -m)" == "x86_64" ]]; then
-    gauge_step 87 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
+    gauge_step 90 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
     "$PYTHON_BIN" -m pip install --quiet torch \
       --index-url https://download.pytorch.org/whl/cpu \
       >> "$LOG_FILE" 2>&1 || { \
@@ -398,14 +406,14 @@ if [[ $_install_whisper -eq 1 ]]; then
         _install_whisper=0; }
   fi
   if [[ $_install_whisper -eq 1 ]]; then
-    gauge_step 90 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
+    gauge_step 92 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
     "$PYTHON_BIN" -m pip install --quiet openai-whisper \
       >> "$LOG_FILE" 2>&1 || { \
         echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }
   fi
 fi
 
-gauge_step 91 "Saving admin credentials to database..."
+gauge_step 93 "Saving admin credentials to database..."
 mkdir -p "$ROOT_DIR/data"
 
 # Write the Python setup script to a temp file so we can pipe the password
@@ -454,13 +462,13 @@ printf '%s' "$_admin_pass" \
 rm -f "$_tmp_py"
 unset _admin_pass
 
-gauge_step 95 "Validating required runtime dependencies..."
+gauge_step 96 "Validating required runtime dependencies..."
 _missing_deps=""
 if ! _missing_deps="$(validate_runtime_dependencies)"; then
   abort "Missing required runtime dependencies after install: ${_missing_deps}"
 fi
 
-gauge_step 97 "Installing and enabling systemd service..."
+gauge_step 98 "Installing and enabling systemd service..."
 bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
   || abort "Service installation failed"
 
