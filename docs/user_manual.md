@@ -34,7 +34,11 @@ Existem três tipos de resultado para sinais SSB:
 
 ### Proteção contra flood de ocupação
 
-Durante transmissões SSB longas, o sistema aplica um gate adaptativo que suprime eventos de ocupação repetidos para o mesmo segmento. Isto evita que o painel de eventos fique saturado de entradas de ocupação enquanto a mesma estação está a transmitir.
+Durante transmissões SSB longas, o sistema aplica vários mecanismos para evitar que o painel de eventos e a cascata fiquem saturados:
+
+- **Debounce por segmento de 2 kHz** — suprime eventos de ocupação repetidos para o mesmo segmento durante **30 segundos** (v0.8.4; era 8 s).
+- **Gate de SNR** — sinais abaixo de **8 dB SNR** são rejeitados e não geram eventos.
+- **Marcadores SSB_VOICE condicionais** — os marcadores "VOICE DETECTED" na cascata só são criados quando o Whisper ASR confirma voz ativa; detecções de ocupação sem ASR não geram marcadores.
 
 ### Configuração ASR no painel Admin
 
@@ -232,7 +236,8 @@ Abrir a interface no browser: `http://localhost:8000/`
 ### Controlos de scan
 - **Start scanning / Stop scanning** — inicia ou para o scan ativo
 - **Botões de banda** (160m … 10m) — mudam de banda imediatamente, mesmo com scan em curso
-- **Botões de modo** (CW / WSPR / FT4 / FT8 / SSB) — selecionam o decoder ou mudam o scan em tempo real
+- **Botões de modo** (CW / WSPR / FT4 / FT8 / SSB) — selecionam o decoder ou mudam o scan em tempo real; o painel de eventos sincroniza imediatamente ao mudar de modo (v0.8.4)
+- **SSB Max Holds** (modo SSB, padrão `0` = auto) — número máximo de *pauses* por passagem completa da banda em frequências SSB ativas. `0` = cálculo adaptivo (~1 hold por 50 kHz de largura, mín. 4, máx. 12). Apenas aplicado ao iniciar o scan; não tem efeito com scan em curso.
 
 ### Filtro de eventos (dropdown)
 
@@ -331,7 +336,7 @@ Aparece apenas quando o scan está ativo mas não chegam frames FFT. Verificar:
 - Reiniciar e reconectar o dongle USB
 
 ### Muitos eventos SSB_TRAFFIC / Voice Signature no painel
-Comportamento normal durante scan SSB em bandas com atividade de voz. Para uma vista mais limpa:
+Desde v0.8.4 o sistema tem proteção incorporada: debounce de 30 s por segmento, gate de SNR (8 dB mínimo) e marcadores SSB_VOICE apenas com confirmação ASR. Se ainda houver muita actividade:
 - Usar filtro **Callsign Only** para mostrar apenas eventos com indicativo resolvido
 - Usar filtro **SSB Callsign Detected** para apenas eventos Whisper com callsign confirmado
 
@@ -339,6 +344,7 @@ Comportamento normal durante scan SSB em bandas com atividade de voz. Para uma v
 - Verificar logs do sistema: `journalctl -u 4ham-spectrum-analysis -n 50`
 - Se o RTL-SDR estava com USB instável, reconectar o dongle e reiniciar o serviço
 - O sistema usa cache de enumeração de dispositivos (TTL 30 s) para reduzir chamadas USB em condições de hardware instável
+- A enumeração SoapySDR corre num processo filho desde v0.8.4 — se a biblioteca `libuhd` causar uma falha nativa (SIGSEGV), apenas o processo filho termina e o servidor continua em execução
 
 ### Onde estão os dados guardados?
 - Eventos: `data/events.sqlite`

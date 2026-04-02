@@ -244,7 +244,11 @@ const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
 let modeStatsCache = {};
 let totalEventsInDB = 0;
+// internalFtStatusModal removed — Internal FT not used in this setup
 const externalFtStatusModalEl = document.getElementById("externalFtStatusModal");
+const cwStatusModalEl = document.getElementById("cwStatusModal");
+const ssbStatusModalEl = document.getElementById("ssbStatusModal");
+// pskStatusModal removed — PSK decoder not yet implemented
 const kissStatusModalEl = document.getElementById("kissStatusModal");
 const decoderLastEventModalEl = document.getElementById("decoderLastEventModal");
 const agcStatusModalEl = document.getElementById("agcStatusModal");
@@ -2476,25 +2480,56 @@ async function fetchDecoderStatus() {
     }
     const data = await resp.json();
     const status = data.status || {};
+    const intNative = status.internal_native || {};
     const extFt = status.external_ft || {};
+    const cwDec = status.cw || {};
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
+
+    // External FT
     if (extFt.enabled) {
       const modes = (extFt.modes || []).join(", ");
       if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = `Configured (${modes})`;
     } else {
       if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
     }
+
+    // CW — enabled either by CW_INTERNAL_ENABLE env var OR force-started by scan mode
+    if (cwStatusModalEl) {
+      const cwSt = (cwDec.status || {});
+      if (cwDec.enabled || cwSt.running) {
+        cwStatusModalEl.textContent = cwSt.running ? "Running" : "Stopped";
+      } else {
+        cwStatusModalEl.textContent = "Disabled";
+      }
+    }
+
+    // SSB / ASR — enabled either by SSB_INTERNAL_ENABLE env var OR force-started by scan mode
+    if (ssbStatusModalEl) {
+      const ssbSt = intNative.ssb_internal_status || {};
+      if (intNative.ssb_internal_enable || ssbSt.running) {
+        const qSize = ssbSt.queue_size ?? 0;
+        ssbStatusModalEl.textContent = ssbSt.running ? (qSize > 0 ? `Running (queue: ${qSize})` : "Running") : "Stopped";
+      } else {
+        ssbStatusModalEl.textContent = "Disabled";
+      }
+    }
+
+    // Direwolf KISS
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
     const kissDisabledReason = kiss.last_error
       ? ` (${kiss.last_error})`
       : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
     if (kissStatusModalEl) kissStatusModalEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
+
     if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = lastEvent;
     if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
     if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Unavailable";
+    if (cwStatusModalEl) cwStatusModalEl.textContent = "Unavailable";
+    if (ssbStatusModalEl) ssbStatusModalEl.textContent = "Unavailable";
+
     if (kissStatusModalEl) kissStatusModalEl.textContent = "Unavailable";
     if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = "-";
     if (agcStatusModalEl) agcStatusModalEl.textContent = "-";
