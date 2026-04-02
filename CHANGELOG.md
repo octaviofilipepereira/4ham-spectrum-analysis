@@ -7,6 +7,17 @@ Last update: 2026-04-02 UTC
 
 # Changelog
 
+## v0.8.4 - 2026-04-02
+
+### Fixed
+- **VOICE DETECTED marker flood on mode switch** — switching modes (e.g. CW → SSB) was flooding the waterfall with historical "VOICE DETECTED" markers. Root cause: markers created from historical events used `Date.now()` instead of the original event timestamp, making old events appear fresh and survive their full TTL. Fixed by using `seenAtMs` (original event time) in all three marker creation paths in `waterfall.js`.
+- **Backend voice marker cache not cleared on scan stop** — `state.voice_marker_cache` persisted across mode switches, causing stale SSB_VOICE markers to continue appearing in spectrum frames after switching to a different mode. Cache is now cleared in `scan_stop()`.
+- **Events card showing wrong mode after mode switch** — Events panel continued showing the previous mode's events until the first decode in the new mode. Fixed by calling `fetchEvents()` and `fetchTotal()` immediately after the mode switch, and syncing `eventsSearchModeInput` with the new mode.
+- **Frontend marker cache not cleared on mode switch** — `decodedMarkerCache` now cleared when switching modes, preventing markers from previous mode polluting the new mode's waterfall.
+- **SSB Traffic event spam** — debounce interval increased from 8 s to 30 s per 2 kHz bucket; added SNR floor gate (rejects signals below `snr_threshold_db`, default 8 dB); SSB_VOICE markers now only injected when ASR confirms actual voice (not on occupancy-only detections).
+- **libuhd SIGSEGV crash** — `SoapySDR.Device.enumerate()` now runs in a subprocess so a native crash in `libuhd.so` kills only the child process, not the main server.
+- **Waterfall tooltip "last" field empty** — added `|| marker?.seen_at` fallback for `embeddedSeenAtMs` in tooltip rendering.
+
 ## v0.8.3 - 2026-04-02
 
 ### Added

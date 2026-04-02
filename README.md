@@ -69,6 +69,13 @@ At the end, **open the URL shown on screen in your browser and log in**. That's 
 
 ## Changelog (cumulative)
 
+### v0.8.4
+- **VOICE DETECTED marker flood fix**: switching modes (CW → SSB) no longer floods the waterfall with historical markers. Markers now use original event timestamps instead of `Date.now()`, ensuring correct TTL expiration. Backend `voice_marker_cache` cleared on scan stop. Frontend `decodedMarkerCache` cleared on mode switch.
+- **Events card sync on mode switch**: Events panel now immediately reloads with the correct mode's events after switching modes.
+- **SSB Traffic spam reduced**: debounce 8 s → 30 s, SNR gate added (rejects below threshold), SSB_VOICE markers only on ASR-confirmed voice.
+- **libuhd crash protection**: `SoapySDR.Device.enumerate()` runs in a subprocess to survive SIGSEGV from `libuhd.so`.
+- **Waterfall tooltip "last" field fix**: added fallback for empty timestamp in marker tooltips.
+
 ### v0.8.3
 - **VOICE DETECTED waterfall markers**: SSB Voice Signature events now produce real-time markers on the waterfall overlay, labeled "VOICE DETECTED" with a distinctive black-and-gold style (45 s TTL). Injected from both the occupancy detector and the ASR/Whisper pipeline.
 - **Mode-filtered event fetch**: switching modes (SSB → CW → SSB) no longer loses events — the frontend sends the active mode filter to the API so the 200-event limit returns only relevant results.
