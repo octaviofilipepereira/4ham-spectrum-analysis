@@ -248,7 +248,7 @@ let totalEventsInDB = 0;
 const externalFtStatusModalEl = document.getElementById("externalFtStatusModal");
 const cwStatusModalEl = document.getElementById("cwStatusModal");
 const ssbStatusModalEl = document.getElementById("ssbStatusModal");
-const pskStatusModalEl = document.getElementById("pskStatusModal");
+// pskStatusModal removed — PSK decoder not yet implemented
 const kissStatusModalEl = document.getElementById("kissStatusModal");
 const decoderLastEventModalEl = document.getElementById("decoderLastEventModal");
 const agcStatusModalEl = document.getElementById("agcStatusModal");
@@ -2516,11 +2516,6 @@ async function fetchDecoderStatus() {
       }
     }
 
-    // PSK
-    if (pskStatusModalEl) {
-      pskStatusModalEl.textContent = intNative.psk_internal_enable ? "Enabled" : "Disabled (set PSK_INTERNAL_ENABLE=1)";
-    }
-
     // Direwolf KISS
     const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
     const kissDisabledReason = kiss.last_error
@@ -2534,7 +2529,7 @@ async function fetchDecoderStatus() {
     if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Unavailable";
     if (cwStatusModalEl) cwStatusModalEl.textContent = "Unavailable";
     if (ssbStatusModalEl) ssbStatusModalEl.textContent = "Unavailable";
-    if (pskStatusModalEl) pskStatusModalEl.textContent = "Unavailable";
+
     if (kissStatusModalEl) kissStatusModalEl.textContent = "Unavailable";
     if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = "-";
     if (agcStatusModalEl) agcStatusModalEl.textContent = "-";
