@@ -51,7 +51,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.3 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.4 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -165,7 +165,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr>
           <td><span class="badge-mode badge-ssb">SSB</span></td>
           <td>continuous</td><td>20 s (SSB) / 45 s (Voice)</td>
-          <td>SSB voice detection with optional Whisper ASR transcription. Events show <strong>Voice Confirmed</strong> (voice only), <strong>Voice Transcript</strong> (has transcript, no callsign — click <strong>TXT</strong> to see it), or the resolved <strong>callsign</strong>. Confirmed voice activity produces <strong>VOICE DETECTED</strong> markers (black-and-gold, 45 s TTL) on the waterfall. Enable Whisper in Admin Config.</td>
+          <td>SSB voice detection with optional Whisper ASR transcription. Events show <strong>Voice Confirmed</strong> (voice only), <strong>Voice Transcript</strong> (has transcript, no callsign — click <strong>TXT</strong> to see it), or the resolved <strong>callsign</strong>. Confirmed voice activity produces <strong>VOICE DETECTED</strong> markers (black-and-gold, 45 s TTL) on the waterfall. Since v0.8.4: 30 s debounce per 2 kHz bucket, 8 dB SNR floor gate, and markers only on ASR-confirmed voice. Enable Whisper in Admin Config.</td>
         </tr>
       </tbody>
     </table>
@@ -303,10 +303,11 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <h3 class="sub-title">VOICE DETECTED waterfall markers</h3>
     <p>
-      Since v0.8.3, confirmed SSB voice activity produces real-time <strong>VOICE DETECTED</strong> markers
+      Confirmed SSB voice activity (ASR-verified) produces real-time <strong>VOICE DETECTED</strong> markers
       on the waterfall overlay. These markers have a distinctive black background with gold text and a
       45-second TTL — long enough to survive natural pauses between SSB "overs" without flickering.
-      Each new voice detection resets the timer. Markers appear automatically; no configuration is needed.
+      Each new voice detection resets the timer. Since v0.8.4, markers are only created when Whisper ASR
+      confirms actual voice; occupancy-only detections no longer produce waterfall markers.
     </p>
 
     <h3 class="sub-title">Enabling Whisper ASR</h3>
@@ -465,8 +466,8 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <h3 class="sub-title">No callsigns decoded in FT8/FT4</h3>
     <ul>
-      <li>Ensure <code>jt9</code> (from the WSJT-X package) is installed and on the system <code>PATH</code>.</li>
-      <li>Check <strong>Decoder Status</strong> — the jt9 pipeline should show "running".</li>
+      <li>The internal FT decoder is built-in and requires no external binary. Check <strong>Decoder Status</strong> — <em>Internal FT</em> should show "Running".</li>
+      <li>If using the external decoder (<code>FT_EXTERNAL_ENABLE=1</code>), ensure <code>jt9</code> (from WSJT-X) is installed and on the system <code>PATH</code>.</li>
       <li>Weak propagation conditions may result in zero decodes even with a clear spectrum.</li>
     </ul>
 
@@ -488,10 +489,15 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <h3 class="sub-title">Events card is flooded with occupancy events</h3>
     <p>
-      Use the default <strong>Show All</strong> filter which only shows callsign-type events.
-      If you selected <strong>All + Occupancy (raw)</strong>, raw occupancy detections from every scan step will appear.
-      Switch back to <strong>Show All</strong> for a clean view of decoded signals.
+      Since v0.8.4, the SSB pipeline has built-in flood protection: 30 s debounce per 2 kHz bucket,
+      an 8 dB SNR floor gate, and VOICE DETECTED waterfall markers only on ASR-confirmed voice.
+      If the events card still feels busy:
     </p>
+    <ul>
+      <li>Make sure you are on the default <strong>Show All</strong> filter — it hides raw occupancy and only shows callsign-type events.</li>
+      <li>If you selected <strong>All + Occupancy (raw)</strong>, raw detections from every scan step will appear. Switch back to <strong>Show All</strong>.</li>
+      <li>Use <strong>SSB Callsign Detected</strong> to see only Whisper-resolved callsigns.</li>
+    </ul>
 
     <h3 class="sub-title">Where is the data stored?</h3>
     <p>All events are stored in <code>data/events.sqlite</code>. Automatic exports go to <code>data/exports/</code>. Manual exports from the Search &amp; Export panel are also saved there.</p>
