@@ -1,14 +1,14 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-03-25
+Last update: 2026-04-02
 -->
 
 # 🗺️ ROADMAP - 4ham-spectrum-analysis
 ## Estrutura de Trabalhos Seguintes
 
-**Versão Atual**: v0.8.2  
-**Última Atualização**: 2026-03-25  
+**Versão Atual**: v0.8.3  
+**Última Atualização**: 2026-04-02  
 **Status**: 🟢 Produção-Ready
 
 ---
@@ -37,6 +37,7 @@ Last update: 2026-03-25
 | v0.6.0 | 2026-03-14 | Waterfall WebGL, retention, i18n EN |
 | v0.7.0 | 2026-03-15 | Linux-only target, instalador TUI |
 | v0.8.0 | 2026-03-22 | SSB Voice Signature, Whisper ASR, SNR gate |
+| v0.8.3 | 2026-04-02 | VOICE DETECTED waterfall markers, mode-filtered events |
 
 ---
 
