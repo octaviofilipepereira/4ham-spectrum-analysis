@@ -2509,7 +2509,8 @@ async function fetchDecoderStatus() {
     if (ssbStatusModalEl) {
       const ssbSt = intNative.ssb_internal_status || {};
       if (intNative.ssb_internal_enable || ssbSt.running) {
-        ssbStatusModalEl.textContent = ssbSt.running ? `Running (queue: ${ssbSt.queue_size ?? 0})` : "Stopped";
+        const qSize = ssbSt.queue_size ?? 0;
+        ssbStatusModalEl.textContent = ssbSt.running ? (qSize > 0 ? `Running (queue: ${qSize})` : "Running") : "Stopped";
       } else {
         ssbStatusModalEl.textContent = "Disabled";
       }
