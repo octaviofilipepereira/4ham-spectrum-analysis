@@ -3353,8 +3353,14 @@ if (quickModeButtons.length) {
           await stopScan();
           selectedDecoderMode = mode;
           wfc.selectedDecoderMode = mode;
+          eventsSearchModeInput.value = mode;
+          // Clear old markers from previous mode to prevent pollution
+          wfc.clearDecodedMarkerCache();
           refreshModeButtons();
           await startScan();
+          // Immediately reload events for the new mode
+          fetchEvents();
+          fetchTotal();
           showToast(`Mode switched to ${mode}`);
         } catch (err) {
           showToastError(`Failed to switch mode: ${err.message}`);
