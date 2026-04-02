@@ -6,6 +6,30 @@ Last update: 2026-02-24 18:30 UTC
 */
 
 import { loadPresetsFromJson } from "./utils/presets.js";
+import {
+  EVENTS_PANEL_PAGE_SIZE,
+  SEARCH_PAGE_SIZE,
+  AUTH_PASSWORD_MASK,
+  SHOW_NON_SDR_DEVICES_KEY,
+  BAND_PRESETS,
+  DEFAULT_BAND_OPTIONS,
+  CW_DECODER_SUBBANDS,
+  DEVICE_AUTO_PROFILES,
+} from "./modules/constants.js";
+import {
+  normalizeNumberInputValue,
+  formatScanRangeSummary,
+  inferBandFromFrequency,
+  normalizeModeLabel,
+  isValidCallsign,
+  extractCallsignFromRaw,
+  isValidLocator,
+  _isSsbSpectralProof,
+  extractDecodedText,
+  getAuthHeader,
+  wsUrl,
+} from "./modules/utils.js";
+import { WaterfallController } from "./modules/waterfall.js";
 
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
@@ -44,17 +68,21 @@ const waterfallRuler = document.getElementById("waterfallRuler");
 const canvas = document.getElementById("waterfallCanvas");
 const spectrumCanvas = document.getElementById("spectrumCanvas");
 const spectrumCtx = spectrumCanvas ? spectrumCanvas.getContext("2d") : null;
-let _specSmooth = null;
-const _SPEC_SMOOTH_ALPHA = 0.2;
-let ctx = null;
-let webglWaterfall = null;
-let waterfallRenderer = "2d";
 const gainInput = document.getElementById("gain");
 const sampleRateInput = document.getElementById("sampleRate");
 const recordPathInput = document.getElementById("recordPath");
 const cwScanParamsRow = document.getElementById("cwScanParamsRow");
 const cwStepHzInput = document.getElementById("cwStepHz");
 const cwDwellSInput = document.getElementById("cwDwellS");
+const ssbScanParamsRow = document.getElementById("ssbScanParamsRow");
+const ssbMaxHoldsInput = document.getElementById("ssbMaxHolds");
+// Force-update the label text to include "(max 12)" — works even with stale HTML cache.
+if (ssbMaxHoldsInput) {
+  const lbl = document.querySelector('label[for="ssbMaxHolds"]');
+  if (lbl && !lbl.textContent.includes("max")) {
+    lbl.textContent = "SSB Max Holds (max 12)";
+  }
+}
 const scanRangeSummaryEl = document.getElementById("scanRangeSummary");
 const cwSegmentSummaryWrapEl = document.getElementById("cwSegmentSummaryWrap");
 const cwSegmentSummaryEl = document.getElementById("cwSegmentSummary");
@@ -73,7 +101,6 @@ const deviceSelect = document.getElementById("deviceSelect");
 const bandSelect = document.getElementById("bandSelect");
 const authUserInput = document.getElementById("authUser");
 const authPassInput = document.getElementById("authPass");
-const AUTH_PASSWORD_MASK = "********";
 const saveSettingsBtn = document.getElementById("saveSettings");
 const testConfigBtn = document.getElementById("testConfig");
 const refreshDevicesBtn = document.getElementById("refreshDevices");
@@ -109,18 +136,6 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 let selectedDecoderMode = null;
 let latestScanState = null;
 
-const CW_DECODER_SUBBANDS = {
-  "160m": { start_hz: 1_800_000, end_hz: 1_840_000 },
-  "80m": { start_hz: 3_500_000, end_hz: 3_600_000 },
-  "40m": { start_hz: 7_000_000, end_hz: 7_040_000 },
-  "30m": { start_hz: 10_100_000, end_hz: 10_130_000 },
-  "20m": { start_hz: 14_000_000, end_hz: 14_070_000 },
-  "17m": { start_hz: 18_068_000, end_hz: 18_110_000 },
-  "15m": { start_hz: 21_000_000, end_hz: 21_150_000 },
-  "12m": { start_hz: 24_890_000, end_hz: 24_930_000 },
-  "10m": { start_hz: 28_000_000, end_hz: 28_300_000 },
-};
-
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
     return;
@@ -141,11 +156,6 @@ function updateAdminAudioStatus(audioProfile, options = {}) {
     adminSetupStatus.classList.add("alert-warning");
     adminSetupStatus.textContent = `Audio not automatically detected: input/output not set | sample rate=${sampleRate} Hz. Configure manually or run Auto-detect Device again.`;
   }
-}
-
-function normalizeNumberInputValue(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function applyDeviceConfigToForm(deviceConfig) {
@@ -238,36 +248,6 @@ const externalFtStatusModalEl = document.getElementById("externalFtStatusModal")
 const kissStatusModalEl = document.getElementById("kissStatusModal");
 const decoderLastEventModalEl = document.getElementById("decoderLastEventModal");
 const agcStatusModalEl = document.getElementById("agcStatusModal");
-const DEVICE_AUTO_PROFILES = {
-  rtl: { sample_rate: 2048000, gain: 30, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  hackrf: { sample_rate: 2000000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  airspy: { sample_rate: 2500000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" },
-  other: { sample_rate: 48000, gain: 20, ppm_correction: 0, frequency_offset_hz: 0, gain_profile: "auto" }
-};
-const BAND_PRESETS = {
-  "160m": { start_hz: 1810000, end_hz: 2000000 },
-  "80m": { start_hz: 3500000, end_hz: 3800000 },
-  "40m": { start_hz: 7000000, end_hz: 7200000 },
-  "20m": { start_hz: 14000000, end_hz: 14350000 },
-  "17m": { start_hz: 18068000, end_hz: 18168000 },
-  "15m": { start_hz: 21000000, end_hz: 21450000 },
-  "12m": { start_hz: 24890000, end_hz: 24990000 },
-  "10m": { start_hz: 28000000, end_hz: 29700000 },
-  "2m": { start_hz: 144000000, end_hz: 146000000 },
-  "70cm": { start_hz: 430000000, end_hz: 440000000 },
-};
-const DEFAULT_BAND_OPTIONS = [
-  { name: "160m", label: "160 m" },
-  { name: "80m", label: "80 m" },
-  { name: "40m", label: "40 m" },
-  { name: "20m", label: "20 m" },
-  { name: "17m", label: "17 m" },
-  { name: "15m", label: "15 m" },
-  { name: "12m", label: "12 m" },
-  { name: "10m", label: "10 m" },
-  { name: "2m", label: "2 m" },
-  { name: "70cm", label: "70 cm" },
-];
 const bandRangesByName = new Map(
   Object.entries(BAND_PRESETS).map(([name, range]) => [
     name,
@@ -369,10 +349,9 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
   }
 
   const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
-  renderWaterfallRuler(bandStartHz, bandEndHz);
-  updateVFODisplay(bandStartHz, bandEndHz);
-  lastSpectrumFrame = null;
-  clearWaterfallFrame();
+  wfc.renderRuler(bandStartHz, bandEndHz);
+  wfc.updateVFODisplay(bandStartHz, bandEndHz);
+  wfc.clearFrame();
 
   try {
     const resp = await fetch("/api/scan/preview/tune", {
@@ -387,111 +366,6 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
   } catch (err) {
     showToastError(err?.message || `Failed to tune to ${nextBand}`);
   }
-}
-
-function getWaterfallFullRangeHz() {
-  const frame = lastSpectrumFrame;
-  const displayStartHz = Number(frame?.band_display_start_hz || 0);
-  const displayEndHz = Number(frame?.band_display_end_hz || 0);
-  const scanStartHz = Number(frame?.scan_start_hz || 0);
-  const scanEndHz = Number(frame?.scan_end_hz || 0);
-  const centerHz = Number(frame?.center_hz || 0);
-  const spanHz = Number(frame?.span_hz || 0);
-  const hasDisplayRange = Number.isFinite(displayStartHz)
-    && Number.isFinite(displayEndHz)
-    && displayStartHz > 0
-    && displayEndHz > displayStartHz;
-  const hasScanRange = Number.isFinite(scanStartHz)
-    && Number.isFinite(scanEndHz)
-    && scanStartHz > 0
-    && scanEndHz > scanStartHz;
-  if (hasDisplayRange) {
-    return {
-      startHz: displayStartHz,
-      spanHz: displayEndHz - displayStartHz,
-    };
-  }
-  if (hasScanRange) {
-    return {
-      startHz: scanStartHz,
-      spanHz: scanEndHz - scanStartHz,
-    };
-  }
-  if (Number.isFinite(centerHz) && Number.isFinite(spanHz) && centerHz > 0 && spanHz > 0) {
-    const fullSpanHz = spanHz * WATERFALL_SEGMENT_COUNT;
-    return {
-      startHz: centerHz - (fullSpanHz / 2),
-      spanHz: fullSpanHz,
-    };
-  }
-  const fallbackBand = bandSelect?.value || "20m";
-  const fallbackRange = getScanRangeForBand(fallbackBand);
-  const startHz = Number(fallbackRange.start_hz || 0);
-  const endHz = Number(fallbackRange.end_hz || 0);
-  if (startHz > 0 && endHz > startHz) {
-    return {
-      startHz,
-      spanHz: endHz - startHz,
-    };
-  }
-  return null;
-}
-
-function getModeFocusFrequencyHz(mode) {
-  const normalizedMode = String(mode || "").trim().toUpperCase();
-  const selectedBand = String(bandSelect?.value || "").trim().toLowerCase();
-  if (normalizedMode === "CW" || normalizedMode === "CW_CANDIDATE") {
-    const cwFocusHz = Number(WATERFALL_CW_FOCUS_FREQUENCIES[selectedBand]);
-    if (Number.isFinite(cwFocusHz) && cwFocusHz > 0) {
-      return cwFocusHz;
-    }
-  }
-  const bandDialFrequencies = WATERFALL_DIAL_FREQUENCIES[selectedBand] || null;
-  if (bandDialFrequencies && Number.isFinite(Number(bandDialFrequencies[normalizedMode]))) {
-    return Number(bandDialFrequencies[normalizedMode]);
-  }
-  const bandRange = getScanRangeForBand(bandSelect?.value || "20m");
-  const startHz = Number(bandRange.start_hz || 0);
-  const endHz = Number(bandRange.end_hz || 0);
-  if (startHz > 0 && endHz > startHz) {
-    return Math.round((startHz + endHz) / 2);
-  }
-  return null;
-}
-
-function recenterWaterfallForMode(mode) {
-  if (!waterfallExplorerEnabled) {
-    waterfallExplorerEnabled = true;
-    localStorage.setItem(WATERFALL_EXPLORER_KEY, "1");
-  }
-  if (waterfallExplorerZoom <= 1) {
-    waterfallExplorerZoom = 4;
-    localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, "4");
-    applyWaterfallExplorerUi();
-  }
-  if (waterfallExplorerZoom <= 1) {
-    return;
-  }
-  const targetHz = Number(getModeFocusFrequencyHz(mode));
-  if (!Number.isFinite(targetHz) || targetHz <= 0) {
-    return;
-  }
-  const fullRange = getWaterfallFullRangeHz();
-  if (!fullRange) {
-    return;
-  }
-  const fullStartHz = Number(fullRange.startHz || 0);
-  const fullSpanHz = Number(fullRange.spanHz || 0);
-  if (!Number.isFinite(fullStartHz) || !Number.isFinite(fullSpanHz) || fullSpanHz <= 0) {
-    return;
-  }
-  const clampedTargetHz = Math.max(fullStartHz, Math.min(fullStartHz + fullSpanHz, targetHz));
-  const zoom = Math.max(1, Number(waterfallExplorerZoom || 1));
-  const visibleSpanHz = fullSpanHz / zoom;
-  const desiredStartHz = clampedTargetHz - (visibleSpanHz / 2);
-  const maxPan = Math.max(0, 1 - (1 / zoom));
-  waterfallExplorerPan = Math.max(0, Math.min(maxPan, (desiredStartHz - fullStartHz) / fullSpanHz));
-  redrawWaterfallFromHistory();
 }
 
 function populateBandSelectOptions(sourceBands) {
@@ -568,16 +442,11 @@ function refreshModeButtons() {
     const isCwMode = String(selectedDecoderMode || "").trim().toUpperCase() === "CW";
     cwScanParamsRow.classList.toggle("d-none", !isCwMode);
   }
-  renderScanContextSummary(latestScanState);
-}
-
-function formatScanRangeSummary(startHz, endHz) {
-  const start = Number(startHz || 0);
-  const end = Number(endHz || 0);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end <= start) {
-    return "--";
+  if (ssbScanParamsRow) {
+    const isSsbMode = String(selectedDecoderMode || "").trim().toUpperCase() === "SSB";
+    ssbScanParamsRow.classList.toggle("d-none", !isSsbMode);
   }
-  return `${formatRulerFrequencyLabel(start)} - ${formatRulerFrequencyLabel(end)}`;
+  renderScanContextSummary(latestScanState);
 }
 
 function resolveActiveBandName(scanState) {
@@ -637,996 +506,45 @@ function renderScanContextSummary(scanState) {
     : "full band";
 }
 
-const EVENTS_PANEL_PAGE_SIZE = 50;
 let eventOffset = 0;
 let eventsPanelPage = 0;
 let latestEvents = [];
-let row = 0;
-let lastSpectrumFrameTs = 0;
 let spectrumFallbackTimer = null;
-// Circular history buffer — stores raw WS frames so pan/zoom/goto can
-// replay the full waterfall instead of resetting to a blank canvas.
-const FFT_HISTORY_MAX = 300;
-const fftHistoryFrames = [];
-let waterfallDragRafPending = false; // rAF gate for drag replay
 let spectrumWs = null;
 let isScanRunning = false;
 let scanActionInFlight = false;
-const SHOW_NON_SDR_DEVICES_KEY = "showNonSdrDevices";
 let showNonSdrDevices = localStorage.getItem(SHOW_NON_SDR_DEVICES_KEY) === "1";
-const WATERFALL_GENERIC_STATUS = "No live spectrum data available. Check SDR device connection and scan status.";
-const WATERFALL_SIMULATE_MODE_MARKERS = false;
-const WATERFALL_MARKER_TTL_MS = 12000;     // generic DSP markers
-const WATERFALL_MARKER_TTL_CW_MS = 45000;  // CW: matches backend cw_sweep_dwell_s(30) × 1.5
-const WATERFALL_MARKER_TTL_SSB_MS = 20000;  // SSB fallback when pass_count is unavailable
-const WATERFALL_MARKER_TTL_SSB_PASSES = 2;  // expire SSB markers after 2 passes for short-signal tolerance
-const WATERFALL_MARKER_BUCKET_HZ = 50;
-const WATERFALL_MARKER_BUCKET_SSB_HZ = 1000;
-const waterfallMarkerCache = new Map();
-// Synthetic markers injected from jt9 decoded callsigns.  FT8/FT4 operate
-// 15-20 dB below the noise floor so DSP quality gates never fire for them.
-// Instead we inject ONE marker per known dial frequency per mode, carrying
-// the most-recently decoded callsign.  This avoids flooding the waterfall
-// with one marker per decoded station (can be 50-100 per cycle on busy bands).
-// TTL = 3 × mode_window: allows 2 consecutive missed decode cycles before
-// the marker disappears.  Only 1 band + 1 mode runs at a time.
-// FT8:  3 × 15 s  =  45 s
-// FT4:  3 × 7.5 s =  23 s (rounded up)
-// WSPR: 3 × 120 s = 360 s
-const WATERFALL_DECODED_MARKER_TTL_FT8_MS  =  45 * 1000; // 3 × 15 s
-const WATERFALL_DECODED_MARKER_TTL_FT4_MS  =  23 * 1000; // 3 × 7.5 s
-const WATERFALL_DECODED_MARKER_TTL_WSPR_MS = 360 * 1000; // 3 × 120 s
-// One decoded-marker entry per "<dialHz>_<MODE>" key.
-const waterfallDecodedMarkerCache = new Map();
-const WATERFALL_CALLSIGN_TTL_MS = 45 * 1000; // match FT8 TTL (dominant mode)
-// Used for DSP-marker to callsign proximity matching (non-decoded modes).
-const WATERFALL_CALLSIGN_MAX_DELTA_HZ = 1500;
-
-// Standard dial frequencies for FT8 / FT4 / WSPR, mirrored from the backend.
-// Used to snap decoded callsigns to a single marker position per band/mode.
-const WATERFALL_DIAL_FREQUENCIES = {
-  "160m": { FT8: 1_840_000, FT4: 1_840_000, WSPR: 1_836_600 },
-  "80m":  { FT8: 3_573_000, FT4: 3_575_500, WSPR: 3_592_600 },
-  "60m":  { FT8: 5_357_000, FT4: 5_357_000, WSPR: 5_287_200 },
-  "40m":  { FT8: 7_074_000, FT4: 7_047_500, WSPR: 7_040_100 },
-  "30m":  { FT8: 10_136_000, FT4: 10_140_000, WSPR: 10_140_200 },
-  "20m":  { FT8: 14_074_000, FT4: 14_080_000, WSPR: 14_095_600 },
-  "17m":  { FT8: 18_100_000, FT4: 18_104_000, WSPR: 18_104_600 },
-  "15m":  { FT8: 21_074_000, FT4: 21_140_000, WSPR: 21_094_600 },
-  "12m":  { FT8: 24_915_000, FT4: 24_919_000, WSPR: 24_924_600 },
-  "10m":  { FT8: 28_074_000, FT4: 28_180_000, WSPR: 28_124_600 },
-  "6m":   { FT8: 50_313_000, FT4: 50_318_000, WSPR: 50_293_000 },
-  "2m":   { FT8: 144_174_000, FT4: 144_170_000, WSPR: 144_489_000 },
-};
-
-const WATERFALL_CW_FOCUS_FREQUENCIES = {
-  "160m": 1_830_000,
-  "80m": 3_530_000,
-  "60m": 5_355_000,
-  "40m": 7_030_000,
-  "30m": 10_120_000,
-  "20m": 14_050_000,
-  "17m": 18_086_000,
-  "15m": 21_050_000,
-  "12m": 24_900_000,
-  "10m": 28_050_000,
-  "6m": 50_100_000,
-  "2m": 144_050_000,
-};
-// Maximum distance from a decoded freq to a known dial freq for the signal
-// to be considered "on that dial".  FT8 audio range is 0-3000 Hz; add 1 kHz
-// margin for direct-sampling frequency offset.
-const WATERFALL_DIAL_SNAP_HZ = 4000;
-
-function findDialFrequency(frequencyHz, mode) {
-  const normMode = String(mode || "").toUpperCase();
-  let best = null;
-  let bestDelta = Infinity;
-  for (const bandFreqs of Object.values(WATERFALL_DIAL_FREQUENCIES)) {
-    const dialHz = bandFreqs[normMode];
-    if (!dialHz) continue;
-    const delta = Math.abs(Number(frequencyHz) - dialHz);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = dialHz;
-    }
-  }
-  return bestDelta <= WATERFALL_DIAL_SNAP_HZ ? best : null;
-}
-const waterfallCallsignCache = new Map();
-let waterfallLatestCallsign = { callsign: "", seenAtMs: null };
-let waterfallHoverTooltip = null;
-// Track active hover so the tooltip survives the per-frame overlay redraw.
-let _waterfallHoverActive = false;
-let _waterfallLastTooltipText = "";
-let _waterfallLastTooltipX = 0;
-let _waterfallLastTooltipY = 0;
-const WATERFALL_EXPLORER_KEY = "waterfallExplorerEnabled";
-const WATERFALL_EXPLORER_ZOOM_KEY = "waterfallExplorerZoom";
-const WATERFALL_SEGMENT_COUNT = 12;
-let waterfallExplorerEnabled = localStorage.getItem(WATERFALL_EXPLORER_KEY) !== "0";
-let waterfallExplorerZoom = Number(localStorage.getItem(WATERFALL_EXPLORER_ZOOM_KEY) || 1);
-if (!Number.isFinite(waterfallExplorerZoom)) {
-  waterfallExplorerZoom = 1;
-}
-waterfallExplorerZoom = Math.max(1, Math.min(16, Math.round(waterfallExplorerZoom)));
-let waterfallExplorerPan = 0;
-if (waterfallExplorerZoom > 1) {
-  const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
-  waterfallExplorerPan = maxPan / 2;
-}
-let waterfallDragActive = false;
-let waterfallDragStartX = 0;
-let waterfallDragStartPan = 0;
-let lastSpectrumFrame = null;
 
 if (showNonSdrDevicesToggle) {
   showNonSdrDevicesToggle.checked = showNonSdrDevices;
 }
 
-function updateWaterfallModeBadge() {
-  if (!waterfallModeBadge) {
-    return;
-  }
-  waterfallModeBadge.textContent = "LIVE";
-  waterfallModeBadge.classList.remove("is-fake");
-  waterfallModeBadge.classList.add("is-live");
-}
-
-const waterfallTransition = document.getElementById("waterfallTransition");
-const waterfallTransitionMsg = document.getElementById("waterfallTransitionMsg");
-
-function showWaterfallTransition(message) {
-  if (!waterfallTransition || !waterfallTransitionMsg) return;
-  waterfallTransitionMsg.textContent = message;
-  waterfallTransition.hidden = false;
-}
-
-function hideWaterfallTransition() {
-  if (!waterfallTransition) return;
-  waterfallTransition.hidden = true;
-  if (waterfallTransitionMsg) waterfallTransitionMsg.textContent = "";
-}
-
-function setWaterfallGenericStatus(message = WATERFALL_GENERIC_STATUS) {
-  if (!waterfallStatus) {
-    return;
-  }
-  waterfallStatus.textContent = message;
-  waterfallStatus.classList.add("is-generic");
-  if (waterfallRuler) {
-    waterfallRuler.innerHTML = "";
-  }
-  if (waterfallModeOverlay) {
-    waterfallModeOverlay.innerHTML = "";
-  }
-}
-
-function clearWaterfallGenericStatus() {
-  if (!waterfallStatus) {
-    return;
-  }
-  waterfallStatus.classList.remove("is-generic");
-}
-
-function applyWaterfallExplorerUi() {
-  if (waterfallExplorerToggle) {
-    waterfallExplorerToggle.textContent = `Explorer SIM: ${waterfallExplorerEnabled ? "ON" : "OFF"}`;
-  }
-  if (waterfallZoomInput) {
-    waterfallZoomInput.value = String(waterfallExplorerZoom);
-    waterfallZoomInput.disabled = !waterfallExplorerEnabled;
-  }
-  if (waterfallResetViewBtn) {
-    waterfallResetViewBtn.disabled = !waterfallExplorerEnabled;
-  }
-  if (waterfallEl) {
-    waterfallEl.classList.toggle("is-draggable", waterfallExplorerEnabled);
-    waterfallEl.classList.remove("is-dragging");
-  }
-}
-
-function buildSegmentedSpectrumSimulation(frame) {
-  const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
-  if (!base.length) {
-    return [];
-  }
-  const now = Date.now() / 1000;
-  const bins = base.length;
-  const stitched = [];
-  for (let segmentIndex = 0; segmentIndex < WATERFALL_SEGMENT_COUNT; segmentIndex += 1) {
-    const shift = Math.floor(((segmentIndex * 0.67) % 1) * bins);
-    const gain = 0.9 + 0.25 * Math.sin(now * 0.2 + segmentIndex * 0.6);
-    for (let idx = 0; idx < bins; idx += 1) {
-      const source = base[(idx + shift) % bins];
-      const ripple = Math.sin((idx / bins) * Math.PI * 6 + segmentIndex + now * 0.45) * 2.2;
-      stitched.push((source * gain) + ripple);
-    }
-  }
-  return stitched;
-}
-
-function getWaterfallViewport(frame) {
-  const base = Array.isArray(frame?.fft_db) ? frame.fft_db : [];
-  const centerHz = Number(frame?.center_hz || 0);
-  const spanHz = Number(frame?.span_hz || 0);
-  const displayStartHz = Number(frame?.band_display_start_hz || 0);
-  const displayEndHz = Number(frame?.band_display_end_hz || 0);
-  const scanStartHz = Number(frame?.scan_start_hz || 0);
-  const scanEndHz = Number(frame?.scan_end_hz || 0);
-  const hasDisplayRange = Number.isFinite(displayStartHz)
-    && Number.isFinite(displayEndHz)
-    && displayStartHz > 0
-    && displayEndHz > displayStartHz;
-  const hasScanRange = Number.isFinite(scanStartHz)
-    && Number.isFinite(scanEndHz)
-    && scanStartHz > 0
-    && scanEndHz > scanStartHz;
-  if (!base.length || spanHz <= 0) {
-    return {
-      fftDb: base,
-      startHz: centerHz - (spanHz / 2),
-      endHz: centerHz + (spanHz / 2),
-      visibleSpanHz: spanHz,
-      simulated: false
-    };
-  }
-  if (!waterfallExplorerEnabled) {
-    return {
-      fftDb: base,
-      startHz: centerHz - (spanHz / 2),
-      endHz: centerHz + (spanHz / 2),
-      visibleSpanHz: spanHz,
-      simulated: false
-    };
-  }
-
-  const stitched = buildSegmentedSpectrumSimulation(frame);
-  const zoom = Math.max(1, waterfallExplorerZoom);
-  const totalBins = stitched.length;
-  const visibleBins = Math.max(256, Math.floor(totalBins / zoom));
-  const maxPan = Math.max(0, 1 - (1 / zoom));
-  waterfallExplorerPan = Math.max(0, Math.min(maxPan, waterfallExplorerPan));
-  const startBin = Math.max(0, Math.min(totalBins - visibleBins, Math.round(waterfallExplorerPan * totalBins)));
-  const fftDb = stitched.slice(startBin, startBin + visibleBins);
-
-  const fullSpanHz = hasDisplayRange
-    ? (displayEndHz - displayStartHz)
-    : (hasScanRange ? (scanEndHz - scanStartHz) : (spanHz * WATERFALL_SEGMENT_COUNT));
-  const visibleSpanHz = fullSpanHz / zoom;
-  const fullStartHz = hasDisplayRange
-    ? displayStartHz
-    : (hasScanRange ? scanStartHz : (centerHz - (fullSpanHz / 2)));
-  const startHz = fullStartHz + (waterfallExplorerPan * fullSpanHz);
-  const endHz = startHz + visibleSpanHz;
-
-  return {
-    fftDb,
-    startHz,
-    endHz,
-    visibleSpanHz,
-    simulated: true
-  };
-}
-
-function clearWaterfallFrame() {
-  row = 0;
-  // Intentional reset (band change, etc.) — discard accumulated history too
-  fftHistoryFrames.length = 0;
-  if (webglWaterfall) {
-    resizeCanvas();
-    return;
-  }
-  if (!ctx) {
-    ctx = canvas.getContext("2d");
-  }
-  if (!ctx) {
-    return;
-  }
-  const width = canvas.width / window.devicePixelRatio;
-  const height = canvas.height / window.devicePixelRatio;
-  ctx.clearRect(0, 0, width, height);
-}
-
-function normalizeModeLabel(mode) {
-  const text = String(mode || "").trim().toUpperCase();
-  if (text === "CW_CANDIDATE") {
-    return "CW TRAFFIC";
-  }
-  if (text === "SSB_TRAFFIC") {
-    return "SSB TRAFFIC";
-  }
-  return text || "SIG";
-}
-
-function modeMatchesSelectedMode(modeValue, selectedModeValue) {
-  const mode = String(modeValue || "").trim().toUpperCase();
-  const selectedMode = String(selectedModeValue || "").trim().toUpperCase();
-  if (!selectedMode) {
-    return true;
-  }
-  if (selectedMode === "CW") {
-    return mode === "CW" || mode === "CW_CANDIDATE";
-  }
-  if (selectedMode === "SSB") {
-    return mode === "SSB" || mode === "SSB_TRAFFIC";
-  }
-  return mode === selectedMode;
-}
-
-function formatRulerFrequencyLabel(frequencyHz) {
-  const mhz = Number(frequencyHz) / 1_000_000;
-  if (!Number.isFinite(mhz)) {
-    return "-";
-  }
-  return `${mhz.toFixed(3)} MHz`;
-}
-
-function formatLastSeenTime(seenAtMs) {
-  const timestamp = Number(seenAtMs);
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return "-";
-  }
-  const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleTimeString();
-}
-
-function ensureWaterfallHoverTooltip() {
-  if (waterfallHoverTooltip || !waterfallEl) {
-    return waterfallHoverTooltip;
-  }
-  const tooltip = document.createElement("div");
-  tooltip.className = "waterfall-hover-tooltip";
-  tooltip.setAttribute("role", "tooltip");
-  tooltip.classList.add("is-hidden");
-  waterfallEl.appendChild(tooltip);
-  waterfallHoverTooltip = tooltip;
-  return waterfallHoverTooltip;
-}
-
-function hideWaterfallHoverTooltip() {
-  const tooltip = ensureWaterfallHoverTooltip();
-  if (!tooltip) {
-    return;
-  }
-  tooltip.classList.add("is-hidden");
-  _waterfallHoverActive = false;
-}
-
-function showWaterfallHoverTooltip(text, clientX, clientY) {
-  const tooltip = ensureWaterfallHoverTooltip();
-  if (!tooltip || !text) {
-    return;
-  }
-  tooltip.textContent = text;
-  const rect = waterfallEl.getBoundingClientRect();
-  const x = Math.max(10, Math.min(rect.width - 10, clientX - rect.left));
-  const y = Math.max(10, Math.min(rect.height - 10, clientY - rect.top));
-  tooltip.style.left = `${x}px`;
-  tooltip.style.top = `${y}px`;
-  tooltip.classList.remove("is-hidden");
-  _waterfallHoverActive = true;
-  _waterfallLastTooltipText = text;
-  _waterfallLastTooltipX = clientX;
-  _waterfallLastTooltipY = clientY;
-}
-
-function computeRulerStepHz(spanHz, rulerWidthPx = 0) {
-  const span = Number(spanHz);
-  if (!Number.isFinite(span) || span <= 0) {
-    return 100_000;
-  }
-
-  const widthPx = Number.isFinite(rulerWidthPx) && rulerWidthPx > 0 ? rulerWidthPx : 960;
-  const targetTicks = Math.max(4, Math.min(16, Math.round(widthPx / 110)));
-  const rawStepHz = span / targetTicks;
-  if (!Number.isFinite(rawStepHz) || rawStepHz <= 0) {
-    return 100_000;
-  }
-
-  const magnitude = 10 ** Math.floor(Math.log10(rawStepHz));
-  const normalized = rawStepHz / magnitude;
-  let niceFactor = 10;
-  if (normalized <= 1) {
-    niceFactor = 1;
-  } else if (normalized <= 2) {
-    niceFactor = 2;
-  } else if (normalized <= 5) {
-    niceFactor = 5;
-  }
-
-  const stepHz = niceFactor * magnitude;
-  return Math.max(1_000, Math.round(stepHz));
-}
-
-function renderWaterfallRuler(startHz, endHz) {
-  if (!waterfallRuler) {
-    return;
-  }
-  const start = Number(startHz);
-  const end = Number(endHz);
-  const span = end - start;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || span <= 0) {
-    waterfallRuler.innerHTML = "";
-    return;
-  }
-
-  const stepHz = computeRulerStepHz(span, waterfallRuler.clientWidth);
-  const selectedBandRange = getScanRangeForBand(bandSelect?.value || "20m");
-  const gridOriginHz = Number(selectedBandRange?.start_hz || start);
-  const firstTick = gridOriginHz + (Math.ceil((start - gridOriginHz) / stepHz) * stepHz);
-  const maxTicks = 500;
-  let count = 0;
-  waterfallRuler.innerHTML = "";
-
-  for (let tickHz = firstTick; tickHz <= end && count < maxTicks; tickHz += stepHz) {
-    const normalized = (tickHz - start) / span;
-    if (normalized < 0 || normalized > 1) {
-      continue;
-    }
-    const left = `${(normalized * 100).toFixed(2)}%`;
-
-    const tick = document.createElement("span");
-    tick.className = "waterfall-ruler__tick";
-    tick.style.left = left;
-
-    const label = document.createElement("span");
-    label.className = "waterfall-ruler__label";
-    label.style.left = left;
-    label.textContent = formatRulerFrequencyLabel(tickHz);
-
-    waterfallRuler.appendChild(tick);
-    waterfallRuler.appendChild(label);
-    count += 1;
-  }
-}
-
-function resolveWaterfallRulerRange(frame, viewport, stableRangeStartHz = null, stableRangeEndHz = null) {
-  const isValidRange = (startValue, endValue) => {
-    const start = Number(startValue);
-    const end = Number(endValue);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      return false;
-    }
-    const center = (start + end) / 2;
-    return center > 1_000_000;
-  };
-
-  if (isValidRange(stableRangeStartHz, stableRangeEndHz)) {
-    if (Boolean(viewport?.simulated) && isValidRange(viewport?.startHz, viewport?.endHz)) {
-      return { startHz: Number(viewport.startHz), endHz: Number(viewport.endHz) };
-    }
-    return { startHz: Number(stableRangeStartHz), endHz: Number(stableRangeEndHz) };
-  }
-  if (isValidRange(frame?.band_display_start_hz, frame?.band_display_end_hz)) {
-    return {
-      startHz: Number(frame.band_display_start_hz),
-      endHz: Number(frame.band_display_end_hz)
-    };
-  }
-  if (isValidRange(frame?.scan_start_hz, frame?.scan_end_hz)) {
-    return { startHz: Number(frame.scan_start_hz), endHz: Number(frame.scan_end_hz) };
-  }
-  if (isValidRange(viewport?.startHz, viewport?.endHz)) {
-    return { startHz: Number(viewport.startHz), endHz: Number(viewport.endHz) };
-  }
-  const bandRange = getScanRangeForBand(bandSelect?.value || "20m");
-  return {
-    startHz: Number(bandRange.start_hz),
-    endHz: Number(bandRange.end_hz)
-  };
-}
-
-function buildStableWaterfallMarkers(frame) {
-  const currentPassCount = Number(frame?.pass_count);
-  const hasCurrentPassCount = Number.isFinite(currentPassCount) && currentPassCount >= 0;
-  const displayStartHz = Number(frame?.band_display_start_hz || 0);
-  const displayEndHz = Number(frame?.band_display_end_hz || 0);
-  const hasDisplayRange = Number.isFinite(displayStartHz)
-    && Number.isFinite(displayEndHz)
-    && displayStartHz > 0
-    && displayEndHz > displayStartHz;
-  const scanStartHz = Number(frame?.scan_start_hz || 0);
-  const scanEndHz = Number(frame?.scan_end_hz || 0);
-  const hasScanRange = Number.isFinite(scanStartHz)
-    && Number.isFinite(scanEndHz)
-    && scanStartHz > 0
-    && scanEndHz > scanStartHz;
-  const defaultStartHz = Number(frame?.center_hz || 0) - (Number(frame?.span_hz || 0) / 2);
-  const defaultEndHz = Number(frame?.center_hz || 0) + (Number(frame?.span_hz || 0) / 2);
-  const rangeStartHz = hasDisplayRange
-    ? displayStartHz
-    : (hasScanRange ? scanStartHz : defaultStartHz);
-  const rangeEndHz = hasDisplayRange
-    ? displayEndHz
-    : (hasScanRange ? scanEndHz : defaultEndHz);
-  
-  // Only show markers during active scan with mode selected
-  if (!isScanRunning || !selectedDecoderMode) {
-    return {
-      markers: [],
-      rangeStartHz,
-      rangeEndHz
-    };
-  }
-  
-  const now = Date.now();
-
-  if (Array.isArray(frame?.mode_markers)) {
-    const selectedMode = String(selectedDecoderMode).toUpperCase();
-    
-    frame.mode_markers.forEach((marker) => {
-      const markerModeRaw = String(marker?.mode || "").trim().toUpperCase();
-      
-      // Filter by selected decoder mode - only show markers matching current mode
-      if (!modeMatchesSelectedMode(markerModeRaw, selectedMode)) {
-        return;
-      }
-      
-      const markerFreq = Number(marker?.frequency_hz);
-      const markerOffset = Number(marker?.offset_hz ?? 0);
-      const inferredFreq = Number(frame?.center_hz || 0) + markerOffset;
-      const frequencyHz = Number.isFinite(markerFreq) && markerFreq > 0 ? markerFreq : inferredFreq;
-      if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) {
-        return;
-      }
-      if (frequencyHz < rangeStartHz || frequencyHz > rangeEndHz) {
-        return;
-      }
-      const isSsbMarker = markerModeRaw === "SSB" || markerModeRaw === "SSB_TRAFFIC";
-      const bucketHz = isSsbMarker ? WATERFALL_MARKER_BUCKET_SSB_HZ : WATERFALL_MARKER_BUCKET_HZ;
-      const key = `${Math.round(frequencyHz / bucketHz) * bucketHz}`;
-      waterfallMarkerCache.set(key, {
-        frequency_hz: frequencyHz,
-        mode: markerModeRaw,
-        snr_db: Number(marker?.snr_db),
-        crest_db: Number(marker?.crest_db),
-        seen_at: now,
-        seen_pass_count: isSsbMarker && hasCurrentPassCount ? currentPassCount : null
-      });
-    });
-  }
-
-  for (const [key, marker] of waterfallMarkerCache.entries()) {
-    const markerModeText = String(marker?.mode || "").trim().toUpperCase();
-    const isCw = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-    const isSsb = markerModeText === "SSB" || markerModeText === "SSB_TRAFFIC";
-    const seenAt = Number(marker?.seen_at || 0);
-    if (!Number.isFinite(seenAt) || seenAt <= 0) {
-      waterfallMarkerCache.delete(key);
-      continue;
-    }
-
-    // Phase 1.4: SSB markers are persisted across sweep passes to reduce
-    // flicker and preserve context while the scanner revisits frequencies.
-    if (isSsb && hasCurrentPassCount) {
-      const seenPassCount = Number(marker?.seen_pass_count);
-      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) <= WATERFALL_MARKER_TTL_SSB_PASSES) {
-        continue;
-      }
-      if (Number.isFinite(seenPassCount) && (currentPassCount - seenPassCount) > WATERFALL_MARKER_TTL_SSB_PASSES) {
-        waterfallMarkerCache.delete(key);
-        continue;
-      }
-    }
-
-    const ttl = isCw
-      ? WATERFALL_MARKER_TTL_CW_MS
-      : (isSsb ? WATERFALL_MARKER_TTL_SSB_MS : WATERFALL_MARKER_TTL_MS);
-    if ((now - seenAt) > ttl) {
-      waterfallMarkerCache.delete(key);
-    }
-  }
-
-  // Expire stale synthetic (jt9-decoded) markers.
-  // Each mode runs independently, so use its own window-based TTL.
-  for (const [key, marker] of waterfallDecodedMarkerCache.entries()) {
-    let ttl;
-    if      (key.endsWith("_WSPR")) ttl = WATERFALL_DECODED_MARKER_TTL_WSPR_MS;
-    else if (key.endsWith("_FT4"))  ttl = WATERFALL_DECODED_MARKER_TTL_FT4_MS;
-    else                             ttl = WATERFALL_DECODED_MARKER_TTL_FT8_MS;
-    if ((now - Number(marker?.seen_at || 0)) > ttl) {
-      waterfallDecodedMarkerCache.delete(key);
-    }
-  }
-
-  // Build merged set: DSP markers take precedence; decoded markers fill the
-  // gaps (FT8/FT4 operate below the noise floor so DSP gates rarely trigger).
-  const mergedMarkerMap = new Map();
-  for (const [key, marker] of waterfallDecodedMarkerCache.entries()) {
-    mergedMarkerMap.set(key, marker);
-  }
-  for (const [key, marker] of waterfallMarkerCache.entries()) {
-    mergedMarkerMap.set(key, marker); // DSP marker wins when both exist
-  }
-
-  const selectedMode = String(selectedDecoderMode).toUpperCase();
-  
-  const markers = Array.from(mergedMarkerMap.values())
-    .filter((marker) => {
-      const frequencyHz = Number(marker?.frequency_hz);
-      const m = String(marker?.mode || "").toUpperCase();
-      
-      // Filter by selected decoder mode
-      if (!modeMatchesSelectedMode(m, selectedMode)) return false;
-      
-      return Number.isFinite(frequencyHz)
-        && frequencyHz >= rangeStartHz
-        && frequencyHz <= rangeEndHz;
-    })
-    .sort((left, right) => Number(left.frequency_hz) - Number(right.frequency_hz));
-
-  return {
-    markers,
-    rangeStartHz,
-    rangeEndHz
-  };
-}
-
-let _overlayLastFingerprint = "";
-
-function _buildOverlayFingerprint(modeMarkers, rangeStartHz, rangeEndHz) {
-  if (!Array.isArray(modeMarkers) || !modeMarkers.length) return "";
-  return modeMarkers.map((m) =>
-    `${m.frequency_hz}|${m.mode}|${m.callsign || ""}|${m.snr_db ?? ""}|${rangeStartHz}|${rangeEndHz}`
-  ).join(";");
-}
-
-function renderWaterfallModeOverlay(modeMarkers, spanHz, rangeStartHz = null, rangeEndHz = null) {
-  if (!waterfallModeOverlay) {
-    return;
-  }
-  const span = Number(spanHz || 0);
-  if (!Array.isArray(modeMarkers) || !modeMarkers.length || span <= 0) {
-    if (waterfallModeOverlay.innerHTML !== "") {
-      waterfallModeOverlay.innerHTML = "";
-      hideWaterfallHoverTooltip();
-    }
-    _overlayLastFingerprint = "";
-    return;
-  }
-
-  // Skip full DOM rebuild if nothing changed (prevents per-frame flicker)
-  const fingerprint = _buildOverlayFingerprint(modeMarkers, rangeStartHz, rangeEndHz);
-  if (fingerprint === _overlayLastFingerprint) {
-    return;
-  }
-  _overlayLastFingerprint = fingerprint;
-
-  waterfallModeOverlay.innerHTML = "";
-  // Sort by frequency_hz (decoded markers) or offset_hz (DSP markers)
-  const sortedMarkers = modeMarkers
-    .slice()
-    .sort((left, right) => {
-      const aFreq = Number(left?.frequency_hz || 0);
-      const bFreq = Number(right?.frequency_hz || 0);
-      if (aFreq && bFreq) return aFreq - bFreq;
-      return Number(left?.offset_hz || 0) - Number(right?.offset_hz || 0);
-    });
-  const lanes = [[], [], []];
-
-  const hasRange = Number.isFinite(rangeStartHz)
-    && Number.isFinite(rangeEndHz)
-    && Number(rangeEndHz) > Number(rangeStartHz);
-  const safeRangeStartHz = hasRange ? Number(rangeStartHz) : null;
-  const safeRangeEndHz = hasRange ? Number(rangeEndHz) : null;
-
-  // For DSP markers (no embedded callsign) fall back to proximity-based lookup.
-  // Decoded markers already have .callsign embedded — no lookup needed.
-  const callsignMap = assignCallsignsToMarkers(
-    sortedMarkers.filter((m) => !m?.decoded)
-  );
-
-  sortedMarkers.forEach((marker) => {
-    const offsetHz = Number(marker?.offset_hz ?? 0);
-    const markerFreq = Number(marker?.frequency_hz);
-    let normalized = 0.5;
-    if (hasRange && Number.isFinite(markerFreq)) {
-      normalized = (markerFreq - safeRangeStartHz) / (safeRangeEndHz - safeRangeStartHz);
-    } else {
-      normalized = (offsetHz + span / 2) / span;
-    }
-    normalized = Math.max(0, Math.min(1, normalized));
-    let laneIndex = 0;
-    const minDistance = 0.06;
-    for (let idx = 0; idx < lanes.length; idx += 1) {
-      const lane = lanes[idx];
-      const tooClose = lane.some((existingPos) => Math.abs(existingPos - normalized) < minDistance);
-      if (!tooClose) {
-        laneIndex = idx;
-        break;
-      }
-    }
-    lanes[laneIndex].push(normalized);
-
-    const label = document.createElement("span");
-    label.className = "waterfall-mode-label";
-    label.style.left = `${(normalized * 100).toFixed(2)}%`;
-    label.style.setProperty("--lane-top", `${laneIndex * 22}px`);
-    label.textContent = normalizeModeLabel(marker?.mode);
-    const snr = Number(marker?.snr_db);
-    const crest = Number(marker?.crest_db);
-    const markerKey = String(Math.round(markerFreq / 50) * 50);
-    // Decoded markers (FT8/FT4 from jt9) have the callsign embedded directly.
-    // DSP markers fall back to a proximity-based cache lookup.
-    const embeddedCallsign = String(marker?.callsign || "");
-    const embeddedSeenAtMs = marker?.seenAtMs || null;
-    const proximityMatch = callsignMap.get(markerKey) || { callsign: "", seenAtMs: null };
-    const markerCallsign = embeddedCallsign || proximityMatch?.callsign || "";
-    const markerModeText = String(marker?.mode || "").trim().toUpperCase();
-    const missingCallsignLabel = markerModeText === "CW_CANDIDATE"
-      ? "CW TRAFFIC"
-      : markerModeText === "CW"
-        ? "CW"
-        : "-";
-    const markerSeenAtText = formatLastSeenTime(embeddedSeenAtMs || proximityMatch?.seenAtMs);
-    const isCwMarker = markerModeText === "CW" || markerModeText === "CW_CANDIDATE";
-    const freqText = Number.isFinite(markerFreq) && markerFreq > 0
-      ? ` | ${(markerFreq / 1_000_000).toFixed(3)} MHz`
-      : "";
-    const callsignText = markerCallsign
-      ? ` | callsign ${markerCallsign}`
-      : ` | ${missingCallsignLabel}`;
-    const crestText = Number.isFinite(crest) ? ` | Crest ${crest.toFixed(1)} dB` : "";
-    const statusText = isCwMarker
-      ? `${Number.isFinite(snr) ? ` | SNR(tone) ${snr.toFixed(1)} dB` : " | SNR(tone) -"}${crestText}`
-      : ` | last ${markerSeenAtText}`;
-    const tooltipText = Number.isFinite(snr)
-      ? `${label.textContent}${freqText}${callsignText}${statusText}${isCwMarker ? "" : ` | ${snr.toFixed(1)} dB`}`
-      : `${label.textContent}${freqText}${callsignText}${statusText}`;
-    label.title = tooltipText;
-    label.setAttribute("aria-label", tooltipText);
-    label.addEventListener("mouseenter", (event) => {
-      showWaterfallHoverTooltip(tooltipText, event.clientX, event.clientY);
-    });
-    label.addEventListener("mousemove", (event) => {
-      showWaterfallHoverTooltip(tooltipText, event.clientX, event.clientY);
-    });
-    label.addEventListener("mouseleave", () => {
-      hideWaterfallHoverTooltip();
-    });
-    waterfallModeOverlay.appendChild(label);
-  });
-  // Restore tooltip if the user was actively hovering before the per-frame redraw.
-  // innerHTML = "" destroys the label elements without firing mouseleave, so
-  // _waterfallHoverActive stays true and we can re-show with the saved state.
-  if (_waterfallHoverActive && _waterfallLastTooltipText) {
-    showWaterfallHoverTooltip(_waterfallLastTooltipText, _waterfallLastTooltipX, _waterfallLastTooltipY);
-  }
-}
-
-function cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs = Date.now(), mode = "") {
-  const normalizedCallsign = String(callsign || "").trim().toUpperCase();
-  const numericFrequency = Number(frequencyHz);
-  if (!normalizedCallsign || !isValidCallsign(normalizedCallsign)) {
-    return;
-  }
-  if (!Number.isFinite(numericFrequency) || numericFrequency <= 0) {
-    return;
-  }
-  const bucketHz = Math.round(numericFrequency / 50) * 50;
-  const normalizedMode = String(mode || "").toUpperCase();
-  waterfallCallsignCache.set(String(bucketHz), {
-    callsign: normalizedCallsign,
-    frequency_hz: numericFrequency,
-    seen_at: Date.now(),   // TTL relative to injection time, not event timestamp
-    seenAtMs: seenAtMs,    // original decode timestamp (for display/tooltip)
-    mode: normalizedMode
-  });
-
-  // FT8 / FT4 signals are decoded 15-20 dB below the noise floor, so the DSP
-  // quality gate (SNR ≥ 10 dB, min_hits ≥ 2) never fires for them.  Instead,
-  // inject ONE synthetic marker per known dial frequency per mode, keeping the
-  // MOST RECENT decoded callsign.  This gives a single, stable FT8 and FT4
-  // marker on the waterfall (not one per station on a busy band).
-  if (normalizedMode !== "FT8" && normalizedMode !== "FT4") {
-    return;
-  }
-  const dialHz = findDialFrequency(numericFrequency, normalizedMode);
-  if (!dialHz) {
-    return;
-  }
-  const markerKey = `${dialHz}_${normalizedMode}`;
-  const existing = waterfallDecodedMarkerCache.get(markerKey);
-  const ts = Number(seenAtMs);
-  // Update when: no existing entry, or this decode is the same age or newer.
-  // Use Date.now() for seen_at so the TTL is relative to injection time, not
-  // the historical event timestamp (which would cause immediate expiry for
-  // events fetched from the DB).
-  if (!existing || ts >= Number(existing.seenAtMs || 0)) {
-    waterfallDecodedMarkerCache.set(markerKey, {
-      frequency_hz: dialHz,    // anchor at dial freq (band centre), not audio offset
-      mode: normalizedMode,
-      snr_db: null,
-      seen_at: Date.now(),     // TTL relative to injection time, not event timestamp
-      callsign: normalizedCallsign,
-      seenAtMs: ts,            // original decode timestamp for ordering/tooltip
-      decoded: true,
-    });
-  }
-}
-
-function cacheLatestCallsign(callsign, seenAtMs = Date.now()) {
-  const normalizedCallsign = String(callsign || "").trim().toUpperCase();
-  const timestampMs = Number(seenAtMs);
-  if (!normalizedCallsign || !isValidCallsign(normalizedCallsign)) {
-    return;
-  }
-  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
-    return;
-  }
-  const currentSeenAt = Number(waterfallLatestCallsign?.seenAtMs || 0);
-  if (timestampMs >= currentSeenAt) {
-    waterfallLatestCallsign = { callsign: normalizedCallsign, seenAtMs: timestampMs };
-  }
-}
-
-function cleanupWaterfallCallsignCache() {
-  const now = Date.now();
-  for (const [key, entry] of waterfallCallsignCache.entries()) {
-    if ((now - Number(entry?.seen_at || 0)) > WATERFALL_CALLSIGN_TTL_MS) {
-      waterfallCallsignCache.delete(key);
-    }
-  }
-}
-
-function updateCallsignCacheFromEvent(eventItem) {
-  if (!eventItem || typeof eventItem !== "object") {
-    return;
-  }
-  
-  // Filter events by selected decoder mode - reject mismatched modes
-  const eventMode = String(eventItem.mode || "").toUpperCase();
-  if (selectedDecoderMode) {
-    const selectedMode = String(selectedDecoderMode).toUpperCase();
-    if (!modeMatchesSelectedMode(eventMode, selectedMode)) {
-      return; // Ignore events from different decoder modes
-    }
-  }
-  
-  const allowRawCallsignInference = eventMode !== "SSB";
-  const callsign = String(
-    eventItem.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem.raw) : "") || ""
-  ).trim().toUpperCase();
-  const frequencyHz = Number(eventItem.frequency_hz);
-  const mode = eventMode;
-  const timestampMs = eventItem.timestamp ? Date.parse(eventItem.timestamp) : Date.now();
-  const seenAtMs = Number.isFinite(timestampMs) ? timestampMs : Date.now();
-  cacheLatestCallsign(callsign, seenAtMs);
-  cacheCallsignByFrequency(callsign, frequencyHz, seenAtMs, mode);
-  cleanupWaterfallCallsignCache();
-}
-
-function updateCallsignCacheFromEvents(items) {
-  if (!Array.isArray(items)) {
-    return;
-  }
-  items.forEach((eventItem) => updateCallsignCacheFromEvent(eventItem));
-}
-
-/**
- * Build a 1:1 mapping from marker frequency to callsign so that each
- * decoded callsign appears on at most ONE marker tooltip.
- *
- * Algorithm:
- *  1. Collect all (callsign-cache entry, marker) pairs within
- *     WATERFALL_CALLSIGN_MAX_DELTA_HZ and matching mode.
- *  2. Sort pairs by frequency delta (closest first).
- *  3. Greedily assign: if neither the cache entry nor the marker
- *     has been used yet, link them.
- *
- * Returns a Map<roundedMarkerFreq, {callsign, seenAtMs}>.
- */
-function assignCallsignsToMarkers(markers) {
-  cleanupWaterfallCallsignCache();
-  const result = new Map();
-  if (!Array.isArray(markers) || !markers.length) {
-    return result;
-  }
-
-  // Build candidate pairs
-  const pairs = [];
-  const cacheEntries = Array.from(waterfallCallsignCache.values());
-  for (const marker of markers) {
-    const mFreq = Number(marker?.frequency_hz);
-    const mMode = String(marker?.mode || "").toUpperCase();
-    if (!Number.isFinite(mFreq) || mFreq <= 0) continue;
-    for (const entry of cacheEntries) {
-      const eFreq = Number(entry?.frequency_hz);
-      const eMode = String(entry?.mode || "").toUpperCase();
-      const eCall = String(entry?.callsign || "");
-      if (!eCall) continue;
-      if (!Number.isFinite(eFreq) || eFreq <= 0) continue;
-      if (mMode && eMode && eMode !== mMode) continue;
-      const delta = Math.abs(eFreq - mFreq);
-      if (delta > WATERFALL_CALLSIGN_MAX_DELTA_HZ) continue;
-      pairs.push({
-        markerKey: String(Math.round(mFreq / 50) * 50),
-        callsign: eCall,
-        seenAt: Number(entry?.seen_at || 0),
-        delta,
-        entryKey: String(Math.round(eFreq / 50) * 50),
-      });
-    }
-  }
-
-  // Sort: smallest delta first; break ties by newest decode
-  pairs.sort((a, b) => a.delta - b.delta || b.seenAt - a.seenAt);
-
-  const usedMarkers = new Set();
-  const usedCallsigns = new Set();
-  for (const p of pairs) {
-    if (usedMarkers.has(p.markerKey)) continue;
-    if (usedCallsigns.has(p.callsign)) continue;
-    usedMarkers.add(p.markerKey);
-    usedCallsigns.add(p.callsign);
-    result.set(p.markerKey, {
-      callsign: p.callsign,
-      seenAtMs: Number.isFinite(p.seenAt) ? p.seenAt : null,
-    });
-  }
-  return result;
-}
-
-function buildSimulatedModeMarkers(spanHz, rangeStartHz = null, rangeEndHz = null) {
-  if (!WATERFALL_SIMULATE_MODE_MARKERS) {
-    return [];
-  }
-  const nextSpanHz = Number(spanHz || 0);
-  if (nextSpanHz <= 0) {
-    return [];
-  }
-  const hasRange = Number.isFinite(rangeStartHz)
-    && Number.isFinite(rangeEndHz)
-    && Number(rangeEndHz) > Number(rangeStartHz);
-  const startHz = hasRange ? Number(rangeStartHz) : -nextSpanHz / 2;
-  const endHz = hasRange ? Number(rangeEndHz) : nextSpanHz / 2;
-  const spanForPlacementHz = endHz - startHz;
-
-  const buildModeSet = (mode, count, snrBase, segmentStartRatio, segmentEndRatio) => {
-    const items = [];
-    const modeSpanRatio = Math.max(0.01, segmentEndRatio - segmentStartRatio);
-    for (let index = 0; index < count; index += 1) {
-      const ratio = segmentStartRatio + (((index + 0.5) / count) * modeSpanRatio);
-      const frequencyHz = startHz + (ratio * spanForPlacementHz);
-      const centeredOffsetHz = frequencyHz - (startHz + spanForPlacementHz / 2);
-      items.push({
-        mode,
-        offset_hz: centeredOffsetHz,
-        frequency_hz: hasRange ? frequencyHz : undefined,
-        snr_db: snrBase + ((index % 5) * 0.8)
-      });
-    }
-    return items;
-  };
-
-  // Filter simulated markers by selected decoder mode
-  if (!selectedDecoderMode) {
-    return []; // No mode selected, show no markers
-  }
-  
-  const selectedMode = String(selectedDecoderMode || "").toUpperCase();
-  
-  // Generate markers only for the selected mode
-  switch (selectedMode) {
-    case "FT8":
-    case "FT4":
-      return buildModeSet(selectedMode, 10, 8.0, 0.0, 1.0);
-    case "CW":
-      return buildModeSet("CW", 20, 10.0, 0.0, 1.0);
-    case "SSB":
-      return buildModeSet("SSB", 30, 12.0, 0.0, 1.0);
-    case "WSPR":
-      return buildModeSet("WSPR", 8, 6.0, 0.0, 1.0);
-    case "APRS":
-      return buildModeSet("APRS", 12, 9.0, 0.0, 1.0);
-    default:
-      return [];
-  }
-}
+const wfc = new WaterfallController(
+  {
+    canvas,
+    spectrumCanvas,
+    spectrumCtx,
+    waterfallEl,
+    waterfallStatus,
+    waterfallModeBadge,
+    waterfallRuler,
+    waterfallModeOverlay,
+    waterfallTransition: document.getElementById("waterfallTransition"),
+    waterfallTransitionMsg: document.getElementById("waterfallTransitionMsg"),
+    waterfallExplorerToggle,
+    waterfallZoomInput,
+    waterfallResetViewBtn,
+    bandSelect,
+    vfoFreqEl: document.getElementById("vfoFreqEl"),
+    vfoGotoInput: document.getElementById("vfoGotoInput"),
+    vfoApplyBtn: document.getElementById("vfoApplyBtn"),
+  },
+  {
+    getScanRange: (bandName) => getScanRangeForBand(bandName),
+    onVFOUpdate: () => refreshQuickBandButtons(),
+    showToast: (msg) => showToast(msg),
+  }
+);
 
 function updateFullscreenButtonState() {
   if (!waterfallFullscreenBtn) {
@@ -1640,9 +558,9 @@ if (copyrightYearEl) {
   copyrightYearEl.textContent = String(new Date().getFullYear());
 }
 
-updateWaterfallModeBadge();
+wfc.updateModeBadge();
 updateFullscreenButtonState();
-applyWaterfallExplorerUi();
+wfc.applyExplorerUi();
 
 function logLine(text) {
   if (!frontendLogsEl) {
@@ -1759,57 +677,6 @@ function showRetentionToast(info) {
   noticeEl.appendChild(closeBtn);
   toast.appendChild(noticeEl);
   logLine(`[Retention] ${rows} events exported and purged.`);
-}
-
-function isValidCallsign(value) {
-  const text = String(value || "").trim().toUpperCase();
-  if (!text) {
-    return true;
-  }
-  return /^(?=.*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(\/[A-Z0-9]{1,4})?$/.test(text);
-}
-
-function extractCallsignFromRaw(value) {
-  const text = String(value || "").toUpperCase();
-  if (!text) {
-    return "";
-  }
-  const match = text.match(/\b(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,3}[0-9][A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?\b/);
-  return match ? match[0] : "";
-}
-
-function _isSsbSpectralProof(text) {
-  if (!text) return false;
-  return /Voice spectral signature/i.test(text)
-      || /^BW \d/.test(text)
-      || /^SSB voice confirmed/i.test(text);
-}
-
-function extractDecodedText(eventItem) {
-  if (!eventItem || typeof eventItem !== "object") {
-    return "";
-  }
-  const mode = String(eventItem.mode || "").toUpperCase();
-  const isSsb = mode === "SSB" || mode === "SSB_TRAFFIC";
-  // For SSB: prioritise raw (Whisper transcript) over msg (spectral summary)
-  const candidates = isSsb
-    ? [eventItem.raw, eventItem.text, eventItem.msg]
-    : [eventItem.msg, eventItem.text, eventItem.raw];
-  for (const candidate of candidates) {
-    const value = String(candidate || "").trim();
-    if (value) {
-      return value.length > 220 ? `${value.slice(0, 220)}…` : value;
-    }
-  }
-  return "";
-}
-
-function isValidLocator(value) {
-  const text = String(value || "").trim().toUpperCase();
-  if (!text) {
-    return true;
-  }
-  return /^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(text);
 }
 
 function loadPresets() {
@@ -1938,10 +805,6 @@ presetSelect.addEventListener("change", () => {
   logLine("Preset applied");
 });
 
-function getAuthHeader() {
-  return {};
-}
-
 function updateLoginStatus() {
   const user = window.__authUser || "";
   loginStatus.textContent = user ? `Auth: ${user}` : "Auth: guest";
@@ -2028,175 +891,7 @@ function updateQuality(minDb, maxDb) {
   qualityLabel.textContent = `SNR: ${snr.toFixed(1)} dB`;
 }
 
-function wsUrl(path) {
-  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${protocol}://${window.location.host}${path}`;
-}
-
-function createWebglWaterfallRenderer(targetCanvas) {
-  const gl = targetCanvas.getContext("webgl", {
-    alpha: false,
-    antialias: false,
-    preserveDrawingBuffer: true,
-    powerPreference: "high-performance"
-  }) || targetCanvas.getContext("experimental-webgl");
-
-  if (!gl) {
-    return null;
-  }
-
-  const vertexSource = `
-    attribute vec2 a_pos;
-    attribute vec2 a_uv;
-    varying vec2 v_uv;
-    void main() {
-      gl_Position = vec4(a_pos, 0.0, 1.0);
-      v_uv = a_uv;
-    }
-  `;
-
-  const fragmentSource = `
-    precision mediump float;
-    varying vec2 v_uv;
-    uniform sampler2D u_tex;
-    void main() {
-      gl_FragColor = texture2D(u_tex, vec2(v_uv.x, 1.0 - v_uv.y));
-    }
-  `;
-
-  function compileShader(type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      const info = gl.getShaderInfoLog(shader) || "shader_compile_failed";
-      gl.deleteShader(shader);
-      throw new Error(info);
-    }
-    return shader;
-  }
-
-  let program;
-  try {
-    const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
-    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
-    program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      throw new Error(gl.getProgramInfoLog(program) || "program_link_failed");
-    }
-  } catch (err) {
-    return null;
-  }
-
-  const vertices = new Float32Array([
-    -1, -1, 0, 0,
-    1, -1, 1, 0,
-    -1, 1, 0, 1,
-    1, 1, 1, 1
-  ]);
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-  const aPos = gl.getAttribLocation(program, "a_pos");
-  const aUv = gl.getAttribLocation(program, "a_uv");
-  gl.enableVertexAttribArray(aPos);
-  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 16, 0);
-  gl.enableVertexAttribArray(aUv);
-  gl.vertexAttribPointer(aUv, 2, gl.FLOAT, false, 16, 8);
-
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-
-  gl.useProgram(program);
-  gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0);
-
-  let width = 0;
-  let height = 0;
-  let pixels = null;
-
-  function resize(displayWidth, displayHeight) {
-    width = Math.max(2, Math.floor(displayWidth));
-    height = Math.max(2, Math.floor(displayHeight));
-    targetCanvas.width = width;
-    targetCanvas.height = height;
-    gl.viewport(0, 0, width, height);
-    pixels = new Uint8Array(width * height * 4);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-  }
-
-  function render(fftDb) {
-    if (!Array.isArray(fftDb) || !fftDb.length || !pixels) {
-      return;
-    }
-    let minDb = Infinity;
-    let maxDb = -Infinity;
-    for (let i = 0; i < fftDb.length; i += 1) {
-      const value = fftDb[i];
-      if (value < minDb) minDb = value;
-      if (value > maxDb) maxDb = value;
-    }
-    const scale = maxDb - minDb || 1;
-    const rowBytes = width * 4;
-    pixels.copyWithin(0, rowBytes);
-    const rowOffset = (height - 1) * rowBytes;
-
-    for (let x = 0; x < width; x += 1) {
-      const idx = Math.floor((x / width) * fftDb.length);
-      const value = (fftDb[idx] - minDb) / scale;
-      const color = colorMap(value);
-      const offset = rowOffset + x * 4;
-      pixels[offset] = color[0];
-      pixels[offset + 1] = color[1];
-      pixels[offset + 2] = color[2];
-      pixels[offset + 3] = 255;
-    }
-
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }
-
-  return { resize, render };
-}
-
-
-function initWaterfallRenderer() {
-  webglWaterfall = createWebglWaterfallRenderer(canvas);
-  if (webglWaterfall) {
-    waterfallRenderer = "webgl";
-    return;
-  }
-  ctx = canvas.getContext("2d");
-  waterfallRenderer = "2d";
-}
-
-function resizeCanvas() {
-  const rect = canvas.getBoundingClientRect();
-  if (webglWaterfall) {
-    webglWaterfall.resize(rect.width, rect.height);
-    return;
-  }
-  canvas.width = Math.floor(rect.width * window.devicePixelRatio);
-  canvas.height = Math.floor(rect.height * window.devicePixelRatio);
-  if (!ctx) {
-    ctx = canvas.getContext("2d");
-  }
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-}
-
-initWaterfallRenderer();
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => wfc.resize());
 
 function addEvent(text) {
   logLine(`events: ${text}`);
@@ -2223,7 +918,7 @@ function pushLiveEventToPanel(eventPayload) {
     }
   }
 
-  updateCallsignCacheFromEvent(eventPayload);
+  wfc.updateCallsignCacheFromEvent(eventPayload);
   latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
   
@@ -2309,7 +1004,6 @@ let _eventsSearchAbort = null;
 
 let _searchResultsCache = [];
 let _searchPage = 0;
-const SEARCH_PAGE_SIZE = 50;
 
 function renderSearchPage() {
   const totalPages = Math.max(1, Math.ceil(_searchResultsCache.length / SEARCH_PAGE_SIZE));
@@ -2438,30 +1132,6 @@ function orderEventsForDisplay(items) {
   return source;
 }
 
-function inferBandFromFrequency(frequencyHz) {
-  const value = Number(frequencyHz);
-  if (!Number.isFinite(value) || value <= 0) {
-    return null;
-  }
-  const bandRanges = [
-    { name: "160m", min: 1800000, max: 2000000 },
-    { name: "80m", min: 3500000, max: 4000000 },
-    { name: "60m", min: 5250000, max: 5450000 },
-    { name: "40m", min: 7000000, max: 7300000 },
-    { name: "30m", min: 10100000, max: 10150000 },
-    { name: "20m", min: 14000000, max: 14350000 },
-    { name: "17m", min: 18068000, max: 18168000 },
-    { name: "15m", min: 21000000, max: 21450000 },
-    { name: "12m", min: 24890000, max: 24990000 },
-    { name: "10m", min: 28000000, max: 29700000 },
-    { name: "6m", min: 50000000, max: 54000000 },
-    { name: "2m", min: 144000000, max: 148000000 },
-    { name: "70cm", min: 430000000, max: 440000000 }
-  ];
-  const match = bandRanges.find((range) => value >= range.min && value <= range.max);
-  return match ? match.name : null;
-}
-
 function renderEventList(targetEl, items, emptyMessage) {
   if (!targetEl) {
     return;
@@ -2485,7 +1155,7 @@ function renderEventList(targetEl, items, emptyMessage) {
     const typeBadge = document.createElement("span");
     const _isSSBVoice = eventItem.type === "callsign" && /^SSB/i.test(eventItem.mode || "") && !eventItem.callsign;
     typeBadge.className = `badge ${eventItem.type === "callsign" ? "bg-info" : "bg-secondary"}`;
-    typeBadge.textContent = _isSSBVoice ? "Voice Signature" : (eventItem.type || "event");
+    typeBadge.textContent = _isSSBVoice ? "VOICE SIGNATURE" : (eventItem.type || "event");
 
     const modeBadge = document.createElement("span");
     modeBadge.className = "badge bg-primary";
@@ -2601,7 +1271,7 @@ function renderEventList(targetEl, items, emptyMessage) {
 
 function renderEvents(items) {
   const sourceItems = Array.isArray(items) ? items : [];
-  updateCallsignCacheFromEvents(sourceItems);
+  wfc.updateCallsignCacheFromEvents(sourceItems);
   latestEvents = sourceItems.filter((eventItem) => {
     if (String(eventItem?.type || "") !== "occupancy") {
       return true;
@@ -2780,6 +1450,10 @@ async function fetchEvents() {
     // Card Events shows events from the last 24 hours
     const start24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const params = new URLSearchParams({ offset: String(eventOffset), limit: "200", start: start24h, end: new Date().toISOString() });
+    const _modeFilter = (eventsSearchModeInput?.value || "").trim();
+    if (_modeFilter) {
+      params.set("mode", _modeFilter);
+    }
     
     const resp = await fetch(`/api/events?${params.toString()}`, {
       headers: { ...getAuthHeader() },
@@ -3073,10 +1747,7 @@ async function startScan() {
   }
 
   // Phase 1.4 behavior: markers are tied to the current scan session only.
-  waterfallMarkerCache.clear();
-  waterfallDecodedMarkerCache.clear();
-  waterfallCallsignCache.clear();
-  _overlayLastFingerprint = "";
+  wfc.clearMarkerCaches();
 
   setStatus("Starting scan...");
   const gain = Number(gainInput.value);
@@ -3115,6 +1786,13 @@ async function startScan() {
       ? Math.max(0.5, cwDwellSValue)
       : 30.0;
   }
+  if (decoderModeToSend === "ssb") {
+    const ssbMaxHoldsValue = Number(ssbMaxHoldsInput?.value);
+    if (Number.isFinite(ssbMaxHoldsValue) && ssbMaxHoldsValue > 0) {
+      requestPayload.scan.ssb_focus_max_holds_per_pass = Math.max(1, Math.round(ssbMaxHoldsValue));
+    }
+    // When 0 or empty, don't send the key — engine uses adaptive calculation.
+  }
   const response = await fetch("/api/scan/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeader() },
@@ -3130,7 +1808,7 @@ async function startScan() {
   // Sync the events filter with the selected decoder mode so only
   // events from this mode appear in the panel.
   if (selectedDecoderMode) {
-    recenterWaterfallForMode(selectedDecoderMode);
+    wfc.recenterForMode(selectedDecoderMode);
     eventsSearchModeInput.value = selectedDecoderMode;
     fetchEvents();
     fetchTotal();
@@ -3147,10 +1825,7 @@ async function stopScan() {
   isScanRunning = false;
   
   // Clear waterfall marker caches when scan stops
-  waterfallMarkerCache.clear();
-  waterfallDecodedMarkerCache.clear();
-  waterfallCallsignCache.clear();
-  _overlayLastFingerprint = "";
+  wfc.clearMarkerCaches();
   latestEvents = []; // Clear events list
   renderEventsPanelFromCache(); // Refresh empty panel
   
@@ -3174,7 +1849,7 @@ async function syncScanState() {
       setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
       if (!wasRunning && nextRunning && selectedDecoderMode) {
-        recenterWaterfallForMode(selectedDecoderMode);
+        wfc.recenterForMode(selectedDecoderMode);
       }
       // Deselect mode button when scan transitions running → stopped
       if (wasRunning && !nextRunning && selectedDecoderMode) {
@@ -3188,7 +1863,7 @@ async function syncScanState() {
     const backendMode = String(data?.decoder_mode || "").trim().toUpperCase();
     if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
       selectedDecoderMode = backendMode;
-      recenterWaterfallForMode(backendMode);
+      wfc.recenterForMode(backendMode);
       refreshModeButtons();
       // Sync the events panel filter with the restored mode
       if (eventsSearchModeInput.value !== backendMode) {
@@ -3260,21 +1935,18 @@ async function switchBandLive(selectedBand) {
   // Scan running: stop and restart on the new band
   scanActionInFlight = true;
   updateScanButtonState();
-  showWaterfallTransition(`Switching to band ${nextBand}...`);
+  wfc.showTransition(`Switching to band ${nextBand}...`);
 
   try {
     await stopScan();
-    // Clear the old band's frame so getWaterfallFullRangeHz() falls back to
-    // the new band's range when recenterWaterfallForMode runs inside startScan()
-    lastSpectrumFrame = null;
-    lastSpectrumFrameTs = 0;
-    clearWaterfallFrame();
+    // Clear the old band's waterfall frame and state
+    wfc.clearFrame();
     await startScan();
     showToast(`Band switched to ${nextBand}`);
   } catch (err) {
     showToastError(err?.message || "Failed to switch band live");
   } finally {
-    hideWaterfallTransition();
+    wfc.hideTransition();
     scanActionInFlight = false;
     updateScanButtonState();
   }
@@ -3331,7 +2003,7 @@ async function fetchCallsignCacheUpdate() {
     const callsignEvents = items.filter((e) =>
       e && e.type === "callsign" && e.callsign && e.frequency_hz
     );
-    updateCallsignCacheFromEvents(callsignEvents);
+    wfc.updateCallsignCacheFromEvents(callsignEvents);
   } catch (_) {
     // silently ignore — waterfall cache is best-effort
   }
@@ -3343,48 +2015,7 @@ setInterval(fetchCallsignCacheUpdate, 5000);
  * Debug helper — call window._debugWaterfall() from the browser console
  * to inspect both waterfall caches and diagnose tooltip issues.
  */
-window._debugWaterfall = function () {
-  console.group("=== waterfall callsign cache (exact-freq buckets) ===");
-  if (waterfallCallsignCache.size === 0) {
-    console.warn("  (empty)");
-  } else {
-    for (const [k, v] of waterfallCallsignCache.entries()) {
-      console.log(`  ${k}: ${v.callsign}  mode=${v.mode}  freq=${v.frequency_hz}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
-    }
-  }
-  console.groupEnd();
-  console.group("=== waterfall decoded marker cache (one per dial-freq/mode) ===");
-  if (waterfallDecodedMarkerCache.size === 0) {
-    console.warn("  (empty — no jt9 decodes yet, or all expired)");
-  } else {
-    for (const [k, v] of waterfallDecodedMarkerCache.entries()) {
-      console.log(`  ${k}: callsign=${v.callsign}  dialFreq=${v.frequency_hz} Hz  mode=${v.mode}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
-    }
-  }
-  console.groupEnd();
-  console.group("=== waterfall DSP marker cache ===");
-  if (waterfallMarkerCache.size === 0) {
-    console.warn("  (empty — DSP quality gate has not fired yet)");
-  } else {
-    for (const [k, v] of waterfallMarkerCache.entries()) {
-      console.log(`  ${k}: mode=${v.mode}  freq=${v.frequency_hz}  snr=${v.snr_db}  age=${Math.round((Date.now() - v.seen_at) / 1000)}s`);
-    }
-  }
-  console.groupEnd();
-  console.log("WATERFALL_CALLSIGN_MAX_DELTA_HZ (DSP fallback) =", WATERFALL_CALLSIGN_MAX_DELTA_HZ);
-  // Show what markers would be rendered right now
-  const last = window._lastSpectrumFrame || lastSpectrumFrame;
-  if (last) {
-    const built = buildStableWaterfallMarkers(last);
-    console.group(`=== built markers (${built.markers.length}) for range ${built.rangeStartHz}-${built.rangeEndHz} Hz ===`);
-    for (const m of built.markers) {
-      console.log(`  ${m.mode}  ${m.frequency_hz} Hz  callsign=${m.callsign || "(DSP, no callsign)"}  decoded=${!!m.decoded}`);
-    }
-    console.groupEnd();
-  } else {
-    console.warn("No spectrum frame received yet — cannot compute built markers.");
-  }
-};
+window._debugWaterfall = () => wfc.debug();
 
 function resetEventsPagination() {
   eventOffset = 0;
@@ -3698,29 +2329,9 @@ function connectSpectrum() {
         const data = JSON.parse(msg.data);
         const frame = decodeSpectrumFrame(data.spectrum_frame);
         if (frame && frame.fft_db) {
-          lastSpectrumFrame = frame;
-          lastSpectrumFrameTs = Date.now();
-          const viewport = getWaterfallViewport(frame);
-          drawWaterfall(frame, viewport);
-          drawSpectrum(viewport.fftDb);
-          const stableMarkers = buildStableWaterfallMarkers(frame);
-          const rulerRange = resolveWaterfallRulerRange(
-            frame,
-            viewport,
-            stableMarkers.rangeStartHz,
-            stableMarkers.rangeEndHz
-          );
-          renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
-          updateVFODisplay(rulerRange.startHz, rulerRange.endHz);
-          const simulatedMarkers = buildSimulatedModeMarkers(
-            viewport.visibleSpanHz,
-            rulerRange.startHz,
-            rulerRange.endHz
-          );
-          const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
-            ? [...stableMarkers.markers, ...simulatedMarkers]
-            : stableMarkers.markers;
-          renderWaterfallModeOverlay(modeMarkers, viewport.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
+          wfc.isScanRunning = isScanRunning;
+          wfc.selectedDecoderMode = selectedDecoderMode;
+          const { viewport, rulerRange } = wfc.processLiveFrame(frame);
           const startHz = Math.round(viewport.startHz);
           const endHz = Math.round(viewport.endHz);
           const minDb = frame.min_db !== undefined ? frame.min_db.toFixed(1) : "?";
@@ -3739,16 +2350,16 @@ function connectSpectrum() {
             peaksInfo = ` | peaks ${frame.peaks.length}: ${topPeaks.join(", ")}`;
           }
           const agcInfo = agcGain ? ` | agc ${agcGain}dB` : "";
-          const explorerInfo = viewport.simulated ? ` | explorer zoom x${waterfallExplorerZoom}` : "";
-          clearWaterfallGenericStatus();
-          waterfallStatus.textContent = `FFT bins: ${viewport.fftDb.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo}${explorerInfo} | ${waterfallRenderer.toUpperCase()}`;
+          const explorerInfo = viewport.simulated ? ` | explorer zoom x${wfc.explorerZoom}` : "";
+          wfc.clearGenericStatus();
+          waterfallStatus.textContent = `FFT bins: ${viewport.fftDb.length} | ${startHz} Hz - ${endHz} Hz | dB ${minDb}..${maxDb} | nf ${noiseFloor}dB${peaksInfo}${agcInfo}${explorerInfo} | ${wfc.renderer.toUpperCase()}`;
           updateQuality(minDb, maxDb);
         }
       } catch (err) {
         if (isScanRunning) {
-          setWaterfallGenericStatus("No live spectrum data available. Check SDR device connection and backend status.");
+          wfc.setGenericStatus("No live spectrum data available. Check SDR device connection and backend status.");
         } else {
-          clearWaterfallGenericStatus();
+          wfc.clearGenericStatus();
         }
       }
     };
@@ -3759,9 +2370,9 @@ function connectSpectrum() {
       if (spectrumWs === ws) {
         wsStatus.textContent = "WS: disconnected";
         if (isScanRunning) {
-          setWaterfallGenericStatus();
+          wfc.setGenericStatus();
         } else {
-          clearWaterfallGenericStatus();
+          wfc.clearGenericStatus();
         }
         spectrumWs = null;
       }
@@ -3769,9 +2380,9 @@ function connectSpectrum() {
   } catch (err) {
     wsStatus.textContent = "WS: disconnected";
     if (isScanRunning) {
-      setWaterfallGenericStatus();
+      wfc.setGenericStatus();
     } else {
-      clearWaterfallGenericStatus();
+      wfc.clearGenericStatus();
     }
   }
 }
@@ -3781,14 +2392,14 @@ function ensureWaterfallFallback() {
     clearInterval(spectrumFallbackTimer);
   }
   spectrumFallbackTimer = setInterval(() => {
-    const staleMs = Date.now() - lastSpectrumFrameTs;
-    if (lastSpectrumFrameTs === 0 || staleMs > 2500) {
+    const staleMs = Date.now() - wfc.lastFrameTs;
+    if (wfc.lastFrameTs === 0 || staleMs > 2500) {
       if (isScanRunning) {
-        setWaterfallGenericStatus();
+        wfc.setGenericStatus();
       } else {
-        clearWaterfallGenericStatus();
+        wfc.clearGenericStatus();
       }
-      drawSpectrumIdle();
+      wfc.drawSpectrumIdle();
     }
   }, 400);
 }
@@ -3808,156 +2419,6 @@ if (waterfallFullscreenBtn) {
 }
 
 document.addEventListener("fullscreenchange", updateFullscreenButtonState);
-
-function redrawWaterfallFromLastFrame() {
-  if (!lastSpectrumFrame || !lastSpectrumFrame.fft_db) {
-    return;
-  }
-  const viewport = getWaterfallViewport(lastSpectrumFrame);
-  drawWaterfall(lastSpectrumFrame, viewport, true);
-  const stableMarkers = buildStableWaterfallMarkers(lastSpectrumFrame);
-  const rulerRange = resolveWaterfallRulerRange(
-    lastSpectrumFrame,
-    viewport,
-    stableMarkers.rangeStartHz,
-    stableMarkers.rangeEndHz
-  );
-  renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
-  const simulatedMarkers = buildSimulatedModeMarkers(
-    viewport.visibleSpanHz,
-    rulerRange.startHz,
-    rulerRange.endHz
-  );
-  const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
-    ? [...stableMarkers.markers, ...simulatedMarkers]
-    : stableMarkers.markers;
-  renderWaterfallModeOverlay(modeMarkers, viewport.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
-}
-
-// Replay the full history buffer with the current pan/zoom viewport.
-// Does NOT clear fftHistoryFrames — only used for pan/zoom/goto changes.
-function redrawWaterfallFromHistory() {
-  if (webglWaterfall) {
-    // WebGL manages its own internal accumulation buffer
-    redrawWaterfallFromLastFrame();
-    return;
-  }
-  if (!fftHistoryFrames.length) {
-    return;
-  }
-  // Clear canvas pixels without touching the history buffer
-  row = 0;
-  if (ctx) {
-    const w = canvas.width / window.devicePixelRatio;
-    const h = canvas.height / window.devicePixelRatio;
-    ctx.clearRect(0, 0, w, h);
-  }
-  for (const hFrame of fftHistoryFrames) {
-    const vp = getWaterfallViewport(hFrame);
-    drawWaterfall(hFrame, vp, true); // _historyReplay=true: don't re-push
-  }
-  // Update ruler and overlays from the most recent frame
-  const lastFrame = fftHistoryFrames[fftHistoryFrames.length - 1];
-  const lastVp = getWaterfallViewport(lastFrame);
-  const stableMarkers = buildStableWaterfallMarkers(lastFrame);
-  const rulerRange = resolveWaterfallRulerRange(
-    lastFrame, lastVp, stableMarkers.rangeStartHz, stableMarkers.rangeEndHz
-  );
-  renderWaterfallRuler(rulerRange.startHz, rulerRange.endHz);
-  const simulatedMarkers = buildSimulatedModeMarkers(
-    lastVp.visibleSpanHz, rulerRange.startHz, rulerRange.endHz
-  );
-  const modeMarkers = WATERFALL_SIMULATE_MODE_MARKERS
-    ? [...stableMarkers.markers, ...simulatedMarkers]
-    : stableMarkers.markers;
-  renderWaterfallModeOverlay(modeMarkers, lastVp.visibleSpanHz, rulerRange.startHz, rulerRange.endHz);
-}
-
-function resetWaterfallExplorerView() {
-  waterfallExplorerZoom = 1;
-  waterfallExplorerPan = 0;
-  localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
-  applyWaterfallExplorerUi();
-  redrawWaterfallFromHistory();
-}
-
-if (waterfallExplorerToggle) {
-  waterfallExplorerToggle.addEventListener("click", () => {
-    waterfallExplorerEnabled = !waterfallExplorerEnabled;
-    localStorage.setItem(WATERFALL_EXPLORER_KEY, waterfallExplorerEnabled ? "1" : "0");
-    if (!waterfallExplorerEnabled) {
-      waterfallExplorerZoom = 1;
-      waterfallExplorerPan = 0;
-      localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
-    }
-    applyWaterfallExplorerUi();
-    redrawWaterfallFromLastFrame();
-  });
-}
-
-if (waterfallZoomInput) {
-  waterfallZoomInput.addEventListener("input", () => {
-    const nextZoom = Math.max(1, Math.min(16, Math.round(Number(waterfallZoomInput.value) || 1)));
-    const currentCenter = waterfallExplorerPan + (0.5 / waterfallExplorerZoom);
-    waterfallExplorerZoom = nextZoom;
-    const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
-    waterfallExplorerPan = Math.max(0, Math.min(maxPan, currentCenter - (0.5 / waterfallExplorerZoom)));
-    localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, String(waterfallExplorerZoom));
-    applyWaterfallExplorerUi();
-    redrawWaterfallFromHistory();
-  });
-}
-
-if (waterfallResetViewBtn) {
-  waterfallResetViewBtn.addEventListener("click", () => {
-    // Keep history — reset only pan/zoom so the full waterfall reappears at zoom=1
-    resetWaterfallExplorerView();
-  });
-}
-
-if (waterfallEl) {
-  waterfallEl.addEventListener("pointerdown", (event) => {
-    if (!waterfallExplorerEnabled) {
-      return;
-    }
-    waterfallDragActive = true;
-    waterfallDragStartX = event.clientX;
-    waterfallDragStartPan = waterfallExplorerPan;
-    waterfallEl.classList.add("is-dragging");
-  });
-}
-
-document.addEventListener("pointermove", (event) => {
-  if (!waterfallDragActive || !waterfallExplorerEnabled || !waterfallEl) {
-    return;
-  }
-  const rect = waterfallEl.getBoundingClientRect();
-  if (!rect.width) {
-    return;
-  }
-  const deltaNorm = ((event.clientX - waterfallDragStartX) / rect.width) * (1 / waterfallExplorerZoom);
-  const maxPan = Math.max(0, 1 - (1 / waterfallExplorerZoom));
-  waterfallExplorerPan = Math.max(0, Math.min(maxPan, waterfallDragStartPan - deltaNorm));
-  // Gate replay to one rAF per drag tick to keep dragging smooth
-  if (!waterfallDragRafPending) {
-    waterfallDragRafPending = true;
-    requestAnimationFrame(() => {
-      waterfallDragRafPending = false;
-      redrawWaterfallFromHistory();
-    });
-  }
-});
-
-document.addEventListener("pointerup", () => {
-  if (!waterfallDragActive) {
-    return;
-  }
-  waterfallDragActive = false;
-  if (waterfallEl) {
-    waterfallEl.classList.remove("is-dragging");
-  }
-});
-
 
 function decodeSpectrumFrame(frame) {
   if (!frame) {
@@ -4075,7 +2536,7 @@ async function loadDevices() {
       option.value = "";
       option.textContent = "No SDR devices detected";
       deviceSelect.appendChild(option);
-      setWaterfallGenericStatus();
+      wfc.setGenericStatus();
       if (devices.length) {
         showToastError("Only non-SDR devices detected. Connect RTL/HackRF/Airspy or run Administration.");
       } else {
@@ -4876,43 +3337,31 @@ if (quickModeButtons.length) {
       }
       const mode = String(button.dataset.quickMode || "").trim();
       
-      // During active scan: allow mode change but prevent deselection
-      if (isScanRunning) {
+      // During active scan: allow mode change but prevent deselection.
+      // Also check latestScanState as a fallback in case isScanRunning was
+      // briefly set false by a syncScanState race between polls.
+      if (isScanRunning || latestScanState?.state === "running") {
         if (selectedDecoderMode === mode) {
-          // Trying to deselect during scan - block it
           showToast("Cannot deselect mode while scanning. Stop the scan first.");
           return;
         }
-        // Changing to different mode during scan - clear caches and notify backend
-        waterfallMarkerCache.clear();
-        waterfallDecodedMarkerCache.clear();
-        waterfallCallsignCache.clear();
-        _overlayLastFingerprint = "";
-        latestEvents = []; // Clear events from previous mode
-        renderEventsPanelFromCache(); // Refresh empty panel
-        
-        selectedDecoderMode = mode;
-        recenterWaterfallForMode(mode);
-        // Sync the events panel filter so only events from this mode are shown
-        eventsSearchModeInput.value = mode;
-        refreshModeButtons();
-        logLine(`Mode changed during scan: ${mode}`);
-        
-        showWaterfallTransition(`Switching to mode ${mode}...`);
-
+        // Stop → change mode → start: avoids all hot-swap race conditions.
+        scanActionInFlight = true;
+        wfc.showTransition(`Switching to mode ${mode}...`);
+        updateScanButtonState();
         try {
-          await fetch("/api/scan/mode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...getAuthHeader() },
-            body: JSON.stringify({ decoder_mode: mode.toLowerCase() })
-          });
+          await stopScan();
+          selectedDecoderMode = mode;
+          wfc.selectedDecoderMode = mode;
+          refreshModeButtons();
+          await startScan();
           showToast(`Mode switched to ${mode}`);
-          fetchEvents();
-          fetchTotal();
         } catch (err) {
           showToastError(`Failed to switch mode: ${err.message}`);
         } finally {
-          hideWaterfallTransition();
+          scanActionInFlight = false;
+          updateScanButtonState();
+          wfc.hideTransition();
         }
         return;
       }
@@ -4927,7 +3376,7 @@ if (quickModeButtons.length) {
         fetchTotal();
       } else {
         selectedDecoderMode = mode;
-        recenterWaterfallForMode(mode);
+        wfc.recenterForMode(mode);
         eventsSearchModeInput.value = mode;
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
@@ -4963,8 +3412,8 @@ saveBandBtn.addEventListener("click", async () => {
 
     if (String(bandSelect?.value || "") === String(payload.band.name)) {
       if (isScanRunning) {
-        renderWaterfallRuler(Number(payload.band.start_hz), Number(payload.band.end_hz));
-        updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        wfc.renderRuler(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        wfc.updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
         showToast("Band saved. New limits apply fully on next scan restart.");
       } else {
         await applyPreviewBandRange(payload.band.name, { syncInputs: true });
@@ -5021,8 +3470,8 @@ async function startApplication() {
       const data = await res.json();
       const deviceCount = Number(data?.devices ?? -1);
       if (deviceCount === 0) {
-        setWaterfallGenericStatus("No SDR device detected. Connect your device and start a scan.");
-        drawSpectrumIdle("No SDR device detected. Connect your device and start a scan.");
+        wfc.setGenericStatus("No SDR device detected. Connect your device and start a scan.");
+        wfc.drawSpectrumIdle("No SDR device detected. Connect your device and start a scan.");
         showToastError("No SDR device detected. Connect your device and start a scan.");
       }
     }
@@ -5100,272 +3549,30 @@ if (loginModalSaveBtnEl) {
   });
 }
 
-// ── Spectrum graph renderer (above waterfall) ──
-function drawSpectrum(fftDb) {
-  if (!spectrumCtx || !Array.isArray(fftDb) || !fftDb.length) return;
-  const sc = spectrumCanvas;
-  const W = sc.offsetWidth > 0 ? sc.offsetWidth : (sc.width || 640);
-  const H = sc.height || 80;
-  if (sc.width !== W) sc.width = W;
-  let minDb = Infinity, maxDb = -Infinity;
-  for (let i = 0; i < fftDb.length; i++) {
-    if (fftDb[i] < minDb) minDb = fftDb[i];
-    if (fftDb[i] > maxDb) maxDb = fftDb[i];
-  }
-  const scale = maxDb - minDb || 1;
-  if (!_specSmooth || _specSmooth.length !== W) {
-    _specSmooth = new Float32Array(W);
-    for (let x = 0; x < W; x++) {
-      const idx = Math.min(fftDb.length - 1, Math.floor((x / (W - 1)) * (fftDb.length - 1)));
-      _specSmooth[x] = (fftDb[idx] - minDb) / scale;
-    }
-  }
-  for (let x = 0; x < W; x++) {
-    const idx = Math.min(fftDb.length - 1, Math.floor((x / (W - 1)) * (fftDb.length - 1)));
-    const v = (fftDb[idx] - minDb) / scale;
-    _specSmooth[x] = _specSmooth[x] * (1 - _SPEC_SMOOTH_ALPHA) + v * _SPEC_SMOOTH_ALPHA;
-  }
-  // Background
-  spectrumCtx.fillStyle = "#080c14";
-  spectrumCtx.fillRect(0, 0, W, H);
-  // Grid
-  spectrumCtx.strokeStyle = "rgba(255,255,255,0.04)";
-  spectrumCtx.lineWidth = 1;
-  for (let g = 1; g <= 3; g++) {
-    const y = Math.round(H * g / 4) + 0.5;
-    spectrumCtx.beginPath(); spectrumCtx.moveTo(0, y); spectrumCtx.lineTo(W, y); spectrumCtx.stroke();
-  }
-  // Filled gradient
-  const grad = spectrumCtx.createLinearGradient(0, 0, 0, H);
-  for (let s = 0; s <= 8; s++) {
-    const [r, g, b] = colorMap(1 - s / 8);
-    grad.addColorStop(s / 8, `rgba(${r},${g},${b},${Math.max(0, 0.48 - s * 0.05)})`);
-  }
-  spectrumCtx.beginPath();
-  spectrumCtx.moveTo(0, H);
-  for (let x = 0; x < W; x++) spectrumCtx.lineTo(x, H - _specSmooth[x] * (H - 3));
-  spectrumCtx.lineTo(W - 1, H);
-  spectrumCtx.closePath();
-  spectrumCtx.fillStyle = grad;
-  spectrumCtx.fill();
-  // Line
-  spectrumCtx.beginPath();
-  for (let x = 0; x < W; x++) {
-    const y = H - _specSmooth[x] * (H - 3);
-    x === 0 ? spectrumCtx.moveTo(x, y) : spectrumCtx.lineTo(x, y);
-  }
-  const [lr, lg, lb] = colorMap(0.85);
-  spectrumCtx.strokeStyle = `rgba(${lr},${lg},${lb},0.88)`;
-  spectrumCtx.lineWidth = 1.5;
-  spectrumCtx.stroke();
+
+eventsSearchCallsignInput?.addEventListener("input", scheduleEventsSearch);
+eventsSearchStartInput?.addEventListener("change", scheduleEventsSearch);
+eventsSearchEndInput?.addEventListener("change", scheduleEventsSearch);
+// Init Flatpickr date pickers with Portuguese locale
+if (eventsSearchStartInput && window.flatpickr) {
+  flatpickr(eventsSearchStartInput, {
+    locale: "pt", dateFormat: "d/m/Y",
+    allowInput: false,
+    onChange: () => scheduleEventsSearch()
+  });
 }
-
-function drawSpectrumIdle(message) {
-  if (!spectrumCtx || !spectrumCanvas) return;
-  const sc = spectrumCanvas;
-  const W = sc.offsetWidth > 0 ? sc.offsetWidth : (sc.width || 640);
-  const H = sc.height || 80;
-  if (sc.width !== W) sc.width = W;
-  spectrumCtx.fillStyle = "#080c14";
-  spectrumCtx.fillRect(0, 0, W, H);
-  spectrumCtx.save();
-  spectrumCtx.font = "13px 'Courier New', monospace";
-  spectrumCtx.fillStyle = "rgba(255,255,255,0.35)";
-  spectrumCtx.textAlign = "center";
-  spectrumCtx.textBaseline = "middle";
-  spectrumCtx.fillText(message || "No live spectrum available. Check SDR device connection and scan status.", W / 2, H / 2);
-  spectrumCtx.restore();
+if (eventsSearchEndInput && window.flatpickr) {
+  flatpickr(eventsSearchEndInput, {
+    locale: "pt", dateFormat: "d/m/Y",
+    allowInput: false,
+    onChange: () => scheduleEventsSearch()
+  });
 }
+eventsSearchPrevBtn?.addEventListener("click", () => { _searchPage--; renderSearchPage(); });
+eventsSearchNextBtn?.addEventListener("click", () => { _searchPage++; renderSearchPage(); });
+document.getElementById("eventsSearchModal")
+  ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
 
-function drawWaterfall(frame, viewport = null, _historyReplay = false) {
-  // Accumulate raw frames for history replay (pan/zoom/goto).
-  // Skip when called recursively during redrawWaterfallFromHistory.
-  if (!_historyReplay && frame && frame.fft_db) {
-    fftHistoryFrames.push(frame);
-    if (fftHistoryFrames.length > FFT_HISTORY_MAX) {
-      fftHistoryFrames.shift();
-    }
-  }
-  const resolvedViewport = viewport || getWaterfallViewport(frame);
-  const fftDb = resolvedViewport.fftDb || [];
-  if (webglWaterfall) {
-    webglWaterfall.render(fftDb);
-    return;
-  }
-  const width = canvas.width / window.devicePixelRatio;
-  const height = canvas.height / window.devicePixelRatio;
-  if (!fftDb.length) {
-    return;
-  }
-
-  let minDb = Infinity;
-  let maxDb = -Infinity;
-  for (let i = 0; i < fftDb.length; i += 1) {
-    const value = fftDb[i];
-    if (value < minDb) {
-      minDb = value;
-    }
-    if (value > maxDb) {
-      maxDb = value;
-    }
-  }
-  const scale = maxDb - minDb || 1;
-  const rowData = ctx.createImageData(Math.floor(width), 1);
-
-  for (let x = 0; x < width; x += 1) {
-    const idx = Math.floor((x / width) * fftDb.length);
-    const value = (fftDb[idx] - minDb) / scale;
-    const color = colorMap(value);
-    const offset = x * 4;
-    rowData.data[offset] = color[0];
-    rowData.data[offset + 1] = color[1];
-    rowData.data[offset + 2] = color[2];
-    rowData.data[offset + 3] = 255;
-  }
-
-  ctx.putImageData(rowData, 0, row);
-  if (!resolvedViewport.simulated && Array.isArray(frame.peaks) && frame.peaks.length && frame.span_hz) {
-    ctx.save();
-    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-    const span = frame.span_hz;
-    frame.peaks.forEach((peak) => {
-      const offset = peak.offset_hz ?? 0;
-      const x = Math.round(((offset + span / 2) / span) * width);
-      ctx.fillRect(x, row, 2, 1);
-    });
-    ctx.restore();
-  }
-  row = (row + 1) % height;
-  if (row === 0) {
-    ctx.clearRect(0, 0, width, height);
-  }
-}
-
-// FT-DX10 "jet" palette — black → electric-blue → cyan → green → yellow → orange → red
-// Colour stops match Yaesu FT-DX10 waterfall display.
-// Pure visual change: zero functional, API or memory impact.
-const _FTDX10_STOPS = [
-  { t: 0.00, r:   0, g:   0, b:   0 },
-  { t: 0.12, r:   0, g:  10, b: 160 },
-  { t: 0.32, r:  20, g:  80, b: 255 },
-  { t: 0.48, r:   0, g: 235, b: 255 },
-  { t: 0.63, r:  30, g: 220, b:   0 },
-  { t: 0.76, r: 255, g: 242, b:   0 },
-  { t: 0.88, r: 255, g: 115, b:   0 },
-  { t: 0.93, r: 255, g:  38, b:   0 },
-  { t: 1.00, r: 200, g:   0, b:   0 },
-];
-function colorMap(value) {
-  const v = value < 0 ? 0 : value > 1 ? 1 : value;
-  const stops = _FTDX10_STOPS;
-  for (let i = 1; i < stops.length; i++) {
-    if (v <= stops[i].t) {
-      const a = stops[i - 1], b = stops[i];
-      const f = (v - a.t) / (b.t - a.t);
-      return [
-        Math.round(a.r + f * (b.r - a.r)),
-        Math.round(a.g + f * (b.g - a.g)),
-        Math.round(a.b + f * (b.b - a.b)),
-      ];
-    }
-  }
-  return [200, 0, 0];
-}
-
-// ─────────────────────────────────────────────
-// VFO DISPLAY + CONTROLS (visual only — no scan state altered)
-// ─────────────────────────────────────────────
-let _vfoDisplayHz = 0;
-const _vfoFreqEl  = document.getElementById("vfoFreqEl");
-
-function _formatVFOFreq(hz) {
-  const mhz = Math.floor(hz / 1_000_000);
-  const khz = Math.floor((hz % 1_000_000) / 1000).toString().padStart(3, "0");
-  const hz3 = (hz % 1000).toString().padStart(3, "0");
-  return `${mhz}<span class="vfo-sep">.</span>${khz}<span class="vfo-sep">.</span>${hz3}`;
-}
-
-function updateVFODisplay(startHz, endHz) {
-  if (!_vfoFreqEl || !Number.isFinite(startHz) || !Number.isFinite(endHz)) return;
-  const centre = Math.round((startHz + endHz) / 2);
-  if (centre === _vfoDisplayHz) return;
-  _vfoDisplayHz = centre;
-  _vfoFreqEl.innerHTML = _formatVFOFreq(centre);
-  refreshQuickBandButtons();
-}
-
-(function initVFOControls() {
-  const gotoInput = document.getElementById("vfoGotoInput");
-  function applyGoto() {
-    const raw = (gotoInput?.value || "").trim().replace(",", ".");
-    const mhz = parseFloat(raw);
-    if (isNaN(mhz) || mhz <= 0) {
-      if (gotoInput) {
-        gotoInput.style.borderColor = "rgba(180,40,40,0.8)";
-        setTimeout(() => { gotoInput.style.borderColor = ""; }, 700);
-      }
-      return;
-    }
-    const targetHz = Math.round(mhz * 1_000_000);
-    const fullRange = getWaterfallFullRangeHz();
-    const fullStartHz = Number(fullRange?.startHz || 0);
-    const fullSpanHz = Number(fullRange?.spanHz || 0);
-    if (
-      !Number.isFinite(fullStartHz)
-      || !Number.isFinite(fullSpanHz)
-      || fullSpanHz <= 0
-      || targetHz < fullStartHz
-      || targetHz > fullStartHz + fullSpanHz
-    ) {
-      showToast(`${mhz.toFixed(3)} MHz is outside the current band`);
-      return;
-    }
-    if (!waterfallExplorerEnabled) {
-      waterfallExplorerEnabled = true;
-      localStorage.setItem(WATERFALL_EXPLORER_KEY, "1");
-    }
-    if (waterfallExplorerZoom <= 1) {
-      waterfallExplorerZoom = 4;
-      localStorage.setItem(WATERFALL_EXPLORER_ZOOM_KEY, "4");
-    }
-    const zoom = waterfallExplorerZoom;
-    const visibleSpanHz  = fullSpanHz / zoom;
-    const desiredStartHz = targetHz - visibleSpanHz / 2;
-    const maxPan = Math.max(0, 1 - 1 / zoom);
-    waterfallExplorerPan = Math.max(0, Math.min(maxPan, (desiredStartHz - fullStartHz) / fullSpanHz));
-    applyWaterfallExplorerUi();
-    redrawWaterfallFromHistory();
-    if (gotoInput) gotoInput.value = "";
-    showToast(`Centred on ${mhz.toFixed(3)} MHz`);
-  }
-  document.getElementById("vfoApplyBtn")?.addEventListener("click", applyGoto);
-  gotoInput?.addEventListener("keydown", e => { if (e.key === "Enter") applyGoto(); });
-
-  // Events Search modal — callsign input also triggers API search
-  // (mode/band/snrMin already have change/input listeners above)
-  eventsSearchCallsignInput?.addEventListener("input", scheduleEventsSearch);
-  eventsSearchStartInput?.addEventListener("change", scheduleEventsSearch);
-  eventsSearchEndInput?.addEventListener("change", scheduleEventsSearch);
-  // Init Flatpickr date pickers with Portuguese locale
-  if (eventsSearchStartInput && window.flatpickr) {
-    flatpickr(eventsSearchStartInput, {
-      locale: "pt", dateFormat: "d/m/Y",
-      allowInput: false,
-      onChange: () => scheduleEventsSearch()
-    });
-  }
-  if (eventsSearchEndInput && window.flatpickr) {
-    flatpickr(eventsSearchEndInput, {
-      locale: "pt", dateFormat: "d/m/Y",
-      allowInput: false,
-      onChange: () => scheduleEventsSearch()
-    });
-  }
-  eventsSearchPrevBtn?.addEventListener("click", () => { _searchPage--; renderSearchPage(); });
-  eventsSearchNextBtn?.addEventListener("click", () => { _searchPage++; renderSearchPage(); });
-  document.getElementById("eventsSearchModal")
-    ?.addEventListener("shown.bs.modal", () => scheduleEventsSearch());
-})();
 
 // ---------------------------------------------------------------------------
 // Global delegated tooltip for TXT (event-decoded-help) buttons

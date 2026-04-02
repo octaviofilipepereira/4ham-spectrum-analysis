@@ -73,6 +73,29 @@ def _broadcast(msg: dict) -> None:
             pass
 
 
+def broadcast_event(event: dict) -> None:
+    """Public API — broadcast a decoded event to all WS /ws/events clients.
+
+    Thread-safe: uses ``call_soon_threadsafe`` when called from a worker
+    thread (e.g. the jt9 decode thread in ft_external).
+    """
+    msg = {"event": event}
+    try:
+        loop = asyncio.get_running_loop()
+        # We are inside the event-loop — safe to call directly.
+        _broadcast(msg)
+    except RuntimeError:
+        # Called from a non-asyncio thread (ft_external decode thread).
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(_broadcast, msg)
+            else:
+                _broadcast(msg)
+        except RuntimeError:
+            _broadcast(msg)
+
+
 def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str = "") -> Optional[dict]:
     """Emit SSB callsign events from occupancy detections in SSB mode.
     
@@ -172,10 +195,26 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     state.db.insert_callsign(event)
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
+
+    # Inject SSB VOICE marker into spectrum frame waterfall markers
+    try:
+        _bucket = str(round(frequency_hz / 1000) * 1000)
+        state.voice_marker_cache[_bucket] = {
+            "frequency_hz": float(frequency_hz),
+            "offset_hz": 0.0,
+            "mode": "SSB_VOICE",
+            "snr_db": float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0),
+            "bandwidth_hz": float(safe_float(occupancy_event.get("bandwidth_hz"), 2800.0) or 2800.0),
+            "confidence": round(ssb_score, 3),
+            "seen_at": _time_mod.time(),
+        }
+    except Exception:
+        pass
+
     return event
 
 
-def update_noise_floor(band: str, power_db: float) -> float:
+def update_noise_floor(band: Optional[str], power_db: float) -> float:
     """
     Update exponential moving average of noise floor for a band.
     
@@ -199,7 +238,7 @@ def update_noise_floor(band: str, power_db: float) -> float:
     return updated
 
 
-def update_threshold(band: str, threshold_dbm: float) -> float:
+def update_threshold(band: Optional[str], threshold_dbm: float) -> float:
     """
     Update adaptive threshold for a band.
     

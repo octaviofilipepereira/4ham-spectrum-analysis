@@ -235,6 +235,31 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: Dict, asr_text: str 
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
 
+    # Inject SSB VOICE marker into spectrum frame waterfall markers
+    try:
+        import time as _t
+        _freq = float(frequency_hz)
+        _bucket = str(round(_freq / 1000) * 1000)
+        state.voice_marker_cache[_bucket] = {
+            "frequency_hz": _freq,
+            "offset_hz": 0.0,
+            "mode": "SSB_VOICE",
+            "snr_db": float(occupancy_event.get("snr_db") or 0.0),
+            "bandwidth_hz": float(occupancy_event.get("bandwidth_hz") or 2800.0),
+            "confidence": round(ssb_score, 3),
+            "seen_at": _t.time(),
+        }
+    except Exception:
+        pass
+
+    # Broadcast to WS /ws/events clients so the frontend Events panel and
+    # waterfall markers update immediately (not only via 5 s HTTP poll).
+    try:
+        from app.websocket.events import broadcast_event
+        broadcast_event(event)
+    except Exception:
+        pass  # best-effort — DB persistence already succeeded
+
 
 async def _run_ssb_detector_loop() -> None:
     global _ssb_iq_queue
@@ -253,9 +278,14 @@ async def _run_ssb_detector_loop() -> None:
                 await asyncio.sleep(0.5)
                 continue
 
+            # Use non-blocking get_nowait + sleep instead of wait_for(queue.get(), timeout)
+            # to avoid the Python 3.10 asyncio.wait_for cancellation propagation bug
+            # (CPython issue #32751) where task.cancel() can be silently absorbed inside
+            # wait_for, preventing _stop_ssb_detector from completing in bounded time.
             try:
-                iq = await asyncio.wait_for(_ssb_iq_queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+                iq = _ssb_iq_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                await asyncio.sleep(0.05)
                 continue
 
             # Collect all queued chunks; keep latest for detection, all for ASR
@@ -269,6 +299,10 @@ async def _run_ssb_detector_loop() -> None:
 
             if iq is None or len(iq) == 0:
                 continue
+
+            # Yield to the event loop before heavy synchronous DSP work so that
+            # incoming HTTP requests (e.g. POST /api/scan/mode) are not starved.
+            await asyncio.sleep(0)
 
             if state.agc_enabled:
                 iq, gain_db = apply_agc_smoothed(
@@ -460,8 +494,11 @@ async def _stop_ssb_detector() -> Dict:
 
     _ssb_detector_task.cancel()
     try:
-        await _ssb_detector_task
-    except asyncio.CancelledError:
+        # Use shield so the timeout firing does not issue a second cancel on the
+        # task.  The task already received cancel() above; shield lets us bound
+        # how long we wait without interfering.  Maximum wait: 2 s.
+        await asyncio.wait_for(asyncio.shield(_ssb_detector_task), timeout=2.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
     _ssb_detector_task = None
 
@@ -611,8 +648,21 @@ async def _stop_ft_internal_decoder() -> Dict:
 
 
 def _handle_ft_external_event(payload: Dict) -> Dict:
-    """Handle event from external FT decoder."""
-    return _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
+    """Handle event from external FT decoder.
+
+    Saves to DB via _ingest_callsign_payloads AND broadcasts the event
+    to all connected /ws/events clients so waterfall markers appear
+    immediately instead of waiting for the 5 s HTTP polling cycle.
+    """
+    result = _ingest_callsign_payloads([payload], {"source": "internal_ft_external"})
+    # Broadcast to WS clients only when the event was actually saved.
+    if result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(payload)
+        except Exception:
+            pass  # best-effort — DB persistence already succeeded
+    return result
 
 
 def _ft_external_flush_iq() -> None:

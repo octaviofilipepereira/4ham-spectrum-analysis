@@ -15,6 +15,7 @@ import collections
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -151,6 +152,9 @@ marker_candidates = {}
 
 # CW decode markers: bucket_key (500 Hz) -> {frequency_hz, offset_hz, mode, snr_db, crest_db, bandwidth_hz, confidence, seen_at}
 cw_marker_cache: dict = {}
+
+# Voice Signature markers: bucket_key (1 kHz) -> {frequency_hz, offset_hz, mode, snr_db, bandwidth_hz, confidence, seen_at}
+voice_marker_cache: dict = {}
 
 threshold_state = {}
 
@@ -439,7 +443,7 @@ def verify_basic_auth_header(auth_header: str) -> bool:
         return password == auth_pass
 
 
-def verify_auth_transport(auth_header: str = None, cookie_header: str = None) -> bool:
+def verify_auth_transport(auth_header: Optional[str] = None, cookie_header: Optional[str] = None) -> bool:
     """Verify either a session cookie or legacy Basic Auth header."""
     from app.dependencies.auth import verify_session_cookie_header
 

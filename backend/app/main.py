@@ -75,6 +75,17 @@ async def lifespan(app_instance: FastAPI):
     from app.dependencies import state as _state
     from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder, _start_cw_decoder
 
+    # Restore ASR enabled/disabled state from DB settings
+    try:
+        from app.decoders.ssb_asr import set_asr_enabled
+        _saved = _state.db.get_settings()
+        _asr_cfg = (_saved.get("asr") or {})
+        _asr_on = bool(_asr_cfg.get("enabled", True))
+        set_asr_enabled(_asr_on)
+        _log.info("ASR startup: enabled=%s (from DB settings)", _asr_on)
+    except Exception as exc:
+        _log.warning("ASR startup config restore failed: %s", exc)
+
     if _state.ft_external_enable:
         try:
             result = await _start_ft_external_decoder(force=False)
@@ -202,6 +213,11 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    # Prevent browser caching of HTML pages so UI updates are always picked up.
+    content_type = response.headers.get("content-type", "")
+    if "text/html" in content_type:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     
     # Remove server header to avoid information disclosure
     if "server" in response.headers:

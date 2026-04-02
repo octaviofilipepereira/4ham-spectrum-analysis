@@ -25,6 +25,84 @@ declare -a _TMPFILES=()
 
 run_sudo() { [[ "${EUID}" -eq 0 ]] && "$@" || sudo "$@"; }
 
+version_ge() {
+  local current="$1"
+  local minimum="$2"
+  [[ "$(printf '%s\n%s\n' "$minimum" "$current" | sort -V | head -n1)" == "$minimum" ]]
+}
+
+OS_ID=""
+OS_VERSION_ID=""
+OS_PRETTY_NAME=""
+
+detect_linux_compatibility() {
+  if [[ ! -f /etc/os-release ]]; then
+    echo "Unsupported Linux distribution: missing /etc/os-release" >&2
+    return 1
+  fi
+
+  # shellcheck disable=SC1091
+  source /etc/os-release
+
+  OS_ID="${ID:-unknown}"
+  OS_VERSION_ID="${VERSION_ID:-0}"
+  OS_PRETTY_NAME="${PRETTY_NAME:-$OS_ID}"
+
+  local id_lower="${OS_ID,,}"
+  case "$id_lower" in
+    ubuntu)
+      version_ge "$OS_VERSION_ID" "20.04"
+      return
+      ;;
+    debian)
+      version_ge "$OS_VERSION_ID" "11"
+      return
+      ;;
+    linuxmint)
+      version_ge "$OS_VERSION_ID" "20"
+      return
+      ;;
+    raspbian)
+      version_ge "$OS_VERSION_ID" "11"
+      return
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+validate_runtime_dependencies() {
+  local -a missing_cmds=()
+  local -a required_cmds=(
+    SoapySDRUtil
+    rtl_test
+    ffmpeg
+    direwolf
+    jt9
+    wsprd
+    node
+    npm
+  )
+
+  for cmd in "${required_cmds[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing_cmds+=("$cmd")
+    fi
+  done
+
+  if ! "$PYTHON_BIN" -c "import SoapySDR" >/dev/null 2>&1; then
+    missing_cmds+=("python:SoapySDR")
+  fi
+
+  if [[ ${#missing_cmds[@]} -gt 0 ]]; then
+    printf '%s\n' "${missing_cmds[@]}" | paste -sd ', ' -
+    return 1
+  fi
+
+  return 0
+}
+
 # ── cleanup on exit ────────────────────────────────────────────────────────────
 cleanup() {
   exec 3>&- 2>/dev/null || true
@@ -69,24 +147,50 @@ abort() {
   exit 1
 }
 
+# ── sanity checks ──────────────────────────────────────────────────────────────
+if [[ "${EUID}" -eq 0 ]]; then
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Error" \
+      --msgbox "Do not run this installer as root.\n\nRun as a normal user with sudo access:\n\n  ./install.sh" 11 62
+  else
+    echo "Do not run this installer as root."
+    echo "Run as a normal user with sudo access: ./install.sh"
+  fi
+  exit 1
+fi
+
+if ! command -v apt-get &>/dev/null; then
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Unsupported OS" \
+      --msgbox "This installer requires apt.\nSupported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS." 9 66
+  else
+    echo "Unsupported OS: this installer requires apt."
+    echo "Supported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS."
+  fi
+  exit 1
+fi
+
+if ! detect_linux_compatibility; then
+  local_msg="Detected Linux: ${OS_PRETTY_NAME:-unknown} (version ${OS_VERSION_ID:-unknown})\n\n"
+  local_msg+="Minimum supported versions:\n"
+  local_msg+="- Ubuntu 20.04+\n"
+  local_msg+="- Debian 11+\n"
+  local_msg+="- Linux Mint 20+\n"
+  local_msg+="- Raspberry Pi OS (Raspbian) 11+\n\n"
+  local_msg+="This installer cannot continue on the detected system."
+  if command -v whiptail &>/dev/null; then
+    whiptail --backtitle "$BT" --title "Unsupported Linux Version" --msgbox "$local_msg" 16 72
+  else
+    printf '%b\n' "$local_msg"
+  fi
+  exit 1
+fi
+
 # ── ensure whiptail is available ───────────────────────────────────────────────
 if ! command -v whiptail &>/dev/null; then
   echo "Installing whiptail for graphical interface..."
   run_sudo apt-get update -qq
   run_sudo apt-get install -y whiptail
-fi
-
-# ── sanity checks ──────────────────────────────────────────────────────────────
-if [[ "${EUID}" -eq 0 ]]; then
-  whiptail --backtitle "$BT" --title "Error" \
-    --msgbox "Do not run this installer as root.\n\nRun as a normal user with sudo access:\n\n  ./install.sh" 11 62
-  exit 1
-fi
-
-if ! command -v apt-get &>/dev/null; then
-  whiptail --backtitle "$BT" --title "Unsupported OS" \
-    --msgbox "This installer requires apt.\nSupported: Ubuntu, Debian, Linux Mint, Raspberry Pi OS." 9 66
-  exit 1
 fi
 
 if ! command -v python3 &>/dev/null; then
@@ -108,14 +212,17 @@ whiptail --backtitle "$BT" --title "Welcome" \
 Welcome to the 4ham Spectrum Analysis installer!
 
 This wizard will:
-  1. Install system packages (SoapySDR, RTL-SDR, Python)
+  1. Install system packages (SoapySDR, RTL-SDR, Python, Node.js, third-party decoders)
   2. Optionally build the RTL-SDR Blog v4 driver from source
   3. Optionally install OpenAI Whisper for SSB voice transcription
   4. Create the Python virtual environment
-  5. Set up your admin account (stored securely in the local DB)
-  6. Install and start the background service (systemd)
+  5. Install frontend JavaScript dependencies (npm)
+  6. Set up your admin account (stored securely in the local DB)
+  7. Validate critical runtime dependencies
+  8. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
+Detected Linux: ${OS_PRETTY_NAME} (supported).
 
 Press Enter to continue." \
   19 68
@@ -155,6 +262,20 @@ On slow internet this may take 20-40 minutes!
   16 68; then
   _install_whisper=1
   _whisper_label="Yes (OpenAI Whisper tiny model)"
+fi
+
+# ── installation mode ──────────────────────────────────────────────────────────
+_install_mode="systemd"
+_install_mode_label="systemd (auto-start on boot)"
+_mode_choice=$(whiptail --backtitle "$BT" --title "Installation Mode" \
+  --menu "How do you want to run 4ham-spectrum-analysis?" \
+  14 78 2 \
+  "systemd" "Install as a systemd service (recommended for production)" \
+  "manual" "Manual start/stop by the user (no systemd service install)" \
+  3>&1 1>&2 2>&3) || exit 0
+if [[ "${_mode_choice}" == "manual" ]]; then
+  _install_mode="manual"
+  _install_mode_label="manual start/stop (no systemd)"
 fi
 
 # ── admin username ─────────────────────────────────────────────────────────────
@@ -209,8 +330,8 @@ Ready to install. Summary:
 
   SDR driver  :  $_rtlv4_label
   ASR Whisper :  $_whisper_label
+  Install mode:  $_install_mode_label
   Admin user  :  $_admin_user
-  Service     :  systemd (auto-start on boot)
   Install log :  $LOG_FILE
 
 Proceed with installation?" \
@@ -223,11 +344,13 @@ gauge_step 3 "Updating package lists..."
 run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
   || abort "apt-get update failed"
 
-gauge_step 18 "Installing system packages (SoapySDR, Python, build tools)..."
+gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, decoders, build tools)..."
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
+  nodejs npm \
   soapysdr-tools libsoapysdr-dev python3-soapysdr \
   soapysdr-module-rtlsdr rtl-sdr \
+  direwolf wsjtx usbutils \
   build-essential cmake libusb-1.0-0-dev \
   ffmpeg \
   >> "$LOG_FILE" 2>&1 \
@@ -280,12 +403,16 @@ gauge_step 84 "Installing Python dependencies..."
 "$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
 
+gauge_step 88 "Installing frontend JavaScript dependencies (npm)..."
+npm --prefix "$ROOT_DIR/frontend" install --no-fund --no-audit \
+  >> "$LOG_FILE" 2>&1 || abort "npm install failed for frontend"
+
 if [[ $_install_whisper -eq 1 ]]; then
   # On x86_64 install CPU-only PyTorch first to avoid pulling CUDA wheels
   # (~200 MB CPU build vs ~915 MB CUDA build). On ARM (Raspberry Pi) the
   # ARM torch wheel is already CPU-only so no special handling needed.
   if [[ "$(uname -m)" == "x86_64" ]]; then
-    gauge_step 87 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
+    gauge_step 90 "Installing PyTorch CPU-only (~200 MB download, please wait)..."
     "$PYTHON_BIN" -m pip install --quiet torch \
       --index-url https://download.pytorch.org/whl/cpu \
       >> "$LOG_FILE" 2>&1 || { \
@@ -293,14 +420,14 @@ if [[ $_install_whisper -eq 1 ]]; then
         _install_whisper=0; }
   fi
   if [[ $_install_whisper -eq 1 ]]; then
-    gauge_step 90 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
+    gauge_step 92 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
     "$PYTHON_BIN" -m pip install --quiet openai-whisper \
       >> "$LOG_FILE" 2>&1 || { \
         echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }
   fi
 fi
 
-gauge_step 91 "Saving admin credentials to database..."
+gauge_step 93 "Saving admin credentials to database..."
 mkdir -p "$ROOT_DIR/data"
 
 # Write the Python setup script to a temp file so we can pipe the password
@@ -349,9 +476,19 @@ printf '%s' "$_admin_pass" \
 rm -f "$_tmp_py"
 unset _admin_pass
 
-gauge_step 97 "Installing and enabling systemd service..."
-bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
-  || abort "Service installation failed"
+gauge_step 96 "Validating required runtime dependencies..."
+_missing_deps=""
+if ! _missing_deps="$(validate_runtime_dependencies)"; then
+  abort "Missing required runtime dependencies after install: ${_missing_deps}"
+fi
+
+if [[ "$_install_mode" == "systemd" ]]; then
+  gauge_step 98 "Installing and enabling systemd service..."
+  bash "$ROOT_DIR/scripts/install_systemd_service.sh" install >> "$LOG_FILE" 2>&1 \
+    || abort "Service installation failed"
+else
+  gauge_step 98 "Skipping systemd service install (manual mode selected)..."
+fi
 
 close_gauge
 
@@ -366,8 +503,9 @@ if [[ $_rtlv4 -eq 1 ]]; then
   _extra_notes="${_extra_notes}\n\nRTL-SDR v4: a reboot is recommended to fully\nactivate the kernel module blacklist."
 fi
 
-whiptail --backtitle "$BT" --title "Installation Complete!" \
-  --msgbox "\
+if [[ "$_install_mode" == "systemd" ]]; then
+  whiptail --backtitle "$BT" --title "Installation Complete!" \
+    --msgbox "\
 4ham-spectrum-analysis is installed and running!
 
 Open in your browser:
@@ -384,4 +522,26 @@ Service management:
   Restart  ./scripts/install_systemd_service.sh restart
   Remove   ./scripts/install_systemd_service.sh uninstall
 ${_extra_notes}" \
-  24 70
+    24 70
+else
+  whiptail --backtitle "$BT" --title "Installation Complete!" \
+    --msgbox "\
+4ham-spectrum-analysis is installed (manual mode).
+
+Server control:
+  Start    ./scripts/server_control.sh start
+  Stop     ./scripts/server_control.sh stop
+  Restart  ./scripts/server_control.sh restart
+  Status   ./scripts/server_control.sh status
+  Logs     ./scripts/server_control.sh logs
+
+Open in your browser:
+  http://${_local_ip}:8000/
+  http://127.0.0.1:8000/
+
+Login with:
+  Username : $_admin_user
+  Password : (the one you set)
+${_extra_notes}" \
+    24 70
+fi

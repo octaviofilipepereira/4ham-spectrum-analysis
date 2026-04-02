@@ -2,10 +2,23 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-03-25 UTC
+Last update: 2026-04-02 UTC
 -->
 
 # Changelog
+
+## v0.8.3 - 2026-04-02
+
+### Added
+- **VOICE DETECTED waterfall markers** — SSB Voice Signature events now produce real-time markers on the waterfall overlay, labeled "VOICE DETECTED" with a distinctive black-and-gold style. Markers are injected from both the occupancy detector and the ASR/Whisper pipeline into a shared `voice_marker_cache`.
+- **Mode-filtered event fetch** — switching modes (SSB → CW → SSB) no longer loses events; `fetchEvents()` now sends the active mode filter to the API so the 200-event limit returns only relevant results.
+
+### Changed
+- **VOICE DETECTED marker TTL** — increased from 15 s to 45 s (backend and frontend) to survive natural pauses between SSB "overs" without flickering.
+- **Marker thresholds** — `MARKER_MIN_SNR_DB` lowered from 10 → 8 dB; `MARKER_MAX_AGE_S` raised from 10 → 30 s for better SSB sensitivity on typical HF noise floors.
+
+### Fixed
+- **ASR startup crash** — ASR configuration is now restored from the database at application startup, preventing a crash when the scan resumes with ASR enabled.
 
 ## v0.8.2 - 2026-03-25
 

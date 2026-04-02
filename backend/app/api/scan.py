@@ -241,7 +241,10 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
         scan.setdefault("ssb_focus_cooldown_s", 20.0)
         scan.setdefault("ssb_focus_bucket_hz", 2000)
-        scan.setdefault("ssb_focus_max_holds_per_pass", 2)
+        # NOTE: ssb_focus_max_holds_per_pass is intentionally NOT set here.
+        # The engine computes it adaptively (~1 hold per 50 kHz of scan span,
+        # min 4, max 12).  If the frontend sends an explicit value it will be
+        # honoured as an override.
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 

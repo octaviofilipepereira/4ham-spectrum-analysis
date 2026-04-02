@@ -648,6 +648,12 @@ h1,
   line-height: 1;
 }
 
+.waterfall-mode-label.is-ssb-voice {
+  background: rgba(0, 0, 0, 0.92);
+  color: #d4a017;
+  border-color: rgba(212, 160, 23, 0.6);
+}
+
 .waterfall-hover-tooltip {
   position: absolute;
   z-index: 4;
