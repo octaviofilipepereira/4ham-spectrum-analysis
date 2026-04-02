@@ -74,6 +74,8 @@ const recordPathInput = document.getElementById("recordPath");
 const cwScanParamsRow = document.getElementById("cwScanParamsRow");
 const cwStepHzInput = document.getElementById("cwStepHz");
 const cwDwellSInput = document.getElementById("cwDwellS");
+const ssbScanParamsRow = document.getElementById("ssbScanParamsRow");
+const ssbMaxHoldsInput = document.getElementById("ssbMaxHolds");
 const scanRangeSummaryEl = document.getElementById("scanRangeSummary");
 const cwSegmentSummaryWrapEl = document.getElementById("cwSegmentSummaryWrap");
 const cwSegmentSummaryEl = document.getElementById("cwSegmentSummary");
@@ -432,6 +434,10 @@ function refreshModeButtons() {
   if (cwScanParamsRow) {
     const isCwMode = String(selectedDecoderMode || "").trim().toUpperCase() === "CW";
     cwScanParamsRow.classList.toggle("d-none", !isCwMode);
+  }
+  if (ssbScanParamsRow) {
+    const isSsbMode = String(selectedDecoderMode || "").trim().toUpperCase() === "SSB";
+    ssbScanParamsRow.classList.toggle("d-none", !isSsbMode);
   }
   renderScanContextSummary(latestScanState);
 }
@@ -1768,6 +1774,13 @@ async function startScan() {
     requestPayload.cw_dwell_s = Number.isFinite(cwDwellSValue)
       ? Math.max(0.5, cwDwellSValue)
       : 30.0;
+  }
+  if (decoderModeToSend === "ssb") {
+    const ssbMaxHoldsValue = Number(ssbMaxHoldsInput?.value);
+    if (Number.isFinite(ssbMaxHoldsValue) && ssbMaxHoldsValue > 0) {
+      requestPayload.scan.ssb_focus_max_holds_per_pass = Math.max(1, Math.round(ssbMaxHoldsValue));
+    }
+    // When 0 or empty, don't send the key — engine uses adaptive calculation.
   }
   const response = await fetch("/api/scan/start", {
     method: "POST",
