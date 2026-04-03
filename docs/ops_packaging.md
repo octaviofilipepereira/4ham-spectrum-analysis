@@ -66,23 +66,4 @@ Use the repository root uninstaller:
 
 Note: unlike `install_systemd_service.sh uninstall`, the root `uninstall.sh` also removes the `.env` file.
 
-## Legacy/advanced deploy helper (optional)
-
-These files remain available for custom packaging flows:
-
-- `deploy/systemd/4ham-spectrum-analysis.service`
-- `deploy/systemd/install-systemd.sh`
-
-Usage:
-
-```bash
-bash deploy/systemd/install-systemd.sh <project_dir> <linux_user> [service_name]
-```
-
-Example:
-
-```bash
-bash deploy/systemd/install-systemd.sh /opt/4ham-spectrum-analysis octavio 4ham-spectrum-analysis
-```
-
 
