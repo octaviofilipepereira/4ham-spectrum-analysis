@@ -19,6 +19,8 @@
         --mode-ssb: #60a5fa;
         --mode-ft8: #34d399;
         --mode-cw: #f59e0b;
+        --mode-ft4: #a78bfa;
+        --mode-wspr: #f472b6;
         --prop-line: #fbbf24;
         --prop-band: #38bdf8;
       }
@@ -541,10 +543,16 @@
             <label>Band</label>
             <select id="bandFilter">
               <option value="ALL">All</option>
+              <option>160m</option>
+              <option>80m</option>
               <option>40m</option>
               <option>20m</option>
+              <option>17m</option>
               <option>15m</option>
+              <option>12m</option>
               <option>10m</option>
+              <option>2m</option>
+              <option>70cm</option>
             </select>
           </div>
 
@@ -554,7 +562,9 @@
               <option value="ALL">All</option>
               <option>SSB</option>
               <option>FT8</option>
+              <option>FT4</option>
               <option>CW</option>
+              <option>WSPR</option>
             </select>
           </div>
 
@@ -609,7 +619,9 @@
             <div class="legend">
               <span><span class="dot" style="background:var(--mode-ssb);"></span> SSB</span>
               <span><span class="dot" style="background:var(--mode-ft8);"></span> FT8</span>
+              <span><span class="dot" style="background:var(--mode-ft4);"></span> FT4</span>
               <span><span class="dot" style="background:var(--mode-cw);"></span> CW</span>
+              <span><span class="dot" style="background:var(--mode-wspr);"></span> WSPR</span>
             </div>
             <svg id="stackedChart"></svg>
           </article>
@@ -690,12 +702,14 @@
 
     <script src="/lib/d3.min.js"></script>
     <script>
-      const BANDS = ["40m", "20m", "15m", "10m"];
-      const MODES = ["SSB", "FT8", "CW"];
+      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
+      const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
       const MODE_COLORS = {
         SSB: getCssVar("--mode-ssb"),
         FT8: getCssVar("--mode-ft8"),
+        FT4: getCssVar("--mode-ft4"),
         CW: getCssVar("--mode-cw"),
+        WSPR: getCssVar("--mode-wspr"),
       };
 
       const presetRow = document.getElementById("presetRow");
