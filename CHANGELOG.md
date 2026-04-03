@@ -7,6 +7,21 @@ Last update: 2026-04-03 UTC
 
 # Changelog
 
+## v0.8.5 - 2026-04-03
+
+### Added
+- **Academic Analytics dashboard** — new page (`/4ham_academic_analytics.html`) with aggregated charts: activity timeline, band distribution, Heatmap Pro (hour × band with cross-highlight and marginal totals), and propagation map. Auto-refreshes every 60 s with period selector (1 h–All). Backend endpoint `/api/analytics/academic`.
+- **Data Analysis toolbar button** — added in the main UI toolbar (before Help), opens the analytics dashboard in a new browser tab.
+- **Version endpoint** — `/api/version` returns the running application version.
+
+### Changed
+- **Environment file moved to project-local `.env`** — previously at `/etc/default/4ham-spectrum-analysis` (required sudo); now at `<project>/.env` (no sudo needed). Systemd service template, install and uninstall scripts updated.
+- **html2canvas served locally** — replaced the last CDN reference (`cdnjs.cloudflare.com/html2canvas`) with a local copy in `frontend/lib/`. Zero external CDN calls.
+
+### Documentation
+- **Help panel** updated to v0.8.5 — new Academic Analytics section, Data Analysis button documented in interface tour.
+- **README, install.md, installation_manual.md, ops_packaging.md, user_manual.md** — updated with `.env` migration, analytics page route, and version bump.
+
 ## v0.8.4 - 2026-04-03
 
 ### Added

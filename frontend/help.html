@@ -51,7 +51,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.4 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.5 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -67,6 +67,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#export">Export &amp; reports</a></li>
       <li><a href="#admin">Admin &amp; configuration</a></li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+      <li><a href="#analytics">Academic Analytics dashboard</a></li>
       <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
     </ol>
   </nav>
@@ -98,6 +99,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td><strong>Band Config</strong></td><td>Configure which bands are scanned, their frequency ranges, and enable/disable individual bands.</td></tr>
         <tr><td><strong>Logs &amp; Reports</strong></td><td>Dropdown with access to Decoder Status, Session Summary, frontend/server logs, and the Search &amp; Export panel.</td></tr>
         <tr><td><strong>Admin Config</strong></td><td>System settings: SDR device, gain, sample rate, data retention, authentication. Requires admin login.</td></tr>
+        <tr><td><strong>Data Analysis</strong></td><td>Opens the Academic Analytics dashboard in a new tab. Provides aggregated charts (activity timeline, band distribution, Heatmap Pro hour×band, propagation map) with auto-refresh.</td></tr>
         <tr><td><strong>Help</strong></td><td>This manual and a quick-reference card.</td></tr>
       </tbody>
     </table>
@@ -452,9 +454,34 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>All shortcuts are case-insensitive and do not fire when focus is inside a text input.</p>
   </section>
 
-  <!-- 11. FAQ -->
+  <!-- 11. ACADEMIC ANALYTICS -->
+  <section id="analytics">
+    <h2 class="section-title">11 · Academic Analytics dashboard</h2>
+    <p>
+      Accessible via the <strong>Data Analysis</strong> button in the toolbar (opens in a new tab), or directly at
+      <code>http://&lt;host&gt;:8000/4ham_academic_analytics.html</code>.
+    </p>
+    <p>The dashboard provides aggregated views of collected event data for academic and analytical purposes:</p>
+    <ul>
+      <li><strong>Activity Timeline</strong> — event count over time, bucketed by hour or day.</li>
+      <li><strong>Band Distribution</strong> — pie or bar chart showing events per amateur band.</li>
+      <li><strong>Hour of Day × Band (Heatmap Pro)</strong> — interactive heatmap with cross-highlight on hover, marginal totals per row/column, and colour-scaled cells for quick pattern recognition.</li>
+      <li><strong>Propagation Map</strong> — geographical distribution of decoded callsigns.</li>
+    </ul>
+    <p>
+      Data is fetched from <code>/api/analytics/academic</code> and auto-refreshes every 60 seconds.
+      A period selector (1 h / 6 h / 24 h / 7 d / 30 d / All) filters the time window.
+      Each chart has a <strong>?</strong> helper icon that shows a description on hover.
+    </p>
+    <p>
+      The <code>.env</code> file in the project root controls service environment variables (host, port, decoder flags).
+      It is created automatically on first install and is not committed to version control.
+    </p>
+  </section>
+
+  <!-- 12. FAQ -->
   <section id="faq">
-    <h2 class="section-title">11 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">12 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>

@@ -88,6 +88,13 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.8.5
+- **Academic Analytics dashboard**: new page with activity timeline, band distribution, Heatmap Pro (hour × band), and propagation map. Accessible via the **Data Analysis** toolbar button or `/4ham_academic_analytics.html`. Backend endpoint `/api/analytics/academic`. Auto-refresh every 60 s.
+- **Data Analysis toolbar button**: opens the analytics dashboard in a new tab (positioned before Help).
+- **Environment file moved to `.env`**: service env file now lives at `<project>/.env` instead of `/etc/default/4ham-spectrum-analysis` — no sudo required.
+- **html2canvas local**: replaced last CDN dependency with a local copy — zero external CDN calls.
+- **Version endpoint**: `/api/version` returns the running version.
+
 ### v0.8.4
 - **VOICE DETECTED marker flood fix**: switching modes (CW → SSB) no longer floods the waterfall with historical markers. Markers now use original event timestamps instead of `Date.now()`, ensuring correct TTL expiration. Backend `voice_marker_cache` cleared on scan stop. Frontend `decodedMarkerCache` cleared on mode switch.
 - **Events card sync on mode switch**: Events panel now immediately reloads with the correct mode's events after switching modes.
