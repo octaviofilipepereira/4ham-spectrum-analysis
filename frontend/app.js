@@ -1876,6 +1876,14 @@ async function syncScanState() {
         fetchTotal();
       }
     }
+    // Restore band select from backend state (handles page refresh mid-scan).
+    // Without this, loadBands() defaults to 20m on fresh load, leaving the
+    // band buttons out of sync with the running scan.
+    const backendBand = String(data?.scan?.band || "").trim();
+    if (nextRunning && backendBand && bandSelect.value !== backendBand) {
+      bandSelect.value = backendBand;
+      refreshQuickBandButtons();
+    }
     renderScanContextSummary(data);
   } catch (err) {
     return;
