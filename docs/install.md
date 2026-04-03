@@ -98,7 +98,7 @@ Service operations:
 ./scripts/install_systemd_service.sh uninstall
 ```
 
-Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
+Environment defaults are stored in the project-local `.env` file (at the repository root).
 
 If you only want to remove the service (keeping project files), run:
 
@@ -128,8 +128,8 @@ To start/stop/restart the backend process without systemd (e.g. in dev):
 ```
 
 Notes:
-- `./uninstall.sh` also removes `/etc/default/4ham-spectrum-analysis`.
-- `./scripts/install_systemd_service.sh uninstall` removes only the service unit (keeps env file and project files).
+- `./uninstall.sh` also removes the project-local `.env` file.
+- `./scripts/install_systemd_service.sh uninstall` removes only the service unit (keeps `.env` and project files).
 
 ## Notes
 - FT8/FT4 decoding uses `jt9` (from WSJT source) directly — no WSJT-X GUI required.
