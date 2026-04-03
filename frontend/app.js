@@ -3501,6 +3501,18 @@ async function startApplication() {
   ensureWaterfallFallback();
   connectStatus();
   connectEvents();
+  // Pre-fetch scan status so loadBands/loadSettings know the running band
+  // BEFORE populating UI, avoiding a flicker to the wrong band.
+  try {
+    const earlyResp = await fetch("/api/scan/status", { headers: { ...getAuthHeader() } });
+    if (earlyResp.ok) {
+      const earlyData = await earlyResp.json();
+      latestScanState = earlyData;
+      if (earlyData?.state === "running" && earlyData?.scan?.band) {
+        localStorage.setItem("4ham_active_band", earlyData.scan.band);
+      }
+    }
+  } catch (_) { /* best effort */ }
   await loadDevices();
   await loadBands();
   await loadSettings();
