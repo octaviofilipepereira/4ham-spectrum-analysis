@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_NAME="4ham-spectrum-analysis"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SERVICE_TEMPLATE="$ROOT_DIR/scripts/${SERVICE_NAME}.service.template"
-ENV_FILE="/etc/default/${SERVICE_NAME}"
+ENV_FILE="$ROOT_DIR/.env"
 PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 
 usage() {
@@ -73,11 +73,11 @@ write_service() {
 }
 
 write_env_defaults() {
-  if run_cmd test -f "$ENV_FILE"; then
+  if [[ -f "$ENV_FILE" ]]; then
     return
   fi
 
-  run_cmd tee "$ENV_FILE" >/dev/null <<EOF
+  cat > "$ENV_FILE" <<EOF
 # 4ham Spectrum Analysis service environment
 APP_HOST=127.0.0.1
 APP_PORT=8000
@@ -103,7 +103,7 @@ uninstall_service() {
   run_cmd rm -f "$SERVICE_FILE"
   run_cmd systemctl daemon-reload
   echo "Service removed: $SERVICE_NAME"
-  echo "Environment file kept: $ENV_FILE"
+  echo "Environment file kept: $ENV_FILE (project-local .env)"
 }
 
 status_service() {

@@ -9,7 +9,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="4ham-spectrum-analysis"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-ENV_FILE="/etc/default/${SERVICE_NAME}"
+ENV_FILE="${ROOT_DIR}/.env"
 
 PURGE_DATA=0
 PURGE_SYSTEM_PACKAGES=0
@@ -30,7 +30,7 @@ Options:
 
 Default behavior (safe):
   - Remove systemd service
-  - Remove service env file (/etc/default/4ham-spectrum-analysis)
+  - Remove service env file (.env in project root)
   - Remove local virtualenv (.venv)
   - Remove frontend node_modules/
 
@@ -172,9 +172,9 @@ else
 fi
 
 # 2) Remove env file
-if run_cmd test -f "${ENV_FILE}"; then
-  echo "[2/5] Removing service environment file..."
-  run_cmd rm -f "${ENV_FILE}"
+if [[ -f "${ENV_FILE}" ]]; then
+  echo "[2/5] Removing service environment file (.env)..."
+  rm -f "${ENV_FILE}"
 else
   echo "[2/5] Service environment file not present."
 fi

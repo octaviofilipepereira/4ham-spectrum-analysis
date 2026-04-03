@@ -12,7 +12,7 @@ Wants=network-online.target
 Type=simple
 User=__SERVICE_USER__
 WorkingDirectory=__ROOT_DIR__
-EnvironmentFile=-/etc/default/4ham-spectrum-analysis
+EnvironmentFile=-__ROOT_DIR__/.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/bin/bash -lc 'cd "__ROOT_DIR__" && exec "__PYTHON_BIN__" -m uvicorn app.main:app --app-dir backend --host "${APP_HOST:-127.0.0.1}" --port "${APP_PORT:-8000}"'
 Restart=on-failure

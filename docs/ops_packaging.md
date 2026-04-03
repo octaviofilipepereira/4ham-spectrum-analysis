@@ -37,10 +37,10 @@ Use the repository service helper script:
 
 ### Environment defaults file
 
-The helper creates/uses:
+The helper creates/uses the project-local environment file:
 
 ```text
-/etc/default/4ham-spectrum-analysis
+<project-root>/.env
 ```
 
 Common keys:
@@ -64,7 +64,7 @@ Use the repository root uninstaller:
 ./uninstall.sh --purge-all --yes
 ```
 
-Note: unlike `install_systemd_service.sh uninstall`, the root `uninstall.sh` also removes `/etc/default/4ham-spectrum-analysis`.
+Note: unlike `install_systemd_service.sh uninstall`, the root `uninstall.sh` also removes the `.env` file.
 
 ## Legacy/advanced deploy helper (optional)
 

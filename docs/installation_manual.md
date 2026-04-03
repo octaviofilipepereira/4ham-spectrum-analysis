@@ -79,15 +79,11 @@ For production-style service management, use:
 ./scripts/install_systemd_service.sh uninstall
 ```
 
-Environment defaults are stored in:
-
-```
-/etc/default/4ham-spectrum-analysis
-```
+Environment defaults are stored in the project-local `.env` file (at the repository root).
 
 Note:
 - `install_systemd_service.sh uninstall` removes only the service unit.
-- `./uninstall.sh` removes service + local environments and also removes the `/etc/default/4ham-spectrum-analysis` file.
+- `./uninstall.sh` removes service + local environments and also removes the `.env` file.
 
 For manual or customised setups, follow the sections below.
 
