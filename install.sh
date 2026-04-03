@@ -218,8 +218,9 @@ This wizard will:
   4. Create the Python virtual environment
   5. Install frontend JavaScript dependencies (npm)
   6. Set up your admin account (stored securely in the local DB)
-  7. Validate critical runtime dependencies
-  8. Install and start the background service (systemd)
+  7. Create the service environment file (.env in project root)
+  8. Validate critical runtime dependencies
+  9. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
 Detected Linux: ${OS_PRETTY_NAME} (supported).
