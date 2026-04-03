@@ -1831,7 +1831,8 @@ async function stopScan() {
     throw new Error(message);
   }
   isScanRunning = false;
-  
+  localStorage.removeItem("4ham_active_band");
+
   // Clear waterfall marker caches when scan stops
   wfc.clearMarkerCaches();
   latestEvents = []; // Clear events list
@@ -2846,14 +2847,20 @@ async function loadSettings() {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
     const data = await resp.json();
     if (data.band) {
+      const persistedBand = localStorage.getItem("4ham_active_band") || "";
       if (typeof data.band === "string") {
-        bandSelect.value = data.band;
+        if (!persistedBand || !bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+          bandSelect.value = data.band;
+        }
       } else if (data.band.name) {
-        bandSelect.value = data.band.name;
+        if (!persistedBand || !bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+          bandSelect.value = data.band.name;
+        }
         bandNameInput.value = data.band.name;
         bandStartInput.value = data.band.start_hz ?? bandStartInput.value;
         bandEndInput.value = data.band.end_hz ?? bandEndInput.value;
       }
+      refreshQuickBandButtons();
     }
     renderScanContextSummary(latestScanState);
     if (data.device_id) {
@@ -3502,8 +3509,8 @@ async function startApplication() {
   fetchEvents();
   fetchTotal();
   setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
+  await syncScanState();
   refreshQuickBandButtons();
-  syncScanState();
   setInterval(syncScanState, 5000);
   fetchModeStats();
   setInterval(fetchModeStats, 10000);
