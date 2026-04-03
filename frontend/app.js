@@ -404,8 +404,11 @@ function populateBandSelectOptions(sourceBands) {
     bandSelect.appendChild(option);
   });
 
+  const savedBand = localStorage.getItem("4ham_active_band") || "";
   if (current && byName.has(current)) {
     bandSelect.value = current;
+  } else if (savedBand && byName.has(savedBand)) {
+    bandSelect.value = savedBand;
   } else {
     bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
   }
@@ -1763,6 +1766,7 @@ async function startScan() {
   }
   const recordPath = recordPathInput.value || null;
   const selectedBand = bandSelect.value;
+  localStorage.setItem("4ham_active_band", selectedBand);
   const range = getScanRangeForBand(selectedBand);
   const decoderModeToSend = selectedDecoderMode ? selectedDecoderMode.toLowerCase() : "";
   const requestPayload = {
@@ -1877,11 +1881,11 @@ async function syncScanState() {
       }
     }
     // Restore band select from backend state (handles page refresh mid-scan).
-    // Without this, loadBands() defaults to 20m on fresh load, leaving the
-    // band buttons out of sync with the running scan.
+    // Also persists to localStorage so subsequent refreshes are instant (no flicker).
     const backendBand = String(data?.scan?.band || "").trim();
     if (nextRunning && backendBand && bandSelect.value !== backendBand) {
       bandSelect.value = backendBand;
+      localStorage.setItem("4ham_active_band", backendBand);
       refreshQuickBandButtons();
     }
     renderScanContextSummary(data);
@@ -1933,6 +1937,7 @@ async function switchBandLive(selectedBand) {
   }
 
   bandSelect.value = nextBand;
+  localStorage.setItem("4ham_active_band", nextBand);
   bandSelect.dispatchEvent(new Event("change"));
 
   if (scanActionInFlight) {
