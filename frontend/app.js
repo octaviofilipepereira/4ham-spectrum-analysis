@@ -135,6 +135,16 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 // Selected decoder mode for scan
 let selectedDecoderMode = null;
 let latestScanState = null;
+let bandUiReady = false;
+
+if (bandSelect) {
+  const persistedBand = localStorage.getItem("4ham_active_band") || "";
+  if (persistedBand && bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+    bandSelect.value = persistedBand;
+  } else {
+    bandSelect.value = "";
+  }
+}
 
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
@@ -413,12 +423,13 @@ function populateBandSelectOptions(sourceBands) {
     bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
   }
 
+  bandUiReady = true;
   refreshBandEditorOptions();
   refreshQuickBandButtons();
 }
 
 function refreshQuickBandButtons() {
-  if (!bandSelect || !quickBandButtons.length) {
+  if (!bandSelect || !quickBandButtons.length || !bandUiReady) {
     return;
   }
 
