@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
+from app.version import APP_VERSION
 
 
 router = APIRouter()
@@ -33,7 +34,7 @@ def health(_: None = Depends(verify_basic_auth)) -> Dict:
     ]
     return {
         "status": "ok",
-        "version": "2.0.2",
+        "version": APP_VERSION,
         "devices": len(sdr_devices)
     }
 

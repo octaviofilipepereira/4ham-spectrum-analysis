@@ -135,6 +135,16 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 // Selected decoder mode for scan
 let selectedDecoderMode = null;
 let latestScanState = null;
+let bandUiReady = false;
+
+if (bandSelect) {
+  const persistedBand = localStorage.getItem("4ham_active_band") || "";
+  if (persistedBand && bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+    bandSelect.value = persistedBand;
+  } else {
+    bandSelect.value = "";
+  }
+}
 
 function updateAdminAudioStatus(audioProfile, options = {}) {
   if (!adminSetupStatus) {
@@ -404,18 +414,22 @@ function populateBandSelectOptions(sourceBands) {
     bandSelect.appendChild(option);
   });
 
+  const savedBand = localStorage.getItem("4ham_active_band") || "";
   if (current && byName.has(current)) {
     bandSelect.value = current;
+  } else if (savedBand && byName.has(savedBand)) {
+    bandSelect.value = savedBand;
   } else {
     bandSelect.value = byName.has("20m") ? "20m" : (byName.keys().next().value || "");
   }
 
+  bandUiReady = true;
   refreshBandEditorOptions();
   refreshQuickBandButtons();
 }
 
 function refreshQuickBandButtons() {
-  if (!bandSelect || !quickBandButtons.length) {
+  if (!bandSelect || !quickBandButtons.length || !bandUiReady) {
     return;
   }
 
@@ -1763,6 +1777,7 @@ async function startScan() {
   }
   const recordPath = recordPathInput.value || null;
   const selectedBand = bandSelect.value;
+  localStorage.setItem("4ham_active_band", selectedBand);
   const range = getScanRangeForBand(selectedBand);
   const decoderModeToSend = selectedDecoderMode ? selectedDecoderMode.toLowerCase() : "";
   const requestPayload = {
@@ -1827,7 +1842,8 @@ async function stopScan() {
     throw new Error(message);
   }
   isScanRunning = false;
-  
+  localStorage.removeItem("4ham_active_band");
+
   // Clear waterfall marker caches when scan stops
   wfc.clearMarkerCaches();
   latestEvents = []; // Clear events list
@@ -1875,6 +1891,14 @@ async function syncScanState() {
         fetchEvents();
         fetchTotal();
       }
+    }
+    // Restore band select from backend state (handles page refresh mid-scan).
+    // Also persists to localStorage so subsequent refreshes are instant (no flicker).
+    const backendBand = String(data?.scan?.band || "").trim();
+    if (nextRunning && backendBand && bandSelect.value !== backendBand) {
+      bandSelect.value = backendBand;
+      localStorage.setItem("4ham_active_band", backendBand);
+      refreshQuickBandButtons();
     }
     renderScanContextSummary(data);
   } catch (err) {
@@ -1925,6 +1949,7 @@ async function switchBandLive(selectedBand) {
   }
 
   bandSelect.value = nextBand;
+  localStorage.setItem("4ham_active_band", nextBand);
   bandSelect.dispatchEvent(new Event("change"));
 
   if (scanActionInFlight) {
@@ -2833,14 +2858,20 @@ async function loadSettings() {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
     const data = await resp.json();
     if (data.band) {
+      const persistedBand = localStorage.getItem("4ham_active_band") || "";
       if (typeof data.band === "string") {
-        bandSelect.value = data.band;
+        if (!persistedBand || !bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+          bandSelect.value = data.band;
+        }
       } else if (data.band.name) {
-        bandSelect.value = data.band.name;
+        if (!persistedBand || !bandSelect.querySelector(`option[value="${persistedBand}"]`)) {
+          bandSelect.value = data.band.name;
+        }
         bandNameInput.value = data.band.name;
         bandStartInput.value = data.band.start_hz ?? bandStartInput.value;
         bandEndInput.value = data.band.end_hz ?? bandEndInput.value;
       }
+      refreshQuickBandButtons();
     }
     renderScanContextSummary(latestScanState);
     if (data.device_id) {
@@ -3481,6 +3512,18 @@ async function startApplication() {
   ensureWaterfallFallback();
   connectStatus();
   connectEvents();
+  // Pre-fetch scan status so loadBands/loadSettings know the running band
+  // BEFORE populating UI, avoiding a flicker to the wrong band.
+  try {
+    const earlyResp = await fetch("/api/scan/status", { headers: { ...getAuthHeader() } });
+    if (earlyResp.ok) {
+      const earlyData = await earlyResp.json();
+      latestScanState = earlyData;
+      if (earlyData?.state === "running" && earlyData?.scan?.band) {
+        localStorage.setItem("4ham_active_band", earlyData.scan.band);
+      }
+    }
+  } catch (_) { /* best effort */ }
   await loadDevices();
   await loadBands();
   await loadSettings();
@@ -3489,8 +3532,8 @@ async function startApplication() {
   fetchEvents();
   fetchTotal();
   setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
+  await syncScanState();
   refreshQuickBandButtons();
-  syncScanState();
   setInterval(syncScanState, 5000);
   fetchModeStats();
   setInterval(fetchModeStats, 10000);

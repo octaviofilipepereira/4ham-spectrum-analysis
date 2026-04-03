@@ -24,6 +24,12 @@ It is designed to run on Raspberry Pi and Linux PC, with a modern web interface 
 
 Note: installation instructions are in [docs/install.md](docs/install.md), including SoapySDR via `apt` on Linux. Full manual in [docs/installation_manual.md](docs/installation_manual.md).
 
+## Documentation
+- Installation (quick + manual): [docs/install.md](docs/install.md)
+- Full installation manual: [docs/installation_manual.md](docs/installation_manual.md)
+- User manual (operation/UI): [docs/user_manual.md](docs/user_manual.md)
+- Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
+
 ## Screenshots
 
 ![Graphical installer](images/screenshot-installer.png)
@@ -65,7 +71,20 @@ The installer presents a **graphical interactive wizard** (whiptail TUI) that gu
 
 At the end, **open the URL shown on screen in your browser and log in**. That's it.
 
+Default frontend routes:
+- Main operating UI: `/`
+- Academic analytics dashboard: `/4ham_academic_analytics.html`
+
 > For full manual installation notes and decoder setup, see [docs/install.md](docs/install.md) and [docs/installation_manual.md](docs/installation_manual.md).
+
+## Uninstall (quick)
+
+```bash
+./uninstall.sh
+./uninstall.sh --purge-data
+./uninstall.sh --purge-system-packages
+./uninstall.sh --purge-all --yes
+```
 
 ## Changelog (cumulative)
 

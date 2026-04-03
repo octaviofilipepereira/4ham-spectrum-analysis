@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4ham Academic Analytics - Demo</title>
+    <style>
+      :root {
+        --bg: #0b1118;
+        --bg-accent: #182636;
+        --panel: #12202d;
+        --panel-2: #16293a;
+        --line: #28445a;
+        --text: #dbe7f3;
+        --text-muted: #9fb4c8;
+        --ok: #34d399;
+        --warn: #fbbf24;
+        --danger: #ef4444;
+        --mode-ssb: #60a5fa;
+        --mode-ft8: #34d399;
+        --mode-cw: #f59e0b;
+        --prop-line: #fbbf24;
+        --prop-band: #38bdf8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 700px at 10% -20%, #1e3a57 0%, transparent 60%),
+          radial-gradient(1000px 600px at 120% 0%, #194444 0%, transparent 55%),
+          linear-gradient(180deg, var(--bg-accent) 0%, var(--bg) 45%);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: none;
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        padding: 24px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        background: linear-gradient(135deg, rgba(36, 64, 92, 0.5), rgba(18, 32, 45, 0.85));
+        border-radius: 18px;
+        padding: 20px;
+        margin-bottom: 18px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(1.3rem, 1.1rem + 1.1vw, 2rem);
+        line-height: 1.2;
+        font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      }
+
+      .hero p {
+        margin: 8px 0 0;
+        color: var(--text-muted);
+      }
+
+      #nextRefreshInfo {
+        margin-top: 4px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        padding: 16px;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr auto;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+
+      .field label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+
+      .field select,
+      .field input {
+        width: 100%;
+        height: 38px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: #0f1c28;
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .preset-btn,
+      .apply-btn {
+        border: 1px solid var(--line);
+        background: #0f1c28;
+        color: var(--text);
+        border-radius: 10px;
+        height: 38px;
+        padding: 0 12px;
+        cursor: pointer;
+      }
+
+      .preset-btn.active {
+        background: #21415a;
+        border-color: #3c6f95;
+      }
+
+      .apply-btn {
+        background: #1b4a44;
+        border-color: #2e7b72;
+        font-weight: 600;
+      }
+
+      .custom-range {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        background: rgba(9, 17, 24, 0.5);
+      }
+
+      .card .label {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+
+      .card .value {
+        font-size: clamp(1.2rem, 1.1rem + 0.8vw, 1.9rem);
+        margin-top: 4px;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 12px;
+      }
+
+      .chart-panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(9, 17, 24, 0.55);
+        padding: 10px;
+      }
+
+      .chart-header {
+        margin: 6px 4px 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .chart-header-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .chart-mode-select {
+        height: 24px;
+        border-radius: 7px;
+        border: 1px solid #33516a;
+        background: #0f1c28;
+        color: var(--text);
+        font-size: 0.72rem;
+        padding: 0 8px;
+      }
+
+      .heatmap-pro-cell {
+        stroke: rgba(7, 14, 22, 0.72);
+        stroke-width: 1;
+        transition: stroke-width 0.11s ease, opacity 0.11s ease;
+      }
+
+      .heatmap-pro-cell.active {
+        stroke: #f8fafc;
+        stroke-width: 2;
+      }
+
+      .heatmap-pro-highlight {
+        fill: rgba(125, 211, 252, 0.14);
+        pointer-events: none;
+      }
+
+      .heatmap-pro-marginal {
+        fill: rgba(56, 189, 248, 0.42);
+      }
+
+      .chart-panel h3 {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+
+      .helper-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 1px solid #33516a;
+        background: #102232;
+        color: #c8d7e6;
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: help;
+        padding: 0;
+        flex-shrink: 0;
+      }
+
+      .helper-icon:hover {
+        border-color: #5b8ab0;
+        color: #ffffff;
+        background: #163247;
+      }
+
+      .helper-icon:focus-visible {
+        outline: 2px solid #5b8ab0;
+        outline-offset: 2px;
+      }
+
+      .chart-panel p {
+        margin: 0 4px 8px;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+      }
+
+      .chart-help-layer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(460px, calc(100vw - 16px));
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(6px);
+        transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+        z-index: 2100;
+      }
+
+      .chart-help-layer.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .chart-help-layer-card {
+        width: 100%;
+        border: 1px solid #33516a;
+        border-radius: 14px;
+        background: rgba(12, 22, 31, 0.96);
+        padding: 12px 14px;
+        color: var(--text);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.4);
+      }
+
+      .chart-help-layer-card .t {
+        font-size: 0.86rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .chart-help-layer-card .d {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+
+      .chart-value-toast {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(320px, calc(100vw - 16px));
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(6px);
+        transition: opacity 0.1s ease, transform 0.1s ease, visibility 0.1s ease;
+        z-index: 2050;
+      }
+
+      .chart-value-toast.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .chart-value-toast-body {
+        width: 100%;
+        border: 1px solid #496883;
+        border-radius: 10px;
+        background: rgba(8, 16, 24, 0.95);
+        padding: 8px 10px;
+        color: #e6f0f8;
+        font-size: 0.76rem;
+        line-height: 1.35;
+        white-space: pre-line;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+      }
+
+      .span-7 {
+        grid-column: span 7;
+      }
+
+      .span-5 {
+        grid-column: span 5;
+      }
+
+      .span-6 {
+        grid-column: span 6;
+      }
+
+      .span-12 {
+        grid-column: span 12;
+      }
+
+      svg {
+        width: 100%;
+        height: 280px;
+        display: block;
+      }
+
+      #heatmapChart {
+        height: 330px;
+      }
+
+      .meta {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(9, 17, 24, 0.55);
+        padding: 14px;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .meta-item {
+        border: 1px solid #1f3446;
+        border-radius: 10px;
+        padding: 10px;
+      }
+
+      .meta-item .k {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+      }
+
+      .meta-item .v {
+        font-weight: 600;
+        margin-top: 4px;
+      }
+
+      .legend {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin: 0 4px 8px;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+      }
+
+      .legend .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .footnote {
+        margin-top: 14px;
+        color: #ffffff;
+        font-size: 0.78rem;
+        text-align: center;
+      }
+
+      .footnote a {
+        color: #ffffff;
+      }
+
+      .prop-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.84rem;
+        margin-top: 6px;
+      }
+
+      .prop-state .badge {
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        border: 1px solid transparent;
+      }
+
+      #kpiBestBandScore {
+        font-size: 0.68rem;
+        white-space: nowrap;
+        line-height: 1.1;
+      }
+
+      .prop-state .badge.excellent {
+        background: rgba(52, 211, 153, 0.2);
+        border-color: rgba(52, 211, 153, 0.45);
+        color: #86efac;
+      }
+
+      .prop-state .badge.good {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.45);
+        color: #93c5fd;
+      }
+
+      .prop-state .badge.fair {
+        background: rgba(251, 191, 36, 0.2);
+        border-color: rgba(251, 191, 36, 0.45);
+        color: #fcd34d;
+      }
+
+      .prop-state .badge.poor {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.45);
+        color: #fca5a5;
+      }
+
+      @media (max-width: 1100px) {
+        .controls {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .cards {
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .span-7,
+        .span-5,
+        .span-6 {
+          grid-column: span 12;
+        }
+
+        .meta-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .wrap {
+          padding: 14px;
+        }
+
+        .cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .controls {
+          grid-template-columns: 1fr;
+        }
+
+        .custom-range {
+          grid-template-columns: 1fr;
+        }
+
+        .meta-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1 id="dashboardTitle">4ham Spectrum Analysis v0.8.4 - Academic Analytics</h1>
+        <p id="apiLastFetchInfo">Last API data query: --</p>
+        <p id="nextRefreshInfo">Time until next data refresh: --</p>
+      </section>
+
+      <section class="panel">
+        <div class="controls">
+          <div class="field">
+            <label>Period</label>
+            <div class="preset-row" id="presetRow">
+              <button class="preset-btn active" data-preset="24h">24h</button>
+              <button class="preset-btn" data-preset="7d">7d</button>
+              <button class="preset-btn" data-preset="30d">30d</button>
+              <button class="preset-btn" data-preset="custom">Custom</button>
+            </div>
+            <div class="custom-range" id="customRange" style="display:none;">
+              <input type="datetime-local" id="startInput" />
+              <input type="datetime-local" id="endInput" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Band</label>
+            <select id="bandFilter">
+              <option value="ALL">All</option>
+              <option>40m</option>
+              <option>20m</option>
+              <option>15m</option>
+              <option>10m</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Mode</label>
+            <select id="modeFilter">
+              <option value="ALL">All</option>
+              <option>SSB</option>
+              <option>FT8</option>
+              <option>CW</option>
+            </select>
+          </div>
+
+          <button class="apply-btn" id="applyBtn">Apply Filters</button>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <span class="label">Total events</span>
+            <div class="value" id="kpiEvents">--</div>
+          </div>
+          <div class="card">
+            <span class="label">Unique callsigns</span>
+            <div class="value" id="kpiCallsigns">--</div>
+          </div>
+          <div class="card">
+            <span class="label">Average SNR</span>
+            <div class="value" id="kpiSnr">--</div>
+          </div>
+          <div class="card">
+            <span class="label">Time coverage</span>
+            <div class="value" id="kpiCoverage">--</div>
+          </div>
+          <div class="card">
+            <span class="label">Propagation score</span>
+            <div class="value" id="kpiPropScore">--</div>
+            <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
+          </div>
+          <div class="card">
+            <span class="label">Best band</span>
+            <div class="value" id="kpiBestBand">--</div>
+            <div class="prop-state"><span id="kpiBestBandScore">--</span></div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="chart-panel span-7">
+            <div class="chart-header">
+              <h3>Event Time Series</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Event Time Series chart" data-help-title="Event Time Series" data-help-text="Shows total event count aggregated by hour for the selected period and active filters. The X axis is UTC time and the Y axis is event volume. Use peaks and troughs to identify active and quiet windows, and compare different periods to detect temporal shifts.">i</button>
+            </div>
+            <p>Total hourly volume for the selected period.</p>
+            <svg id="timelineChart"></svg>
+          </article>
+
+          <article class="chart-panel span-5">
+            <div class="chart-header">
+              <h3>Distribution by Band and Mode</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Distribution by Band and Mode chart" data-help-title="Distribution by Band and Mode" data-help-text="Each bar represents one band and each color segment represents mode contribution inside that band. Total bar height is total activity for the band. Use it to see which bands dominate and which modes are driving each band profile.">i</button>
+            </div>
+            <p>Stacked bars with a breakdown by mode.</p>
+            <div class="legend">
+              <span><span class="dot" style="background:var(--mode-ssb);"></span> SSB</span>
+              <span><span class="dot" style="background:var(--mode-ft8);"></span> FT8</span>
+              <span><span class="dot" style="background:var(--mode-cw);"></span> CW</span>
+            </div>
+            <svg id="stackedChart"></svg>
+          </article>
+
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 id="hourBandTitle">Hour of Day x Band Activity (Heatmap Pro)</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Hour of Day x Band Activity chart" data-help-title="Hour of Day x Band Activity (Heatmap Pro)" data-help-text="Rows are UTC hours (0 to 23) and columns are bands. Cell color intensity represents event count. On hover, the active cell is highlighted and the full row/hour and column/band are emphasized to make patterns easier to read. Side bars show per-hour and per-band totals for quick comparison.">i</button>
+            </div>
+            <p id="hourBandDescription">High-contrast heatmap with cross-highlighting and marginal totals.</p>
+            <svg id="heatmapChart"></svg>
+          </article>
+
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3>Top Callsigns in Period</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Top Callsigns in Period chart" data-help-title="Top Callsigns in Period" data-help-text="Ranks the top 10 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change.">i</button>
+            </div>
+            <p>Top 10 callsigns by number of occurrences.</p>
+            <svg id="topCallsignsChart"></svg>
+          </article>
+
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3>Propagation Score by Band</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows computed propagation quality score for each band on a 0 to 100 scale, combining signal quality and activity weighting. Higher bars suggest better expected propagation conditions. Compare bands to choose the most favorable operating band for the selected period.">i</button>
+            </div>
+            <p>Weighted average by activity in the selected period.</p>
+            <svg id="propagationBandChart"></svg>
+          </article>
+
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3>Propagation Time Trend</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots global propagation score over time at hourly resolution for the selected window. Rising segments suggest improving propagation and falling segments suggest degradation. The dashed line marks the average score, helping you compare short-term fluctuations against overall conditions.">i</button>
+            </div>
+            <p>Global propagation score curve per hour (0 to 100).</p>
+            <svg id="propagationTrendChart"></svg>
+          </article>
+        </div>
+
+        <section class="meta">
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="k">Data snapshot</span>
+              <span class="v" id="metaSnapshot">2026-04-03 12:10 UTC</span>
+            </div>
+            <div class="meta-item">
+              <span class="k">Update frequency</span>
+              <span class="v" id="metaUpdateFrequency">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k">Analyzed period</span>
+              <span class="v" id="metaPeriod">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k">Data quality</span>
+              <span class="v">Consistency: 99.2%</span>
+            </div>
+          </div>
+          <div class="footnote">
+            Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; &copy; 2026 Octávio Filipe Gonçalves | License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>
+          </div>
+        </section>
+      </section>
+    </div>
+
+    <div class="chart-help-layer" id="chartHelpLayer" role="status" aria-live="polite">
+      <div class="chart-help-layer-card">
+        <div class="t" id="chartHelpLayerTitle"></div>
+        <div class="d" id="chartHelpLayerText"></div>
+      </div>
+    </div>
+
+    <div class="chart-value-toast" id="chartValueToast" role="status" aria-live="polite">
+      <div class="chart-value-toast-body" id="chartValueToastText"></div>
+    </div>
+
+    <script src="/lib/d3.min.js"></script>
+    <script>
+      const BANDS = ["40m", "20m", "15m", "10m"];
+      const MODES = ["SSB", "FT8", "CW"];
+      const MODE_COLORS = {
+        SSB: getCssVar("--mode-ssb"),
+        FT8: getCssVar("--mode-ft8"),
+        CW: getCssVar("--mode-cw"),
+      };
+
+      const presetRow = document.getElementById("presetRow");
+      const customRange = document.getElementById("customRange");
+      const startInput = document.getElementById("startInput");
+      const endInput = document.getElementById("endInput");
+      const bandFilter = document.getElementById("bandFilter");
+      const modeFilter = document.getElementById("modeFilter");
+      const applyBtn = document.getElementById("applyBtn");
+      const hourBandTitle = document.getElementById("hourBandTitle");
+      const hourBandDescription = document.getElementById("hourBandDescription");
+      const hourBandChartSvg = document.getElementById("heatmapChart");
+
+      const kpiEvents = document.getElementById("kpiEvents");
+      const kpiCallsigns = document.getElementById("kpiCallsigns");
+      const kpiSnr = document.getElementById("kpiSnr");
+      const kpiCoverage = document.getElementById("kpiCoverage");
+      const kpiPropScore = document.getElementById("kpiPropScore");
+      const kpiPropState = document.getElementById("kpiPropState");
+      const kpiBestBand = document.getElementById("kpiBestBand");
+      const kpiBestBandScore = document.getElementById("kpiBestBandScore");
+      const metaPeriod = document.getElementById("metaPeriod");
+      const metaSnapshot = document.getElementById("metaSnapshot");
+      const metaUpdateFrequency = document.getElementById("metaUpdateFrequency");
+      const dashboardTitle = document.getElementById("dashboardTitle");
+      const apiLastFetchInfo = document.getElementById("apiLastFetchInfo");
+      const nextRefreshInfo = document.getElementById("nextRefreshInfo");
+      const chartHelpLayer = document.getElementById("chartHelpLayer");
+      const chartHelpLayerTitle = document.getElementById("chartHelpLayerTitle");
+      const chartHelpLayerText = document.getElementById("chartHelpLayerText");
+      const chartValueToast = document.getElementById("chartValueToast");
+      const chartValueToastText = document.getElementById("chartValueToastText");
+      const AUTO_REFRESH_INTERVAL_MS = 60 * 1000;
+      const HOUR_BAND_HEATMAP_HEIGHT_PX = 420;
+
+      let synthetic = buildSyntheticData();
+      let dataSource = "simulated";
+      let lastResolvedRange = null;
+      let lastFilters = { band: "ALL", mode: "ALL" };
+      let currentPreset = "24h";
+      let refreshCountdownTimer = null;
+      let nextRefreshDeadlineMs = null;
+      let isLoading = false;
+
+      updateMetaUpdateFrequency();
+
+      const now = new Date();
+      endInput.value = toLocalDateTimeValue(now);
+      startInput.value = toLocalDateTimeValue(new Date(now.getTime() - 24 * 3600 * 1000));
+
+      presetRow.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-preset]");
+        if (!btn) return;
+        currentPreset = btn.dataset.preset;
+        for (const b of presetRow.querySelectorAll("button[data-preset]")) {
+          b.classList.toggle("active", b === btn);
+        }
+        customRange.style.display = currentPreset === "custom" ? "grid" : "none";
+      });
+
+      applyBtn.addEventListener("click", () => {
+        loadAndRender();
+      });
+      window.addEventListener("resize", debounce(renderFromCurrentRange, 120));
+
+      initChartHelp();
+      startAutoRefresh();
+      updateHourBandDescription();
+      loadAndRender();
+
+      function initChartHelp() {
+        const helperIcons = document.querySelectorAll(".helper-icon[data-help-title][data-help-text]");
+        for (const icon of helperIcons) {
+          const helpTitle = icon.getAttribute("data-help-title") || "Chart Help";
+          const helpText = icon.getAttribute("data-help-text") || "";
+
+          icon.addEventListener("mouseenter", (event) => {
+            showChartHelpLayer(helpTitle, helpText, event, icon);
+          });
+          icon.addEventListener("mousemove", (event) => {
+            positionChartHelpLayer(event.clientX, event.clientY);
+          });
+          icon.addEventListener("focus", () => {
+            showChartHelpLayer(helpTitle, helpText, null, icon);
+          });
+          icon.addEventListener("mouseleave", hideChartHelpLayer);
+          icon.addEventListener("blur", hideChartHelpLayer);
+        }
+      }
+
+      function showChartHelpLayer(title, text, pointerEvent, anchorEl) {
+        if (!chartHelpLayer || !chartHelpLayerTitle || !chartHelpLayerText) {
+          return;
+        }
+        chartHelpLayerTitle.textContent = title;
+        chartHelpLayerText.textContent = text;
+        chartHelpLayer.classList.add("visible");
+
+        const fallbackRect = anchorEl ? anchorEl.getBoundingClientRect() : null;
+        const pointerX = pointerEvent ? pointerEvent.clientX : (fallbackRect ? fallbackRect.left + (fallbackRect.width / 2) : window.innerWidth / 2);
+        const pointerY = pointerEvent ? pointerEvent.clientY : (fallbackRect ? fallbackRect.top : window.innerHeight / 2);
+
+        window.requestAnimationFrame(() => {
+          positionChartHelpLayer(pointerX, pointerY);
+        });
+      }
+
+      function positionChartHelpLayer(pointerX, pointerY) {
+        if (!chartHelpLayer || !chartHelpLayer.classList.contains("visible")) {
+          return;
+        }
+
+        const tooltipRect = chartHelpLayer.getBoundingClientRect();
+        const margin = 8;
+        const gap = 14;
+
+        let left = pointerX - (tooltipRect.width / 2);
+        left = Math.max(margin, Math.min(left, window.innerWidth - tooltipRect.width - margin));
+
+        let top = pointerY - tooltipRect.height - gap;
+        if (top < margin) {
+          top = Math.min(pointerY + gap, window.innerHeight - tooltipRect.height - margin);
+        }
+
+        chartHelpLayer.style.left = `${Math.round(left)}px`;
+        chartHelpLayer.style.top = `${Math.round(top)}px`;
+      }
+
+      function hideChartHelpLayer() {
+        if (!chartHelpLayer) {
+          return;
+        }
+        chartHelpLayer.classList.remove("visible");
+      }
+
+      function showChartValueToast(lines, pointerEvent, fallbackX, fallbackY) {
+        if (!chartValueToast || !chartValueToastText) {
+          return;
+        }
+
+        const text = Array.isArray(lines)
+          ? lines.filter((line) => Boolean(line)).join("\n")
+          : String(lines || "");
+        if (!text) {
+          hideChartValueToast();
+          return;
+        }
+
+        chartValueToastText.textContent = text;
+        chartValueToast.classList.add("visible");
+
+        const pointerX = pointerEvent
+          ? pointerEvent.clientX
+          : (Number.isFinite(fallbackX) ? fallbackX : window.innerWidth / 2);
+        const pointerY = pointerEvent
+          ? pointerEvent.clientY
+          : (Number.isFinite(fallbackY) ? fallbackY : window.innerHeight / 2);
+
+        window.requestAnimationFrame(() => {
+          positionChartValueToast(pointerX, pointerY);
+        });
+      }
+
+      function positionChartValueToast(pointerX, pointerY) {
+        if (!chartValueToast || !chartValueToast.classList.contains("visible")) {
+          return;
+        }
+
+        const toastRect = chartValueToast.getBoundingClientRect();
+        const margin = 8;
+        const gap = 14;
+
+        let left = pointerX - (toastRect.width / 2);
+        left = Math.max(margin, Math.min(left, window.innerWidth - toastRect.width - margin));
+
+        let top = pointerY - toastRect.height - gap;
+        if (top < margin) {
+          top = Math.min(pointerY + gap, window.innerHeight - toastRect.height - margin);
+        }
+
+        chartValueToast.style.left = `${Math.round(left)}px`;
+        chartValueToast.style.top = `${Math.round(top)}px`;
+      }
+
+      function hideChartValueToast() {
+        if (!chartValueToast) {
+          return;
+        }
+        chartValueToast.classList.remove("visible");
+      }
+
+      function startAutoRefresh() {
+        if (!refreshCountdownTimer) {
+          refreshCountdownTimer = window.setInterval(() => {
+            updateNextRefreshInfo();
+          }, 250);
+        }
+        updateNextRefreshInfo();
+      }
+
+      function updateMetaUpdateFrequency() {
+        if (!metaUpdateFrequency) {
+          return;
+        }
+
+        const totalSeconds = Math.round(AUTO_REFRESH_INTERVAL_MS / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (minutes > 0 && seconds === 0) {
+          metaUpdateFrequency.textContent = `Every ${minutes} minute${minutes === 1 ? "" : "s"} (dashboard auto-refresh)`;
+          return;
+        }
+        metaUpdateFrequency.textContent = `Every ${totalSeconds} seconds (dashboard auto-refresh)`;
+      }
+
+      function updateHourBandDescription() {
+        if (!hourBandDescription) {
+          return;
+        }
+        if (hourBandChartSvg) {
+          hourBandChartSvg.style.height = `${HOUR_BAND_HEATMAP_HEIGHT_PX}px`;
+        }
+        if (hourBandTitle) {
+          hourBandTitle.textContent = "Hour of Day x Band Activity (Heatmap Pro)";
+        }
+        hourBandDescription.textContent = "High-contrast heatmap with cross-highlighting and marginal totals.";
+      }
+
+      async function loadAndRender() {
+        if (isLoading) {
+          return;
+        }
+        isLoading = true;
+        try {
+          const { start, end } = resolvePeriodRange();
+          const selectedBand = bandFilter.value;
+          const selectedMode = modeFilter.value;
+
+          lastResolvedRange = { start, end };
+          lastFilters = { band: selectedBand, mode: selectedMode };
+
+          const loaded = await fetchAcademicDataset(start, end, selectedBand, selectedMode);
+          if (!loaded && metaSnapshot) {
+            dataSource = "simulated";
+            metaSnapshot.textContent = "Simulated dataset (API fallback)";
+          }
+          renderFromCurrentRange();
+        } finally {
+          isLoading = false;
+        }
+      }
+
+      function renderFromCurrentRange() {
+        const range = lastResolvedRange || resolvePeriodRange();
+        const start = range.start;
+        const end = range.end;
+        const selectedBand = lastFilters.band || bandFilter.value;
+        const selectedMode = lastFilters.mode || modeFilter.value;
+
+        hideChartValueToast();
+
+        const filteredSeries = synthetic.series.filter((row) => {
+          if (row.ts < start || row.ts > end) return false;
+          if (selectedBand !== "ALL" && row.band !== selectedBand) return false;
+          if (selectedMode !== "ALL" && row.mode !== selectedMode) return false;
+          return true;
+        });
+
+        const filteredCallsigns = synthetic.callsigns.filter((row) => {
+          if (row.ts < start || row.ts > end) return false;
+          if (selectedBand !== "ALL" && row.band !== selectedBand) return false;
+          if (selectedMode !== "ALL" && row.mode !== selectedMode) return false;
+          return true;
+        });
+
+        updateKpis(filteredSeries, filteredCallsigns, start, end);
+        const propagation = computePropagationAnalytics(filteredSeries, start, end);
+        updatePropagationKpis(propagation);
+        drawTimeline(filteredSeries, start, end);
+        drawStackedByBandMode(filteredSeries);
+        drawHourBandChart(filteredSeries);
+        drawTopCallsigns(filteredCallsigns);
+        drawPropagationBandChart(propagation);
+        drawPropagationTrendChart(propagation, start, end);
+      }
+
+      function drawHourBandChart(rows) {
+        drawHeatmapPro(rows);
+      }
+
+      async function fetchAcademicDataset(start, end, selectedBand, selectedMode) {
+        const queryAt = new Date();
+        const params = new URLSearchParams({
+          start: start.toISOString(),
+          end: end.toISOString(),
+          bucket: "hour",
+        });
+        if (selectedBand && selectedBand !== "ALL") {
+          params.set("band", selectedBand);
+        }
+        if (selectedMode && selectedMode !== "ALL") {
+          params.set("mode", selectedMode);
+        }
+
+        try {
+          const resp = await fetch(`/api/analytics/academic?${params.toString()}`);
+          updateApiLastFetchInfo(queryAt);
+          if (!resp.ok) {
+            return false;
+          }
+          const payload = await resp.json();
+          if (String(payload?.status || "") !== "ok" || !payload?.data) {
+            return false;
+          }
+
+          const appVersion = String(payload?.app_version || "").trim();
+          if (dashboardTitle && appVersion) {
+            dashboardTitle.textContent = `4ham Spectrum Analysis v${appVersion} - Academic Analytics`;
+          }
+
+          const series = Array.isArray(payload.data.series) ? payload.data.series : [];
+          const callsigns = Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [];
+
+          synthetic = {
+            series: series
+              .map((row) => ({
+                ts: new Date(row.ts),
+                band: row.band,
+                mode: row.mode,
+                count: Number(row.count || 0),
+                snr: Number(row.snr || 0),
+              }))
+              .filter((row) => !Number.isNaN(row.ts.getTime())),
+            callsigns: callsigns
+              .map((row) => ({
+                ts: new Date(row.ts),
+                band: row.band,
+                mode: row.mode,
+                callsign: row.callsign,
+                hits: Number(row.hits || 0),
+              }))
+              .filter((row) => !Number.isNaN(row.ts.getTime())),
+          };
+
+          dataSource = "api";
+          if (metaSnapshot) {
+            const snapshot = payload.snapshot_utc ? new Date(payload.snapshot_utc) : null;
+            metaSnapshot.textContent = snapshot && !Number.isNaN(snapshot.getTime())
+              ? `${fmtDateUtc(snapshot)} (${dataSource})`
+              : `API snapshot (${dataSource})`;
+          }
+          return true;
+        } catch (_err) {
+          updateApiLastFetchInfo(queryAt);
+          return false;
+        }
+      }
+
+      function updateApiLastFetchInfo(queryAt) {
+        if (!apiLastFetchInfo) {
+          return;
+        }
+        apiLastFetchInfo.textContent = `Last API data query: ${fmtDateUtc(queryAt)}`;
+        nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
+        updateNextRefreshInfo();
+        startAutoRefresh();
+      }
+
+      function updateNextRefreshInfo() {
+        if (!nextRefreshInfo) {
+          return;
+        }
+        if (!nextRefreshDeadlineMs) {
+          nextRefreshInfo.textContent = "Time until next data refresh: --";
+          return;
+        }
+
+        const remainingMs = nextRefreshDeadlineMs - Date.now();
+        if (remainingMs <= 0) {
+          if (!isLoading) {
+            nextRefreshInfo.textContent = "Refreshing data...";
+            nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
+            loadAndRender();
+          }
+          return;
+        }
+
+        const totalSeconds = Math.ceil(remainingMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        nextRefreshInfo.textContent = `Time until next data refresh: ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function updateKpis(seriesRows, callsignRows, start, end) {
+        const totalEvents = d3.sum(seriesRows, (d) => d.count);
+        const snrWeighted = d3.sum(seriesRows, (d) => d.count * d.snr);
+        const snrAvg = totalEvents > 0 ? snrWeighted / totalEvents : 0;
+
+        const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
+
+        const hourlyCoverage = new Set(
+          seriesRows.map((d) => `${d.ts.getUTCFullYear()}-${d.ts.getUTCMonth()}-${d.ts.getUTCDate()}-${d.ts.getUTCHours()}`)
+        ).size;
+        const hoursWindow = Math.max(1, Math.round((end - start) / 3600000));
+        const coveragePct = Math.min(100, (hourlyCoverage / hoursWindow) * 100);
+
+        kpiEvents.textContent = formatInt(totalEvents);
+        kpiCallsigns.textContent = formatInt(uniqueCallsigns);
+        kpiSnr.textContent = `${snrAvg.toFixed(1)} dB`;
+        kpiCoverage.textContent = `${coveragePct.toFixed(1)}%`;
+
+        metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
+      }
+
+      function computePropagationAnalytics(seriesRows, start, end) {
+        const modeWeight = { SSB: 1.0, FT8: 1.08, CW: 0.92 };
+        const byBand = new Map(BANDS.map((b) => [b, { band: b, weightedScore: 0, totalCount: 0 }]));
+        const byHour = new Map();
+
+        for (const row of seriesRows) {
+          const snrNorm = clamp((row.snr - 4) / 16, 0, 1);
+          const activityNorm = clamp(Math.log1p(row.count) / Math.log1p(90), 0, 1);
+          const score = clamp(100 * ((0.65 * snrNorm + 0.35 * activityNorm) * (modeWeight[row.mode] || 1)), 0, 100);
+
+          const bandAgg = byBand.get(row.band) || { band: row.band, weightedScore: 0, totalCount: 0 };
+          bandAgg.weightedScore += score * row.count;
+          bandAgg.totalCount += row.count;
+          byBand.set(row.band, bandAgg);
+
+          const hourKey = row.ts.toISOString().slice(0, 13);
+          const hourAgg = byHour.get(hourKey) || { ts: new Date(`${hourKey}:00:00.000Z`), weightedScore: 0, totalCount: 0 };
+          hourAgg.weightedScore += score * row.count;
+          hourAgg.totalCount += row.count;
+          byHour.set(hourKey, hourAgg);
+        }
+
+        const byBandArray = Array.from(byBand.values()).map((item) => ({
+          band: item.band,
+          score: item.totalCount > 0 ? item.weightedScore / item.totalCount : 0,
+          events: item.totalCount,
+        }));
+
+        const trend = Array.from(byHour.values())
+          .map((item) => ({
+            ts: item.ts,
+            score: item.totalCount > 0 ? item.weightedScore / item.totalCount : 0,
+          }))
+          .sort((a, b) => a.ts - b.ts);
+
+        const weightedTotal = d3.sum(byBandArray, (d) => d.score * d.events);
+        const eventsTotal = d3.sum(byBandArray, (d) => d.events);
+        const overallScore = eventsTotal > 0 ? weightedTotal / eventsTotal : 0;
+        const bestBand = byBandArray.slice().sort((a, b) => b.score - a.score)[0] || null;
+        const trendStd = d3.deviation(trend, (d) => d.score) || 0;
+        const stability = clamp(100 - trendStd * 2.5, 0, 100);
+
+        return {
+          start,
+          end,
+          overallScore,
+          stability,
+          bestBand,
+          byBand: byBandArray,
+          trend,
+        };
+      }
+
+      function updatePropagationKpis(propagation) {
+        const score = propagation.overallScore || 0;
+        const state = propagationState(score);
+
+        kpiPropScore.textContent = `${score.toFixed(1)}`;
+        kpiPropState.textContent = state.label;
+        kpiPropState.className = `badge ${state.className}`;
+
+        if (propagation.bestBand) {
+          kpiBestBand.textContent = propagation.bestBand.band;
+          kpiBestBandScore.textContent = `${propagation.bestBand.score.toFixed(1)} / 100 | stability ${propagation.stability.toFixed(1)}%`;
+        } else {
+          kpiBestBand.textContent = "--";
+          kpiBestBandScore.textContent = "--";
+        }
+      }
+
+      function propagationState(score) {
+        if (score >= 75) return { label: "Excellent", className: "excellent" };
+        if (score >= 60) return { label: "Good", className: "good" };
+        if (score >= 45) return { label: "Fair", className: "fair" };
+        return { label: "Poor", className: "poor" };
+      }
+
+      function drawTimeline(rows, start, end) {
+        const svg = d3.select("#timelineChart");
+        svg.selectAll("*").remove();
+
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 14, right: 14, bottom: 30, left: 48 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const byHour = d3.rollups(
+          rows,
+          (v) => d3.sum(v, (d) => d.count),
+          (d) => d.ts.getTime()
+        )
+          .map(([ts, total]) => ({ ts: new Date(Number(ts)), total }))
+          .sort((a, b) => a.ts - b.ts);
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        const x = d3.scaleTime().domain([start, end]).range([0, innerW]);
+        const yMax = Math.max(10, d3.max(byHour, (d) => d.total) || 0);
+        const y = d3.scaleLinear().domain([0, yMax]).nice().range([innerH, 0]);
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x).ticks(6).tickFormat(d3.utcFormat("%d/%m %Hh")))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .call(d3.axisLeft(y).ticks(5))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        const area = d3
+          .area()
+          .x((d) => x(d.ts))
+          .y0(innerH)
+          .y1((d) => y(d.total))
+          .curve(d3.curveMonotoneX);
+
+        const line = d3
+          .line()
+          .x((d) => x(d.ts))
+          .y((d) => y(d.total))
+          .curve(d3.curveMonotoneX);
+
+        g.append("path")
+          .datum(byHour)
+          .attr("fill", "rgba(96,165,250,0.25)")
+          .attr("d", area);
+
+        g.append("path")
+          .datum(byHour)
+          .attr("fill", "none")
+          .attr("stroke", "#60a5fa")
+          .attr("stroke-width", 2)
+          .attr("d", line);
+
+        if (byHour.length > 0) {
+          const hoverLine = g.append("line")
+            .attr("stroke", "#7dd3fc")
+            .attr("stroke-width", 1)
+            .attr("opacity", 0.7)
+            .style("display", "none");
+
+          const hoverDot = g.append("circle")
+            .attr("r", 3.2)
+            .attr("fill", "#e0f2fe")
+            .attr("stroke", "#0284c7")
+            .attr("stroke-width", 1)
+            .style("display", "none");
+
+          g.append("rect")
+            .attr("width", innerW)
+            .attr("height", innerH)
+            .attr("fill", "transparent")
+            .on("mousemove", (event) => {
+              const [mx] = d3.pointer(event);
+              const hoveredTs = x.invert(clamp(mx, 0, innerW));
+              const nearest = d3.least(byHour, (d) => Math.abs(d.ts - hoveredTs));
+              if (!nearest) {
+                return;
+              }
+
+              const px = x(nearest.ts);
+              const py = y(nearest.total);
+              hoverLine
+                .attr("x1", px)
+                .attr("x2", px)
+                .attr("y1", 0)
+                .attr("y2", innerH)
+                .style("display", null);
+              hoverDot
+                .attr("cx", px)
+                .attr("cy", py)
+                .style("display", null);
+
+              showChartValueToast([
+                "Event Timeline",
+                fmtDateUtc(nearest.ts),
+                `Events: ${formatInt(nearest.total)}`,
+              ], event);
+            })
+            .on("mouseleave", () => {
+              hoverLine.style("display", "none");
+              hoverDot.style("display", "none");
+              hideChartValueToast();
+            });
+        }
+      }
+
+      function drawStackedByBandMode(rows) {
+        const svg = d3.select("#stackedChart");
+        svg.selectAll("*").remove();
+
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 10, right: 12, bottom: 28, left: 40 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const byBand = BANDS.map((band) => {
+          const row = { band };
+          for (const mode of MODES) {
+            row[mode] = d3.sum(rows.filter((d) => d.band === band && d.mode === mode), (d) => d.count);
+          }
+          return row;
+        });
+
+        const stack = d3.stack().keys(MODES)(byBand);
+
+        const x = d3.scaleBand().domain(BANDS).range([0, innerW]).padding(0.2);
+        const yMax = Math.max(10, d3.max(byBand, (d) => MODES.reduce((acc, m) => acc + d[m], 0)) || 0);
+        const y = d3.scaleLinear().domain([0, yMax]).nice().range([innerH, 0]);
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .call(d3.axisLeft(y).ticks(5))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.selectAll("g.layer")
+          .data(stack)
+          .join("g")
+          .attr("fill", (d) => MODE_COLORS[d.key])
+          .selectAll("rect")
+          .data((d) => d)
+          .join("rect")
+          .attr("x", (d) => x(d.data.band))
+          .attr("y", (d) => y(d[1]))
+          .attr("height", (d) => Math.max(0, y(d[0]) - y(d[1])))
+          .attr("width", x.bandwidth())
+          .on("mousemove", function (event, d) {
+            const layer = d3.select(this.parentNode).datum();
+            const mode = layer ? layer.key : "N/A";
+            const events = d.data && mode && Number.isFinite(d.data[mode]) ? d.data[mode] : 0;
+            showChartValueToast([
+              `Band: ${d.data.band}`,
+              `Mode: ${mode}`,
+              `Events: ${formatInt(events)}`,
+            ], event);
+          })
+          .on("mouseleave", hideChartValueToast);
+      }
+
+      function drawHeatmapPro(rows) {
+        const svg = d3.select("#heatmapChart");
+        svg.selectAll("*").remove();
+
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 42, right: 76, bottom: 34, left: 52 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const hours = d3.range(24);
+        const grid = [];
+        for (const hour of hours) {
+          for (const band of BANDS) {
+            const value = d3.sum(
+              rows.filter((d) => d.band === band && d.ts.getUTCHours() === hour),
+              (d) => d.count
+            );
+            grid.push({ hour, band, value });
+          }
+        }
+
+        const maxValue = d3.max(grid, (d) => d.value) || 1;
+        const bandTotals = new Map(BANDS.map((band) => [band, 0]));
+        const hourTotals = new Map(hours.map((hour) => [hour, 0]));
+        for (const item of grid) {
+          bandTotals.set(item.band, (bandTotals.get(item.band) || 0) + item.value);
+          hourTotals.set(item.hour, (hourTotals.get(item.hour) || 0) + item.value);
+        }
+
+        const colorForValue = (value) => {
+          const norm = maxValue > 0 ? Math.pow(value / maxValue, 0.62) : 0;
+          return d3.interpolateRgbBasis(["#07111a", "#11324b", "#1f7aa5", "#38bdf8", "#e0f2fe"])(norm);
+        };
+
+        const x = d3.scaleBand().domain(BANDS).range([0, innerW]).padding(0.05);
+        const y = d3.scaleBand().domain(hours).range([0, innerH]).padding(0.05);
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const rowHighlight = g.append("rect")
+          .attr("class", "heatmap-pro-highlight")
+          .attr("x", 0)
+          .attr("width", innerW)
+          .attr("height", y.bandwidth())
+          .style("display", "none");
+
+        const colHighlight = g.append("rect")
+          .attr("class", "heatmap-pro-highlight")
+          .attr("y", 0)
+          .attr("height", innerH)
+          .attr("width", x.bandwidth())
+          .style("display", "none");
+
+        const cells = g.selectAll("rect.heatmap-pro-cell")
+          .data(grid)
+          .join("rect")
+          .attr("class", "heatmap-pro-cell")
+          .attr("x", (d) => x(d.band))
+          .attr("y", (d) => y(d.hour))
+          .attr("width", x.bandwidth())
+          .attr("height", y.bandwidth())
+          .attr("fill", (d) => colorForValue(d.value))
+          .attr("opacity", (d) => (d.value > 0 ? 1 : 0.6))
+          .on("mousemove", (event, d) => {
+            cells.classed("active", false);
+            d3.select(event.currentTarget).classed("active", true);
+            rowHighlight
+              .attr("y", y(d.hour))
+              .style("display", null);
+            colHighlight
+              .attr("x", x(d.band))
+              .style("display", null);
+            showChartValueToast([
+              `Band: ${d.band}`,
+              `UTC hour: ${String(d.hour).padStart(2, "0")}:00`,
+              `Events: ${formatInt(d.value)}`,
+            ], event);
+          })
+          .on("mouseleave", () => {
+            cells.classed("active", false);
+            rowHighlight.style("display", "none");
+            colHighlight.style("display", "none");
+            hideChartValueToast();
+          });
+
+        const topBarHeight = margin.top - 14;
+        const topScale = d3.scaleLinear()
+          .domain([0, d3.max(BANDS, (band) => bandTotals.get(band) || 0) || 1])
+          .range([0, topBarHeight]);
+
+        const topTotals = svg.append("g").attr("transform", `translate(${margin.left},12)`);
+        topTotals.selectAll("rect")
+          .data(BANDS)
+          .join("rect")
+          .attr("class", "heatmap-pro-marginal")
+          .attr("x", (band) => x(band))
+          .attr("y", (band) => topBarHeight - topScale(bandTotals.get(band) || 0))
+          .attr("width", x.bandwidth())
+          .attr("height", (band) => topScale(bandTotals.get(band) || 0));
+
+        const rightBarWidth = margin.right - 18;
+        const rightScale = d3.scaleLinear()
+          .domain([0, d3.max(hours, (hour) => hourTotals.get(hour) || 0) || 1])
+          .range([0, rightBarWidth]);
+
+        const rightTotals = svg.append("g").attr("transform", `translate(${margin.left + innerW + 8},${margin.top})`);
+        rightTotals.selectAll("rect")
+          .data(hours)
+          .join("rect")
+          .attr("class", "heatmap-pro-marginal")
+          .attr("x", 0)
+          .attr("y", (hour) => y(hour))
+          .attr("width", (hour) => rightScale(hourTotals.get(hour) || 0))
+          .attr("height", y.bandwidth());
+
+        svg.append("text")
+          .attr("x", margin.left + innerW + 10)
+          .attr("y", margin.top - 8)
+          .attr("fill", "#9fb4c8")
+          .attr("font-size", 10)
+          .text("Σ hour");
+
+        svg.append("text")
+          .attr("x", margin.left - 2)
+          .attr("y", 10)
+          .attr("fill", "#9fb4c8")
+          .attr("font-size", 10)
+          .text("Σ band");
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .call(d3.axisLeft(y).tickValues([0, 3, 6, 9, 12, 15, 18, 21]))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+      }
+
+      function drawTopCallsigns(rows) {
+        const svg = d3.select("#topCallsignsChart");
+        svg.selectAll("*").remove();
+
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 10, right: 14, bottom: 24, left: 92 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const top = d3
+          .rollups(rows, (v) => d3.sum(v, (d) => d.hits), (d) => d.callsign)
+          .map(([callsign, total]) => ({ callsign, total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10)
+          .reverse();
+
+        const x = d3.scaleLinear().domain([0, d3.max(top, (d) => d.total) || 1]).nice().range([0, innerW]);
+        const y = d3.scaleBand().domain(top.map((d) => d.callsign)).range([innerH, 0]).padding(0.18);
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        g.append("g")
+          .call(d3.axisLeft(y))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x).ticks(5))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.selectAll("rect")
+          .data(top)
+          .join("rect")
+          .attr("x", 0)
+          .attr("y", (d) => y(d.callsign))
+          .attr("height", y.bandwidth())
+          .attr("width", (d) => x(d.total))
+          .attr("fill", "#34d399")
+          .on("mousemove", (event, d) => {
+            showChartValueToast([
+              `Callsign: ${d.callsign}`,
+              `Total hits: ${formatInt(d.total)}`,
+            ], event);
+          })
+          .on("mouseleave", hideChartValueToast);
+      }
+
+      function drawPropagationBandChart(propagation) {
+        const svg = d3.select("#propagationBandChart");
+        svg.selectAll("*").remove();
+
+        const rows = propagation.byBand || [];
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 12, right: 14, bottom: 30, left: 44 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const x = d3.scaleBand().domain(BANDS).range([0, innerW]).padding(0.22);
+        const y = d3.scaleLinear().domain([0, 100]).range([innerH, 0]);
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .call(d3.axisLeft(y).ticks(5))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.selectAll("rect")
+          .data(rows)
+          .join("rect")
+          .attr("x", (d) => x(d.band))
+          .attr("y", (d) => y(d.score))
+          .attr("width", x.bandwidth())
+          .attr("height", (d) => innerH - y(d.score))
+          .attr("fill", "var(--prop-band)")
+          .on("mousemove", (event, d) => {
+            showChartValueToast([
+              `Band: ${d.band}`,
+              `Propagation score: ${d.score.toFixed(1)} / 100`,
+              `Events: ${formatInt(d.events)}`,
+            ], event);
+          })
+          .on("mouseleave", hideChartValueToast);
+
+        g.selectAll("text.score")
+          .data(rows)
+          .join("text")
+          .attr("class", "score")
+          .attr("x", (d) => x(d.band) + x.bandwidth() / 2)
+          .attr("y", (d) => y(d.score) - 6)
+          .attr("text-anchor", "middle")
+          .attr("fill", "#9fd9ff")
+          .attr("font-size", 11)
+          .text((d) => d.score.toFixed(1));
+      }
+
+      function drawPropagationTrendChart(propagation, start, end) {
+        const svg = d3.select("#propagationTrendChart");
+        svg.selectAll("*").remove();
+
+        const data = propagation.trend || [];
+        const w = svg.node().clientWidth;
+        const h = svg.node().clientHeight;
+        const margin = { top: 14, right: 16, bottom: 30, left: 44 };
+        const innerW = w - margin.left - margin.right;
+        const innerH = h - margin.top - margin.bottom;
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        const x = d3.scaleTime().domain([start, end]).range([0, innerW]);
+        const y = d3.scaleLinear().domain([0, 100]).range([innerH, 0]);
+
+        g.append("g")
+          .attr("transform", `translate(0,${innerH})`)
+          .call(d3.axisBottom(x).ticks(6).tickFormat(d3.utcFormat("%d/%m %Hh")))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        g.append("g")
+          .call(d3.axisLeft(y).ticks(5))
+          .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8").attr("font-size", 11))
+          .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
+
+        const line = d3
+          .line()
+          .x((d) => x(d.ts))
+          .y((d) => y(d.score))
+          .curve(d3.curveMonotoneX);
+
+        g.append("path")
+          .datum(data)
+          .attr("fill", "none")
+          .attr("stroke", "var(--prop-line)")
+          .attr("stroke-width", 2.2)
+          .attr("d", line);
+
+        const avg = propagation.overallScore || 0;
+        g.append("line")
+          .attr("x1", 0)
+          .attr("x2", innerW)
+          .attr("y1", y(avg))
+          .attr("y2", y(avg))
+          .attr("stroke", "#fbbf24")
+          .attr("stroke-dasharray", "4,4")
+          .attr("opacity", 0.8);
+
+        g.append("text")
+          .attr("x", innerW - 4)
+          .attr("y", y(avg) - 6)
+          .attr("text-anchor", "end")
+          .attr("fill", "#fcd34d")
+          .attr("font-size", 11)
+          .text(`avg ${avg.toFixed(1)}`);
+
+        if (data.length > 0) {
+          const hoverLine = g.append("line")
+            .attr("stroke", "#f8fafc")
+            .attr("stroke-width", 1)
+            .attr("opacity", 0.6)
+            .style("display", "none");
+
+          const hoverDot = g.append("circle")
+            .attr("r", 3.2)
+            .attr("fill", "#f8fafc")
+            .attr("stroke", "#38bdf8")
+            .attr("stroke-width", 1)
+            .style("display", "none");
+
+          g.append("rect")
+            .attr("width", innerW)
+            .attr("height", innerH)
+            .attr("fill", "transparent")
+            .on("mousemove", (event) => {
+              const [mx] = d3.pointer(event);
+              const hoveredTs = x.invert(clamp(mx, 0, innerW));
+              const nearest = d3.least(data, (d) => Math.abs(d.ts - hoveredTs));
+              if (!nearest) {
+                return;
+              }
+
+              const px = x(nearest.ts);
+              const py = y(nearest.score);
+              hoverLine
+                .attr("x1", px)
+                .attr("x2", px)
+                .attr("y1", 0)
+                .attr("y2", innerH)
+                .style("display", null);
+              hoverDot
+                .attr("cx", px)
+                .attr("cy", py)
+                .style("display", null);
+
+              showChartValueToast([
+                "Propagation Trend",
+                fmtDateUtc(nearest.ts),
+                `Score: ${nearest.score.toFixed(1)} / 100`,
+              ], event);
+            })
+            .on("mouseleave", () => {
+              hoverLine.style("display", "none");
+              hoverDot.style("display", "none");
+              hideChartValueToast();
+            });
+        }
+      }
+
+      function resolvePeriodRange() {
+        const end = new Date();
+        if (currentPreset === "24h") {
+          return { start: new Date(end.getTime() - 24 * 3600 * 1000), end };
+        }
+        if (currentPreset === "7d") {
+          return { start: new Date(end.getTime() - 7 * 24 * 3600 * 1000), end };
+        }
+        if (currentPreset === "30d") {
+          return { start: new Date(end.getTime() - 30 * 24 * 3600 * 1000), end };
+        }
+
+        const customStart = startInput.value ? new Date(startInput.value) : new Date(end.getTime() - 24 * 3600 * 1000);
+        const customEnd = endInput.value ? new Date(endInput.value) : end;
+        if (customEnd <= customStart) {
+          return { start: new Date(customEnd.getTime() - 24 * 3600 * 1000), end: customEnd };
+        }
+        return { start: customStart, end: customEnd };
+      }
+
+      function buildSyntheticData() {
+        const rng = mulberry32(20260403);
+        const now = new Date();
+        const start = new Date(now.getTime() - 60 * 24 * 3600 * 1000);
+        const series = [];
+        const callsigns = [];
+        const callsignPool = [
+          "CT7BFV", "EA1XYZ", "F4ABC", "G3NRT", "DL1HAM",
+          "K1DX", "PY2RAD", "IZ5QSO", "OE3MNO", "OH1AAA",
+          "SP5DX", "SM6HAM", "PA3QRP", "LU5DX", "CT1ABC"
+        ];
+
+        for (let t = start.getTime(); t <= now.getTime(); t += 3600000) {
+          const ts = new Date(t);
+          for (const band of BANDS) {
+            for (const mode of MODES) {
+              const base = band === "40m" ? 34 : band === "20m" ? 26 : band === "15m" ? 14 : 10;
+              const modeWeight = mode === "SSB" ? 1.45 : mode === "FT8" ? 1.2 : 0.65;
+              const hourFactor = Math.sin((ts.getUTCHours() / 24) * Math.PI * 2) * 0.25 + 1;
+              const weekendBoost = [0, 6].includes(ts.getUTCDay()) ? 1.15 : 1;
+              const noise = 0.65 + rng() * 0.8;
+              const count = Math.max(0, Math.round(base * modeWeight * hourFactor * weekendBoost * noise));
+              const snr = 7.5 + (band === "40m" ? 2.2 : 1.2) + (mode === "CW" ? 1.6 : 0) + rng() * 6;
+
+              series.push({ ts, band, mode, count, snr });
+
+              const candidateN = Math.max(0, Math.round((count / 18) * (0.5 + rng())));
+              for (let i = 0; i < candidateN; i++) {
+                const callsign = callsignPool[Math.floor(rng() * callsignPool.length)];
+                callsigns.push({
+                  ts,
+                  band,
+                  mode,
+                  callsign,
+                  hits: 1 + Math.floor(rng() * 4),
+                });
+              }
+            }
+          }
+        }
+
+        return { series, callsigns };
+      }
+
+      function mulberry32(seed) {
+        let t = seed >>> 0;
+        return function () {
+          t += 0x6d2b79f5;
+          let r = Math.imul(t ^ (t >>> 15), 1 | t);
+          r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+          return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function debounce(fn, waitMs) {
+        let timer = null;
+        return (...args) => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => fn(...args), waitMs);
+        };
+      }
+
+      function getCssVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      function formatInt(value) {
+        return new Intl.NumberFormat("en-GB").format(Math.round(value || 0));
+      }
+
+      function fmtDateUtc(date) {
+        return d3.utcFormat("%Y-%m-%d %H:%M UTC")(date);
+      }
+
+      function toLocalDateTimeValue(date) {
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+    </script>
+  </body>
+</html>

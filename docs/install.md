@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-02 UTC
+Last update: 2026-04-03 UTC
 -->
 
 # Installation Guide
@@ -10,8 +10,8 @@ Last update: 2026-04-02 UTC
 > **Recommended:** use the automatic graphical installer — just run `./install.sh` from the repository root. It handles everything end-to-end with a guided TUI.
 > To remove the installation, run `./uninstall.sh`.
 
-For a complete, step-by-step manual, see [docs/installation_manual.md](installation_manual.md).
-For service deployment/packaging, see [docs/ops_packaging.md](ops_packaging.md).
+For a complete, step-by-step manual, see [installation_manual.md](installation_manual.md).
+For service deployment/packaging, see [ops_packaging.md](ops_packaging.md).
 
 ## Automatic Installer (recommended)
 
@@ -30,6 +30,10 @@ The installer presents an interactive graphical wizard (whiptail) that:
 6. Installs and starts the systemd background service (auto-start on boot)
 
 At the end, open the printed URL in your browser and log in. No further steps needed.
+
+Frontend routes after install:
+- Main UI: `/`
+- Academic analytics dashboard: `/4ham_academic_analytics.html`
 
 ---
 
@@ -96,6 +100,12 @@ Service operations:
 
 Environment defaults are stored at `/etc/default/4ham-spectrum-analysis`.
 
+If you only want to remove the service (keeping project files), run:
+
+```bash
+./scripts/install_systemd_service.sh uninstall
+```
+
 ## Server control (runtime)
 
 To start/stop/restart the backend process without systemd (e.g. in dev):
@@ -116,6 +126,10 @@ To start/stop/restart the backend process without systemd (e.g. in dev):
 ./uninstall.sh --purge-system-packages               # also removes system apt packages
 ./uninstall.sh --purge-all --yes                     # full wipe: everything above + project folder
 ```
+
+Notes:
+- `./uninstall.sh` also removes `/etc/default/4ham-spectrum-analysis`.
+- `./scripts/install_systemd_service.sh uninstall` removes only the service unit (keeps env file and project files).
 
 ## Notes
 - FT8/FT4 decoding uses `jt9` (from WSJT source) directly — no WSJT-X GUI required.

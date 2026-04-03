@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-02 UTC
+Last update: 2026-04-03 UTC
 -->
 
 # Installation Manual
@@ -12,6 +12,7 @@ This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi
 ## Contents
 - System Requirements
 - Quick Start (graphical installer)
+- Service Management (`systemd` helper)
 - Prerequisites
 - Linux (Ubuntu/Debian)
 - Raspberry Pi
@@ -57,8 +58,36 @@ To remove the installation:
 ```
 ./uninstall.sh                           # safe: removes service, venv, node_modules
 ./uninstall.sh --purge-data             # also removes data/, logs/, exports/
+./uninstall.sh --purge-system-packages  # also removes apt packages installed for this app
 ./uninstall.sh --purge-all --yes        # full wipe
 ```
+
+Frontend routes after install:
+- Main UI: `/`
+- Academic analytics dashboard: `/4ham_academic_analytics.html`
+
+## Service Management (`systemd` helper)
+
+For production-style service management, use:
+
+```
+./scripts/install_systemd_service.sh install
+./scripts/install_systemd_service.sh status
+./scripts/install_systemd_service.sh logs
+./scripts/install_systemd_service.sh restart
+./scripts/install_systemd_service.sh stop
+./scripts/install_systemd_service.sh uninstall
+```
+
+Environment defaults are stored in:
+
+```
+/etc/default/4ham-spectrum-analysis
+```
+
+Note:
+- `install_systemd_service.sh uninstall` removes only the service unit.
+- `./uninstall.sh` removes service + local environments and also removes the `/etc/default/4ham-spectrum-analysis` file.
 
 For manual or customised setups, follow the sections below.
 
@@ -324,8 +353,18 @@ python backend/cli.py --stop
 - If scan is running and RF is visible but no callsigns appear, confirm WSJT-X `Reporting` is set to `127.0.0.1:2237` and that `/api/decoders/status` updates `wsjtx_udp.last_packet_at`.
 
 ## Uninstall
-- Remove the virtual environment: `rm -rf .venv`
-- Remove system packages:
+
+Recommended:
+
 ```
-sudo apt remove soapysdr-tools libsoapysdr-dev python3-soapysdr rtl-sdr
+./uninstall.sh
+./uninstall.sh --purge-data
+./uninstall.sh --purge-system-packages
+./uninstall.sh --purge-all --yes
+```
+
+Service-only uninstall:
+
+```
+./scripts/install_systemd_service.sh uninstall
 ```

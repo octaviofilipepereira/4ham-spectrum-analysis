@@ -34,6 +34,9 @@ Default behavior (safe):
   - Remove local virtualenv (.venv)
   - Remove frontend node_modules/
 
+Service-only removal (keep env/project files):
+  ./scripts/install_systemd_service.sh uninstall
+
 Examples:
   ./uninstall.sh
   ./uninstall.sh --purge-data

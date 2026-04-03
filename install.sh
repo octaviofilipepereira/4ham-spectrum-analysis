@@ -511,6 +511,7 @@ if [[ "$_install_mode" == "systemd" ]]; then
 Open in your browser:
   http://${_local_ip}:8000/
   http://127.0.0.1:8000/
+  http://${_local_ip}:8000/4ham_academic_analytics.html
 
 Login with:
   Username : $_admin_user
@@ -538,6 +539,7 @@ Server control:
 Open in your browser:
   http://${_local_ip}:8000/
   http://127.0.0.1:8000/
+  http://${_local_ip}:8000/4ham_academic_analytics.html
 
 Login with:
   Username : $_admin_user
