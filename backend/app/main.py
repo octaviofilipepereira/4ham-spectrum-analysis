@@ -31,9 +31,10 @@ from slowapi.errors import RateLimitExceeded
 # Configure logging with rotation BEFORE any other imports that use logging
 from app.log_config import setup_logging
 setup_logging()
+from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
 
 
@@ -168,7 +169,7 @@ async def lifespan(app_instance: FastAPI):
 app = FastAPI(
     title="4ham Spectrum Analysis",
     description="Real-time spectrum monitoring and digital mode decoding for amateur radio",
-    version="2.0.2",
+    version=APP_VERSION,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -240,6 +241,7 @@ app.include_router(exports.router, prefix="/api", tags=["Exports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
+app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers

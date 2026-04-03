@@ -5,6 +5,7 @@
 1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
 2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
+3. [Dashboard Académico (Heatmap Pro)](#dashboard-académico-heatmap-pro)
 
 ---
 
@@ -215,10 +216,23 @@ python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 
 Ou via script de desenvolvimento:
 ```bash
-./run_dev.sh
+./scripts/run_dev.sh start
 ```
 
 Abrir a interface no browser: `http://localhost:8000/`
+
+### Dashboard académico
+
+Além da interface principal, existe uma página dedicada a análise académica:
+
+- `http://localhost:8000/4ham_academic_analytics.html`
+
+Na secção **Hour of Day x Band Activity (Heatmap Pro)**:
+- Linhas = horas UTC (0 a 23)
+- Colunas = bandas
+- Cor da célula = volume de eventos
+- Hover destaca célula, linha e coluna para leitura cruzada
+- Barras marginais mostram totais por banda (topo) e por hora (lado direito)
 
 ---
 
