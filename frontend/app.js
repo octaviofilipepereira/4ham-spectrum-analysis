@@ -2568,7 +2568,7 @@ async function loadDevices() {
     refreshDevicesBtn.textContent = "Refreshing...";
   }
   try {
-    const resp = await fetch("/api/devices", { headers: { ...getAuthHeader() } });
+    const resp = await fetch("/api/devices?force=true", { headers: { ...getAuthHeader() } });
     if (!resp.ok) {
       throw new Error(`devices_fetch_failed_${resp.status}`);
     }

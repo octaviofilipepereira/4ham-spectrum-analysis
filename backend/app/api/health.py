@@ -9,9 +9,9 @@ Health and Devices API
 Basic system health and SDR device information endpoints.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
@@ -40,13 +40,16 @@ def health(_: None = Depends(verify_basic_auth)) -> Dict:
 
 
 @router.get("/devices")
-def devices(_: None = Depends(verify_basic_auth)) -> List[Dict]:
+def devices(
+    _: None = Depends(verify_basic_auth),
+    force: bool = Query(False, description="Bypass enumeration cache"),
+) -> List[Dict]:
     """
     List available SDR devices.
     
     Returns list of detected devices with their capabilities.
     """
-    return state.controller.list_devices()
+    return state.controller.list_devices(force=force)
 
 
 @router.get("/bands")

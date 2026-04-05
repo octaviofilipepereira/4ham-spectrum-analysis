@@ -271,7 +271,12 @@ class SDRController:
         result = _enumerate_via_subprocess()
         if result is not None:
             self._enum_cache = result
-            self._enum_cache_ts = now
+            # Only update timestamp when we got actual devices;
+            # empty results expire immediately so hotplug is detected.
+            if result:
+                self._enum_cache_ts = now
+            else:
+                self._enum_cache_ts = 0.0
         elif not self._enum_cache:
             _log.warning("SoapySDR enumerate failed and no cached data available")
         else:
@@ -300,9 +305,9 @@ class SDRController:
             "direct_sampling_mode_applied": applied_mode,
         }
 
-    def list_devices(self):
+    def list_devices(self, force: bool = False):
         devices = []
-        for details in self._enumerate_devices():
+        for details in self._enumerate_devices(force=force):
             devices.append({
                 "id": details.get("driver", "unknown"),
                 "type": details.get("driver", "unknown"),
