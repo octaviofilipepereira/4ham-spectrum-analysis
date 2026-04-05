@@ -27,7 +27,8 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 ## Documentation
 - Installation (quick + manual): [docs/install.md](docs/install.md)
 - Full installation manual: [docs/installation_manual.md](docs/installation_manual.md)
-- User manual (operation/UI): [docs/user_manual.md](docs/user_manual.md)
+- User manual (PT): [docs/user_manual.md](docs/user_manual.md)
+- User manual (EN): [docs/user_manual_en.md](docs/user_manual_en.md)
 - Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
 
 ## Screenshots
