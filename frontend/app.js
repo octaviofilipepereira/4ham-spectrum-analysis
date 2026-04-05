@@ -2514,18 +2514,23 @@ async function fetchDecoderStatus() {
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
 
     // External FT
-    if (extFt.enabled) {
-      const modes = (extFt.modes || []).join(", ");
-      if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = `Configured (${modes})`;
-    } else {
-      if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
+    if (externalFtStatusModalEl) {
+      if (extFt.enabled) {
+        const modes = (extFt.modes || []).join("/");
+        const ftSt = extFt.ft_external_status || {};
+        const runLabel = ftSt.running ? "Running" : "Stopped";
+        externalFtStatusModalEl.textContent = `Configured (${modes}) / ${runLabel}`;
+      } else {
+        externalFtStatusModalEl.textContent = "Not configured (set FT_EXTERNAL_ENABLE=1)";
+      }
     }
 
     // CW — enabled either by CW_INTERNAL_ENABLE env var OR force-started by scan mode
     if (cwStatusModalEl) {
       const cwSt = (cwDec.status || {});
       if (cwDec.enabled || cwSt.running) {
-        cwStatusModalEl.textContent = cwSt.running ? "Running" : "Stopped";
+        const runLabel = cwSt.running ? "Running" : "Stopped";
+        cwStatusModalEl.textContent = `Configured / ${runLabel}`;
       } else {
         cwStatusModalEl.textContent = "Disabled";
       }
@@ -2536,7 +2541,8 @@ async function fetchDecoderStatus() {
       const ssbSt = intNative.ssb_internal_status || {};
       if (intNative.ssb_internal_enable || ssbSt.running) {
         const qSize = ssbSt.queue_size ?? 0;
-        ssbStatusModalEl.textContent = ssbSt.running ? (qSize > 0 ? `Running (queue: ${qSize})` : "Running") : "Stopped";
+        const runLabel = ssbSt.running ? (qSize > 0 ? `Running (queue: ${qSize})` : "Running") : "Stopped";
+        ssbStatusModalEl.textContent = `Configured / ${runLabel}`;
       } else {
         ssbStatusModalEl.textContent = "Disabled";
       }
