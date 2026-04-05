@@ -587,6 +587,71 @@ fi
 
 close_gauge
 
+# ── desktop shortcut (optional — only when a graphical session is detected) ────
+_desktop_created=0
+if [[ -n "${XDG_CURRENT_DESKTOP:-}" || -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+  _desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+  _app_dir="$HOME/.local/share/applications"
+  _desktop_file="4ham-spectrum-analysis.desktop"
+  _control="$ROOT_DIR/scripts/server_control.sh"
+
+  if whiptail --backtitle "$BT" --title "Desktop Shortcut"     --yesno "Create a desktop shortcut?
+
+Double-click opens the dashboard in your browser.
+Right-click for Start / Stop / Restart Server." 12 60; then
+
+    cat > "/tmp/$_desktop_file" <<DEOF
+[Desktop Entry]
+Version=1.0
+Name=4ham Spectrum Analysis
+Comment=SDR Spectrum Analyser — CT7BFV
+GenericName=Spectrum Analyser
+Exec=xdg-open http://127.0.0.1:8000/
+Icon=utilities-system-monitor
+Terminal=false
+Type=Application
+Categories=HamRadio;Science;Education;
+StartupNotify=false
+Actions=start;stop;restart;status;
+
+[Desktop Action start]
+Name=Start Server
+Exec=$_control start
+Icon=media-playback-start
+
+[Desktop Action stop]
+Name=Stop Server
+Exec=$_control stop
+Icon=media-playback-stop
+
+[Desktop Action restart]
+Name=Restart Server
+Exec=$_control restart
+Icon=view-refresh
+
+[Desktop Action status]
+Name=Server Status
+Exec=$_control status
+Icon=dialog-information
+Terminal=true
+DEOF
+
+    mkdir -p "$_desktop_dir" "$_app_dir"
+    cp "/tmp/$_desktop_file" "$_desktop_dir/$_desktop_file"
+    cp "/tmp/$_desktop_file" "$_app_dir/$_desktop_file"
+    chmod +x "$_desktop_dir/$_desktop_file"
+    chmod +x "$_app_dir/$_desktop_file"
+    rm -f "/tmp/$_desktop_file"
+
+    # Trust the desktop file (GNOME ≥ 3.28)
+    if command -v gio >/dev/null 2>&1; then
+      gio set "$_desktop_dir/$_desktop_file" metadata::trusted true 2>/dev/null || true
+    fi
+
+    _desktop_created=1
+  fi
+fi
+
 # ── installation complete ──────────────────────────────────────────────────────
 _local_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
 
@@ -596,6 +661,9 @@ if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
 fi
 if [[ $_rtlv4 -eq 1 ]]; then
   _extra_notes="${_extra_notes}\n\nRTL-SDR v4: a reboot is recommended to fully\nactivate the kernel module blacklist."
+fi
+if [[ $_desktop_created -eq 1 ]]; then
+  _extra_notes="${_extra_notes}\n\nDesktop shortcut created. Right-click it\nfor Start / Stop / Restart Server actions."
 fi
 
 if [[ "$_install_mode" == "systemd" ]]; then

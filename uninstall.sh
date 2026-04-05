@@ -179,6 +179,23 @@ else
   echo "[2/5] Service environment file not present."
 fi
 
+# 2b) Remove desktop shortcuts
+_desktop_file="4ham-spectrum-analysis.desktop"
+_desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+_app_dir="$HOME/.local/share/applications"
+_removed_desktop=0
+if [[ -f "$_desktop_dir/$_desktop_file" ]]; then
+  rm -f "$_desktop_dir/$_desktop_file"
+  _removed_desktop=1
+fi
+if [[ -f "$_app_dir/$_desktop_file" ]]; then
+  rm -f "$_app_dir/$_desktop_file"
+  _removed_desktop=1
+fi
+if [[ $_removed_desktop -eq 1 ]]; then
+  echo "     Removed desktop shortcut."
+fi
+
 # 3) Remove local dependencies created by installer
 echo "[3/5] Removing local environments/dependencies..."
 rm -rf "${ROOT_DIR}/.venv"
