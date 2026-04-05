@@ -593,12 +593,14 @@ if [[ -n "${XDG_CURRENT_DESKTOP:-}" || -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLA
   _desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
   _app_dir="$HOME/.local/share/applications"
   _desktop_file="4ham-spectrum-analysis.desktop"
-  _control="$ROOT_DIR/scripts/server_control.sh"
+  _launcher="$ROOT_DIR/scripts/4ham_launcher.sh"
 
-  if whiptail --backtitle "$BT" --title "Desktop Shortcut"     --yesno "Create a desktop shortcut?
+  if whiptail --backtitle "$BT" --title "Desktop Shortcut" \
+    --yesno "Create a desktop shortcut?
 
-Double-click opens the dashboard in your browser.
-Right-click for Start / Stop / Restart Server." 12 60; then
+Opens an interactive menu with:
+  • Open Dashboard in Browser
+  • Start / Restart / Stop Server" 12 60; then
 
     cat > "/tmp/$_desktop_file" <<DEOF
 [Desktop Entry]
@@ -606,34 +608,12 @@ Version=1.0
 Name=4ham Spectrum Analysis
 Comment=SDR Spectrum Analyser — CT7BFV
 GenericName=Spectrum Analyser
-Exec=xdg-open http://127.0.0.1:8000/
+Exec=$_launcher
 Icon=utilities-system-monitor
-Terminal=false
+Terminal=true
 Type=Application
 Categories=HamRadio;Science;Education;
 StartupNotify=false
-Actions=start;stop;restart;status;
-
-[Desktop Action start]
-Name=Start Server
-Exec=$_control start
-Icon=media-playback-start
-
-[Desktop Action stop]
-Name=Stop Server
-Exec=$_control stop
-Icon=media-playback-stop
-
-[Desktop Action restart]
-Name=Restart Server
-Exec=$_control restart
-Icon=view-refresh
-
-[Desktop Action status]
-Name=Server Status
-Exec=$_control status
-Icon=dialog-information
-Terminal=true
 DEOF
 
     mkdir -p "$_desktop_dir" "$_app_dir"
@@ -663,7 +643,7 @@ if [[ $_rtlv4 -eq 1 ]]; then
   _extra_notes="${_extra_notes}\n\nRTL-SDR v4: a reboot is recommended to fully\nactivate the kernel module blacklist."
 fi
 if [[ $_desktop_created -eq 1 ]]; then
-  _extra_notes="${_extra_notes}\n\nDesktop shortcut created. Right-click it\nfor Start / Stop / Restart Server actions."
+  _extra_notes="${_extra_notes}\n\nDesktop shortcut created. Double-click it\nfor an interactive server control menu."
 fi
 
 if [[ "$_install_mode" == "systemd" ]]; then
