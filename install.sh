@@ -248,23 +248,47 @@ fi
 
 # ── ASR / Whisper ──────────────────────────────────────────────────────────────
 _install_whisper=0
-_whisper_label="No (can be added later: pip install openai-whisper)"
-if whiptail --backtitle "$BT" --title "ASR Voice Transcription (optional)" \
-  --yesno "\
-Install OpenAI Whisper for SSB voice transcription?
+_whisper_model_size="tiny"
+_whisper_label="Não (adicionar depois: pip install openai-whisper)"
+_whisper_choice=$(whiptail --backtitle "$BT" \
+  --title "ASR Voice Transcription (OpenAI Whisper)" \
+  --menu "\
+Whisper converte áudio SSB/USB em texto legível, visível
+no log de eventos em tempo real. Escolha o modelo:
 
-Whisper converts SSB audio into readable text, shown in
-the live event Toast and stored in the event log.
-
-WARNING — large download (~700 MB for PyTorch + Whisper).
-On slow internet this may take 20-40 minutes!
-
-  YES  ->  Install Whisper now (recommended if bandwidth allows).
-  NO   ->  Skip for now (install later: pip install openai-whisper)." \
-  16 68; then
-  _install_whisper=1
-  _whisper_label="Yes (OpenAI Whisper tiny model)"
-fi
+Qualidade em SSB com QRM/QRN (todos correm em CPU):
+  tiny  -> fraca  | rápido  | ~75 MB + ~200 MB PyTorch
+  base  -> boa    | médio   | ~150 MB + ~200 MB PyTorch  [recomendado]
+  small -> muito  | lento   | ~500 MB + ~200 MB PyTorch
+  no    -> não instalar agora (pip install openai-whisper)" \
+  18 72 4 \
+  "no"    "Não instalar — adicionar depois manualmente" \
+  "tiny"  "tiny   ~75 MB  — rápido, qualidade fraca em SSB com ruído" \
+  "base"  "base  ~150 MB  — RECOMENDADO, bom equilíbrio para SSB" \
+  "small" "small ~500 MB  — maior precisão, lento em CPU" \
+  3>&1 1>&2 2>&3) || exit 0
+case "$_whisper_choice" in
+  tiny)
+    _install_whisper=1
+    _whisper_model_size="tiny"
+    _whisper_label="Sim — tiny  (~75 MB, rápido, qualidade fraca em SSB)"
+    ;;
+  base)
+    _install_whisper=1
+    _whisper_model_size="base"
+    _whisper_label="Sim — base (~150 MB, recomendado para SSB)"
+    ;;
+  small)
+    _install_whisper=1
+    _whisper_model_size="small"
+    _whisper_label="Sim — small (~500 MB, melhor precisão, lento em CPU)"
+    ;;
+  *)
+    _install_whisper=0
+    _whisper_model_size="tiny"
+    _whisper_label="Não (adicionar depois: pip install openai-whisper)"
+    ;;
+esac
 
 # ── installation mode ──────────────────────────────────────────────────────────
 _install_mode="systemd"
@@ -440,6 +464,7 @@ _env_defaults=(
   "DIREWOLF_AUTOSTART=1"
   "DIREWOLF_CMD=direwolf -t 0 -p"
   "SSB_INTERNAL_ENABLE=1"
+  "WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}"
 )
 if [[ -f "$ENV_FILE" ]]; then
   for _kv in "${_env_defaults[@]}"; do
@@ -459,6 +484,7 @@ DIREWOLF_KISS_ENABLE=1
 DIREWOLF_AUTOSTART=1
 DIREWOLF_CMD=direwolf -t 0 -p
 SSB_INTERNAL_ENABLE=1
+WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}
 EOF
 fi
 
@@ -484,7 +510,7 @@ if [[ $_install_whisper -eq 1 ]]; then
         _install_whisper=0; }
   fi
   if [[ $_install_whisper -eq 1 ]]; then
-    gauge_step 92 "Installing OpenAI Whisper (~50 MB, PyTorch already cached)..."
+    gauge_step 92 "Installing OpenAI Whisper (modelo: ${_whisper_model_size}, ~50 MB)..."
     "$PYTHON_BIN" -m pip install --quiet openai-whisper \
       >> "$LOG_FILE" 2>&1 || { \
         echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }

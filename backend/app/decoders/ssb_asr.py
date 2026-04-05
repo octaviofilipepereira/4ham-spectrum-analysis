@@ -15,6 +15,7 @@ transcription are no-ops and the spectral-proof fallback is used instead.
 """
 
 import math
+import os
 import threading
 import time as _time_module
 from typing import Dict, Optional
@@ -259,7 +260,7 @@ class SsbAsrEngine:
 # Module-level singleton and convenience helpers
 # ---------------------------------------------------------------------------
 
-_engine = SsbAsrEngine(model_size="tiny")
+_engine = SsbAsrEngine(model_size=os.environ.get("WHISPER_MODEL_SIZE", "tiny"))
 
 
 # ---------------------------------------------------------------------------
