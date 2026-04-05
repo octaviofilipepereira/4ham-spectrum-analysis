@@ -16,6 +16,7 @@ ROOT_DIR="$SCRIPT_DIR"
 SERVICE_NAME="4ham-spectrum-analysis"
 VENV_DIR="$ROOT_DIR/.venv"
 PYTHON_BIN="$VENV_DIR/bin/python"
+ENV_FILE="$ROOT_DIR/.env"
 LOG_FILE="/tmp/4ham-install-$(date +%Y%m%d-%H%M%S).log"
 BT="4ham-spectrum-analysis — Installer"
 
@@ -349,13 +350,15 @@ gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, decoders, 
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
   nodejs npm \
-  soapysdr-tools libsoapysdr-dev python3-soapysdr \
+  soapysdr-tools libsoapysdr-dev \
   soapysdr-module-rtlsdr rtl-sdr \
   direwolf wsjtx usbutils \
   build-essential cmake libusb-1.0-0-dev \
   ffmpeg \
   >> "$LOG_FILE" 2>&1 \
   || abort "System package installation failed"
+# python3-soapysdr may not exist on all distros — install separately (non-fatal)
+run_sudo apt-get install -y python3-soapysdr >> "$LOG_FILE" 2>&1 || true
 
 if [[ $_rtlv4 -eq 1 ]]; then
   gauge_step 33 "Removing conflicting standard rtl-sdr package..."
@@ -394,9 +397,69 @@ if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
   run_sudo usermod -aG plugdev "$(id -un)" >> "$LOG_FILE" 2>&1
 fi
 
+gauge_step 67 "Installing SDR udev rules..."
+# RTL-SDR udev rules (covers RTL2832U and RTL2838 chipsets)
+if [[ ! -f /etc/udev/rules.d/20-rtlsdr.rules ]]; then
+  run_sudo tee /etc/udev/rules.d/20-rtlsdr.rules >/dev/null <<'UDEVRULES'
+# RTL-SDR USB device permissions — created by 4ham-spectrum-analysis installer
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", GROUP="plugdev", MODE="0660", SYMLINK+="rtl_sdr"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", GROUP="plugdev", MODE="0660", SYMLINK+="rtl_sdr"
+UDEVRULES
+  run_sudo udevadm control --reload-rules >> "$LOG_FILE" 2>&1 || true
+  run_sudo udevadm trigger >> "$LOG_FILE" 2>&1 || true
+fi
+
+gauge_step 69 "Blacklisting conflicting DVB kernel modules..."
+if [[ ! -f /etc/modprobe.d/blacklist-rtl.conf ]]; then
+  run_sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'BLACKLIST'
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832
+blacklist rtl2830
+BLACKLIST
+fi
+run_sudo modprobe -r dvb_usb_rtl28xxu >> "$LOG_FILE" 2>&1 || true
+
 gauge_step 72 "Creating Python virtual environment..."
+# Recreate venv if system has SoapySDR but venv cannot import it
+if [[ -x "$PYTHON_BIN" ]]; then
+  if python3 -c "import SoapySDR" >/dev/null 2>&1 && ! "$PYTHON_BIN" -c "import SoapySDR" >/dev/null 2>&1; then
+    rm -rf "$VENV_DIR"
+  fi
+fi
 if [[ ! -x "$PYTHON_BIN" ]]; then
-  python3 -m venv "$VENV_DIR" >> "$LOG_FILE" 2>&1 || abort "Failed to create Python venv"
+  python3 -m venv --system-site-packages "$VENV_DIR" >> "$LOG_FILE" 2>&1 \
+    || abort "Failed to create Python venv"
+fi
+
+gauge_step 78 "Creating project environment defaults (.env)..."
+# Write .env if missing; inject missing decoder keys into existing .env
+_env_defaults=(
+  "FT_EXTERNAL_ENABLE=1"
+  "FT_EXTERNAL_MODES=FT8,FT4"
+  "DIREWOLF_KISS_ENABLE=1"
+  "DIREWOLF_AUTOSTART=1"
+  "DIREWOLF_CMD=direwolf -t 0 -p"
+  "SSB_INTERNAL_ENABLE=1"
+)
+if [[ -f "$ENV_FILE" ]]; then
+  for _kv in "${_env_defaults[@]}"; do
+    _var="${_kv%%=*}"
+    if ! grep -q "^${_var}=" "$ENV_FILE" 2>/dev/null; then
+      printf '%s\n' "$_kv" >> "$ENV_FILE"
+    fi
+  done
+else
+  cat > "$ENV_FILE" <<EOF
+# 4ham Spectrum Analysis service environment
+APP_HOST=127.0.0.1
+APP_PORT=8000
+FT_EXTERNAL_ENABLE=1
+FT_EXTERNAL_MODES=FT8,FT4
+DIREWOLF_KISS_ENABLE=1
+DIREWOLF_AUTOSTART=1
+DIREWOLF_CMD=direwolf -t 0 -p
+SSB_INTERNAL_ENABLE=1
+EOF
 fi
 
 gauge_step 84 "Installing Python dependencies..."
