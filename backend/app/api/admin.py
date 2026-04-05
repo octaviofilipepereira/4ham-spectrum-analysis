@@ -10,9 +10,13 @@ Admin API
 Administrative operations and device setup endpoints.
 """
 
-from typing import Dict
+import asyncio
+import os
+import subprocess
+from pathlib import Path
+from typing import Dict, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
@@ -29,6 +33,9 @@ from app.sdr.controller import soapy_import_status
 
 
 router = APIRouter()
+
+# Repo root: backend/app/api/admin.py → ../../../../
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 @router.post("/reset-all-config")
@@ -262,3 +269,150 @@ async def run_retention_now(_: None = Depends(verify_basic_auth)) -> Dict:
             "download_url": None,
         },
     }
+
+
+@router.get("/update/check")
+def admin_update_check(_: None = Depends(verify_basic_auth)) -> Dict:
+    """
+    Check if software updates are available via git.
+
+    Fetches from origin and compares local HEAD with remote.
+
+    Returns:
+        Dict with up_to_date flag, commits_behind count, branch name,
+        and list of pending commit messages.
+    """
+    if not command_exists("git"):
+        return {"status": "error", "error": "git not found in PATH"}
+
+    branch_result = run_command(
+        ["git", "-C", str(_REPO_ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
+        timeout=10,
+    )
+    branch = (branch_result.get("stdout") or "main").strip()
+    if branch in ("HEAD", ""):
+        branch = "main"
+
+    fetch_result = run_command(
+        ["git", "-C", str(_REPO_ROOT), "fetch", "origin", branch],
+        timeout=30,
+    )
+    if fetch_result.get("returncode") != 0:
+        return {
+            "status": "error",
+            "error": "git fetch failed: " + (fetch_result.get("stderr") or "").strip(),
+        }
+
+    count_result = run_command(
+        ["git", "-C", str(_REPO_ROOT), "rev-list", f"HEAD..origin/{branch}", "--count"],
+        timeout=10,
+    )
+    try:
+        commits_behind = int((count_result.get("stdout") or "0").strip())
+    except ValueError:
+        commits_behind = 0
+
+    commit_log: List[str] = []
+    if commits_behind > 0:
+        log_result = run_command(
+            [
+                "git", "-C", str(_REPO_ROOT),
+                "log", f"HEAD..origin/{branch}",
+                "--oneline", "--no-merges",
+            ],
+            timeout=10,
+        )
+        commit_log = [
+            line for line in (log_result.get("stdout") or "").splitlines() if line.strip()
+        ]
+
+    return {
+        "status": "ok",
+        "up_to_date": commits_behind == 0,
+        "commits_behind": commits_behind,
+        "branch": branch,
+        "commit_log": commit_log,
+    }
+
+
+@router.post("/update/apply")
+async def admin_update_apply(
+    background_tasks: BackgroundTasks,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """
+    Apply pending software updates via git pull.
+
+    Runs git pull, detects which files changed, and determines whether
+    a service restart is required (any backend Python file changed).
+    If a restart is needed it is scheduled via BackgroundTasks so the
+    HTTP response is delivered before the process is replaced.
+
+    Returns:
+        Dict with updated flag, head hashes, files_changed list,
+        restart_required flag, and raw pull output.
+    """
+    if not command_exists("git"):
+        return {"status": "error", "error": "git not found in PATH"}
+
+    head_before = (
+        run_command(
+            ["git", "-C", str(_REPO_ROOT), "rev-parse", "HEAD"],
+            timeout=10,
+        ).get("stdout") or ""
+    ).strip()
+
+    pull_result = run_command(
+        ["git", "-C", str(_REPO_ROOT), "pull"],
+        timeout=60,
+    )
+    if pull_result.get("returncode") != 0:
+        return {
+            "status": "error",
+            "error": "git pull failed: " + (pull_result.get("stderr") or "").strip(),
+        }
+
+    head_after = (
+        run_command(
+            ["git", "-C", str(_REPO_ROOT), "rev-parse", "HEAD"],
+            timeout=10,
+        ).get("stdout") or ""
+    ).strip()
+
+    updated = head_before != head_after
+    files_changed: List[str] = []
+    restart_required = False
+
+    if updated and head_before:
+        diff_result = run_command(
+            ["git", "-C", str(_REPO_ROOT), "diff", head_before, head_after, "--name-only"],
+            timeout=10,
+        )
+        files_changed = [
+            f for f in (diff_result.get("stdout") or "").splitlines() if f.strip()
+        ]
+        restart_required = any(f.startswith("backend/") for f in files_changed)
+
+    if restart_required:
+        background_tasks.add_task(_schedule_restart)
+
+    return {
+        "status": "ok",
+        "updated": updated,
+        "head_before": head_before[:12] if head_before else None,
+        "head_after": head_after[:12] if head_after else None,
+        "files_changed": files_changed,
+        "restart_required": restart_required,
+        "pull_output": (pull_result.get("stdout") or "").strip(),
+    }
+
+
+async def _schedule_restart() -> None:
+    """Restart the systemd service after a short delay to allow the HTTP response to be sent."""
+    await asyncio.sleep(3)
+    service_name = os.environ.get("SERVICE_NAME", "4ham-spectrum-analysis")
+    subprocess.Popen(
+        ["systemctl", "restart", service_name],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )

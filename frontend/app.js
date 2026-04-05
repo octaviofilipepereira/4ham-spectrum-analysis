@@ -107,6 +107,7 @@ const refreshDevicesBtn = document.getElementById("refreshDevices");
 const adminDeviceSetupBtn = document.getElementById("adminDeviceSetup");
 const adminAudioAutoDetectBtn = document.getElementById("adminAudioAutoDetect");
 const purgeInvalidEventsBtn = document.getElementById("purgeInvalidEvents");
+const checkForUpdatesBtn = document.getElementById("checkForUpdates");
 const resetDefaultsBtn = document.getElementById("resetDefaults");
 const resetAllConfigBtn = document.getElementById("resetAllConfig");
 const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
@@ -3308,6 +3309,91 @@ if (purgeInvalidEventsBtn) {
     } finally {
       purgeInvalidEventsBtn.disabled = false;
       purgeInvalidEventsBtn.textContent = previousLabel || "Purge invalid events";
+    }
+  });
+}
+
+if (checkForUpdatesBtn) {
+  checkForUpdatesBtn.addEventListener("click", async () => {
+    const previousLabel = checkForUpdatesBtn.textContent;
+    checkForUpdatesBtn.disabled = true;
+    checkForUpdatesBtn.textContent = "A verificar...";
+    const statusEl = document.getElementById("adminSetupStatus");
+
+    const showStatus = (type, msg) => {
+      if (statusEl) {
+        statusEl.className = `alert alert-${type} py-2 mb-0`;
+        statusEl.textContent = msg;
+      }
+    };
+
+    try {
+      const resp = await fetch("/api/admin/update/check", {
+        headers: { ...getAuthHeader() },
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Falha a verificar actualizações");
+        throw new Error(message);
+      }
+      const data = await resp.json();
+
+      if (data.status === "error") {
+        throw new Error(data.error || "Erro desconhecido");
+      }
+
+      if (data.up_to_date) {
+        showStatus("success", "Software actualizado. Nenhuma actualização disponível.");
+        showToast("Software actualizado");
+        return;
+      }
+
+      const commitLines = (data.commit_log || []).slice(0, 5).join("\n  ");
+      const confirmMsg =
+        `Existem ${data.commits_behind} commit(s) disponíveis (branch: ${data.branch}):\n` +
+        `  ${commitLines}\n\nActualizar agora?`;
+      if (!window.confirm(confirmMsg)) {
+        showStatus("info", `${data.commits_behind} actualização(ões) disponível(eis). Clique novamente para instalar.`);
+        return;
+      }
+
+      checkForUpdatesBtn.textContent = "A actualizar...";
+      const applyResp = await fetch("/api/admin/update/apply", {
+        method: "POST",
+        headers: { ...getAuthHeader() },
+      });
+      if (!applyResp.ok) {
+        const message = await parseApiError(applyResp, "Falha ao aplicar actualização");
+        throw new Error(message);
+      }
+      const applyData = await applyResp.json();
+
+      if (applyData.status === "error") {
+        throw new Error(applyData.error || "Erro desconhecido");
+      }
+
+      if (!applyData.updated) {
+        showStatus("info", "Nenhuma alteração aplicada (git pull sem novidades).");
+        return;
+      }
+
+      if (applyData.restart_required) {
+        showStatus(
+          "warning",
+          `Actualização aplicada (${applyData.head_after}). Serviço a reiniciar — aguarde ~10 segundos e faça refresh à página.`
+        );
+        showToast("Actualização instalada. Serviço a reiniciar...");
+      } else {
+        showStatus(
+          "success",
+          `Actualização aplicada (${applyData.head_after}). Faça refresh à página para carregar o frontend actualizado.`
+        );
+        showToast("Actualização instalada. Faça refresh.");
+      }
+    } catch (err) {
+      showToastError(err?.message || "Falha a verificar actualizações");
+    } finally {
+      checkForUpdatesBtn.disabled = false;
+      checkForUpdatesBtn.textContent = previousLabel || "Verificar actualizações";
     }
   });
 }
