@@ -409,11 +409,15 @@ if [[ $_rtlv4 -eq 1 ]]; then
   run_sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'BLACKLIST'
 blacklist dvb_usb_rtl28xxu
 blacklist rtl2832
+blacklist rtl2832_sdr
 blacklist rtl2830
 BLACKLIST
-  run_sudo modprobe -r dvb_usb_rtl28xxu >> "$LOG_FILE" 2>&1 || true
+  run_sudo modprobe -r dvb_usb_rtl28xxu rtl2832_sdr rtl2832 >> "$LOG_FILE" 2>&1 || true
 
   rm -rf "$_rtltmp"
+
+  gauge_step 63 "Re-installing SoapySDR RTL module (uses v4 driver library)..."
+  run_sudo apt-get install -y soapysdr-module-rtlsdr >> "$LOG_FILE" 2>&1 || true
 fi
 
 gauge_step 65 "Configuring USB device access (plugdev group)..."
@@ -438,10 +442,11 @@ if [[ ! -f /etc/modprobe.d/blacklist-rtl.conf ]]; then
   run_sudo tee /etc/modprobe.d/blacklist-rtl.conf >/dev/null <<'BLACKLIST'
 blacklist dvb_usb_rtl28xxu
 blacklist rtl2832
+blacklist rtl2832_sdr
 blacklist rtl2830
 BLACKLIST
 fi
-run_sudo modprobe -r dvb_usb_rtl28xxu >> "$LOG_FILE" 2>&1 || true
+run_sudo modprobe -r dvb_usb_rtl28xxu rtl2832_sdr rtl2832 >> "$LOG_FILE" 2>&1 || true
 
 gauge_step 72 "Creating Python virtual environment..."
 # Recreate venv if system has SoapySDR but venv cannot import it
