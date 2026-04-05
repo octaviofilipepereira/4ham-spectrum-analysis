@@ -136,6 +136,13 @@ def academic_analytics(
         if not band_name or not mode_name:
             continue
 
+        # Normalize sub-modes so SSB_TRAFFIC counts as SSB and
+        # CW_CANDIDATE counts as CW in all analytics aggregations.
+        if mode_name == "SSB_TRAFFIC":
+            mode_name = "SSB"
+        elif mode_name == "CW_CANDIDATE":
+            mode_name = "CW"
+
         event_type = str(event.get("type") or "").strip().lower()
         bucket_dt = _bucket_start(ts, bucket_name)
         bucket_iso = bucket_dt.isoformat()
