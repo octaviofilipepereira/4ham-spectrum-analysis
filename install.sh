@@ -510,7 +510,7 @@ if [[ $_install_whisper -eq 1 ]]; then
         _install_whisper=0; }
   fi
   if [[ $_install_whisper -eq 1 ]]; then
-    gauge_step 92 "Installing OpenAI Whisper (modelo: ${_whisper_model_size}, ~50 MB)..."
+    gauge_step 92 "Installing OpenAI Whisper package (~50 MB, modelo ${_whisper_model_size} descarrega na 1.ª execução)..."
     "$PYTHON_BIN" -m pip install --quiet openai-whisper \
       >> "$LOG_FILE" 2>&1 || { \
         echo "[WARN] openai-whisper install failed — ASR will not be available" >> "$LOG_FILE"; }
