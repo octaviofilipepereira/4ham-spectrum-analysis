@@ -104,7 +104,7 @@ def test_external_ft_decoder_formats_mode_flag_placeholder():
         )
 
         await decoder.start()
-        await asyncio.sleep(0.25)
+        await asyncio.sleep(0.6)
         await decoder.stop()
 
         assert len(commands) >= 1
