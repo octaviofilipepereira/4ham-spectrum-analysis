@@ -2610,6 +2610,15 @@ async function loadDevices() {
       option.textContent = device.name;
       deviceSelect.appendChild(option);
     });
+    // Apply auto-profile for the selected device so gain/sample_rate
+    // fields reflect the correct defaults instead of the HTML fallbacks.
+    const selectedId = deviceSelect.value;
+    if (selectedId) {
+      const family = inferDeviceFamily(selectedId);
+      const profile = DEVICE_AUTO_PROFILES[family] || DEVICE_AUTO_PROFILES.other;
+      if (gainInput) gainInput.value = String(profile.gain);
+      if (sampleRateInput) sampleRateInput.value = String(profile.sample_rate);
+    }
     if (showNonSdrDevices) {
       showToast(`Detected ${visibleDevices.length} device(s) (${sdrDevices.length} SDR)`);
     } else {
