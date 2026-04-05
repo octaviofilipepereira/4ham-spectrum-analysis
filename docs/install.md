@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-03 UTC
+Last update: 2026-04-05 UTC
 -->
 
 # Installation Guide
@@ -116,6 +116,14 @@ To start/stop/restart the backend process without systemd (e.g. in dev):
 ./scripts/server_control.sh restart
 ./scripts/server_control.sh status
 ./scripts/server_control.sh logs
+```
+
+### Desktop launcher
+
+On graphical systems, the installer offers a desktop shortcut that opens an interactive terminal menu with Start / Stop / Restart / Open Dashboard options. The launcher can also be run directly:
+
+```bash
+./scripts/4ham_launcher.sh
 ```
 
 ## Uninstallation

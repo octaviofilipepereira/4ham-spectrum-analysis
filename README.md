@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-03 UTC
+Last update: 2026-04-05 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -87,6 +87,16 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.8.7
+- **Desktop launcher shortcut**: installer offers an optional desktop shortcut on graphical systems. Double-click opens an interactive terminal menu (Start / Stop / Restart Server, Open Dashboard). Works on GNOME, Cinnamon, XFCE, KDE, MATE, LXQt. Uninstaller removes the shortcut.
+- **Installer Whisper model choice**: choose between `tiny`, `base`, or `small` Whisper models during installation, with pros/cons for each.
+- **RTL-SDR v4 install fix**: reinstalls SoapySDR Python module and properly blacklists `rtl2832_sdr` kernel module.
+- **Decoder Status UI**: shows Configured / Running / Stopped for each decoder instead of just Disabled.
+- **Academic Analytics fix**: `SSB_TRAFFIC` and `CW_CANDIDATE` events now included in all analytics charts and propagation calculations.
+- **Check for Updates**: new button in Admin Config performs `git fetch/pull` and auto-restarts the server.
+- **Admin Config layout**: Purge / Reset defaults / Reset total moved to a second button row; all buttons documented in help.
+- **RTL-SDR hotplug**: Refresh Devices button applies correct gain and sample rate when an RTL-SDR is detected.
 
 ### v0.8.5
 - **Academic Analytics dashboard**: new page with activity timeline, band distribution, Heatmap Pro (hour × band), and propagation map. Accessible via the **Data Analysis** toolbar button or `/4ham_academic_analytics.html`. Backend endpoint `/api/analytics/academic`. Auto-refresh every 60 s.

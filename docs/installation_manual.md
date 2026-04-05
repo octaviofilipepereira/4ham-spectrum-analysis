@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-03 UTC
+Last update: 2026-04-05 UTC
 -->
 
 # Installation Manual
@@ -65,6 +65,27 @@ To remove the installation:
 Frontend routes after install:
 - Main UI: `/`
 - Academic analytics dashboard: `/4ham_academic_analytics.html`
+
+## Desktop Shortcut (graphical environments)
+
+On systems with a graphical desktop (GNOME, Cinnamon, XFCE, KDE, MATE, LXQt), the installer offers to create a desktop shortcut. Double-clicking it opens an interactive terminal menu:
+
+1. **Open Dashboard in Browser** (only if the server is running)
+2. **Start Server**
+3. **Restart Server**
+4. **Stop Server**
+
+The shortcut is placed on `~/Desktop/` and in `~/.local/share/applications/`. The launcher script is `scripts/4ham_launcher.sh`.
+
+To create the shortcut manually on an existing installation:
+
+```bash
+scripts/4ham_launcher.sh          # run directly from a terminal
+```
+
+Or create a `.desktop` file pointing to it — see the installer source for an example.
+
+The uninstaller (`./uninstall.sh`) removes the shortcut automatically.
 
 ## Service Management (`systemd` helper)
 

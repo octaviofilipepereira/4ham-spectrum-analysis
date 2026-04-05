@@ -6,7 +6,7 @@
 openapi: 3.0.3
 info:
   title: 4ham Spectrum Analysis API
-  version: 0.8.5
+  version: 0.8.7
   description: REST API for spectrum scan control, device management, and event history.
 servers:
   - url: http://localhost:8000
@@ -463,7 +463,7 @@ components:
           example: ok
         version:
           type: string
-          example: 0.8.5
+          example: 0.8.7
         devices:
           type: integer
           example: 1

@@ -2,10 +2,32 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-03 UTC
+Last update: 2026-04-05 UTC
 -->
 
 # Changelog
+
+## v0.8.7 - 2026-04-05
+
+### Added
+- **Desktop launcher shortcut** — on graphical systems (GNOME, Cinnamon, XFCE, KDE, MATE, LXQt), the installer offers an optional desktop shortcut. Double-click opens an interactive terminal menu with: Open Dashboard, Start / Restart / Stop Server. Launcher script: `scripts/4ham_launcher.sh`. Uninstaller removes the shortcut automatically.
+- **Check for Updates button** — new button in Admin Config performs `git fetch/pull` and auto-restarts the server when updates are available.
+- **Installer Whisper model choice** — choose between `tiny`, `base`, or `small` Whisper models during `./install.sh` setup, with a description of pros/cons for each.
+
+### Fixed
+- **Academic Analytics normalization** — `SSB_TRAFFIC` events now counted as `SSB` and `CW_CANDIDATE` as `CW` in all analytics charts (timeline, band distribution, heatmap, propagation).
+- **RTL-SDR v4 install path** — reinstalls SoapySDR Python module inside the venv and properly blacklists the `rtl2832_sdr` kernel module.
+- **RTL-SDR hotplug** — Refresh Devices button now applies the correct gain and sample rate when an RTL-SDR is detected.
+- **Desktop shortcut Exec quoting** — paths with spaces are now properly quoted in the `.desktop` file.
+
+### Changed
+- **Decoder Status UI** — shows Configured / Running / Stopped for each decoder instead of just Disabled.
+- **Admin Config layout** — Purge / Reset defaults / Reset total buttons moved to a second row; all Admin buttons documented in help.
+- **Whisper gauge message** — clarified that the model downloads on first run, not during install.
+
+### Documentation
+- **Help panel** updated to v0.8.7 — new Desktop launcher section (§12), renumbered FAQ to §13.
+- **README, install.md, installation_manual.md, CHANGELOG** — updated with desktop launcher, version bump, and new features.
 
 ## v0.8.5 - 2026-04-03
 

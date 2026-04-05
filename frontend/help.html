@@ -51,7 +51,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.5 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.8.7 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -68,6 +68,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#admin">Admin &amp; configuration</a></li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
       <li><a href="#analytics">Academic Analytics dashboard</a></li>
+      <li><a href="#launcher">Desktop launcher</a></li>
       <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
     </ol>
   </nav>
@@ -524,9 +525,30 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </p>
   </section>
 
-  <!-- 12. FAQ -->
+  <!-- 12. DESKTOP LAUNCHER -->
+  <section id="launcher">
+    <h2 class="section-title">12 · Desktop launcher</h2>
+    <p>
+      On systems with a graphical desktop (GNOME, Cinnamon, XFCE, KDE, MATE, LXQt), the installer offers to create a
+      <strong>desktop shortcut</strong>. Double-clicking it opens an interactive terminal menu:
+    </p>
+    <ul>
+      <li><strong>1) Open Dashboard in Browser</strong> — opens <code>http://127.0.0.1:8000/</code> (only if the server is running).</li>
+      <li><strong>2) Start Server</strong> — starts the backend process.</li>
+      <li><strong>3) Restart Server</strong> — stops and restarts the backend.</li>
+      <li><strong>4) Stop Server</strong> — stops the backend process.</li>
+      <li><strong>0) Exit</strong> — closes the launcher.</li>
+    </ul>
+    <p>
+      The launcher script is <code>scripts/4ham_launcher.sh</code> and can also be run directly from a terminal.
+      The shortcut is placed on the Desktop and in <code>~/.local/share/applications/</code>.
+      The uninstaller removes it automatically.
+    </p>
+  </section>
+
+  <!-- 13. FAQ -->
   <section id="faq">
-    <h2 class="section-title">12 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">13 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>
