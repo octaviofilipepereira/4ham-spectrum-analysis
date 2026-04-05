@@ -247,6 +247,32 @@ Na secção **Hour of Day x Band Activity (Heatmap Pro)**:
 | **Admin Config** | SDR, ganho, retenção de dados, autenticação. Requer login de administrador |
 | **Help** | Manual do utilizador (este documento) |
 
+### Painel Admin Config — Secções de configuração
+
+| Secção | O que configura |
+|--------|-----------------|
+| **SDR** | Seleção do dispositivo, ganho (dB), sample rate, correção PPM, offset de frequência, perfil de ganho |
+| **Device Configuration** | Classe do dispositivo (RTL / HackRF / AirSpy / outro), correção PPM, offset de frequência (Hz), perfil de ganho (auto/manual) |
+| **Audio Configuration** | Nome do dispositivo de entrada/saída de áudio (placa de som), sample rate (Hz), multiplicador RX gain, multiplicador TX gain. Reservado para modos SDR em placa de som |
+| **Scan** | Dwell time padrão, tamanho FFT, overlap |
+| **Retention** | Limite máximo de eventos antes de auto-exportar+purge; número de eventos recentes a manter; diretório de exportação |
+| **Authentication** | Alterar password de administrador |
+| **SSB Voice Transcription** | Ativar/desativar Whisper ASR para SSB voice-to-text. Requer pacote `openai-whisper` |
+
+### Painel Admin Config — Botões
+
+| Botão | Função |
+|-------|--------|
+| **Refresh Devices** | Força nova enumeração SoapySDR contornando o cache de 300 s. Atualiza o dropdown de dispositivos e aplica automaticamente os valores correctos de ganho e sample rate para o dispositivo detectado (RTL-SDR: gain 30, 2,048 MS/s; HackRF: gain 20, 2 MS/s; AirSpy: gain 20, 2,5 MS/s) |
+| **Save device** | Persiste os campos de Device Configuration (classe, PPM, offset, perfil de ganho) na base de dados. As alterações no formulário são temporárias até este botão ser premido |
+| **Save audio** | Persiste os campos de Audio Configuration (dispositivo de entrada/saída, sample rate, RX/TX gain) na base de dados |
+| **Test Config** | Valida a configuração actual sem guardar. Verifica: disponibilidade do dispositivo SoapySDR, ferramentas de áudio presentes no sistema (`arecord`, `aplay`, `pactl`, `pw-cli`), e que os valores de sample rate e ganho estão dentro dos limites aceites. Reporta pass/fail com detalhe num toast |
+| **Auto-detect Device** | Assistente de configuração automática em dois passos. Passo 1 (dry run): consulta o backend para pacotes necessários, mostra diálogo de confirmação com estado actual e dependências em falta. Passo 2 (se aprovado): instala pacotes de sistema em falta via `sudo`/`pkexec`, detecta o dispositivo SDR, aplica o perfil recomendado (ganho, sample rate, PPM, perfil de ganho) aos campos do formulário, e guarda a configuração na base de dados |
+| **Auto-detect Audio** | Consulta o backend para dispositivos de áudio disponíveis (PipeWire / PulseAudio / ALSA). Preenche os campos de Audio Configuration com os nomes dos dispositivos detectados e o sample rate. **Não guarda automaticamente** — clicar em **Save audio** depois para persistir |
+| **Purge invalid events** | Pede confirmação e elimina da base de dados todos os eventos de ocupação e callsign incompletos ou mal formados (sem timestamp, frequência inválida, callsign nulo/unknown, etc.). Atualiza os contadores no UI após a conclusão |
+| **Reset defaults** | Pede confirmação e repõe as definições padrão da aplicação (modos activos, opções de summary e outras configurações gerais). **Não afecta** eventos guardados, bandas customizadas, device configuration nem audio configuration |
+| **Reset total** | ⚠️ Destrutivo. Pede confirmação e elimina **todas** as definições e bandas customizadas da base de dados (`DELETE FROM settings`, `DELETE FROM bands`), limpa o localStorage do browser e recarrega a página. Equivale a estado de instalação limpa. Os eventos não são afectados |
+
 ### Controlos de scan
 - **Start scanning / Stop scanning** — inicia ou para o scan ativo
 - **Botões de banda** (160m … 10m) — mudam de banda imediatamente, mesmo com scan em curso

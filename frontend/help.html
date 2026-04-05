@@ -417,15 +417,60 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <h3 class="sub-title">Band Config</h3>
     <p>Enable or disable individual bands, adjust their frequency ranges (start/stop in Hz), and configure per-band scan parameters.</p>
 
-    <h3 class="sub-title">Admin Config</h3>
+    <h3 class="sub-title">Admin Config — Settings sections</h3>
     <table class="manual-table">
       <thead><tr><th>Section</th><th>Settings</th></tr></thead>
       <tbody>
-        <tr><td>SDR</td><td>Device index, gain (dB), sample rate, PPM correction, antenna.</td></tr>
+        <tr><td>SDR</td><td>Device selection, gain (dB), sample rate, PPM correction, frequency offset, gain profile.</td></tr>
+        <tr><td>Device Configuration</td><td>Device class (RTL / HackRF / AirSpy / other), PPM correction, frequency offset (Hz), gain profile (auto/manual).</td></tr>
+        <tr><td>Audio Configuration</td><td>Sound-card input/output device names, sample rate (Hz), RX gain multiplier, TX gain multiplier. Used for future sound-card SDR modes.</td></tr>
         <tr><td>Scan</td><td>Default dwell time, FFT size, overlap.</td></tr>
         <tr><td>Retention</td><td>Maximum event count before auto-export + purge; number of recent events to keep; export directory.</td></tr>
         <tr><td>Authentication</td><td>Change admin password.</td></tr>
         <tr><td>SSB Voice Transcription</td><td>Enable/disable Whisper ASR for automatic SSB voice-to-text. Requires <code>openai-whisper</code> package.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Admin Config — Buttons</h3>
+    <table class="manual-table">
+      <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Refresh Devices</strong></td>
+          <td>Forces a new SoapySDR device enumeration, bypassing the 300-second cache. Populates the device dropdown and automatically applies the correct gain and sample rate defaults for the detected device (RTL-SDR: gain 30, 2.048 MS/s; HackRF: gain 20, 2 MS/s; AirSpy: gain 20, 2.5 MS/s).</td>
+        </tr>
+        <tr>
+          <td><strong>Save device</strong></td>
+          <td>Persists the current Device Configuration fields (device class, PPM, frequency offset, gain profile) to the database. Changes made in the form are only local until this button is clicked.</td>
+        </tr>
+        <tr>
+          <td><strong>Save audio</strong></td>
+          <td>Persists the current Audio Configuration fields (input/output device, sample rate, RX/TX gain) to the database.</td>
+        </tr>
+        <tr>
+          <td><strong>Test Config</strong></td>
+          <td>Validates the current configuration without saving. Checks: SoapySDR device availability, audio tools present on the system (<code>arecord</code>, <code>aplay</code>, <code>pactl</code>, <code>pw-cli</code>), and that sample rate / gain values are within accepted ranges. Reports pass or fail with specific details in a toast notification.</td>
+        </tr>
+        <tr>
+          <td><strong>Auto-detect Device</strong></td>
+          <td>Two-step automated setup wizard. Step 1 (dry run): queries the backend for required packages, shows a confirmation dialog with current status and missing dependencies. Step 2 (if approved): installs missing system packages via <code>sudo</code> / <code>pkexec</code>, detects the SDR device, applies the recommended profile (gain, sample rate, PPM, gain profile) to the form fields, and saves the configuration to the database.</td>
+        </tr>
+        <tr>
+          <td><strong>Auto-detect Audio</strong></td>
+          <td>Queries the backend for available audio devices (PipeWire / PulseAudio / ALSA). Fills in the Audio Configuration fields with the detected input/output device names and sample rate. Does <em>not</em> save automatically — click <strong>Save audio</strong> afterwards to persist.</td>
+        </tr>
+        <tr>
+          <td><strong>Purge invalid events</strong></td>
+          <td>Asks for confirmation, then deletes from the database all occupancy and callsign events that are incomplete or malformed (missing timestamp, invalid frequency, null/unknown callsign, etc.). Updates event counters in the UI after completion. Reports the number of events deleted.</td>
+        </tr>
+        <tr>
+          <td><strong>Reset defaults</strong></td>
+          <td>Asks for confirmation, then restores the application's default settings (active modes, summary options, and other general settings). Does <em>not</em> affect stored events, custom bands, device configuration, or audio configuration.</td>
+        </tr>
+        <tr>
+          <td><strong>Reset total</strong></td>
+          <td>⚠️ Destructive. Asks for confirmation, then deletes <em>all</em> settings and custom bands from the database (<code>DELETE FROM settings</code>, <code>DELETE FROM bands</code>), clears browser local storage, and reloads the page. Equivalent to a clean installation state. Stored events are not affected.</td>
+        </tr>
       </tbody>
     </table>
 
