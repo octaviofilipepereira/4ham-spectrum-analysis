@@ -89,6 +89,18 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.9.0
+- **3-formula propagation scoring**: separate Digital/CW/SSB formulas with tailored SNR normalisation. Server-computed scores.
+- **Export multi-format**: CSV, XLSX (Aggregated + All Events), and JSON export from Academic Analytics.
+- **1 h / 12 h presets**: short-period options with minute-level bucketing for higher resolution.
+- **Loading overlay**: spinner shown while switching periods or applying filters.
+- **Callsign ITU validation**: two-branch regex rejects invalid callsigns (e.g. "5I5I").
+- **Heuristic mode filtering**: occupancy events from DSP heuristic only modes (no decoder confirmation) are now excluded.
+- **Empty analytics fix**: confirmed-modes pre-scan queries full DB, preventing blank dashboards for short periods.
+- **Propagation scoring reference docs**: EN + PT with formulas, constants, implementation tables, and PDF exports.
+- **Frontend bug fixes**: CW_TRAFFIC in CW_MODES, FST4W/Q65/VOICE_DETECTION in SNR_PARAMS, verification threshold >5.
+- **Immediate preset switching**, **preset persistence**, **top 20 callsigns**, **Heatmap Pro improvements**.
+
 ### v0.8.7
 - **Desktop launcher shortcut**: installer offers an optional desktop shortcut on graphical systems. Double-click opens an interactive terminal menu (Start / Stop / Restart Server, Open Dashboard). Works on GNOME, Cinnamon, XFCE, KDE, MATE, LXQt. Uninstaller removes the shortcut.
 - **Installer Whisper model choice**: choose between `tiny`, `base`, or `small` Whisper models during installation, with pros/cons for each.

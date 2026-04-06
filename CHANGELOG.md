@@ -2,10 +2,40 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-05 UTC
+Last update: 2026-04-06 UTC
 -->
 
 # Changelog
+
+## v0.9.0 - 2026-04-06
+
+### Added
+- **3-formula propagation scoring** — separate scoring formulas for Digital (FT8/FT4/WSPR/FST4W/Q65), CW, and SSB modes, each with tailored SNR normalisation and weighting. Server-computed scores served via `/api/analytics/academic`.
+- **Export multi-format** — Academic Analytics dashboard now exports data in CSV, XLSX (with Aggregated + All Events sheets), and JSON via a dropdown button.
+- **1 h / 12 h presets** — new short-period presets in the analytics dashboard with automatic minute-level bucketing for higher time resolution.
+- **Loading overlay** — visual spinner overlay when switching time periods or applying filters, preventing interaction during data fetch.
+- **Callsign ITU validation** — all callsigns are now validated against a two-branch ITU amateur radio regex (letter-start and digit-start patterns), rejecting invalid strings like "5I5I".
+- **Propagation scoring reference docs** — new `propagation_scoring_reference.md` (EN) and `propagation_scoring_reference_pt.md` (PT) with full formulas, constants, and implementation tables. PDF exports included.
+
+### Fixed
+- **Empty analytics on short periods** — the confirmed-modes pre-scan now queries the entire `callsign_events` table instead of just the time-filtered window, preventing blank dashboards for 1 h periods without callsign events.
+- **Heuristic-only mode filtering** — occupancy events from DSP heuristic classification (SSB, WSPR, FT4, FSK/PSK, AM) are now excluded when no decoder-confirmed callsigns exist for that mode, preventing misleading "phantom" mode entries.
+- **CW_TRAFFIC not in frontend CW_MODES** — added `CW_TRAFFIC` to the frontend `CW_MODES` set for correct SNR normalisation.
+- **Missing SNR_PARAMS** — added `FST4W`, `Q65`, and `VOICE_DETECTION` to the frontend `SNR_PARAMS` map.
+- **Verification threshold mismatch** — frontend verification threshold changed from `>50` to `>5` to match backend.
+- **Stacked bar minimum height** — enforced 3 px minimum segment height in stacked bar charts.
+- **CW_CANDIDATE/CW_TRAFFIC band=NULL** — events with missing band field now included in analytics.
+
+### Changed
+- **Immediate preset switching** — clicking a period preset (1 h, 12 h, 24 h, 7 d, 30 d) now loads data immediately without needing Apply Filters.
+- **Preset persistence** — selected period preset is saved in `sessionStorage` across page refreshes.
+- **Top Callsigns** — chart expanded to top 20 and fills card height.
+- **Heatmap Pro** — larger Σ labels, hover tooltips on marginal bars, KPI renamed to "Overall Propagation score".
+- **Author field** — updated to "Octávio Filipe Gonçalves | Indicativo: CT7BFV / Projecto: 4ham-spectrum-analysis" in docs.
+
+### Documentation
+- **Help panel** updated to v0.9.0.
+- **Propagation scoring reference** validated against codebase — 5 discrepancies found and fixed.
 
 ## v0.8.7 - 2026-04-05
 
