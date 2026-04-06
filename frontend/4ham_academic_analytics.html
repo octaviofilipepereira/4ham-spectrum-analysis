@@ -774,6 +774,11 @@ Last update: 2026-04-03 UTC
           b.classList.toggle("active", b === btn);
         }
         customRange.style.display = currentPreset === "custom" ? "grid" : "none";
+
+        // Preset switches should update charts immediately; custom keeps manual apply.
+        if (currentPreset !== "custom") {
+          loadAndRender();
+        }
       });
 
       applyBtn.addEventListener("click", () => {
