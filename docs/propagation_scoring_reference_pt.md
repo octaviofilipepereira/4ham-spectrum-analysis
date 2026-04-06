@@ -1,7 +1,7 @@
 # Referência de Pontuação de Propagação — Validação & Design
 
 > **Versão do documento**: 1.1 — 2026-04-06  
-> **Autor**: CT7BFV / projecto 4ham-spectrum-analysis  
+> **Autor**: Octávio Filipe Gonçalves | Indicativo: CT7BFV / Projecto: 4ham-spectrum-analysis  
 > **Objectivo**: Documento de referência para o sistema de pontuação de propagação com 3 fórmulas, validado contra standards da indústria e investigação científica.
 
 ---

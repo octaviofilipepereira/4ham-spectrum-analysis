@@ -1,7 +1,7 @@
 # Propagation Scoring Reference — Validation & Design
 
 > **Document version**: 1.1 — 2026-04-06  
-> **Author**: CT7BFV / 4ham-spectrum-analysis project  
+> **Author**: Octávio Filipe Gonçalves | Callsign: CT7BFV / Project: 4ham-spectrum-analysis  
 > **Purpose**: Reference document for the 3-formula propagation scoring system, validated against industry standards and scientific research.
 
 ---
