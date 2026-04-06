@@ -597,7 +597,7 @@ Last update: 2026-04-03 UTC
             <div class="value" id="kpiCoverage">--</div>
           </div>
           <div class="card">
-            <span class="label">Propagation score</span>
+            <span class="label">Overall Propagation score</span>
             <div class="value" id="kpiPropScore">--</div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
           </div>
@@ -1593,13 +1593,27 @@ Last update: 2026-04-03 UTC
           .attr("x", 0)
           .attr("y", (hour) => y(hour))
           .attr("width", (hour) => rightScale(hourTotals.get(hour) || 0))
-          .attr("height", y.bandwidth());
+          .attr("height", y.bandwidth())
+          .on("mousemove", (event, hour) => {
+            rowHighlight
+              .attr("y", y(hour))
+              .style("display", null);
+            showChartValueToast([
+              `UTC hour: ${String(hour).padStart(2, "0")}:00`,
+              `Total events (all bands): ${formatInt(hourTotals.get(hour) || 0)}`,
+            ], event);
+          })
+          .on("mouseleave", () => {
+            rowHighlight.style("display", "none");
+            hideChartValueToast();
+          });
 
         svg.append("text")
           .attr("x", margin.left + innerW + 10)
           .attr("y", margin.top - 8)
           .attr("fill", "#9fb4c8")
-          .attr("font-size", 10)
+          .attr("font-size", 12)
+          .attr("font-weight", 700)
           .text("Σ hour");
 
         svg.append("text")
