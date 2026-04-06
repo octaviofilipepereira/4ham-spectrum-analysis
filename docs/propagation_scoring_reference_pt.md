@@ -45,7 +45,7 @@ A **"percentagem de fiabilidade" do VOACAP** é o conceito existente mais próxi
 
 ### 2.2 PSK Reporter — Princípio de Design Chave
 
-Da especificação do desenvolvedor do PSK Reporter (Philip Gladstone, N1DQ):
+Da especificação do Programador do PSK Reporter (Philip Gladstone, N1DQ):
 
 > *"Cada callsign deve ser reportado no máximo uma vez por período de cinco minutos. Idealmente, um callsign deve ser reportado apenas uma vez por hora se não tiver 'mudado'."*
 
@@ -194,7 +194,7 @@ SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB n
 
 ## 7. Fontes & Referências
 
-1. **Especificação do Desenvolvedor PSK Reporter** — Philip Gladstone, N1DQ  
+1. **Especificação do Programador PSK Reporter** — Philip Gladstone, N1DQ  
    https://www.pskreporter.info/pskdev.html
 
 2. **Guia do Utilizador WSJT-X v2.6** — Joseph H. Taylor Jr., K1JT  
