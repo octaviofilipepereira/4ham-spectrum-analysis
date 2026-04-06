@@ -160,6 +160,25 @@ def academic_analytics(
     )
     events = sanitize_events_for_api(db_events)
 
+    # Pre-scan: determine which modes have decoder-confirmed callsigns.
+    # Occupancy events for modes without any real callsign decode are
+    # excluded — they come solely from the DSP bandwidth heuristic and
+    # mislead users into thinking a scan was performed for that mode.
+    confirmed_modes: set = set()
+    for ev in events:
+        if str(ev.get("type") or "").strip().lower() != "callsign":
+            continue
+        cs = str(ev.get("callsign") or "").strip()
+        if not cs or not is_valid_callsign(cs):
+            continue
+        m = str(ev.get("mode") or "").strip().upper()
+        if m == "SSB_TRAFFIC":
+            m = "SSB"
+        elif m in ("CW_CANDIDATE", "CW_TRAFFIC"):
+            m = "CW"
+        if m:
+            confirmed_modes.add(m)
+
     series_map: Dict[Tuple[str, str, str], Dict] = {}
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
     timeline_totals: Dict[str, int] = {}
@@ -197,6 +216,19 @@ def academic_analytics(
             mode_name = "CW"
 
         event_type = str(event.get("type") or "").strip().lower()
+
+        # Skip events for modes without decoder-confirmed callsigns.
+        # Occupancy events are purely from the DSP bandwidth heuristic;
+        # callsign events with empty callsign are voice-detection markers
+        # that also lack decoder confirmation.
+        if mode_name not in confirmed_modes:
+            if event_type == "occupancy":
+                continue
+            if event_type == "callsign":
+                cs = str(event.get("callsign") or "").strip()
+                if not cs or not is_valid_callsign(cs):
+                    continue
+
         bucket_dt = _bucket_start(ts, bucket_name)
         bucket_iso = bucket_dt.isoformat()
 
