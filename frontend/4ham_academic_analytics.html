@@ -933,7 +933,21 @@ Last update: 2026-04-03 UTC
           events: r.events,
         }));
 
-        return { series: rows, propagation_by_band: propRows, period: { start: start.toISOString(), end: end.toISOString() } };
+        /* All individual events sorted by band then timestamp */
+        const allEvents = [...series]
+          .sort((a, b) => {
+            const bi = bandOrder.indexOf(a.band) - bandOrder.indexOf(b.band);
+            return bi !== 0 ? bi : a.ts - b.ts;
+          })
+          .map((r) => ({
+            timestamp_utc: r.ts.toISOString(),
+            band: r.band,
+            mode: r.mode,
+            events: r.count,
+            snr_db: Number(r.snr.toFixed(1)),
+          }));
+
+        return { series: rows, all_events: allEvents, propagation_by_band: propRows, period: { start: start.toISOString(), end: end.toISOString() } };
       }
 
       function exportFilename(fmt) {
@@ -977,7 +991,9 @@ Last update: 2026-04-03 UTC
           const wb = XLSX.utils.book_new();
           const wsEvents = XLSX.utils.json_to_sheet(data.series);
           const wsProp = XLSX.utils.json_to_sheet(data.propagation_by_band);
+          const wsAll = XLSX.utils.json_to_sheet(data.all_events);
           XLSX.utils.book_append_sheet(wb, wsEvents, "Events by Band-Mode");
+          XLSX.utils.book_append_sheet(wb, wsAll, "All Events");
           XLSX.utils.book_append_sheet(wb, wsProp, "Propagation by Band");
           XLSX.writeFile(wb, exportFilename("xlsx"));
         }
