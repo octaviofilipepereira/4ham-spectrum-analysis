@@ -138,7 +138,7 @@ A descodificação de callsigns CW é inerentemente menos fiável que FT8/FT4/WS
 
 SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB não tem mensagem digital estruturada — a avaliação da propagação depende da qualidade da detecção de voz, SNR e força do sinal.
 
-**Nenhuma ferramenta externa fornece pontuação automática de propagação SSB como o 4HAM-Spectrum-Analysis.** Este é território genuinamente inovador.
+**Nenhuma ferramenta externa fornece pontuação automática de propagação SSB como o 4HAM-Spectrum-Analysis.**
 
 | Componente | Peso | Fundamentação |
 |---|---|---|
