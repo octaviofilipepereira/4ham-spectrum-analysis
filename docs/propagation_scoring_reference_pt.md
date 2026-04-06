@@ -93,7 +93,7 @@ O Guia do Utilizador WSJT-X §7.1 também afirma:
 
 ### 4.1 Categoria 1: FT8 / FT4 / WSPR (Descodificação Paralela de Banda Larga)
 
-Estes modos descodificam **toda a banda passante simultaneamente**. Cada sinal na largura de banda de 2500 Hz é processado em paralelo. Uma descodificação bem-sucedida produz um callsign + relatório de SNR. Se energia é detectada mas o sinal é fraco demais para descodificar, aparece como evento de ocupação sem callsign.
+Estes modos descodificam **toda a banda simultaneamente**. Cada sinal na largura de banda de 2500 Hz é processado em paralelo. Uma descodificação bem-sucedida produz um callsign + relatório de SNR. Se energia é detectada mas o sinal é fraco demais para descodificar, aparece como evento de ocupação sem callsign.
 
 **Portanto**: `decode_rate` (proporção de callsigns para total de eventos) é uma medida directa da qualidade do sinal e da propagação.
 
