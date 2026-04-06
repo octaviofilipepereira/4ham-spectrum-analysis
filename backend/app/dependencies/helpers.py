@@ -15,6 +15,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 from pathlib import Path
+from statistics import median
 from typing import Optional, List, Dict, Any, Tuple
 
 from app.dependencies import state
@@ -251,19 +252,157 @@ def sanitize_events_for_api(items: List[Dict]) -> List[Dict]:
     return sanitized
 
 
+# ─── Mode categories for propagation scoring ────────────────────────────────
+# See docs/propagation_scoring_reference.md for full rationale.
+
+_DIGITAL_WIDEBAND_MODES = frozenset({"FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"})
+_CW_MODES = frozenset({"CW", "CW_CANDIDATE"})
+_SSB_MODES = frozenset({"SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION"})
+
+# SNR normalisation parameters per mode (floor, ceiling)
+_SNR_PARAMS: Dict[str, Tuple[float, float]] = {
+    "FT8":  (-20.0, 10.0),
+    "FT4":  (-17.5, 10.0),
+    "WSPR": (-31.0,  0.0),
+    "JT65": (-25.0,  5.0),
+    "JT9":  (-26.0,  5.0),
+    "FST4": (-28.0,  2.0),
+    "FST4W":(-33.0,  0.0),
+    "Q65":  (-22.0,  8.0),
+    "CW":   (-15.0, 20.0),
+    "CW_CANDIDATE": (-15.0, 20.0),
+    "SSB":  (  3.0, 30.0),
+    "SSB_TRAFFIC": (3.0, 30.0),
+    "AM":   (  3.0, 30.0),
+    "VOICE_DETECTION": (3.0, 30.0),
+}
+_DEFAULT_SNR_PARAMS = (-20.0, 10.0)
+
+
+def _mode_category(mode: str) -> str:
+    """Return 'digital', 'cw', or 'ssb' for a given mode name."""
+    m = mode.upper()
+    if m in _DIGITAL_WIDEBAND_MODES:
+        return "digital"
+    if m in _CW_MODES:
+        return "cw"
+    if m in _SSB_MODES:
+        return "ssb"
+    return "digital"  # default fallback
+
+
+def _normalise_snr(snr_db: float, mode: str) -> float:
+    """Normalise SNR to 0-1 using mode-specific floor/ceiling."""
+    floor, ceiling = _SNR_PARAMS.get(mode.upper(), _DEFAULT_SNR_PARAMS)
+    rng = ceiling - floor
+    if rng <= 0:
+        return 0.5
+    return clamp((snr_db - floor) / rng, 0.0, 1.0)
+
+
+def _score_to_state(score: float) -> str:
+    if score >= 70:
+        return "Excellent"
+    if score >= 50:
+        return "Good"
+    if score >= 30:
+        return "Fair"
+    return "Poor"
+
+
+def _compute_band_propagation(band_data: Dict) -> Dict:
+    """
+    Compute propagation score for a single band using the 3-formula approach.
+
+    band_data contains pre-aggregated metrics per category for one band.
+    Returns dict with score, state, and component breakdown.
+    """
+    cat_scores = []
+    cat_weights = []
+
+    # ── Digital wideband (FT8/FT4/WSPR) ──────────────────────────────
+    d = band_data.get("digital")
+    if d and d["total_events"] > 0:
+        decode_rate = d["callsign_events"] / d["total_events"] if d["total_events"] > 0 else 0.0
+        snr_list = d["snr_values"]
+        snr_component = _normalise_snr(median(snr_list), d["dominant_mode"]) if snr_list else 0.0
+        callsign_norm = clamp(math.log1p(d["unique_callsigns"]) / math.log1p(20), 0.0, 1.0)
+        recency_component = d["avg_recency"]
+
+        score = 100.0 * (
+            0.40 * decode_rate +
+            0.35 * snr_component +
+            0.15 * callsign_norm +
+            0.10 * recency_component
+        )
+        cat_scores.append(clamp(score, 0.0, 100.0))
+        cat_weights.append(d["total_events"])
+
+    # ── CW ────────────────────────────────────────────────────────────
+    c = band_data.get("cw")
+    if c and c["total_events"] > 0:
+        traffic_norm = clamp(math.log1p(c["total_events"]) / math.log1p(100), 0.0, 1.0)
+        snr_list = c["snr_values"]
+        snr_component = _normalise_snr(median(snr_list), "CW") if snr_list else 0.0
+        pwr_list = c["power_values"]
+        signal_component = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
+        callsign_bonus = min(1.0, c["callsign_events"] / max(1, c["total_events"]) * 3.0)
+        recency_component = c["avg_recency"]
+
+        score = 100.0 * (
+            0.30 * traffic_norm +
+            0.30 * snr_component +
+            0.15 * signal_component +
+            0.15 * callsign_bonus +
+            0.10 * recency_component
+        )
+        cat_scores.append(clamp(score, 0.0, 100.0))
+        cat_weights.append(c["total_events"])
+
+    # ── SSB ───────────────────────────────────────────────────────────
+    s = band_data.get("ssb")
+    if s and s["total_events"] > 0:
+        traffic_norm = clamp(math.log1p(s["total_events"]) / math.log1p(100), 0.0, 1.0)
+        snr_list = s["snr_values"]
+        snr_component = _normalise_snr(median(snr_list), "SSB") if snr_list else 0.0
+        pwr_list = s["power_values"]
+        signal_component = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
+        voice_quality = s["avg_confidence"]
+        transcript_bonus = 1.0 if s["has_transcript"] else 0.0
+        callsign_bonus = min(1.0, s["callsign_events"] / max(1, s["total_events"]) * 3.0)
+        recency_component = s["avg_recency"]
+
+        score = 100.0 * (
+            0.20 * traffic_norm +
+            0.25 * snr_component +
+            0.15 * signal_component +
+            0.20 * voice_quality +
+            0.10 * transcript_bonus +
+            0.05 * callsign_bonus +
+            0.05 * recency_component
+        )
+        cat_scores.append(clamp(score, 0.0, 100.0))
+        cat_weights.append(s["total_events"])
+
+    if not cat_scores:
+        return {"score": 0.0, "state": "Poor"}
+
+    # Weighted average across categories present in this band
+    total_w = sum(cat_weights)
+    band_score = sum(s * w for s, w in zip(cat_scores, cat_weights)) / total_w if total_w > 0 else 0.0
+    return {"score": round(band_score, 1), "state": _score_to_state(band_score)}
+
+
 def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Dict:
     """
-    Build propagation summary from recent events.
-    
-    Calculates propagation score per band based on recent events,
-    considering SNR, confidence, and recency.
-    
-    Args:
-        window_minutes: Time window in minutes
-        limit: Maximum events to consider
-        
-    Returns:
-        Dict with overall and per-band propagation metrics
+    Build propagation summary using the 3-formula approach.
+
+    Three mode-category scoring formulas are applied:
+      * Digital wideband (FT8/FT4/WSPR): decode_rate + SNR + callsigns + recency
+      * CW: traffic_volume + SNR + signal_strength + callsign_bonus + recency
+      * SSB: traffic_volume + SNR + signal_strength + voice_quality + transcript + callsign_bonus + recency
+
+    See docs/propagation_scoring_reference.md for full design rationale.
     """
     safe_window_minutes = max(1, int(window_minutes or 30))
     safe_limit = max(100, min(int(limit or 3000), 10000))
@@ -276,81 +415,144 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         end=now.isoformat()
     )
 
-    per_band = {}
-    weighted_score_sum = 0.0
-    weighted_sum = 0.0
+    # ── Aggregate per band × category ─────────────────────────────────
+    per_band: Dict[str, Dict[str, Dict]] = {}
+
+    def _empty_cat() -> Dict:
+        return {
+            "total_events": 0,
+            "callsign_events": 0,
+            "unique_callsigns": 0,
+            "snr_values": [],
+            "power_values": [],
+            "recency_sum": 0.0,
+            "avg_recency": 0.0,
+            "avg_confidence": 0.0,
+            "confidence_sum": 0.0,
+            "has_transcript": False,
+            "max_snr_db": None,
+            "dominant_mode": "",
+            "_callsign_set": set(),
+            "_mode_counts": {},
+        }
 
     for event in events:
         band = str(event.get("band") or "").strip()
         if not band:
             continue
-        bucket = per_band.setdefault(
-            band,
-            {
-                "band": band,
-                "events": 0,
-                "weighted_score_sum": 0.0,
-                "weighted_sum": 0.0,
-                "max_snr_db": None,
-            }
-        )
 
-        event_type = str(event.get("type") or "")
-        base_weight = 1.0 if event_type == "callsign" else 0.55
+        mode_raw = str(event.get("mode") or "").strip().upper()
+        if not mode_raw:
+            continue
 
+        cat = _mode_category(mode_raw)
+        band_cats = per_band.setdefault(band, {})
+        bucket = band_cats.get(cat)
+        if bucket is None:
+            bucket = _empty_cat()
+            band_cats[cat] = bucket
+
+        event_type = str(event.get("type") or "").strip().lower()
+        bucket["total_events"] += 1
+
+        # Mode frequency tracking for dominant_mode
+        bucket["_mode_counts"][mode_raw] = bucket["_mode_counts"].get(mode_raw, 0) + 1
+
+        # Callsign tracking
+        if event_type == "callsign":
+            bucket["callsign_events"] += 1
+            callsign = str(event.get("callsign") or "").strip().upper()
+            if callsign:
+                bucket["_callsign_set"].add(callsign)
+
+        # SNR
+        raw_snr = safe_float(event.get("snr_db"), default=None)
+        if raw_snr is not None:
+            bucket["snr_values"].append(raw_snr)
+            prev_max = bucket["max_snr_db"]
+            bucket["max_snr_db"] = raw_snr if prev_max is None else max(prev_max, raw_snr)
+
+        # Power (signal strength)
+        raw_power = safe_float(event.get("power_dbm"), default=None)
+        if raw_power is not None:
+            bucket["power_values"].append(raw_power)
+
+        # Recency
         parsed_ts = parse_event_timestamp(event.get("timestamp"))
-        recency_weight = 0.6
         if parsed_ts is not None:
             age_minutes = max(0.0, (now - parsed_ts).total_seconds() / 60.0)
-            recency_weight = clamp(1.0 - (age_minutes / safe_window_minutes), 0.2, 1.0)
+            recency = clamp(1.0 - (age_minutes / safe_window_minutes), 0.2, 1.0)
+        else:
+            recency = 0.5
+        bucket["recency_sum"] += recency
 
-        raw_snr = safe_float(event.get("snr_db"), default=None)
-        snr_norm = 0.5
-        if raw_snr is not None:
-            snr_norm = clamp((raw_snr + 20.0) / 40.0, 0.0, 1.0)
-            previous_max = bucket["max_snr_db"]
-            bucket["max_snr_db"] = raw_snr if previous_max is None else max(previous_max, raw_snr)
+        # Confidence
+        conf = safe_float(event.get("confidence"), default=None)
+        if conf is not None:
+            bucket["confidence_sum"] += clamp(conf, 0.0, 1.0)
 
-        confidence_default = 0.6 if event_type == "callsign" else 0.5
-        confidence = clamp(safe_float(event.get("confidence"), default=confidence_default), 0.0, 1.0)
+        # Transcript / raw text (SSB)
+        if not bucket["has_transcript"]:
+            raw_text = event.get("raw") or event.get("msg") or ""
+            if isinstance(raw_text, str) and len(raw_text.strip()) > 2:
+                bucket["has_transcript"] = True
 
-        combined_weight = base_weight * recency_weight
-        weighted_score = snr_norm * confidence * combined_weight
+    # ── Finalise per-category aggregates ──────────────────────────────
+    for band_cats in per_band.values():
+        for bucket in band_cats.values():
+            n = bucket["total_events"]
+            if n > 0:
+                bucket["avg_recency"] = bucket["recency_sum"] / n
+                bucket["avg_confidence"] = bucket["confidence_sum"] / n
+                bucket["unique_callsigns"] = len(bucket["_callsign_set"])
+                # Determine dominant mode
+                if bucket["_mode_counts"]:
+                    bucket["dominant_mode"] = max(bucket["_mode_counts"], key=bucket["_mode_counts"].get)
+            # Clean up internal fields
+            del bucket["_callsign_set"]
+            del bucket["_mode_counts"]
 
-        bucket["events"] += 1
-        bucket["weighted_score_sum"] += weighted_score
-        bucket["weighted_sum"] += combined_weight
-
-        weighted_score_sum += weighted_score
-        weighted_sum += combined_weight
-
-    # Calculate final scores
-    def _score_to_state(score: float) -> str:
-        if score >= 70:
-            return "Excellent"
-        if score >= 50:
-            return "Good"
-        if score >= 30:
-            return "Fair"
-        return "Poor"
-
+    # ── Compute per-band scores ───────────────────────────────────────
     bands = []
-    for bucket in per_band.values():
-        denom = bucket["weighted_sum"]
-        raw_score = (bucket["weighted_score_sum"] / denom * 100.0) if denom > 0 else 0.0
-        score_rounded = round(raw_score, 1)
-        max_snr = bucket["max_snr_db"]
-        bands.append({
-            "band": bucket["band"],
-            "score": score_rounded,
-            "state": _score_to_state(score_rounded),
-            "events": int(bucket["events"]),
-            "max_snr_db": round(max_snr, 1) if max_snr is not None else None,
-        })
+    for band, band_cats in per_band.items():
+        result = _compute_band_propagation(band_cats)
+        total_events = sum(c["total_events"] for c in band_cats.values())
+        total_callsigns = sum(c["unique_callsigns"] for c in band_cats.values())
+        total_callsign_events = sum(c["callsign_events"] for c in band_cats.values())
 
-    overall_score = round(
-        (weighted_score_sum / weighted_sum * 100.0) if weighted_sum > 0 else 0.0, 1
-    )
+        # Collect max SNR across all categories
+        max_snr = None
+        for c in band_cats.values():
+            if c["max_snr_db"] is not None:
+                max_snr = c["max_snr_db"] if max_snr is None else max(max_snr, c["max_snr_db"])
+
+        # Determine dominant category label
+        cat_events = {cat: c["total_events"] for cat, c in band_cats.items() if c["total_events"] > 0}
+        dominant_category = max(cat_events, key=cat_events.get) if cat_events else "digital"
+
+        decode_rate = (total_callsign_events / total_events) if total_events > 0 else None
+
+        entry = {
+            "band": band,
+            "score": result["score"],
+            "state": result["state"],
+            "events": total_events,
+            "max_snr_db": round(max_snr, 1) if max_snr is not None else None,
+            "unique_callsigns": total_callsigns,
+            "mode_category": dominant_category,
+        }
+        if decode_rate is not None:
+            entry["decode_rate"] = round(decode_rate, 3)
+
+        bands.append(entry)
+
+    # ── Overall score (weighted by events) ────────────────────────────
+    total_events_all = sum(b["events"] for b in bands)
+    if total_events_all > 0:
+        overall_score = sum(b["score"] * b["events"] for b in bands) / total_events_all
+    else:
+        overall_score = 0.0
+    overall_score = round(overall_score, 1)
 
     bands.sort(key=lambda x: (x["score"], x["events"]), reverse=True)
 

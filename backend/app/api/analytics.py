@@ -10,15 +10,18 @@ Aggregated analytics endpoints for academic dashboards.
 """
 
 from datetime import datetime, timedelta, timezone
-from math import ceil
-from statistics import pstdev
+from math import ceil, log1p
+from statistics import median, pstdev
 from typing import Dict, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.dependencies import state
 from app.dependencies.auth import optional_verify_basic_auth
-from app.dependencies.helpers import clamp, parse_event_timestamp, safe_float, sanitize_events_for_api
+from app.dependencies.helpers import (
+    clamp, parse_event_timestamp, safe_float, sanitize_events_for_api,
+    _mode_category, _normalise_snr,
+)
 
 
 router = APIRouter()
@@ -40,39 +43,71 @@ def _bucket_start(ts: datetime, bucket: str) -> datetime:
 
 
 def _propagation_state(score: float) -> str:
-    if score >= 75:
+    if score >= 70:
         return "Excellent"
-    if score >= 60:
+    if score >= 50:
         return "Good"
-    if score >= 45:
+    if score >= 30:
         return "Fair"
     return "Poor"
 
 
-def _compute_propagation_score(
-    snr_db: Optional[float],
-    confidence: Optional[float],
-    event_type: str,
-    ts: datetime,
-    end_dt: datetime,
-    period_minutes: float,
-) -> Tuple[float, float]:
-    base_weight = 1.0 if event_type == "callsign" else 0.55
-    age_minutes = max(0.0, (end_dt - ts).total_seconds() / 60.0)
-    recency_weight = clamp(1.0 - (age_minutes / max(1.0, period_minutes)), 0.2, 1.0)
+def _compute_category_score(cat_data: Dict) -> float:
+    """
+    Compute propagation score for a single mode category using the 3-formula
+    approach.  Returns score in [0, 100].
 
-    snr_norm = 0.5
-    if snr_db is not None:
-        snr_norm = clamp((snr_db + 20.0) / 40.0, 0.0, 1.0)
+    cat_data must contain aggregated metrics produced by the main loop.
+    """
+    category = cat_data["category"]
+    n = cat_data["total_events"]
+    if n <= 0:
+        return 0.0
 
-    default_confidence = 0.6 if event_type == "callsign" else 0.5
-    conf_raw = safe_float(confidence, default=default_confidence)
-    if conf_raw is None:
-        conf_raw = default_confidence
-    conf = clamp(conf_raw, 0.0, 1.0)
+    snr_list = cat_data["snr_values"]
+    pwr_list = cat_data["power_values"]
+    avg_recency = cat_data["recency_sum"] / n
+    avg_conf = cat_data["confidence_sum"] / n
 
-    combined_weight = base_weight * recency_weight
-    return snr_norm * conf * combined_weight, combined_weight
+    if category == "digital":
+        decode_rate = cat_data["callsign_events"] / n if n > 0 else 0.0
+        snr_c = _normalise_snr(median(snr_list), cat_data["dominant_mode"]) if snr_list else 0.0
+        call_norm = clamp(log1p(cat_data["unique_callsigns"]) / log1p(20), 0.0, 1.0)
+        return clamp(100.0 * (
+            0.40 * decode_rate +
+            0.35 * snr_c +
+            0.15 * call_norm +
+            0.10 * avg_recency
+        ), 0.0, 100.0)
+
+    if category == "cw":
+        traffic_norm = clamp(log1p(n) / log1p(100), 0.0, 1.0)
+        snr_c = _normalise_snr(median(snr_list), "CW") if snr_list else 0.0
+        sig_c = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
+        call_bonus = min(1.0, cat_data["callsign_events"] / max(1, n) * 3.0)
+        return clamp(100.0 * (
+            0.30 * traffic_norm +
+            0.30 * snr_c +
+            0.15 * sig_c +
+            0.15 * call_bonus +
+            0.10 * avg_recency
+        ), 0.0, 100.0)
+
+    # SSB
+    traffic_norm = clamp(log1p(n) / log1p(100), 0.0, 1.0)
+    snr_c = _normalise_snr(median(snr_list), "SSB") if snr_list else 0.0
+    sig_c = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
+    transcript_bonus = 1.0 if cat_data.get("has_transcript") else 0.0
+    call_bonus = min(1.0, cat_data["callsign_events"] / max(1, n) * 3.0)
+    return clamp(100.0 * (
+        0.20 * traffic_norm +
+        0.25 * snr_c +
+        0.15 * sig_c +
+        0.20 * avg_conf +
+        0.10 * transcript_bonus +
+        0.05 * call_bonus +
+        0.05 * avg_recency
+    ), 0.0, 100.0)
 
 
 @router.get("/analytics/academic")
@@ -112,8 +147,8 @@ def academic_analytics(
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
     timeline_totals: Dict[str, int] = {}
 
-    propagation_by_band: Dict[str, Dict] = {}
-    propagation_trend: Dict[str, Dict] = {}
+    propagation_by_band: Dict[str, Dict[str, Dict]] = {}  # band -> category -> agg
+    propagation_trend: Dict[str, Dict[str, Dict]] = {}  # bucket_iso -> category -> agg
 
     total_events = 0
     snr_weighted_sum = 0.0
@@ -191,40 +226,61 @@ def academic_analytics(
                     callsign_map[call_key] = call_obj
                 call_obj["hits"] += 1
 
-        weighted_score, weighted_amount = _compute_propagation_score(
-            snr_db=snr_db,
-            confidence=safe_float(event.get("confidence"), default=None),
-            event_type=event_type,
-            ts=ts,
-            end_dt=end_dt,
-            period_minutes=period_minutes,
-        )
+        # ── Propagation: aggregate per band × category ────────────
+        mode_raw = str(event.get("mode") or "").strip().upper()
+        cat = _mode_category(mode_raw or mode_name)
 
-        band_prop = propagation_by_band.get(band_name)
-        if band_prop is None:
-            band_prop = {
-                "band": band_name,
-                "events": 0,
-                "weighted_score_sum": 0.0,
-                "weighted_sum": 0.0,
-            }
-            propagation_by_band[band_name] = band_prop
+        def _ensure_cat(container, key, category):
+            cats = container.setdefault(key, {})
+            if category not in cats:
+                cats[category] = {
+                    "category": category,
+                    "total_events": 0,
+                    "callsign_events": 0,
+                    "unique_callsigns": 0,
+                    "snr_values": [],
+                    "power_values": [],
+                    "recency_sum": 0.0,
+                    "confidence_sum": 0.0,
+                    "has_transcript": False,
+                    "dominant_mode": mode_raw or mode_name,
+                    "_callsign_set": set(),
+                    "_mode_counts": {},
+                }
+            return cats[category]
 
-        band_prop["events"] += 1
-        band_prop["weighted_score_sum"] += weighted_score
-        band_prop["weighted_sum"] += weighted_amount
+        band_cat = _ensure_cat(propagation_by_band, band_name, cat)
+        trend_cat = _ensure_cat(propagation_trend, bucket_iso, cat)
 
-        trend_prop = propagation_trend.get(bucket_iso)
-        if trend_prop is None:
-            trend_prop = {
-                "ts": bucket_iso,
-                "weighted_score_sum": 0.0,
-                "weighted_sum": 0.0,
-            }
-            propagation_trend[bucket_iso] = trend_prop
+        for agg in (band_cat, trend_cat):
+            agg["total_events"] += 1
+            agg["_mode_counts"][mode_raw or mode_name] = agg["_mode_counts"].get(mode_raw or mode_name, 0) + 1
 
-        trend_prop["weighted_score_sum"] += weighted_score
-        trend_prop["weighted_sum"] += weighted_amount
+            if event_type == "callsign":
+                agg["callsign_events"] += 1
+                cs = str(event.get("callsign") or "").strip().upper()
+                if cs:
+                    agg["_callsign_set"].add(cs)
+
+            if snr_db is not None:
+                agg["snr_values"].append(snr_db)
+
+            pwr = safe_float(event.get("power_dbm"), default=None)
+            if pwr is not None:
+                agg["power_values"].append(pwr)
+
+            age_min = max(0.0, (end_dt - ts).total_seconds() / 60.0)
+            recency = clamp(1.0 - (age_min / max(1.0, period_minutes)), 0.2, 1.0)
+            agg["recency_sum"] += recency
+
+            conf = safe_float(event.get("confidence"), default=None)
+            if conf is not None:
+                agg["confidence_sum"] += clamp(conf, 0.0, 1.0)
+
+            if not agg["has_transcript"]:
+                raw_text = event.get("raw") or event.get("msg") or ""
+                if isinstance(raw_text, str) and len(raw_text.strip()) > 2:
+                    agg["has_transcript"] = True
 
     series_rows = []
     for row in series_map.values():
@@ -244,14 +300,38 @@ def academic_analytics(
     callsign_rows = list(callsign_map.values())
     callsign_rows.sort(key=lambda item: (item["ts"], item["band"], item["mode"], item["callsign"]))
 
+    # ── Finalise propagation category aggregates ───────────────────
+    def _finalise_cats(container):
+        for key, cats in container.items():
+            for agg in cats.values():
+                n = agg["total_events"]
+                if n > 0:
+                    agg["unique_callsigns"] = len(agg["_callsign_set"])
+                    if agg["_mode_counts"]:
+                        agg["dominant_mode"] = max(agg["_mode_counts"], key=agg["_mode_counts"].get)
+                del agg["_callsign_set"]
+                del agg["_mode_counts"]
+
+    _finalise_cats(propagation_by_band)
+    _finalise_cats(propagation_trend)
+
     propagation_band_rows = []
-    for row in propagation_by_band.values():
-        denom = row["weighted_sum"]
-        score = (row["weighted_score_sum"] / denom * 100.0) if denom > 0 else 0.0
+    for band_name_key, cats in propagation_by_band.items():
+        cat_scores = []
+        cat_weights = []
+        total_ev = 0
+        for agg in cats.values():
+            if agg["total_events"] > 0:
+                sc = _compute_category_score(agg)
+                cat_scores.append(sc)
+                cat_weights.append(agg["total_events"])
+                total_ev += agg["total_events"]
+        total_w = sum(cat_weights)
+        score = sum(s * w for s, w in zip(cat_scores, cat_weights)) / total_w if total_w > 0 else 0.0
         propagation_band_rows.append(
             {
-                "band": row["band"],
-                "events": int(row["events"]),
+                "band": band_name_key,
+                "events": int(total_ev),
                 "score": round(score, 3),
                 "state": _propagation_state(score),
             }
@@ -260,12 +340,19 @@ def academic_analytics(
     propagation_band_rows.sort(key=lambda item: (item["score"], item["events"]), reverse=True)
 
     trend_rows = []
-    for row in propagation_trend.values():
-        denom = row["weighted_sum"]
-        score = (row["weighted_score_sum"] / denom * 100.0) if denom > 0 else 0.0
+    for bucket_key, cats in propagation_trend.items():
+        cat_scores = []
+        cat_weights = []
+        for agg in cats.values():
+            if agg["total_events"] > 0:
+                sc = _compute_category_score(agg)
+                cat_scores.append(sc)
+                cat_weights.append(agg["total_events"])
+        total_w = sum(cat_weights)
+        score = sum(s * w for s, w in zip(cat_scores, cat_weights)) / total_w if total_w > 0 else 0.0
         trend_rows.append(
             {
-                "ts": row["ts"],
+                "ts": bucket_key,
                 "score": round(score, 3),
                 "state": _propagation_state(score),
             }

@@ -1562,7 +1562,12 @@ function renderPropagationSummary(data, options = {}) {
     const events = Number(item?.events || 0);
     const maxSNR = item?.max_snr_db;
     const snrLabel = maxSNR === null || maxSNR === undefined ? "-" : `${Number(maxSNR).toFixed(1)} dB`;
-    li.textContent = `${bandName}: ${score}/100 (${state}) | events=${events} | max SNR=${snrLabel}`;
+    const callsigns = item?.unique_callsigns;
+    const callsignLabel = callsigns !== null && callsigns !== undefined ? ` | callsigns=${callsigns}` : "";
+    const decodeRate = item?.decode_rate;
+    const decodeLabel = decodeRate !== null && decodeRate !== undefined ? ` | decode=${(decodeRate * 100).toFixed(0)}%` : "";
+    const catLabel = item?.mode_category ? ` [${item.mode_category}]` : "";
+    li.textContent = `${bandName}: ${score}/100 (${state}) | events=${events} | max SNR=${snrLabel}${callsignLabel}${decodeLabel}${catLabel}`;
     propagationBands.appendChild(li);
   });
 }
