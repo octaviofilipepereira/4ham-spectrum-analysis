@@ -757,7 +757,7 @@ Last update: 2026-04-03 UTC
       let dataSource = "simulated";
       let lastResolvedRange = null;
       let lastFilters = { band: "ALL", mode: "ALL" };
-      let currentPreset = "24h";
+      let currentPreset = sessionStorage.getItem("4ham_preset") || "24h";
       let refreshCountdownTimer = null;
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
@@ -769,10 +769,22 @@ Last update: 2026-04-03 UTC
       endInput.value = toLocalDateTimeValue(now);
       startInput.value = toLocalDateTimeValue(new Date(now.getTime() - 24 * 3600 * 1000));
 
+      // Restore active button state from sessionStorage on page load
+      {
+        const savedBtn = presetRow.querySelector(`button[data-preset="${currentPreset}"]`);
+        if (savedBtn) {
+          for (const b of presetRow.querySelectorAll("button[data-preset]")) {
+            b.classList.toggle("active", b === savedBtn);
+          }
+          customRange.style.display = currentPreset === "custom" ? "grid" : "none";
+        }
+      }
+
       presetRow.addEventListener("click", (event) => {
         const btn = event.target.closest("button[data-preset]");
         if (!btn) return;
         currentPreset = btn.dataset.preset;
+        sessionStorage.setItem("4ham_preset", currentPreset);
         for (const b of presetRow.querySelectorAll("button[data-preset]")) {
           b.classList.toggle("active", b === btn);
         }
