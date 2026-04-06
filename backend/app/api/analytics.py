@@ -160,24 +160,28 @@ def academic_analytics(
     )
     events = sanitize_events_for_api(db_events)
 
-    # Pre-scan: determine which modes have decoder-confirmed callsigns.
+    # Pre-scan: determine which modes have decoder-confirmed callsigns
+    # across the ENTIRE database (not just the selected window).
     # Occupancy events for modes without any real callsign decode are
     # excluded — they come solely from the DSP bandwidth heuristic and
     # mislead users into thinking a scan was performed for that mode.
     confirmed_modes: set = set()
-    for ev in events:
-        if str(ev.get("type") or "").strip().lower() != "callsign":
-            continue
-        cs = str(ev.get("callsign") or "").strip()
-        if not cs or not is_valid_callsign(cs):
-            continue
-        m = str(ev.get("mode") or "").strip().upper()
-        if m == "SSB_TRAFFIC":
-            m = "SSB"
-        elif m in ("CW_CANDIDATE", "CW_TRAFFIC"):
-            m = "CW"
-        if m:
-            confirmed_modes.add(m)
+    try:
+        with state.db._lock:
+            rows = state.db._conn.execute(
+                "SELECT DISTINCT UPPER(mode) FROM callsign_events "
+                "WHERE callsign IS NOT NULL AND callsign != ''"
+            ).fetchall()
+        for (m,) in rows:
+            cs_mode = m.strip()
+            if cs_mode == "SSB_TRAFFIC":
+                cs_mode = "SSB"
+            elif cs_mode in ("CW_CANDIDATE", "CW_TRAFFIC"):
+                cs_mode = "CW"
+            confirmed_modes.add(cs_mode)
+    except Exception:
+        # On any DB error, fall back to showing all modes
+        confirmed_modes = None
 
     series_map: Dict[Tuple[str, str, str], Dict] = {}
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
@@ -221,7 +225,7 @@ def academic_analytics(
         # Occupancy events are purely from the DSP bandwidth heuristic;
         # callsign events with empty callsign are voice-detection markers
         # that also lack decoder confirmation.
-        if mode_name not in confirmed_modes:
+        if confirmed_modes is not None and mode_name not in confirmed_modes:
             if event_type == "occupancy":
                 continue
             if event_type == "callsign":
