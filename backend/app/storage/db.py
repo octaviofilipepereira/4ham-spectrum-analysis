@@ -430,7 +430,7 @@ class Database:
                 mode_filter_occ = ""
                 time_filter = ""
                 if band:
-                    band_filter = "AND UPPER(band) = UPPER(?)"
+                    band_filter = "AND (UPPER(band) = UPPER(?) OR band IS NULL)"
                     params.append(band)
                 if mode:
                     mode_filter_occ = "AND UPPER(mode) LIKE UPPER(?)"
@@ -463,7 +463,7 @@ class Database:
             snr_filter = ""
             time_filter = ""
             if band:
-                band_filter = "AND UPPER(band) = UPPER(?)"
+                band_filter = "AND (UPPER(band) = UPPER(?) OR band IS NULL)"
                 params.append(band)
             if mode:
                 mode_filter = "AND UPPER(mode) LIKE UPPER(?)"

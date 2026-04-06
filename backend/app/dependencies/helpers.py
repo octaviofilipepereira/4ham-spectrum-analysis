@@ -169,6 +169,22 @@ def parse_event_timestamp(timestamp_str: str) -> Optional[datetime]:
         return None
 
 
+_FALLBACK_BANDS = [
+    ("160m", 1_810_000, 2_000_000),
+    ("80m",  3_500_000, 3_800_000),
+    ("60m",  5_250_000, 5_450_000),
+    ("40m",  7_000_000, 7_200_000),
+    ("30m",  10_100_000, 10_150_000),
+    ("20m",  14_000_000, 14_350_000),
+    ("17m",  18_068_000, 18_168_000),
+    ("15m",  21_000_000, 21_450_000),
+    ("12m",  24_890_000, 24_990_000),
+    ("10m",  28_000_000, 29_700_000),
+    ("6m",   50_000_000, 54_000_000),
+    ("2m",   144_000_000, 146_000_000),
+]
+
+
 def infer_band_from_frequency(frequency_hz: float) -> Optional[str]:
     """
     Infer frequency band name from frequency in Hz.
@@ -183,13 +199,18 @@ def infer_band_from_frequency(frequency_hz: float) -> Optional[str]:
     if freq_hz is None or freq_hz <= 0:
         return None
     
-    # Get bands from database
+    # Get bands from database; fall back to hardcoded IARU Region 1 table
     bands = state.db.get_bands()
-    for band in bands:
-        start_hz = band.get("start_hz", 0)
-        end_hz = band.get("end_hz", 0)
-        if start_hz <= freq_hz <= end_hz:
-            return band.get("name")
+    if bands:
+        for band in bands:
+            start_hz = band.get("start_hz", 0)
+            end_hz = band.get("end_hz", 0)
+            if start_hz <= freq_hz <= end_hz:
+                return band.get("name")
+    else:
+        for name, start_hz, end_hz in _FALLBACK_BANDS:
+            if start_hz <= freq_hz <= end_hz:
+                return name
     
     return None
 
