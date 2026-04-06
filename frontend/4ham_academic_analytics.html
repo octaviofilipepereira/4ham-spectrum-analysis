@@ -899,13 +899,33 @@ Last update: 2026-04-03 UTC
           start, end
         );
 
-        const rows = series.map((r) => ({
-          timestamp_utc: r.ts.toISOString(),
-          band: r.band,
-          mode: r.mode,
-          events: r.count,
-          peak_snr_db: Number(r.snr.toFixed(1)),
-        }));
+        /* Aggregate by band + mode */
+        const agg = new Map();
+        for (const r of series) {
+          const key = `${r.band}||${r.mode}`;
+          const cur = agg.get(key);
+          if (cur) {
+            cur.total_events += r.count;
+            cur.peak_snr_db = Math.max(cur.peak_snr_db, r.snr);
+            cur._snrSum += r.snr * r.count;
+            cur._snrN += r.count;
+          } else {
+            agg.set(key, { band: r.band, mode: r.mode, total_events: r.count, peak_snr_db: r.snr, _snrSum: r.snr * r.count, _snrN: r.count });
+          }
+        }
+        const bandOrder = ["160m","80m","60m","40m","30m","20m","17m","15m","12m","10m","6m","2m"];
+        const rows = [...agg.values()]
+          .sort((a, b) => {
+            const bi = bandOrder.indexOf(a.band) - bandOrder.indexOf(b.band);
+            return bi !== 0 ? bi : a.mode.localeCompare(b.mode);
+          })
+          .map((r) => ({
+            band: r.band,
+            mode: r.mode,
+            total_events: r.total_events,
+            peak_snr_db: Number(r.peak_snr_db.toFixed(1)),
+            avg_snr_db: Number((r._snrSum / r._snrN).toFixed(1)),
+          }));
 
         const propRows = (propagation.byBand || []).map((r) => ({
           band: r.band,
@@ -943,7 +963,7 @@ Last update: 2026-04-03 UTC
         }
 
         if (fmt === "csv") {
-          const headers = ["timestamp_utc", "band", "mode", "events", "peak_snr_db"];
+          const headers = ["band", "mode", "total_events", "peak_snr_db", "avg_snr_db"];
           const lines = [
             headers.join(","),
             ...data.series.map((r) => headers.map((h) => r[h] ?? "").join(",")),
@@ -957,7 +977,7 @@ Last update: 2026-04-03 UTC
           const wb = XLSX.utils.book_new();
           const wsEvents = XLSX.utils.json_to_sheet(data.series);
           const wsProp = XLSX.utils.json_to_sheet(data.propagation_by_band);
-          XLSX.utils.book_append_sheet(wb, wsEvents, "Events");
+          XLSX.utils.book_append_sheet(wb, wsEvents, "Events by Band-Mode");
           XLSX.utils.book_append_sheet(wb, wsProp, "Propagation by Band");
           XLSX.writeFile(wb, exportFilename("xlsx"));
         }
