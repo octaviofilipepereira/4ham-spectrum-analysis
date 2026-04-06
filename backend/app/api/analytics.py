@@ -162,6 +162,7 @@ def academic_analytics(
     series_map: Dict[Tuple[str, str, str], Dict] = {}
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
     timeline_totals: Dict[str, int] = {}
+    raw_events: list = []
 
     propagation_by_band: Dict[str, Dict[str, Dict]] = {}  # band -> category -> agg
     propagation_trend: Dict[str, Dict[str, Dict]] = {}  # bucket_iso -> category -> agg
@@ -206,6 +207,20 @@ def academic_analytics(
         if snr_db is not None:
             snr_weighted_sum += snr_db
             snr_weight_total += 1
+
+        # Collect individual event for raw export
+        raw_ev = {
+            "timestamp": ts.isoformat(),
+            "type": event_type,
+            "band": band_name,
+            "mode": mode_name,
+            "snr_db": round(snr_db, 1) if snr_db is not None else None,
+            "frequency_hz": int(event.get("frequency_hz") or 0) or None,
+        }
+        if event_type == "callsign":
+            raw_ev["callsign"] = str(event.get("callsign") or "").strip().upper() or None
+            raw_ev["grid"] = str(event.get("grid") or "").strip().upper() or None
+        raw_events.append(raw_ev)
 
         series_key = (bucket_iso, band_name, mode_name)
         bucket_obj = series_map.get(series_key)
@@ -428,5 +443,6 @@ def academic_analytics(
             "timeline": timeline_rows,
             "propagation_by_band": propagation_band_rows,
             "propagation_trend": trend_rows,
+            "raw_events": raw_events,
         },
     }

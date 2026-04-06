@@ -933,18 +933,26 @@ Last update: 2026-04-03 UTC
           events: r.events,
         }));
 
-        /* All individual events sorted by band then timestamp */
-        const allEvents = [...series]
+        /* All individual events from the database, sorted by band then timestamp */
+        const allEvents = (synthetic.rawEvents || [])
+          .filter((r) => {
+            if (band !== "ALL" && r.band !== band) return false;
+            if (mode !== "ALL" && r.mode !== mode) return false;
+            return true;
+          })
           .sort((a, b) => {
             const bi = bandOrder.indexOf(a.band) - bandOrder.indexOf(b.band);
-            return bi !== 0 ? bi : a.ts - b.ts;
+            return bi !== 0 ? bi : (a.timestamp || "").localeCompare(b.timestamp || "");
           })
           .map((r) => ({
-            timestamp_utc: r.ts.toISOString(),
+            timestamp_utc: r.timestamp,
+            type: r.type,
             band: r.band,
             mode: r.mode,
-            events: r.count,
-            snr_db: Number(r.snr.toFixed(1)),
+            callsign: r.callsign || "",
+            grid: r.grid || "",
+            snr_db: r.snr_db != null ? Number(r.snr_db) : "",
+            frequency_hz: r.frequency_hz || "",
           }));
 
         return { series: rows, all_events: allEvents, propagation_by_band: propRows, period: { start: start.toISOString(), end: end.toISOString() } };
@@ -1268,6 +1276,7 @@ Last update: 2026-04-03 UTC
 
           const series = Array.isArray(payload.data.series) ? payload.data.series : [];
           const callsigns = Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [];
+          const rawEvts = Array.isArray(payload.data.raw_events) ? payload.data.raw_events : [];
 
           synthetic = {
             series: series
@@ -1288,6 +1297,7 @@ Last update: 2026-04-03 UTC
                 hits: Number(row.hits || 0),
               }))
               .filter((row) => !Number.isNaN(row.ts.getTime())),
+            rawEvents: rawEvts,
           };
 
           // Use server-computed propagation data (accurate, uses real per-event data)
