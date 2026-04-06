@@ -1015,12 +1015,20 @@ Last update: 2026-04-03 UTC
         drawHeatmapPro(rows);
       }
 
+      function selectBucket(start, end) {
+        const durationMs = end - start;
+        const hours = durationMs / 3600000;
+        if (hours <= 2) return "minute";
+        if (hours > 72) return "day";
+        return "hour";
+      }
+
       async function fetchAcademicDataset(start, end, selectedBand, selectedMode) {
         const queryAt = new Date();
         const params = new URLSearchParams({
           start: start.toISOString(),
           end: end.toISOString(),
-          bucket: "hour",
+          bucket: selectBucket(start, end),
         });
         if (selectedBand && selectedBand !== "ALL") {
           params.set("band", selectedBand);

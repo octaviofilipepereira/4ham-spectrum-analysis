@@ -39,6 +39,8 @@ def _parse_iso_utc(value: Optional[str], field_name: str) -> Optional[datetime]:
 def _bucket_start(ts: datetime, bucket: str) -> datetime:
     if bucket == "day":
         return ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    if bucket == "minute":
+        return ts.replace(second=0, microsecond=0)
     return ts.replace(minute=0, second=0, microsecond=0)
 
 
@@ -140,8 +142,8 @@ def academic_analytics(
     Output is lightweight and ready for chart rendering.
     """
     bucket_name = str(bucket or "hour").strip().lower()
-    if bucket_name not in {"hour", "day"}:
-        raise HTTPException(status_code=400, detail="bucket must be 'hour' or 'day'")
+    if bucket_name not in {"minute", "hour", "day"}:
+        raise HTTPException(status_code=400, detail="bucket must be 'minute', 'hour' or 'day'")
 
     end_dt = _parse_iso_utc(end, "end") or datetime.now(timezone.utc)
     start_dt = _parse_iso_utc(start, "start") or (end_dt - timedelta(days=7))
@@ -377,7 +379,7 @@ def academic_analytics(
         {"ts": ts, "count": int(count)} for ts, count in sorted(timeline_totals.items(), key=lambda item: item[0])
     ]
 
-    bucket_seconds = 3600 if bucket_name == "hour" else 86400
+    bucket_seconds = 60 if bucket_name == "minute" else (3600 if bucket_name == "hour" else 86400)
     expected_buckets = max(1, int(ceil((end_dt - start_dt).total_seconds() / bucket_seconds)))
     coverage_pct = clamp((len(buckets_seen) / expected_buckets) * 100.0, 0.0, 100.0)
 
