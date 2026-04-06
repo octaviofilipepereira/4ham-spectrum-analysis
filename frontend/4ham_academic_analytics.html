@@ -759,6 +759,7 @@ Last update: 2026-04-03 UTC
       let refreshCountdownTimer = null;
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
+      let serverPropagation = null; // propagation data from API (overrides client-side compute)
 
       updateMetaUpdateFrequency();
 
@@ -997,7 +998,8 @@ Last update: 2026-04-03 UTC
         });
 
         updateKpis(filteredSeries, filteredCallsigns, start, end);
-        const propagation = computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end);
+        // Prefer server-computed propagation (accurate); fall back to JS computation for simulated data
+        const propagation = serverPropagation || computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end);
         updatePropagationKpis(propagation);
         drawTimeline(filteredSeries, start, end);
         drawStackedByBandMode(filteredSeries);
@@ -1064,6 +1066,35 @@ Last update: 2026-04-03 UTC
               }))
               .filter((row) => !Number.isNaN(row.ts.getTime())),
           };
+
+          // Use server-computed propagation data (accurate, uses real per-event data)
+          const kpis = payload.kpis || {};
+          const propBands = Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [];
+          const propTrend = Array.isArray(payload.data.propagation_trend) ? payload.data.propagation_trend : [];
+          if (propBands.length > 0 || kpis.propagation_score != null) {
+            const byBandArray = BANDS.map((b) => {
+              const found = propBands.find((r) => r.band === b);
+              return { band: b, score: found ? Number(found.score) : 0, events: found ? Number(found.events) : 0 };
+            });
+            const trend = propTrend
+              .map((r) => ({ ts: new Date(r.ts), score: Number(r.score) }))
+              .filter((r) => !Number.isNaN(r.ts.getTime()))
+              .sort((a, b) => a.ts - b.ts);
+            const overallScore = Number(kpis.propagation_score || 0);
+            const bestBandData = propBands.length > 0 ? propBands[0] : null;
+            const bestBand = bestBandData
+              ? { band: bestBandData.band, score: Number(bestBandData.score), events: Number(bestBandData.events) }
+              : null;
+            serverPropagation = {
+              overallScore,
+              stability: Number(kpis.stability_pct || 0),
+              bestBand,
+              byBand: byBandArray,
+              trend,
+            };
+          } else {
+            serverPropagation = null;
+          }
 
           dataSource = "api";
           if (metaSnapshot) {
