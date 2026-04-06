@@ -418,6 +418,15 @@ Last update: 2026-04-03 UTC
         display: block;
       }
 
+      .chart-panel-fill {
+        display: flex;
+        flex-direction: column;
+      }
+      .chart-panel-fill svg {
+        flex: 1 1 0;
+        min-height: 280px;
+      }
+
       #heatmapChart {
         height: 330px;
       }
@@ -700,12 +709,12 @@ Last update: 2026-04-03 UTC
             <svg id="heatmapChart"></svg>
           </article>
 
-          <article class="chart-panel span-6">
+          <article class="chart-panel chart-panel-fill span-6">
             <div class="chart-header">
               <h3>Top Callsigns in Period</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Top Callsigns in Period chart" data-help-title="Top Callsigns in Period" data-help-text="Ranks the top 15 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain Top Callsigns in Period chart" data-help-title="Top Callsigns in Period" data-help-text="Ranks the top 20 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change.">i</button>
             </div>
-            <p>Top 15 callsigns by number of occurrences.</p>
+            <p>Top 20 callsigns by number of occurrences.</p>
             <svg id="topCallsignsChart"></svg>
           </article>
 
@@ -1890,7 +1899,7 @@ Last update: 2026-04-03 UTC
           .rollups(rows, (v) => d3.sum(v, (d) => d.hits), (d) => d.callsign)
           .map(([callsign, total]) => ({ callsign, total }))
           .sort((a, b) => b.total - a.total)
-          .slice(0, 15)
+          .slice(0, 20)
           .reverse();
 
         const x = d3.scaleLinear().domain([0, d3.max(top, (d) => d.total) || 1]).nice().range([0, innerW]);
