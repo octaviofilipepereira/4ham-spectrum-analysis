@@ -1578,7 +1578,20 @@ Last update: 2026-04-03 UTC
           .attr("x", (band) => x(band))
           .attr("y", (band) => topBarHeight - topScale(bandTotals.get(band) || 0))
           .attr("width", x.bandwidth())
-          .attr("height", (band) => topScale(bandTotals.get(band) || 0));
+          .attr("height", (band) => topScale(bandTotals.get(band) || 0))
+          .on("mousemove", (event, band) => {
+            colHighlight
+              .attr("x", x(band))
+              .style("display", null);
+            showChartValueToast([
+              `Band: ${band}`,
+              `Total events (all hours): ${formatInt(bandTotals.get(band) || 0)}`,
+            ], event);
+          })
+          .on("mouseleave", () => {
+            colHighlight.style("display", "none");
+            hideChartValueToast();
+          });
 
         const rightBarWidth = margin.right - 18;
         const rightScale = d3.scaleLinear()
@@ -1620,7 +1633,8 @@ Last update: 2026-04-03 UTC
           .attr("x", margin.left - 2)
           .attr("y", 10)
           .attr("fill", "#9fb4c8")
-          .attr("font-size", 10)
+          .attr("font-size", 12)
+          .attr("font-weight", 700)
           .text("Σ band");
 
         g.append("g")
