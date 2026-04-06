@@ -138,7 +138,7 @@ CW callsign decoding is inherently less reliable than FT8/FT4/WSPR due to:
 
 SSB shares CW's sequential scanning limitation. Additionally, SSB has no structured digital message — propagation assessment relies on voice detection quality, SNR, and signal strength.
 
-**No external tool provides automated SSB propagation scoring as 4HAM-Spectrum-Analysis.** This is genuinely novel territory.
+**No external tool provides automated SSB propagation scoring as 4HAM-Spectrum-Analysis.**
 
 | Component | Weight | Rationale |
 |---|---|---|
