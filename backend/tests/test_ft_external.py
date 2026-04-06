@@ -183,7 +183,7 @@ def test_external_ft_decoder_wspr_command_template():
         )
 
         await decoder.start()
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.6)
         await decoder.stop()
 
         assert len(commands) >= 1
