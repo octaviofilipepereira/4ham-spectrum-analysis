@@ -189,10 +189,10 @@ def academic_analytics(
             continue
 
         # Normalize sub-modes so SSB_TRAFFIC counts as SSB and
-        # CW_CANDIDATE counts as CW in all analytics aggregations.
+        # CW_CANDIDATE / CW_TRAFFIC count as CW in all analytics aggregations.
         if mode_name == "SSB_TRAFFIC":
             mode_name = "SSB"
-        elif mode_name == "CW_CANDIDATE":
+        elif mode_name in ("CW_CANDIDATE", "CW_TRAFFIC"):
             mode_name = "CW"
 
         event_type = str(event.get("type") or "").strip().lower()

@@ -256,7 +256,7 @@ def sanitize_events_for_api(items: List[Dict]) -> List[Dict]:
 # See docs/propagation_scoring_reference.md for full rationale.
 
 _DIGITAL_WIDEBAND_MODES = frozenset({"FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"})
-_CW_MODES = frozenset({"CW", "CW_CANDIDATE"})
+_CW_MODES = frozenset({"CW", "CW_CANDIDATE", "CW_TRAFFIC"})
 _SSB_MODES = frozenset({"SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION"})
 
 # SNR normalisation parameters per mode (floor, ceiling)
