@@ -992,7 +992,7 @@ Last update: 2026-04-03 UTC
         });
 
         updateKpis(filteredSeries, filteredCallsigns, start, end);
-        const propagation = computePropagationAnalytics(filteredSeries, start, end);
+        const propagation = computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end);
         updatePropagationKpis(propagation);
         drawTimeline(filteredSeries, start, end);
         drawStackedByBandMode(filteredSeries);
@@ -1130,7 +1130,7 @@ Last update: 2026-04-03 UTC
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
       }
 
-      function computePropagationAnalytics(seriesRows, start, end) {
+      function computePropagationAnalytics(seriesRows, callsignRows, start, end) {
         // 3-formula approach: digital wideband (FT8/FT4/WSPR), CW, SSB
         const DIGITAL_MODES = new Set(["FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"]);
         const CW_MODES = new Set(["CW", "CW_CANDIDATE"]);
@@ -1160,6 +1160,12 @@ Last update: 2026-04-03 UTC
           return clamp(100 * (0.20 * actC + 0.25 * snrC + 0.15 * 0.5 + 0.20 * 0.6 + 0.10 * 0 + 0.05 * actC + 0.05 * 0.7), 0, 100);
         }
 
+        // Count confirmed callsigns per band for verification
+        const callsignCountByBand = new Map();
+        for (const cs of (callsignRows || [])) {
+          callsignCountByBand.set(cs.band, (callsignCountByBand.get(cs.band) || 0) + (cs.hits || 1));
+        }
+
         const byBand = new Map(BANDS.map((b) => [b, { band: b, weightedScore: 0, totalCount: 0 }]));
         const byHour = new Map();
 
@@ -1179,11 +1185,19 @@ Last update: 2026-04-03 UTC
           byHour.set(hourKey, hourAgg);
         }
 
-        const byBandArray = Array.from(byBand.values()).map((item) => ({
-          band: item.band,
-          score: item.totalCount > 0 ? item.weightedScore / item.totalCount : 0,
-          events: item.totalCount,
-        }));
+        const byBandArray = Array.from(byBand.values()).map((item) => {
+          let score = item.totalCount > 0 ? item.weightedScore / item.totalCount : 0;
+          // Verification: reduce score for bands with few/no confirmed callsigns
+          if (item.totalCount > 50) {
+            const confirmedCallsigns = callsignCountByBand.get(item.band) || 0;
+            const confRatio = confirmedCallsigns / item.totalCount;
+            if (confRatio < 0.03) {
+              const verification = 0.65 + 0.35 * (confRatio / 0.03);
+              score = score * verification;
+            }
+          }
+          return { band: item.band, score, events: item.totalCount };
+        });
 
         const trend = Array.from(byHour.values())
           .map((item) => ({

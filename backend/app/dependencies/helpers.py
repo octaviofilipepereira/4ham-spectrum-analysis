@@ -356,6 +356,12 @@ def _compute_band_propagation(band_data: Dict) -> Dict:
             0.15 * callsign_bonus +
             0.10 * recency_component
         )
+        # Verification: occupancy-only events lack callsign confirmation
+        if c["total_events"] > 5:
+            conf_ratio = c["callsign_events"] / c["total_events"]
+            if conf_ratio < 0.03:
+                verification = 0.65 + 0.35 * (conf_ratio / 0.03)
+                score = score * verification
         cat_scores.append(clamp(score, 0.0, 100.0))
         cat_weights.append(c["total_events"])
 
@@ -381,6 +387,12 @@ def _compute_band_propagation(band_data: Dict) -> Dict:
             0.05 * callsign_bonus +
             0.05 * recency_component
         )
+        # Verification: occupancy-only events lack callsign confirmation
+        if s["total_events"] > 5:
+            conf_ratio = s["callsign_events"] / s["total_events"]
+            if conf_ratio < 0.03:
+                verification = 0.65 + 0.35 * (conf_ratio / 0.03)
+                score = score * verification
         cat_scores.append(clamp(score, 0.0, 100.0))
         cat_weights.append(s["total_events"])
 

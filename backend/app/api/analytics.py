@@ -85,13 +85,20 @@ def _compute_category_score(cat_data: Dict) -> float:
         snr_c = _normalise_snr(median(snr_list), "CW") if snr_list else 0.0
         sig_c = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
         call_bonus = min(1.0, cat_data["callsign_events"] / max(1, n) * 3.0)
-        return clamp(100.0 * (
+        score = 100.0 * (
             0.30 * traffic_norm +
             0.30 * snr_c +
             0.15 * sig_c +
             0.15 * call_bonus +
             0.10 * avg_recency
-        ), 0.0, 100.0)
+        )
+        # Verification: occupancy-only events lack callsign confirmation
+        if n > 5:
+            conf_ratio = cat_data["callsign_events"] / n
+            if conf_ratio < 0.03:
+                verification = 0.65 + 0.35 * (conf_ratio / 0.03)
+                score = score * verification
+        return clamp(score, 0.0, 100.0)
 
     # SSB
     traffic_norm = clamp(log1p(n) / log1p(100), 0.0, 1.0)
@@ -99,7 +106,7 @@ def _compute_category_score(cat_data: Dict) -> float:
     sig_c = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
     transcript_bonus = 1.0 if cat_data.get("has_transcript") else 0.0
     call_bonus = min(1.0, cat_data["callsign_events"] / max(1, n) * 3.0)
-    return clamp(100.0 * (
+    score = 100.0 * (
         0.20 * traffic_norm +
         0.25 * snr_c +
         0.15 * sig_c +
@@ -107,7 +114,14 @@ def _compute_category_score(cat_data: Dict) -> float:
         0.10 * transcript_bonus +
         0.05 * call_bonus +
         0.05 * avg_recency
-    ), 0.0, 100.0)
+    )
+    # Verification: occupancy-only events lack callsign confirmation
+    if n > 5:
+        conf_ratio = cat_data["callsign_events"] / n
+        if conf_ratio < 0.03:
+            verification = 0.65 + 0.35 * (conf_ratio / 0.03)
+            score = score * verification
+    return clamp(score, 0.0, 100.0)
 
 
 @router.get("/analytics/academic")
