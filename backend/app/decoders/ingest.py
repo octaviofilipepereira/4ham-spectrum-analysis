@@ -54,6 +54,27 @@ def normalize_callsign(value):
     return cleaned or None
 
 
+# ITU amateur radio callsign format:
+# prefix (1-2 letters, or digit+letter) + digit(s) + suffix (1-4 letters)
+# Optional portable indicator (/P, /M, /1, etc.)
+# Valid: CT7BFV, K1DX, 9A1AA, VU2ABC, EA1XYZ/P
+# Invalid: 121121, 5I5I, 999, ABCDEF
+_VALID_CALLSIGN_RE = re.compile(
+    r"^(?:"
+    r"(?:[A-Z]{1,2}\d|[A-Z]\d[A-Z])\d{0,3}[A-Z]{1,4}"   # letter-start prefix
+    r"|"
+    r"\d[A-Z]{1,2}\d{1,3}[A-Z]{2,4}"                      # digit-start prefix (min 2 suffix)
+    r")(?:/[A-Z0-9]{1,4})?$"
+)
+
+
+def is_valid_callsign(value):
+    """Return True if *value* looks like a plausible amateur-radio callsign."""
+    if not value:
+        return False
+    return bool(_VALID_CALLSIGN_RE.match(str(value).upper()))
+
+
 def _infer_band_from_frequency(frequency_hz):
     try:
         value = int(frequency_hz)
@@ -72,6 +93,9 @@ def build_callsign_event(payload, scan_state):
         return None
     callsign = normalize_callsign(payload.get("callsign"))
     mode = _normalize_mode(payload.get("mode"))
+    # Reject strings that don't look like a real amateur callsign
+    if callsign and not is_valid_callsign(callsign):
+        callsign = None
     if not callsign:
         # For CW, allow events without an identified callsign so that decoded
         # text and occupancy data are still recorded (callsign stored as "").

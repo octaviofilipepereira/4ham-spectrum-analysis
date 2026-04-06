@@ -22,6 +22,7 @@ from app.dependencies.helpers import (
     clamp, parse_event_timestamp, safe_float, sanitize_events_for_api,
     _mode_category, _normalise_snr,
 )
+from app.decoders.ingest import is_valid_callsign
 
 
 router = APIRouter()
@@ -242,7 +243,7 @@ def academic_analytics(
 
         if event_type == "callsign":
             callsign = str(event.get("callsign") or "").strip().upper()
-            if callsign:
+            if callsign and is_valid_callsign(callsign):
                 unique_callsigns.add(callsign)
                 call_key = (bucket_iso, band_name, mode_name, callsign)
                 call_obj = callsign_map.get(call_key)
