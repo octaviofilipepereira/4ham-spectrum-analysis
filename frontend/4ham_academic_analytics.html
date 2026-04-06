@@ -1427,13 +1427,15 @@ Last update: 2026-04-03 UTC
       function computePropagationAnalytics(seriesRows, callsignRows, start, end) {
         // 3-formula approach: digital wideband (FT8/FT4/WSPR), CW, SSB
         const DIGITAL_MODES = new Set(["FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"]);
-        const CW_MODES = new Set(["CW", "CW_CANDIDATE"]);
+        const CW_MODES = new Set(["CW", "CW_CANDIDATE", "CW_TRAFFIC"]);
         const SSB_MODES = new Set(["SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION"]);
         const SNR_PARAMS = {
           FT8: [-20, 10], FT4: [-17.5, 10], WSPR: [-31, 0],
           JT65: [-25, 5], JT9: [-26, 5], FST4: [-28, 2],
+          FST4W: [-33, 0], Q65: [-22, 8],
           CW: [-15, 20], CW_CANDIDATE: [-15, 20],
           SSB: [3, 30], SSB_TRAFFIC: [3, 30], AM: [3, 30],
+          VOICE_DETECTION: [3, 30],
         };
         function modeCategory(m) {
           if (DIGITAL_MODES.has(m)) return "digital";
@@ -1482,7 +1484,7 @@ Last update: 2026-04-03 UTC
         const byBandArray = Array.from(byBand.values()).map((item) => {
           let score = item.totalCount > 0 ? item.weightedScore / item.totalCount : 0;
           // Verification: reduce score for bands with few/no confirmed callsigns
-          if (item.totalCount > 50) {
+          if (item.totalCount > 5) {
             const confirmedCallsigns = callsignCountByBand.get(item.band) || 0;
             const confRatio = confirmedCallsigns / item.totalCount;
             if (confRatio < 0.03) {

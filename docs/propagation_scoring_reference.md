@@ -1,6 +1,6 @@
 # Propagation Scoring Reference — Validation & Design
 
-> **Document version**: 1.0 — 2026-04-06  
+> **Document version**: 1.1 — 2026-04-06  
 > **Author**: CT7BFV / 4ham-spectrum-analysis project  
 > **Purpose**: Reference document for the 3-formula propagation scoring system, validated against industry standards and scientific research.
 
@@ -167,12 +167,28 @@ SSB shares CW's sequential scanning limitation. Additionally, SSB has no structu
 
 ## 6. Implementation Locations
 
+### 6.1 Backend (canonical implementation)
+
 | File | Function | Purpose |
 |---|---|---|
-| `backend/app/dependencies/helpers.py` | `build_propagation_summary()` | Main propagation scoring for live dashboard |
-| `backend/app/api/analytics.py` | `_compute_propagation_score()` | Propagation scoring for academic analytics |
-| `frontend/app.js` | `renderPropagationSummary()` | Frontend rendering of propagation data |
-| `frontend/4ham_academic_analytics.html` | `computePropagationAnalytics()` | Client-side propagation for academic dashboard |
+| `backend/app/dependencies/helpers.py` | `build_propagation_summary()` | Main entry point — live dashboard propagation scoring |
+| `backend/app/dependencies/helpers.py` | `_compute_band_propagation()` | Core per-band scoring engine (called by above) |
+| `backend/app/dependencies/helpers.py` | `_normalise_snr()` | Mode-specific SNR normalization |
+| `backend/app/dependencies/helpers.py` | `_mode_category()` | Mode → category classifier (digital / cw / ssb) |
+| `backend/app/dependencies/helpers.py` | `_score_to_state()` | Score → label mapping (Excellent / Good / Fair / Poor) |
+| `backend/app/api/analytics.py` | `_compute_category_score()` | Category-level scoring for academic analytics |
+| `backend/app/api/analytics.py` | `_propagation_state()` | Score → label mapping (mirrors `_score_to_state`) |
+| `backend/app/api/events.py` | `propagation_summary()` | REST endpoint `/api/propagation/summary` |
+
+### 6.2 Frontend
+
+| File | Function | Purpose |
+|---|---|---|
+| `frontend/app.js` | `renderPropagationSummary()` | Display rendering of backend-computed propagation data |
+| `frontend/app.js` | `requestPropagationSummary()` | Fetches propagation data from API |
+| `frontend/4ham_academic_analytics.html` | `computePropagationAnalytics()` | Client-side fallback propagation scoring |
+
+> **Note**: The frontend `computePropagationAnalytics()` is a **simplified approximation** of the backend formulas, used only as a client-side fallback when the server endpoint is unavailable. It applies the correct weights but uses simplified inputs (e.g., log-normalized event counts instead of actual decode rates, hardcoded recency/quality values). The **backend implementation is canonical**.
 
 ---
 
