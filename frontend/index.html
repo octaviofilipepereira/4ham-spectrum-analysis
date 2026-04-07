@@ -87,9 +87,9 @@ Last update: 2026-02-22 16:27:19 UTC
                   <pre id="status" class="status-inline">Disconnected</pre>
                 </div>
               </div>
-              <!-- Scan controls -->
+              <!-- Scan controls: Start Single Scanning + band buttons -->
               <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center scan-controls-row">
-                <button class="btn btn-primary" id="startScan">Start scanning</button>
+                <button class="btn btn-primary" id="startScan">Start Single Scanning</button>
                 <div class="scan-quick-bands" aria-label="Quick band switch">
                   <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="160m">160m</button>
                   <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="80m">80m</button>
@@ -106,9 +106,9 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="login-status status-chip logout-chip d-none" id="logoutBtn" title="Log out (clear local session)" type="button">Logout</button>
                 <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
               </div>
-              <!-- Mode selection controls -->
+              <!-- Rotation toggle + mode buttons -->
               <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center">
-                <div style="width: 138px;"></div>
+                <button class="btn btn-primary rotation-toggle-btn" type="button" id="rotationToggleBtn" title="Configure scan rotation between bands and modes">Config Scan Rotation</button>
                 <div class="scan-quick-modes" aria-label="Quick mode selection">
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="CW">CW</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="WSPR">WSPR</button>
@@ -126,8 +126,6 @@ Last update: 2026-02-22 16:27:19 UTC
                   <label class="form-label mb-0" for="ssbMaxHolds" title="Maximum voice-signature focus holds per sweep pass (0 = auto-adaptive)">SSB Max Holds (max 12)</label>
                   <input type="number" id="ssbMaxHolds" value="0" min="0" max="12" step="1" class="form-control form-control-sm" style="width: 80px;" title="0 = auto (~1 per 50 kHz of band span, min 4, max 12)" />
                 </div>
-                <!-- Rotation toggle -->
-                <button class="btn btn-outline-secondary btn-sm rotation-toggle-btn" type="button" id="rotationToggleBtn" title="Configure scan rotation between bands and modes">⟳ Rotation</button>
               </div>
               <!-- Rotation configuration panel (collapsible) -->
               <div class="col-12 d-none" id="rotationPanel">

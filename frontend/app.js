@@ -1729,7 +1729,7 @@ function updateScanButtonState() {
     startBtn.disabled = true;
     return;
   }
-  startBtn.textContent = isScanRunning ? "Stop scanning" : "Start scanning";
+  startBtn.textContent = isScanRunning ? "Stop Single Scanning" : "Start Single Scanning";
   startBtn.disabled = false;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);

@@ -401,14 +401,17 @@ h1,
 
 /* ── Rotation Panel ──────────────────────────────────────────── */
 .rotation-toggle-btn {
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 0.92rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  padding: 0.35rem 1rem;
+  border-width: 2px;
 }
 .rotation-toggle-btn.is-active {
-  background: rgba(255, 179, 71, 0.18);
-  border-color: rgba(255, 179, 71, 0.78);
+  background: rgba(255, 179, 71, 0.25);
+  border-color: var(--accent);
   color: var(--accent);
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.3);
 }
 
 .rotation-panel {
