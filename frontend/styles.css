@@ -399,6 +399,95 @@ h1,
   color: var(--accent);
 }
 
+/* ── Rotation Panel ──────────────────────────────────────────── */
+.rotation-toggle-btn {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.rotation-toggle-btn.is-active {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(255, 179, 71, 0.78);
+  color: var(--accent);
+}
+
+.rotation-panel {
+  background: rgba(18, 24, 40, 0.7);
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.25rem;
+}
+
+.rotation-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.rotation-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.rotation-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rotation-slot-row .slot-index {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 18px;
+}
+
+.rotation-slot-row .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+  opacity: 0.5;
+  font-size: 0.6rem;
+}
+.rotation-slot-row .btn-close:hover { opacity: 1; }
+
+.rotation-live-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.65rem;
+  background: rgba(69, 214, 197, 0.08);
+  border: 1px solid rgba(69, 214, 197, 0.25);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.rotation-live-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  animation: rotation-pulse 1.5s ease-in-out infinite;
+}
+
+.rotation-live-status__countdown {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes rotation-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .waterfall {
   margin-top: 0;
   padding: 44px 16px 16px;

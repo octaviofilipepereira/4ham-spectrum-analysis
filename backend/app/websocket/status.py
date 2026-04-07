@@ -130,6 +130,10 @@ async def ws_status(websocket: WebSocket) -> None:
                 }
             }
 
+            # Attach rotation status if active
+            if state.scan_rotation and state.scan_rotation.running:
+                payload["rotation"] = state.scan_rotation.status()
+
             # Attach and consume the retention notification (fires once per event)
             if state.retention_notification:
                 payload["retention_completed"] = state.retention_notification

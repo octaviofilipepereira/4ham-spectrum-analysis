@@ -126,6 +126,64 @@ Last update: 2026-02-22 16:27:19 UTC
                   <label class="form-label mb-0" for="ssbMaxHolds" title="Maximum voice-signature focus holds per sweep pass (0 = auto-adaptive)">SSB Max Holds (max 12)</label>
                   <input type="number" id="ssbMaxHolds" value="0" min="0" max="12" step="1" class="form-control form-control-sm" style="width: 80px;" title="0 = auto (~1 per 50 kHz of band span, min 4, max 12)" />
                 </div>
+                <!-- Rotation toggle -->
+                <button class="btn btn-outline-secondary btn-sm rotation-toggle-btn" type="button" id="rotationToggleBtn" title="Configure scan rotation between bands and modes">⟳ Rotation</button>
+              </div>
+              <!-- Rotation configuration panel (collapsible) -->
+              <div class="col-12 d-none" id="rotationPanel">
+                <div class="rotation-panel">
+                  <div class="rotation-panel__header">
+                    <h3 class="h6 mb-0">Scan Rotation</h3>
+                    <div class="d-flex align-items-center gap-2">
+                      <select class="form-select form-select-sm" id="rotationModeSelect" style="width: auto;">
+                        <option value="bands">Bands × Modes</option>
+                        <option value="modes">Single Band × Modes</option>
+                      </select>
+                    </div>
+                  </div>
+                  <!-- Single-band selector (visible only in "modes" mode) -->
+                  <div class="d-none d-flex align-items-center gap-2 mb-2" id="rotationBandRow">
+                    <label class="form-label mb-0">Band:</label>
+                    <select class="form-select form-select-sm" id="rotationBand" style="width: auto;">
+                      <option value="160m">160m</option>
+                      <option value="80m">80m</option>
+                      <option value="40m">40m</option>
+                      <option value="20m" selected>20m</option>
+                      <option value="17m">17m</option>
+                      <option value="15m">15m</option>
+                      <option value="12m">12m</option>
+                      <option value="10m">10m</option>
+                    </select>
+                  </div>
+                  <!-- Default dwell + loop -->
+                  <div class="d-flex align-items-center gap-3 mb-2">
+                    <div class="d-flex align-items-center gap-1">
+                      <label class="form-label mb-0" for="rotationDwell">Dwell (s):</label>
+                      <input type="number" id="rotationDwell" value="60" min="8" step="5" class="form-control form-control-sm" style="width: 80px;" title="Time to stay on each slot before switching" />
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" id="rotationLoop" checked />
+                      <label class="form-check-label" for="rotationLoop">Loop</label>
+                    </div>
+                  </div>
+                  <!-- Slot list -->
+                  <div id="rotationSlots" class="rotation-slots"></div>
+                  <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-outline-info btn-sm" type="button" id="rotationAddSlot">+ Add Slot</button>
+                    <div class="ms-auto d-flex gap-2">
+                      <button class="btn btn-primary btn-sm" type="button" id="rotationStartBtn">Start Rotation</button>
+                      <button class="btn btn-danger btn-sm d-none" type="button" id="rotationStopBtn">Stop Rotation</button>
+                    </div>
+                  </div>
+                  <!-- Live status (visible while rotation is running) -->
+                  <div class="d-none rotation-live-status" id="rotationLiveStatus">
+                    <span class="rotation-live-status__dot"></span>
+                    <span id="rotationLiveSlot">--</span>
+                    <span class="text-muted mx-1">→</span>
+                    <span id="rotationLiveNext" class="text-muted">--</span>
+                    <span class="rotation-live-status__countdown" id="rotationLiveCountdown">--s</span>
+                  </div>
+                </div>
               </div>
               <div class="col-12 scan-context" id="scanContext" aria-live="polite">
                 <span class="scan-context__item">
