@@ -11,6 +11,52 @@
     "region_profile_path": { "type": "string" },
     "cw_step_hz": { "type": "integer", "minimum": 1 },
     "cw_dwell_s": { "type": "number", "exclusiveMinimum": 0 },
+    "rotation": {
+      "type": "object",
+      "description": "Scan rotation configuration — cycles through band+mode slots automatically.",
+      "required": ["slots"],
+      "additionalProperties": false,
+      "properties": {
+        "rotation_mode": {
+          "type": "string",
+          "enum": ["bands", "modes"],
+          "description": "'bands' = each slot has band+mode; 'modes' = single band, multiple modes."
+        },
+        "band": {
+          "type": "string",
+          "description": "Band name (only for rotation_mode 'modes')."
+        },
+        "dwell_s": {
+          "type": "integer",
+          "minimum": 8,
+          "description": "Default dwell time per slot in seconds."
+        },
+        "loop": {
+          "type": "boolean",
+          "description": "If true, cycle repeats forever; if false, stop after one pass."
+        },
+        "modes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Mode list (only for rotation_mode 'modes')."
+        },
+        "slots": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["band", "mode"],
+            "additionalProperties": false,
+            "properties": {
+              "band": { "type": "string" },
+              "mode": { "type": "string" },
+              "dwell_s": { "type": "integer", "minimum": 8 }
+            }
+          },
+          "description": "Slot list (for rotation_mode 'bands')."
+        }
+      }
+    },
     "scan": {
       "type": "object",
       "required": ["band", "start_hz", "end_hz", "step_hz", "dwell_ms", "mode"],
