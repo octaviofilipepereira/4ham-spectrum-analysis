@@ -1,0 +1,79 @@
+% Custom pandoc template for 4ham-spectrum-analysis scoring reference PDFs
+% Uses Arial, A4, auto-wrapping tables
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{fontspec}
+\setmainfont{Arial}
+\setsansfont{Arial}
+\setmonofont{Liberation Mono}
+
+\usepackage[margin=2cm]{geometry}
+\usepackage{longtable,booktabs,tabularx,array}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  pdftitle={$title$}
+}
+\usepackage{fancyvrb}
+\usepackage{xcolor}
+\usepackage{listings}
+
+% Code block styling
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  breakatwhitespace=false,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!5},
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  aboveskip=8pt,
+  belowskip=8pt
+}
+
+% Override pandoc's default table to use full-width auto-wrapping columns
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{%
+  \small
+  \renewcommand{\arraystretch}{1.3}%
+}
+
+% Tight list support
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% Heading formatting
+\usepackage{titlesec}
+\titleformat{\section}{\Large\bfseries}{}{0em}{}
+\titleformat{\subsection}{\large\bfseries}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{}{0em}{}
+
+% Blockquote styling
+\usepackage{mdframed}
+\renewenvironment{quote}{%
+  \begin{mdframed}[
+    linewidth=2pt,
+    linecolor=gray!40,
+    leftmargin=0pt,
+    innerleftmargin=10pt,
+    innerrightmargin=10pt,
+    innertopmargin=6pt,
+    innerbottommargin=6pt,
+    skipabove=8pt,
+    skipbelow=8pt
+  ]
+  \itshape
+}{%
+  \end{mdframed}
+}
+
+\begin{document}
+
+$body$
+
+\end{document}

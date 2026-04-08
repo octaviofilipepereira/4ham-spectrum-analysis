@@ -112,7 +112,12 @@ snr_component  = normalise_snr(median(snr_values), modo_dominante)
 callsign_norm  = clamp(ln(1 + unique_callsigns) / ln(21), 0, 1)
 recency        = avg_recency   (0–1, decaimento temporal)
 
-Score = 100 × (0.40 × decode_rate + 0.35 × snr_component + 0.15 × callsign_norm + 0.10 × recency)
+Score = 100 × (
+    0.40 × decode_rate
+  + 0.35 × snr_component
+  + 0.15 × callsign_norm
+  + 0.10 × recency
+)
 Score = clamp(Score, 0, 100)
 ```
 
@@ -151,11 +156,18 @@ A descodificação de callsigns CW é inerentemente menos fiável que FT8/FT4/WS
 ```
 traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
 snr_component     = normalise_snr(median(snr_values), "CW")
-signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 se sem dados de potência]
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)
+                    [default 0.3 se sem dados de potência]
 callsign_bonus    = min(1, callsign_events / total_events × 3)
 recency           = avg_recency   (0–1)
 
-Score = 100 × (0.30 × traffic_norm + 0.30 × snr_component + 0.15 × signal_component + 0.15 × callsign_bonus + 0.10 × recency)
+Score = 100 × (
+    0.30 × traffic_norm
+  + 0.30 × snr_component
+  + 0.15 × signal_component
+  + 0.15 × callsign_bonus
+  + 0.10 × recency
+)
 ```
 
 **Penalização de verificação** (eventos só de ocupância não têm confirmação de callsign):
@@ -194,13 +206,22 @@ SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB n
 ```
 traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
 snr_component     = normalise_snr(median(snr_values), "SSB")
-signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 se sem dados de potência]
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)
+                    [default 0.3 se sem dados de potência]
 voice_quality     = avg_confidence   (0–1, do detector de voz)
 transcript_bonus  = 1.0 se tem transcrição, 0.0 se não
 callsign_bonus    = min(1, callsign_events / total_events × 3)
 recency           = avg_recency   (0–1)
 
-Score = 100 × (0.20 × traffic_norm + 0.25 × snr_component + 0.15 × signal_component + 0.20 × voice_quality + 0.10 × transcript_bonus + 0.05 × callsign_bonus + 0.05 × recency)
+Score = 100 × (
+    0.20 × traffic_norm
+  + 0.25 × snr_component
+  + 0.15 × signal_component
+  + 0.20 × voice_quality
+  + 0.10 × transcript_bonus
+  + 0.05 × callsign_bonus
+  + 0.05 × recency
+)
 ```
 
 **Penalização de verificação** (mesmo que CW):
