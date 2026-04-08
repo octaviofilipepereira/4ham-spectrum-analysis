@@ -51,6 +51,12 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 | ![Propagation map fullscreen](images/screenshot-propagation-fullscreen.png) | ![Events card](images/screenshot-events-card.png) |
 | *Propagation map — fullscreen* | *Events card* |
 
+![Academic Analytics — header](images/screenshot-Academic-Analytics-Header.png)
+*Academic Analytics — propagation scoring, band heatmap, and KPIs*
+
+![Academic Analytics — footer](images/screenshot-Academic-Analytics-Footer.png)
+*Academic Analytics — charts, top callsigns, and export options*
+
 ![Administration — configuration modal](images/screenshot-admin.png)
 *Administration — configuration modal*
 
