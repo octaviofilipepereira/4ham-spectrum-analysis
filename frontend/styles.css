@@ -425,8 +425,8 @@ h1,
 .rotation-panel__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .rotation-slots {
@@ -458,6 +458,14 @@ h1,
   font-size: 0.6rem;
 }
 .rotation-slot-row .btn-close:hover { opacity: 1; }
+
+.rotation-panel.is-locked select,
+.rotation-panel.is-locked input,
+.rotation-panel.is-locked .btn-close,
+.rotation-panel.is-locked .btn-outline-info {
+  pointer-events: none;
+  opacity: 0.55;
+}
 
 .rotation-live-status {
   display: flex;

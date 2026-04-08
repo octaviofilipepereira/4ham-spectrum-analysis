@@ -870,6 +870,13 @@ async def rotation_start(
                 detail=f"Unknown band: {first.band}",
             )
 
+        # Reuse device from last scan state if available;
+        # otherwise omit — controller auto-selects first real SDR.
+        prev_device = (
+            state.scan_state.get("device")
+            or (state.scan_state.get("scan") or {}).get("device_id")
+        )
+
         # Build a minimal scan payload for the first slot
         scan_payload = {
             "scan": {
@@ -882,9 +889,10 @@ async def rotation_start(
                 "sample_rate": 2048000,
                 "mode": "auto",
             },
-            "device": "rtl_sdr",
             "decoder_mode": first.mode,
         }
+        if prev_device:
+            scan_payload["device"] = prev_device
         # Use the regular scan_start to initialise everything properly
         await scan_start(scan_payload, request, _)
 

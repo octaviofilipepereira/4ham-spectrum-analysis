@@ -1910,6 +1910,11 @@ async function syncScanState() {
     // Sync rotation state from backend (handles page refresh while rotation active)
     if (data?.rotation?.running && !rotationRunning) {
       rotationRunning = true;
+      // Restore slot list from backend so UI survives page refresh
+      if (data.rotation.slots && data.rotation.slots.length) {
+        rotationSlots = data.rotation.slots.map((s) => ({ band: s.band, mode: s.mode.toUpperCase() }));
+      }
+      renderRotationSlots();
       updateRotationUI();
       startRotationPoll();
       if (rotationPanel.classList.contains("d-none")) {
@@ -2037,9 +2042,14 @@ function renderRotationSlots() {
     row.appendChild(idx);
 
     if (mode === "bands") {
+      const bandLabel = document.createElement("span");
+      bandLabel.className = "form-label mb-0 text-white";
+      bandLabel.textContent = "Band";
+      row.appendChild(bandLabel);
+
       const bandSel = document.createElement("select");
       bandSel.className = "form-select form-select-sm";
-      bandSel.style.width = "80px";
+      bandSel.style.width = "110px";
       ROTATION_BANDS.forEach((b) => {
         const opt = document.createElement("option");
         opt.value = b; opt.textContent = b;
@@ -2050,9 +2060,14 @@ function renderRotationSlots() {
       row.appendChild(bandSel);
     }
 
+    const modeLabel = document.createElement("span");
+    modeLabel.className = "form-label mb-0 text-white";
+    modeLabel.textContent = "Mode";
+    row.appendChild(modeLabel);
+
     const modeSel = document.createElement("select");
     modeSel.className = "form-select form-select-sm";
-    modeSel.style.width = "80px";
+    modeSel.style.width = "110px";
     ROTATION_MODES.forEach((m) => {
       const opt = document.createElement("option");
       opt.value = m; opt.textContent = m;
@@ -2061,23 +2076,6 @@ function renderRotationSlots() {
     });
     modeSel.addEventListener("change", () => { rotationSlots[i].mode = modeSel.value; });
     row.appendChild(modeSel);
-
-    // Per-slot dwell override
-    const dwellInput = document.createElement("input");
-    dwellInput.type = "number";
-    dwellInput.className = "form-control form-control-sm";
-    dwellInput.style.width = "70px";
-    dwellInput.min = "8";
-    dwellInput.step = "5";
-    dwellInput.placeholder = "dwell";
-    dwellInput.title = "Per-slot dwell override (seconds)";
-    if (slot.dwell_s) dwellInput.value = slot.dwell_s;
-    dwellInput.addEventListener("change", () => {
-      const v = parseInt(dwellInput.value, 10);
-      if (v > 0) { rotationSlots[i].dwell_s = v; }
-      else { delete rotationSlots[i].dwell_s; dwellInput.value = ""; }
-    });
-    row.appendChild(dwellInput);
 
     if (rotationSlots.length > 2) {
       const closeBtn = document.createElement("button");
@@ -2100,7 +2098,10 @@ rotationToggleBtn?.addEventListener("click", () => {
   const isVisible = !panel.classList.contains("d-none");
   panel.classList.toggle("d-none", isVisible);
   rotationToggleBtn.classList.toggle("is-active", !isVisible);
-  if (!isVisible) renderRotationSlots();
+  if (!isVisible) {
+    renderRotationSlots();
+    if (rotationRunning) updateRotationUI();
+  }
 });
 
 rotationModeSelect?.addEventListener("change", () => {
@@ -2154,7 +2155,7 @@ async function startRotation() {
   }
 
   try {
-    const resp = await fetch("/api/rotation/start", {
+    const resp = await fetch("/api/scan/rotation/start", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeader() },
       body: JSON.stringify(payload),
@@ -2175,7 +2176,7 @@ async function startRotation() {
 
 async function stopRotation() {
   try {
-    const resp = await fetch("/api/rotation/stop", {
+    const resp = await fetch("/api/scan/rotation/stop", {
       method: "POST",
       headers: { ...getAuthHeader() },
     });
@@ -2197,20 +2198,15 @@ function updateRotationUI() {
   rotationStartBtn?.classList.toggle("d-none", rotationRunning);
   rotationStopBtn?.classList.toggle("d-none", !rotationRunning);
   rotationLiveStatus?.classList.toggle("d-none", !rotationRunning);
-  // Disable slot editing while running
-  rotationSlotsEl?.querySelectorAll("select, input, .btn-close").forEach((el) => {
-    el.disabled = rotationRunning;
-  });
+  // Lock/unlock panel editing via CSS class
+  const panel = document.querySelector(".rotation-panel");
+  if (panel) panel.classList.toggle("is-locked", rotationRunning);
   rotationAddSlotBtn && (rotationAddSlotBtn.disabled = rotationRunning);
-  rotationModeSelect && (rotationModeSelect.disabled = rotationRunning);
-  rotationBand && (rotationBand.disabled = rotationRunning);
-  rotationDwell && (rotationDwell.disabled = rotationRunning);
-  rotationLoop && (rotationLoop.disabled = rotationRunning);
 }
 
 async function pollRotationStatus() {
   try {
-    const resp = await fetch("/api/rotation/status", { headers: { ...getAuthHeader() } });
+    const resp = await fetch("/api/scan/rotation/status", { headers: { ...getAuthHeader() } });
     if (!resp.ok) return;
     const data = await resp.json();
     if (data.running) {
@@ -2765,6 +2761,10 @@ function connectStatus() {
           if (rotationLiveCountdown) rotationLiveCountdown.textContent = `${Math.ceil(rem)}s`;
           if (!rotationRunning) {
             rotationRunning = true;
+            if (data.rotation.slots && data.rotation.slots.length) {
+              rotationSlots = data.rotation.slots.map((s) => ({ band: s.band, mode: s.mode.toUpperCase() }));
+            }
+            renderRotationSlots();
             updateRotationUI();
             if (rotationPanel.classList.contains("d-none")) {
               rotationPanel.classList.remove("d-none");
