@@ -5,7 +5,14 @@
 1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
 2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Dashboard Académico (Heatmap Pro)](#dashboard-académico-heatmap-pro)
+3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
+4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
+5. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
+6. [Configuração Inicial](#configuração-inicial)
+7. [Interface do Utilizador](#interface-do-utilizador)
+8. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+9. [Exportação de Dados](#exportação-de-dados)
+10. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -240,18 +247,91 @@ Ou via script de desenvolvimento:
 
 Abrir a interface no browser: `http://localhost:8000/`
 
-### Dashboard académico
+---
 
-Além da interface principal, existe uma página dedicada a análise académica:
+## Dashboard Academic Analytics
 
-- `http://localhost:8000/4ham_academic_analytics.html`
+Além da interface principal, existe uma página dedicada a análise académica e agregada de eventos:
 
-Na secção **Hour of Day x Band Activity (Heatmap Pro)**:
-- Linhas = horas UTC (0 a 23)
-- Colunas = bandas
-- Cor da célula = volume de eventos
-- Hover destaca célula, linha e coluna para leitura cruzada
-- Barras marginais mostram totais por banda (topo) e por hora (lado direito)
+- Acessível via o botão **Data Analysis** na barra de ferramentas (abre num novo separador)
+- Ou diretamente em `http://localhost:8000/4ham_academic_analytics.html`
+
+Os dados vêm do endpoint `/api/analytics/academic` e são **atualizados automaticamente a cada 60 segundos**. Um contador de contagem regressiva indica o próximo refresh.
+
+### Seletor de período
+
+| Preset | Período |
+|---|---|
+| **1h** | Última hora (padrão no primeiro acesso) |
+| **12h** | Últimas 12 horas |
+| **24h** | Últimas 24 horas |
+| **7d** | Últimos 7 dias |
+| **30d** | Últimos 30 dias |
+| **Custom** | Intervalo personalizado (data/hora de início e fim) |
+
+O preset ativo é memorizado na sessão do browser. Os presets curtos (≤ 2 h) usam agregação ao minuto para maior resolução; acima de 72 h agrega por dia; caso contrário por hora.
+
+### Filtros de banda e modo
+
+- **Band** — filtrar por banda individual (160m … 70cm) ou **All**
+- **Mode** — filtrar por modo (SSB, FT8, FT4, CW, WSPR) ou **All**
+- Clicar em **Apply Filters** após alterar filtros ou o período personalizado
+
+### Cartões KPI (resumo)
+
+Seis cartões no topo apresentam métricas agregadas para o período selecionado:
+
+| Cartão | Descrição |
+|---|---|
+| **Total events** | Soma de todos os eventos no período/filtro |
+| **Unique callsigns** | Número de indicativos distintos |
+| **Average SNR** | SNR médio ponderado (dB) |
+| **Time coverage** | Percentagem de horas UTC com dados vs. total de horas na janela |
+| **Overall Propagation** | Score composto (0–100) com badge colorido (Excellent/Good/Fair/Poor) |
+| **Best band** | Banda com melhor score de propagação + estabilidade |
+
+### Gráficos
+
+#### Event Time Series
+Gráfico de área com sobreposição de linha mostrando total de eventos por hora (ou minuto/dia conforme resolução). Hover mostra data e contagem.
+
+#### Distribution by Band and Mode
+Gráfico de barras empilhadas — cada barra é uma banda, cada segmento de cor representa um modo. Legenda inline com cores: SSB (azul), FT8 (verde), FT4 (púrpura), CW (âmbar), WSPR (rosa).
+
+#### Hour of Day × Band — Heatmap Pro
+Matriz interativa: 24 linhas (horas UTC 0–23) × colunas (bandas). A intensidade da cor indica o volume de eventos. Funcionalidades:
+- **Cross-highlighting** — ao passar o rato, toda a linha e coluna são destacadas
+- **Barras marginais** — totais por banda (topo, **Σ band**) e por hora (lado direito, **Σ hour**)
+- Escala de cor normalizada por potência (expoente 0.62) de azul-escuro a branco
+
+#### Top Callsigns in Period
+Gráfico de barras horizontais com os **top 20 indicativos** por total de aparições no período filtrado.
+
+#### Propagation Score by Band
+Gráfico de barras verticais com o score de propagação (0–100) por banda. Rótulos numéricos acima de cada barra.
+
+#### Propagation Time Trend
+Gráfico de linha mostrando a evolução do score global de propagação ao longo do tempo. Linha tracejada horizontal indica a média do período.
+
+### Ícones de ajuda
+
+Cada painel de gráfico tem um ícone **"i"** no cabeçalho. Ao passar o rato, aparece um cartão flutuante com o título e uma descrição detalhada do gráfico.
+
+### Exportação
+
+Botão **Export ▾** com três formatos:
+
+| Formato | Conteúdo exportado |
+|---|---|
+| **CSV** | Linhas agregadas: banda, modo, total eventos, SNR pico, SNR médio |
+| **JSON** | Objeto estruturado com séries agregadas, eventos por bucket temporal, todos os eventos individuais, propagação por banda e período |
+| **XLSX** | Workbook com 4 folhas: "Events by Band-Mode" (agregado), "Aggregated Events" (por bucket temporal), "All Events" (todos os eventos individuais com indicativo, grid, SNR, frequência), "Propagation by Band" (score + eventos por banda) |
+
+Nome do ficheiro: `4ham-analytics_{início}_{fim}.{ext}`
+
+### Metadados (rodapé)
+
+Quatro campos informativos: snapshot dos dados (timestamp UTC), frequência de atualização (1 min), período analisado, e qualidade dos dados.
 
 ---
 

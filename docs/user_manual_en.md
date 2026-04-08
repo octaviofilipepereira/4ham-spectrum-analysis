@@ -5,7 +5,14 @@
 1. [SSB Events — Voice Signature](#ssb-events--voice-signature)
 2. [Understanding the Metrics](#understanding-the-metrics)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Academic Dashboard (Heatmap Pro)](#academic-dashboard-heatmap-pro)
+3. [Academic Analytics Dashboard](#academic-analytics-dashboard)
+4. [Scan Rotation](#scan-rotation)
+5. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
+6. [Initial Setup](#initial-setup)
+7. [User Interface](#user-interface)
+8. [Spectrogram Interpretation](#spectrogram-interpretation)
+9. [Data Export](#data-export)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -240,18 +247,91 @@ Or via the development script:
 
 Open the interface in the browser: `http://localhost:8000/`
 
-### Academic dashboard
+---
 
-In addition to the main interface, there is a dedicated page for academic analysis:
+## Academic Analytics Dashboard
 
-- `http://localhost:8000/4ham_academic_analytics.html`
+In addition to the main interface, there is a dedicated page for aggregated academic analysis:
 
-In the **Hour of Day x Band Activity (Heatmap Pro)** section:
-- Rows = UTC hours (0 to 23)
-- Columns = bands
-- Cell colour = event volume
-- Hover highlights cell, row and column for cross-reading
-- Marginal bars show totals per band (top) and per hour (right side)
+- Accessible via the **Data Analysis** button in the toolbar (opens in a new tab)
+- Or directly at `http://localhost:8000/4ham_academic_analytics.html`
+
+Data is fetched from `/api/analytics/academic` and **auto-refreshes every 60 seconds**. A countdown timer shows the next refresh.
+
+### Period selector
+
+| Preset | Period |
+|---|---|
+| **1h** | Last hour (default on first visit) |
+| **12h** | Last 12 hours |
+| **24h** | Last 24 hours |
+| **7d** | Last 7 days |
+| **30d** | Last 30 days |
+| **Custom** | Custom range (start/end date and time) |
+
+The active preset is remembered in the browser session. Short presets (≤ 2 h) use minute-level bucketing for higher resolution; above 72 h, data is aggregated by day; otherwise by hour.
+
+### Band and mode filters
+
+- **Band** — filter by individual band (160m … 70cm) or **All**
+- **Mode** — filter by mode (SSB, FT8, FT4, CW, WSPR) or **All**
+- Click **Apply Filters** after changing filters or the custom range
+
+### KPI summary cards
+
+Six cards at the top show aggregated metrics for the selected period:
+
+| Card | Description |
+|---|---|
+| **Total events** | Sum of all events in the period/filter |
+| **Unique callsigns** | Number of distinct callsigns |
+| **Average SNR** | Weighted-average SNR in dB |
+| **Time coverage** | Percentage of UTC hours with data vs. total hours in the window |
+| **Overall Propagation** | Composite score (0–100) with coloured badge (Excellent/Good/Fair/Poor) |
+| **Best band** | Band with best propagation score + stability |
+
+### Charts
+
+#### Event Time Series
+Area chart with line overlay showing total events per hour (or minute/day depending on resolution). Hover shows date and count.
+
+#### Distribution by Band and Mode
+Stacked bar chart — each bar is a band, each colour segment represents a mode. Inline legend with colours: SSB (blue), FT8 (green), FT4 (purple), CW (amber), WSPR (pink).
+
+#### Hour of Day × Band — Heatmap Pro
+Interactive matrix: 24 rows (UTC hours 0–23) × columns (bands). Colour intensity indicates event volume. Features:
+- **Cross-highlighting** — hovering highlights the full row and column
+- **Marginal bars** — per-band totals (top, **Σ band**) and per-hour totals (right side, **Σ hour**)
+- Power-normalised colour scale (exponent 0.62) from dark navy to near-white
+
+#### Top Callsigns in Period
+Horizontal bar chart showing the **top 20 callsigns** by total hits in the filtered period.
+
+#### Propagation Score by Band
+Vertical bar chart with propagation score (0–100) per band. Numeric labels above each bar.
+
+#### Propagation Time Trend
+Line chart showing the evolution of the global propagation score over time. Dashed horizontal line indicates the period average.
+
+### Helper icons
+
+Each chart panel has an **"i"** icon in its header. On hover, a floating card appears with the chart title and a detailed description.
+
+### Export
+
+**Export ▾** button with three formats:
+
+| Format | Content exported |
+|---|---|
+| **CSV** | Aggregated rows: band, mode, total events, peak SNR, average SNR |
+| **JSON** | Structured object with aggregated series, time-bucketed events, all individual events, propagation by band, and period |
+| **XLSX** | Workbook with 4 sheets: "Events by Band-Mode" (aggregated), "Aggregated Events" (by time bucket), "All Events" (individual events with callsign, grid, SNR, frequency), "Propagation by Band" (score + events per band) |
+
+Filename pattern: `4ham-analytics_{start}_{end}.{ext}`
+
+### Metadata (footer)
+
+Four informational fields: data snapshot (UTC timestamp), update frequency (1 min), analysed period, and data quality.
 
 ---
 
