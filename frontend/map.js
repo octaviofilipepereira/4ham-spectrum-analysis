@@ -297,17 +297,23 @@
     addControls(container, controls, !isModal);
   }
 
+  // ── Read selected window from UI dropdown ─────────────────────────────────
+  function getWindowMinutes() {
+    const sel = document.getElementById("mapWindowSelect");
+    return sel ? parseInt(sel.value, 10) || 60 : 60;
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
   const PropMap = {
     init(containerId, windowMinutes) {
-      windowMinutes = windowMinutes || 60;
+      windowMinutes = windowMinutes || getWindowMinutes();
       render(containerId, windowMinutes, false);
       if (_refreshTimer) clearInterval(_refreshTimer);
-      _refreshTimer = setInterval(() => render(containerId, windowMinutes, false), 60000);
+      _refreshTimer = setInterval(() => render(containerId, getWindowMinutes(), false), 60000);
     },
 
     refresh(containerId, windowMinutes) {
-      render(containerId || "propagationMap", windowMinutes || 60, false);
+      render(containerId || "propagationMap", windowMinutes || getWindowMinutes(), false);
     },
 
     async renderModal() {
@@ -316,13 +322,14 @@
       const W = c.clientWidth  || window.innerWidth  - 48;
       const H = Math.max(window.innerHeight - 150, 300);
       const world = await loadWorld();
+      const win = getWindowMinutes();
 
       if (_lastData) {
         const { controls } = drawGlobe(c, W, H, _lastData, world);
         addControls(c, controls, false);
       }
       try {
-        const fresh = await fetchData(60);
+        const fresh = await fetchData(win);
         _lastData = fresh;
         const { controls } = drawGlobe(c, W, H, fresh, world);
         addControls(c, controls, false);
@@ -338,8 +345,14 @@
     if (document.getElementById("propagationMap")) {
       // Double rAF ensures flex layout AND paint have completed before measuring
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => PropMap.init("propagationMap", 60));
+        requestAnimationFrame(() => PropMap.init("propagationMap"));
       });
+
+      // Re-render immediately when user changes the time window
+      const sel = document.getElementById("mapWindowSelect");
+      if (sel) {
+        sel.addEventListener("change", () => PropMap.refresh("propagationMap"));
+      }
     }
 
     const modalEl = document.getElementById("mapFullscreenModal");
