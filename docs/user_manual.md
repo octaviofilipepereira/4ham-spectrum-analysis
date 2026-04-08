@@ -309,7 +309,7 @@ Seis cartões no topo sumarizam o estado geral do período selecionado:
 | **Unique callsigns** | Número de indicativos distintos descodificados | Quanto mais indicativos únicos, melhor a propagação — indica que sinais de múltiplas estações estão a chegar. Um valor alto com Total events alto indica propagação diversificada |
 | **Average SNR** | SNR médio ponderado em dB | Valores acima de 0 dB indicam sinais geralmente fortes. Valores negativos (ex.: -8 dB) indicam sinais fracos mas descodificáveis. Compare com o threshold do modo: FT8 descodifica até -20 dB, SSB precisa de pelo menos +3 dB |
 | **Time coverage** | Percentagem de horas UTC que tiveram atividade | 100% = atividade em todas as horas da janela. Valores baixos (ex.: 30%) indicam propagação esporádica — a banda só esteve aberta em algumas horas |
-| **Overall Propagation** | Score composto (0–100) | Avaliação global usando as 3 fórmulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). O badge colorido dá uma leitura rápida |
+| **Overall Propagation** | Score composto (0–100) | Avaliação global usando as 3 fórmulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). O badge colorido dá uma leitura rápida. Referência: [propagation_scoring_reference_pt.md](propagation_scoring_reference_pt.md) |
 | **Best band** | Banda com melhor score de propagação | Indica qual banda ofereceu as melhores condições no período. O sub-texto mostra o score e a estabilidade (%) — estabilidade alta significa propagação consistente, não apenas picos isolados |
 
 ### Gráficos — como interpretar

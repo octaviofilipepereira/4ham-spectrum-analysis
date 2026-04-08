@@ -29,6 +29,8 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 - Full installation manual: [docs/installation_manual.md](docs/installation_manual.md)
 - User manual (PT): [docs/user_manual.md](docs/user_manual.md)
 - User manual (EN): [docs/user_manual_en.md](docs/user_manual_en.md)
+- Propagation scoring reference (EN): [docs/propagation_scoring_reference.md](docs/propagation_scoring_reference.md)
+- Propagation scoring reference (PT): [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md)
 - Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
 
 ## Screenshots
@@ -617,6 +619,8 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 ## References
 - Installation: see [docs/install.md](docs/install.md).
 - SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
+- Propagation scoring (EN): see [docs/propagation_scoring_reference.md](docs/propagation_scoring_reference.md).
+- Propagation scoring (PT): see [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md).
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
 - Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
 - Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).

@@ -309,7 +309,7 @@ Six cards at the top summarise the overall state for the selected period:
 | **Unique callsigns** | Number of distinct decoded callsigns | The more unique callsigns, the better the propagation — it means signals from multiple stations are arriving. A high value with high Total events indicates diversified propagation |
 | **Average SNR** | Weighted-average SNR in dB | Values above 0 dB indicate generally strong signals. Negative values (e.g. -8 dB) indicate weak but decodable signals. Compare with the mode threshold: FT8 decodes down to -20 dB, SSB needs at least +3 dB |
 | **Time coverage** | Percentage of UTC hours that had activity | 100% = activity in every hour of the window. Low values (e.g. 30%) indicate sporadic propagation — the band was only open during some hours |
-| **Overall Propagation** | Composite score (0–100) | Global assessment using the 3 formulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). The coloured badge gives a quick visual reading |
+| **Overall Propagation** | Composite score (0–100) | Global assessment using the 3 formulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). The coloured badge gives a quick visual reading. Reference: [propagation_scoring_reference.md](propagation_scoring_reference.md) |
 | **Best band** | Band with best propagation score | Shows which band offered the best conditions in the period. The sub-text shows the score and stability (%) — high stability means consistent propagation, not just isolated peaks |
 
 ### Charts — how to interpret

@@ -417,6 +417,11 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <div class="warn-box">
       ⚠ A band can show a high peak SNR but a <em>Fair</em> or <em>Poor</em> propagation score if activity was sparse or concentrated in the distant past.
     </div>
+    <div class="info-box">
+      📚 Full reference with exact formulas, scientific validation, and sources:<br>
+      • English: <code>docs/propagation_scoring_reference.md</code><br>
+      • Português: <code>docs/propagation_scoring_reference_pt.md</code>
+    </div>
   </section>
 
   <!-- 9. EXPORT -->
@@ -604,7 +609,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td><strong>Unique callsigns</strong></td><td>Distinct decoded callsigns</td><td>More unique callsigns = better propagation reaching your receiver from many stations.</td></tr>
         <tr><td><strong>Average SNR</strong></td><td>Weighted-average SNR (dB)</td><td>Above 0 dB = generally strong signals. Negative = weak but decodable. Compare with the mode threshold (FT8: −20 dB, SSB: +3 dB).</td></tr>
         <tr><td><strong>Time coverage</strong></td><td>% of UTC hours with activity</td><td>100% = activity every hour. Low values (e.g. 30%) = sporadic — band only open during some hours.</td></tr>
-        <tr><td><strong>Overall Propagation</strong></td><td>Composite score (0–100)</td><td>Uses the 3-formula system (Digital/CW/SSB). ≥ 70 Excellent 🟢, ≥ 50 Good 🟡, ≥ 30 Fair 🟠, &lt; 30 Poor 🔴.</td></tr>
+        <tr><td><strong>Overall Propagation</strong></td><td>Composite score (0–100)</td><td>Uses the 3-formula system (Digital/CW/SSB). ≥ 70 Excellent 🟢, ≥ 50 Good 🟡, ≥ 30 Fair 🟠, &lt; 30 Poor 🔴. See <code>docs/propagation_scoring_reference.md</code> for exact formulas.</td></tr>
         <tr><td><strong>Best band</strong></td><td>Band with highest propagation score</td><td>Sub-text shows score + stability (%). High stability = consistent propagation, not isolated peaks.</td></tr>
       </tbody>
     </table>
