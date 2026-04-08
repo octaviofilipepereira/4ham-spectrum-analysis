@@ -6,7 +6,7 @@ Last update: 2026-04-08 UTC
 -->
 
 # 4ham-spectrum-analysis
-Web platform for amateur radio spectrum analysis, with DSP, real-time events, and decoder integration.
+Web platform for amateur radio spectrum analysis, with real-time DSP, decoder integration (FT8/FT4/WSPR/CW), propagation scoring, academic analytics, and automated multi-band scan rotation.
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
