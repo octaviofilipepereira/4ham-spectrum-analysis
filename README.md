@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-05 UTC
+Last update: 2026-04-08 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -93,12 +93,12 @@ Default frontend routes:
 - **3-formula propagation scoring**: separate Digital/CW/SSB formulas with tailored SNR normalisation. Server-computed scores.
 - **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
 - **Propagation map time window**: selectable 1h / 2h / 4h / 8h / 24h filter on the propagation globe.
-- **Per-band×mode heuristic filter**: Academic Analytics excludes phantom modes — only band+mode pairs confirmed by a running decoder are shown.
+- **Per-band×mode phantom mode elimination**: two-layer fix — occupancy events forced to match active decoder mode (prevents heuristic mis-classification), and confirmed_band_modes filter time-scoped to analysed period (prevents historical sessions from polluting charts).
 - **Export multi-format**: CSV, XLSX (Aggregated + All Events), and JSON export from Academic Analytics.
 - **1 h / 12 h presets**: short-period options with minute-level bucketing for higher resolution.
 - **Loading overlay**: spinner shown while switching periods or applying filters.
 - **Callsign ITU validation**: two-branch regex rejects invalid callsigns (e.g. "5I5I").
-- **Empty analytics fix**: confirmed-modes pre-scan queries full DB, preventing blank dashboards for short periods.
+- **Comprehensive Academic Analytics documentation**: full chapter in PT/EN manuals and help.html — purpose, KPI interpretation, chart-by-chart guide, step-by-step export, metadata footer.
 - **Propagation scoring reference docs**: EN + PT with formulas, constants, implementation tables, and PDF exports.
 - **Frontend bug fixes**: CW_TRAFFIC in CW_MODES, FST4W/Q65/VOICE_DETECTION in SNR_PARAMS, verification threshold >5.
 - **Immediate preset switching**, **preset persistence**, **top 20 callsigns**, **Heatmap Pro improvements**.
