@@ -2161,8 +2161,8 @@ Last update: 2026-04-03 UTC
           return { start: new Date(end.getTime() - 30 * 24 * 3600 * 1000), end };
         }
 
-        const customStart = startInput.value ? new Date(startInput.value) : new Date(end.getTime() - 24 * 3600 * 1000);
-        const customEnd = endInput.value ? new Date(endInput.value) : end;
+        const customStart = startInput.value ? new Date(startInput.value + 'Z') : new Date(end.getTime() - 24 * 3600 * 1000);
+        const customEnd = endInput.value ? new Date(endInput.value + 'Z') : end;
         if (customEnd <= customStart) {
           return { start: new Date(customEnd.getTime() - 24 * 3600 * 1000), end: customEnd };
         }

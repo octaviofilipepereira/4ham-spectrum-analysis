@@ -1077,8 +1077,8 @@ async function fetchAndRenderSearchResults() {
   if (mode)     params.set("mode", mode);
   if (band)     params.set("band", band);
   if (snrMin !== "") params.set("snr_min", snrMin);
-  const startISO = start.length === 10 ? (() => { const [d,m,y] = start.split("/"); const dt = new Date(`${y}-${m}-${d}T00:00:00`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
-  const endISO   = end.length   === 10 ? (() => { const [d,m,y] = end.split("/");   const dt = new Date(`${y}-${m}-${d}T23:59:59`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  const startISO = start.length === 10 ? (() => { const [d,m,y] = start.split("/"); const dt = new Date(`${y}-${m}-${d}T00:00:00Z`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  const endISO   = end.length   === 10 ? (() => { const [d,m,y] = end.split("/");   const dt = new Date(`${y}-${m}-${d}T23:59:59Z`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
   if (startISO) params.set("start", startISO);
   if (endISO)   params.set("end",   endISO);
 
