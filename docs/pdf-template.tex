@@ -198,7 +198,51 @@ $endif$
 $if(verbatim-in-note)$
 \usepackage{fancyvrb}
 $endif$
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
+% -- 4HAM custom colours --
+\definecolor{hamblue}{HTML}{1B4F72}
+\definecolor{hamaccent}{HTML}{2E86C1}
+\definecolor{hamlight}{HTML}{EBF5FB}
+\definecolor{hamgray}{HTML}{F2F3F4}
+\definecolor{hamrule}{HTML}{AEB6BF}
+\definecolor{hamgreen}{HTML}{1E8449}
+\definecolor{hamorange}{HTML}{E67E22}
+
+% -- Coloured section headings --
+\usepackage{titlesec}
+\titleformat{\section}{\Large\bfseries\color{hamblue}}{}{0em}{}[\color{hamaccent}\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{hamblue}}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{hamaccent}}{}{0em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+% -- Coloured table headers --
+\usepackage{colortbl}
+
+% -- Styled horizontal rules --
+\renewcommand{\rule}[2]{\textcolor{hamaccent}{\vrule width #1 height #2}}
+
+% -- Nicer blockquotes --
+\usepackage[most]{tcolorbox}
+\renewenvironment{quote}{%
+  \begin{tcolorbox}[
+    colback=hamlight,
+    colframe=hamaccent,
+    leftrule=3pt,
+    rightrule=0pt,
+    toprule=0pt,
+    bottomrule=0pt,
+    arc=0pt,
+    boxsep=4pt,
+    left=8pt,
+    right=8pt,
+    top=4pt,
+    bottom=4pt
+  ]
+  \color{hamblue}\itshape
+}{%
+  \end{tcolorbox}
+}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
 \IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
 \hypersetup{
@@ -270,11 +314,12 @@ $else$
 % Allow footnotes in longtable head/foot
 \IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
 \makesavenoteenv{longtable}
-% -- 4HAM custom: shrink tables, add row padding, allow cell wrapping --
+% -- 4HAM custom: shrink tables, add row padding, coloured headers --
 \AtBeginEnvironment{longtable}{%
   \footnotesize
   \renewcommand{\arraystretch}{1.4}%
   \setlength{\tabcolsep}{4pt}%
+  \rowcolors{2}{hamgray}{white}%
 }
 $endif$
 $endif$
@@ -405,6 +450,39 @@ $if(logo)$
 \logo{\includegraphics{$logo$}}
 $endif$
 $endif$
+
+% -- 4HAM: Styled code blocks with coloured background + left border --
+\usepackage{framed}
+\definecolor{shadecolor}{HTML}{EBF5FB}
+\makeatletter
+\@ifundefined{Shaded}{%
+  \newenvironment{Shaded}{}{}%
+}{}
+\makeatother
+\renewenvironment{Shaded}{%
+  \def\FrameCommand{%
+    \hspace{0pt}%
+    {\color{hamaccent}\vrule width 3pt}%
+    {\color{shadecolor}\vrule width 4pt}%
+    \colorbox{shadecolor}%
+  }%
+  \MakeFramed{\advance\hsize-\width\FrameRestore}%
+  \small
+}{%
+  \endMakeFramed
+}
+
+% -- 4HAM: Page header/footer with accent --
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{hamblue}\textbf{4HAM-Spectrum-Analysis}}
+\fancyhead[R]{\small\color{hamaccent}Propagation Scoring Reference}
+\fancyfoot[C]{\small\color{hamblue}\thepage}
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{hamaccent}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{\color{hamlight}\leaders\hrule height \footrulewidth\hfill}}
 
 \begin{document}
 $if(has-frontmatter)$
