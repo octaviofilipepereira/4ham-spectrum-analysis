@@ -548,26 +548,169 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <!-- 12. ACADEMIC ANALYTICS -->
   <section id="analytics">
     <h2 class="section-title">12 · Academic Analytics dashboard</h2>
+
+    <h3 class="sub-title">Purpose</h3>
+    <p>
+      Academic Analytics is an aggregated analysis tool designed to answer concrete questions about amateur radio activity:
+    </p>
+    <ul>
+      <li><strong>Which bands are most active</strong> right now, today, or over the last 30 days?</li>
+      <li><strong>At what UTC hours does propagation peak</strong> on each band? (essential for planning DX operations)</li>
+      <li><strong>What is the real quality of propagation</strong> — not just a single SNR peak, but consistency over time?</li>
+      <li><strong>Which stations are most active</strong> in the analysed period?</li>
+      <li><strong>How has propagation evolved</strong> over hours or days?</li>
+    </ul>
+    <p>
+      Unlike the main dashboard (which shows real-time, event-by-event data), Academic Analytics <strong>aggregates and synthesises</strong> large volumes of data to reveal patterns and trends not visible in the individual event stream. It is especially useful for identifying the best times and bands for DX, post-session or contest analysis, academic work on HF propagation, and comparing activity across bands and modes over days or weeks.
+    </p>
+
+    <h3 class="sub-title">Access</h3>
     <p>
       Accessible via the <strong>Data Analysis</strong> button in the toolbar (opens in a new tab), or directly at
       <code>http://&lt;host&gt;:8000/4ham_academic_analytics.html</code>.
+      Data auto-refreshes every 60 seconds. The header shows the last query timestamp and a countdown to the next refresh.
     </p>
-    <p>The dashboard provides aggregated views of collected event data for academic and analytical purposes:</p>
+
+    <h3 class="sub-title">Period selector</h3>
+    <table class="manual-table">
+      <thead><tr><th>Preset</th><th>Period</th><th>Time resolution</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1h</strong></td><td>Last hour (default on first visit)</td><td>Minute</td></tr>
+        <tr><td><strong>12h</strong></td><td>Last 12 hours</td><td>Hour</td></tr>
+        <tr><td><strong>24h</strong></td><td>Last 24 hours</td><td>Hour</td></tr>
+        <tr><td><strong>7d</strong></td><td>Last 7 days</td><td>Hour</td></tr>
+        <tr><td><strong>30d</strong></td><td>Last 30 days</td><td>Day</td></tr>
+        <tr><td><strong>Custom</strong></td><td>Custom start / end date-time</td><td>Automatic</td></tr>
+      </tbody>
+    </table>
+    <p>The active preset is remembered in the browser session. Time resolution is chosen automatically to keep charts readable.</p>
+    <div class="info-box">
+      💡 Use <strong>1h</strong> to follow the current operating session in near-real time. Use <strong>7d</strong> or <strong>30d</strong> to study seasonal propagation patterns.
+    </div>
+
+    <h3 class="sub-title">Band and mode filters</h3>
+    <p>
+      <strong>Band</strong> — filter by individual band (160m … 70cm) or <strong>All</strong>.
+      <strong>Mode</strong> — filter by mode (SSB, FT8, FT4, CW, WSPR) or <strong>All</strong>.
+      Click <strong>Apply Filters</strong> to reload. Filters apply to <strong>all charts and KPIs simultaneously</strong>,
+      enabling focused analysis — e.g. viewing only FT8 on 20m to assess transatlantic propagation.
+    </p>
+
+    <h3 class="sub-title">KPI summary cards — how to interpret</h3>
+    <table class="manual-table">
+      <thead><tr><th>Card</th><th>What it shows</th><th>How to interpret</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Total events</strong></td><td>Total number of events (occupancy + callsigns)</td><td>High values = active bands / favourable propagation. Compare with earlier periods to spot trends.</td></tr>
+        <tr><td><strong>Unique callsigns</strong></td><td>Distinct decoded callsigns</td><td>More unique callsigns = better propagation reaching your receiver from many stations.</td></tr>
+        <tr><td><strong>Average SNR</strong></td><td>Weighted-average SNR (dB)</td><td>Above 0 dB = generally strong signals. Negative = weak but decodable. Compare with the mode threshold (FT8: −20 dB, SSB: +3 dB).</td></tr>
+        <tr><td><strong>Time coverage</strong></td><td>% of UTC hours with activity</td><td>100% = activity every hour. Low values (e.g. 30%) = sporadic — band only open during some hours.</td></tr>
+        <tr><td><strong>Overall Propagation</strong></td><td>Composite score (0–100)</td><td>Uses the 3-formula system (Digital/CW/SSB). ≥ 70 Excellent 🟢, ≥ 50 Good 🟡, ≥ 30 Fair 🟠, &lt; 30 Poor 🔴.</td></tr>
+        <tr><td><strong>Best band</strong></td><td>Band with highest propagation score</td><td>Sub-text shows score + stability (%). High stability = consistent propagation, not isolated peaks.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Charts — how to interpret</h3>
+    <p>Each chart has an <strong>"i"</strong> icon in the header — hover for a description. Hover over chart elements (bars, cells, line points) for a tooltip with exact values.</p>
+
+    <h3 class="sub-title">Event Time Series</h3>
+    <p>Area chart showing event volume over time (by minute, hour or day depending on period resolution).</p>
     <ul>
-      <li><strong>Activity Timeline</strong> — event count over time, bucketed by hour or day.</li>
-      <li><strong>Band Distribution</strong> — pie or bar chart showing events per amateur band.</li>
-      <li><strong>Hour of Day × Band (Heatmap Pro)</strong> — interactive heatmap with cross-highlight on hover, marginal totals per row/column, and colour-scaled cells for quick pattern recognition.</li>
-      <li><strong>Propagation Map</strong> — geographical distribution of decoded callsigns.</li>
+      <li><strong>Peaks</strong> = moments of high activity — likely a propagation opening or contest.</li>
+      <li><strong>Valleys</strong> = periods without activity — propagation closed or scan stopped.</li>
+      <li><strong>Cyclic pattern</strong> (peaks at the same hours across days) = normal daily solar cycle — HF propagation rises after sunrise, falls at night.</li>
+      <li><strong>Rising trend</strong> over days = improving solar conditions.</li>
     </ul>
-    <p>
-      Data is fetched from <code>/api/analytics/academic</code> and auto-refreshes every 60 seconds.
-      A period selector (1 h / 6 h / 24 h / 7 d / 30 d / All) filters the time window.
-      Each chart has a <strong>?</strong> helper icon that shows a description on hover.
-    </p>
-    <p>
-      The <code>.env</code> file in the project root controls service environment variables (host, port, decoder flags).
-      It is created automatically on first install and is not committed to version control.
-    </p>
+
+    <h3 class="sub-title">Distribution by Band and Mode</h3>
+    <p>Stacked bar chart — one bar per band, divided by mode colours: <span style="color:#60a5fa">■ SSB</span>, <span style="color:#34d399">■ FT8</span>, <span style="color:#a78bfa">■ FT4</span>, <span style="color:#fbbf24">■ CW</span>, <span style="color:#f472b6">■ WSPR</span>.</p>
+    <ul>
+      <li><strong>Tall bars</strong> = very active bands in the period.</li>
+      <li><strong>Missing bars</strong> = band had no activity (propagation closed or not scanned).</li>
+      <li><strong>Bar composition</strong>: if dominated by one colour, only that mode was active on the band.</li>
+      <li><strong>Compare heights</strong> between bands to decide where to operate.</li>
+    </ul>
+    <div class="info-box">
+      💡 Only band+mode pairs that had a decoder running appear. If SSB was never scanned on 12m, no SSB events will show for 12m — this is intelligent filtering, not a bug.
+    </div>
+
+    <h3 class="sub-title">Hour of Day × Band — Heatmap Pro</h3>
+    <p>Interactive matrix: 24 rows (UTC hours 0–23) × columns (bands). Colour intensity = event volume at that hour+band intersection.</p>
+    <ul>
+      <li><strong>Bright/white cells</strong> = heavy activity at that hour+band.</li>
+      <li><strong>Dark cells</strong> = little or no activity.</li>
+      <li><strong>Bright horizontal rows</strong> = hours with activity across many bands (e.g. 14–18h UTC is typically peak HF propagation).</li>
+      <li><strong>Bright vertical columns</strong> = bands active during many hours (consistent propagation).</li>
+      <li><strong>Marginal bars</strong>: top (<strong>Σ band</strong>) = total per band; right (<strong>Σ hour</strong>) = total per hour.</li>
+      <li><strong>Cross-highlighting</strong>: hover on a cell to highlight its full row and column for easy cross-reading.</li>
+    </ul>
+    <p><strong>Practical use:</strong> find at which UTC hours your preferred band is most active. Example: if cell [15h UTC, 20m] is bright, that is a good time to operate 20m.</p>
+
+    <h3 class="sub-title">Top Callsigns in Period</h3>
+    <p>Horizontal bar chart of the <strong>top 20 callsigns</strong> sorted by total hits.</p>
+    <ul>
+      <li>High-hit callsigns = stations consistently active with good propagation to your receiver.</li>
+      <li>Useful for spotting beacons, contest stations, or DX super-stations.</li>
+      <li>If your own callsign appears it confirms your signal is getting through.</li>
+    </ul>
+
+    <h3 class="sub-title">Propagation Score by Band</h3>
+    <p>Vertical bar chart showing the propagation score (0–100) for each band. Numeric labels above each bar.</p>
+    <ul>
+      <li><strong>≥ 70</strong> = excellent — consistent decoding, good SNR, many callsigns.</li>
+      <li><strong>50–69</strong> = good — reliable conditions.</li>
+      <li><strong>30–49</strong> = fair — marginal signals, intermittent decoding.</li>
+      <li><strong>&lt; 30</strong> = poor — few or no decodes.</li>
+      <li>Compare bars across bands to choose the best band to operate right now.</li>
+    </ul>
+
+    <h3 class="sub-title">Propagation Time Trend</h3>
+    <p>Line chart showing how the global propagation score varied over time. A dashed horizontal line marks the period average.</p>
+    <ul>
+      <li><strong>Line above average</strong> = conditions better than usual at that moment.</li>
+      <li><strong>Line below average</strong> = conditions worse than usual.</li>
+      <li><strong>Rising trend</strong> through the day = propagation improving (typical morning → solar peak).</li>
+      <li><strong>Falling trend</strong> = propagation deteriorating (typical after sunset on HF).</li>
+      <li><strong>Near-flat, high line</strong> = stable and good conditions — ideal for operation.</li>
+    </ul>
+
+    <h3 class="sub-title">How to export data</h3>
+    <p>To export the analysed data:</p>
+    <ol>
+      <li>Select the desired <strong>period</strong> and <strong>filters</strong> (band, mode).</li>
+      <li>Click the <strong>Export ▾</strong> button (top-right of the controls bar).</li>
+      <li>Choose a format from the dropdown:</li>
+    </ol>
+    <table class="manual-table">
+      <thead><tr><th>Format</th><th>Best for</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><strong>CSV</strong></td><td>Spreadsheets (Excel, LibreOffice), importing into other tools</td><td>Band, mode, total events, peak SNR, average SNR</td></tr>
+        <tr><td><strong>JSON</strong></td><td>Programmatic processing (Python, JS)</td><td>Full object: aggregated series, time-bucketed events, all individual events, propagation by band, period</td></tr>
+        <tr><td><strong>XLSX</strong></td><td>Professional reports, detailed Excel analysis</td><td>Workbook with 4 sheets (see below)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">XLSX sheets breakdown</h3>
+    <table class="manual-table">
+      <thead><tr><th>Sheet</th><th>Content</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Events by Band-Mode</strong></td><td>Data aggregated by band+mode</td><td>Overview: events per band and mode</td></tr>
+        <tr><td><strong>Aggregated Events</strong></td><td>Events grouped by time bucket (hour/day)</td><td>Temporal trend analysis</td></tr>
+        <tr><td><strong>All Events</strong></td><td>Every individual event: timestamp, callsign, band, mode, frequency, SNR, grid</td><td>Detailed event-by-event analysis, complete log</td></tr>
+        <tr><td><strong>Propagation by Band</strong></td><td>Score and event count per band</td><td>Propagation quality summary</td></tr>
+      </tbody>
+    </table>
+    <p>The file is generated in the browser and downloaded automatically as <code>4ham-analytics_{start}_{end}.{ext}</code>.</p>
+
+    <h3 class="sub-title">Metadata footer</h3>
+    <table class="manual-table">
+      <thead><tr><th>Field</th><th>Information</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Data snapshot</strong></td><td>UTC timestamp of the last server query</td></tr>
+        <tr><td><strong>Update frequency</strong></td><td>Auto-refresh interval (every 1 minute)</td></tr>
+        <tr><td><strong>Analysed period</strong></td><td>Full time range of the current analysis</td></tr>
+        <tr><td><strong>Data quality</strong></td><td>Data consistency indicator</td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- 13. DESKTOP LAUNCHER -->
