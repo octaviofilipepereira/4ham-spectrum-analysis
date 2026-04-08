@@ -7,7 +7,7 @@ Last update: 2026-04-05 UTC
 
 # Installation Manual
 
-This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi, including optional decoder integrations.
+This manual provides a complete setup for Linux (Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+), including optional decoder integrations.
 
 ## Contents
 - System Requirements
@@ -25,7 +25,7 @@ This manual provides a complete setup for Linux (Ubuntu/Debian) and Raspberry Pi
 
 | Component  | Minimum (no ASR)                                       | With Whisper ASR              |
 |------------|--------------------------------------------------------|-------------------------------|
-| OS         | Ubuntu 20.04+ / Debian 11+ / Raspberry Pi OS 64-bit    | Same                          |
+| OS         | Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit) | Same                |
 | CPU        | 2 cores, 1.5 GHz                                       | 4 cores, 2 GHz                |
 | RAM        | 2 GB                                                   | 4 GB                          |
 | Disk       | 2 GB                                                   | 10 GB (PyTorch/Whisper ~6.8 GB) |

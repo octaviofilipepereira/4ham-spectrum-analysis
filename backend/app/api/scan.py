@@ -26,6 +26,7 @@ from app.config.loader import (
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
+from app.scan.rotation import RotationConfig, RotationSlot, ScanRotation
 from app.api.decoders import (
     _start_cw_decoder,
     _stop_cw_decoder,
@@ -417,6 +418,10 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     """
     await state.scan_engine.stop_async()
     await _stop_ssb_detector()
+    # Stop rotation if active
+    if state.scan_rotation and state.scan_rotation.running:
+        await state.scan_rotation.stop()
+        state.scan_rotation = None
     state.scan_state["state"] = "stopped"
     state.scan_state["decoder_mode"] = ""  # clear so frontend doesn't auto-select the button
     # Clear voice marker cache to prevent stale SSB VOICE DETECTED markers
@@ -695,6 +700,8 @@ def scan_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
     """
     payload = dict(state.scan_state)
     payload["engine"] = state.scan_engine.status()
+    if state.scan_rotation:
+        payload["rotation"] = state.scan_rotation.status()
     return payload
 
 
@@ -716,3 +723,255 @@ def scans(limit: int = 100, _: bool = Depends(optional_verify_basic_auth)) -> Li
         List of scan records
     """
     return state.db.get_scans(limit=limit)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Scan Rotation endpoints
+# ═══════════════════════════════════════════════════════════════════
+
+async def _rotation_switch_slot(slot: RotationSlot) -> bool:
+    """Callback invoked by ScanRotation when it's time to switch slot.
+
+    Orchestrates:
+    1. Stop current decoders
+    2. Resolve band frequencies
+    3. Restart scan at new band (if changed)
+    4. Start the new decoder mode
+    """
+    current_scan = dict(state.scan_state.get("scan") or {})
+    current_band = str(current_scan.get("band") or "").strip().lower()
+    new_band = slot.band.strip().lower()
+    new_mode = slot.mode.strip().lower()
+
+    log(f"rotation_switch band={slot.band} mode={slot.mode}")
+
+    # ── Resolve band bounds ──────────────────────────────────────
+    band_start_hz, band_end_hz = _lookup_band_bounds(slot.band)
+    if band_start_hz is None or band_end_hz is None:
+        log(f"rotation_switch_failed:unknown_band={slot.band}")
+        return False
+
+    start_hz = band_start_hz
+    end_hz = band_end_hz
+
+    # Apply mode-specific subband clipping
+    if new_mode == "cw":
+        start_hz, end_hz = _resolve_cw_sweep_bounds(slot.band, start_hz, end_hz)
+    elif new_mode == "ssb":
+        start_hz, end_hz = _resolve_ssb_bounds(slot.band, start_hz, end_hz)
+
+    # ── Band change: stop + restart scan engine ──────────────────
+    band_changed = (current_band != new_band)
+    freq_changed = (
+        int(current_scan.get("start_hz", 0) or 0) != start_hz
+        or int(current_scan.get("end_hz", 0) or 0) != end_hz
+    )
+
+    if band_changed or freq_changed:
+        # Stop all decoders before restarting scan
+        await _stop_ft_external_decoder()
+        await _stop_cw_decoder()
+        await _stop_ssb_detector()
+
+        new_scan = dict(current_scan)
+        new_scan["band"] = slot.band
+        new_scan["start_hz"] = start_hz
+        new_scan["end_hz"] = end_hz
+        center_hz = (start_hz + end_hz) // 2
+        new_scan["center_hz"] = center_hz
+
+        # Band display bounds for frontend ruler
+        display_start, display_end = _resolve_band_display_bounds(
+            slot.band, start_hz, end_hz,
+        )
+        if display_start is not None and display_end is not None:
+            new_scan["band_display_start_hz"] = display_start
+            new_scan["band_display_end_hz"] = display_end
+
+        # SSB focus params
+        if new_mode == "ssb":
+            new_scan["ssb_focus_enable"] = True
+            new_scan.setdefault("ssb_focus_hold_ms", 15000)
+            new_scan.setdefault("ssb_focus_hits_required", 2)
+            new_scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
+            new_scan.setdefault("ssb_focus_cooldown_s", 20.0)
+            new_scan.setdefault("ssb_focus_bucket_hz", 2000)
+        else:
+            new_scan["ssb_focus_enable"] = False
+
+        # Stop and restart scan engine (keeps SDR device open internally)
+        await state.scan_engine.stop_async()
+        await state.scan_engine.start_async(new_scan)
+
+        state.scan_state["scan"] = new_scan
+        state.scan_state["state"] = "running"
+        state.scan_state["scan_id"] = state.db.start_scan(
+            new_scan, datetime.now(timezone.utc).isoformat(),
+        )
+        log(f"rotation_scan_restarted band={slot.band} range={start_hz}-{end_hz}")
+    else:
+        # Same band/freqs — just stop old decoders
+        await _stop_ft_external_decoder()
+        await _stop_cw_decoder()
+        await _stop_ssb_detector()
+
+    # ── Start new decoder ────────────────────────────────────────
+    state.scan_state["decoder_mode"] = new_mode
+    ft_modes = ["ft8", "ft4", "wspr"]
+
+    if new_mode in ft_modes:
+        result = await _start_ft_external_decoder(force=True)
+        if state.ft_external_decoder:
+            state.ft_external_decoder.set_modes([new_mode.upper()])
+        state.ft_external_modes[:] = [new_mode.upper()]
+        log(f"rotation_decoder_started:ft:{new_mode} result={result}")
+    elif new_mode == "cw":
+        result = await _start_cw_decoder(
+            force=True,
+            band_start_hz=start_hz,
+            band_end_hz=end_hz,
+        )
+        log(f"rotation_decoder_started:cw result={result}")
+    elif new_mode == "ssb":
+        result = await _start_ssb_detector(force=True)
+        log(f"rotation_decoder_started:ssb result={result}")
+
+    return True
+
+
+@router.post("/rotation/start")
+async def rotation_start(
+    payload: dict,
+    request: Request,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Start scan rotation with the given slot configuration.
+
+    Requires a running scan or will start one automatically.
+    """
+    # Stop any existing rotation
+    if state.scan_rotation and state.scan_rotation.running:
+        await state.scan_rotation.stop()
+        state.scan_rotation = None
+
+    # Parse rotation config
+    try:
+        config = RotationConfig.from_dict(payload)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # If no scan is running, start one on the first slot
+    if state.scan_state.get("state") != "running":
+        first = config.slots[0]
+        band_start, band_end = _lookup_band_bounds(first.band)
+        if band_start is None or band_end is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown band: {first.band}",
+            )
+
+        # Reuse device from last scan state if available;
+        # otherwise omit — controller auto-selects first real SDR.
+        prev_device = (
+            state.scan_state.get("device")
+            or (state.scan_state.get("scan") or {}).get("device_id")
+        )
+
+        # Build a minimal scan payload for the first slot
+        scan_payload = {
+            "scan": {
+                "band": first.band,
+                "start_hz": band_start,
+                "end_hz": band_end,
+                "center_hz": (band_start + band_end) // 2,
+                "step_hz": 2000,
+                "dwell_ms": 250,
+                "sample_rate": 2048000,
+                "mode": "auto",
+            },
+            "decoder_mode": first.mode,
+        }
+        if prev_device:
+            scan_payload["device"] = prev_device
+        # Use the regular scan_start to initialise everything properly
+        await scan_start(scan_payload, request, _)
+
+    # Create and start rotation
+    rotation = ScanRotation(config, _rotation_switch_slot)
+    state.scan_rotation = rotation
+    started = await rotation.start()
+    if not started:
+        raise HTTPException(status_code=500, detail="Failed to start rotation")
+
+    log(f"rotation_started slots={len(config.slots)}")
+    return rotation.status()
+
+
+@router.post("/rotation/stop")
+async def rotation_stop(_: None = Depends(verify_basic_auth)) -> Dict:
+    """Stop scan rotation and the active scan, releasing the SDR device."""
+    if not state.scan_rotation or not state.scan_rotation.running:
+        raise HTTPException(status_code=400, detail="No rotation is running")
+
+    await state.scan_rotation.stop()
+    # Stop all decoders that might be running
+    await _stop_ft_external_decoder()
+    await _stop_cw_decoder()
+    await _stop_ssb_detector()
+    # Stop the active scan to release the SDR device
+    await state.scan_engine.stop_async()
+    state.scan_state["state"] = "stopped"
+    state.scan_state["decoder_mode"] = ""
+    state.scan_state["scan"] = None
+    state.scan_state["device"] = None
+    state.voice_marker_cache.clear()
+    state.db.end_scan(
+        state.scan_state.get("scan_id"),
+        datetime.now(timezone.utc).isoformat()
+    )
+
+    status = state.scan_rotation.status()
+    log("rotation_stopped")
+
+    # Reopen preview mode so the waterfall keeps showing data
+    try:
+        sdr_devices = [
+            d for d in state.controller.list_devices()
+            if str(d.get("type", "")).lower() not in ("audio",)
+        ]
+        if sdr_devices:
+            preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+            preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            preview_start = int(os.getenv("PREVIEW_START_HZ", "14000000"))
+            preview_end = int(os.getenv("PREVIEW_END_HZ", "14350000"))
+            opened = await state.scan_engine.preview_open(
+                device_id=sdr_devices[0]["id"],
+                sample_rate=preview_sr,
+                center_hz=preview_hz,
+                start_hz=preview_start,
+                end_hz=preview_end,
+            )
+            if opened:
+                state.scan_state["state"] = "preview"
+                state.scan_state["scan"] = {
+                    "band": "20m",
+                    "center_hz": preview_hz,
+                    "start_hz": preview_start,
+                    "end_hz": preview_end,
+                    "sample_rate": preview_sr,
+                    "mode": "fixed",
+                }
+    except Exception:
+        pass
+
+    return status
+
+
+@router.get("/rotation/status")
+def rotation_status(
+    _: bool = Depends(optional_verify_basic_auth),
+) -> Dict:
+    """Get rotation status (current slot, time remaining, full config)."""
+    if not state.scan_rotation:
+        return {"running": False}
+    return state.scan_rotation.status()

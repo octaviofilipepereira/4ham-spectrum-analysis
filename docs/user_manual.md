@@ -5,7 +5,14 @@
 1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
 2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Dashboard Académico (Heatmap Pro)](#dashboard-académico-heatmap-pro)
+3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
+4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
+5. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
+6. [Configuração Inicial](#configuração-inicial)
+7. [Interface do Utilizador](#interface-do-utilizador)
+8. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+9. [Exportação de Dados](#exportação-de-dados)
+10. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -81,47 +88,66 @@ SNR = nível_do_sinal_dB - ruído_de_fundo_dB
 
 **O que é**: Avaliação **agregada** das condições de propagação baseada em **múltiplos eventos recentes**.
 
-**Como é calculado**:
+**Como é calculado (v0.9.0 — 3 fórmulas por categoria de modo)**:
 
-Para cada evento na janela temporal (60 minutos), o sistema calcula um score ponderado considerando:
+Desde a v0.9.0, o sistema usa **três fórmulas distintas** adaptadas às características de cada tipo de modo. Cada fórmula combina métricas ponderadas, normalizadas entre 0 e 1, e produz um score final entre 0 e 100.
 
-1. **SNR normalizado** (0 a 1):
-   ```
-   snr_norm = (SNR + 20) / 40
-   ```
-   - SNR -20 dB → 0.0 (0%)
-   - SNR 0 dB → 0.5 (50%)
-   - SNR 20 dB → 1.0 (100%)
-   - SNR ≥ 20 dB → 1.0 (limite máximo)
+##### Categoria 1 — Digital (FT8 / FT4 / WSPR / JT65 / JT9 / FST4 / FST4W / Q65)
 
-2. **Confidence** (confiança da descodificação):
-   - Mede quão "limpa" foi a descodificação do sinal
-   - Varia entre 0.01 e 0.99
+Estes modos descodificam toda a passband em paralelo. A taxa de descodificação (proporção de indicativos vs. eventos totais) é a métrica primária.
 
-3. **Recency weight** (peso temporal):
-   ```
-   recency = 1.0 - (idade_minutos / janela_minutos)
-   ```
-   - Evento recém-recebido: peso 1.0
-   - Evento há 60 minutos: peso 0.2
-   - **Sinais recentes têm mais influência no score**
+| Componente | Peso | Descrição |
+|---|---|---|
+| `decode_rate` | **40 %** | Proporção de eventos com indicativo vs. total de deteções |
+| `median_snr` | **35 %** | SNR mediano normalizado pelo limiar do modo |
+| `unique_callsigns` | **15 %** | Número de indicativos únicos (diversidade) |
+| `recency` | **10 %** | Eventos mais recentes pesam mais |
 
-4. **Base weight** (tipo de evento):
-   - **Callsign** (indicativo descodificado): peso 1.0
-   - **Occupancy** (ocupação detetada): peso 0.55
+**Normalização SNR (específica por modo)**:
 
-**Score final**:
+| Modo | Floor (limiar descodificação) | Ceiling | Faixa |
+|---|---|---|---|
+| FT8 | −20 dB | +10 dB | 30 dB |
+| FT4 | −17,5 dB | +10 dB | 27,5 dB |
+| WSPR | −31 dB | 0 dB | 31 dB |
+
 ```
-Score por evento = snr_norm × confidence × base_weight × recency_weight
-
-Propagation Score = (soma de todos os scores / soma dos pesos) × 100
+snr_norm = clamp((SNR - floor) / faixa, 0, 1)
 ```
 
-**Classificação**:
+##### Categoria 2 — CW (Morse)
+
+CW usa varrimento sequencial por frequência com dwell curto. Não captar um indicativo **não indica propagação fraca** — o operador pode simplesmente não ter transmitido o indicativo durante a janela de escuta.
+
+| Componente | Peso | Descrição |
+|---|---|---|
+| `traffic_volume` | **30 %** | CW_TRAFFIC detetado = banda ativa |
+| `snr_quality` | **30 %** | SNR normalizado (floor −15 dB, ceiling +20 dB) |
+| `signal_strength` | **15 %** | Nível de sinal RF como indicador de propagação |
+| `callsign_bonus` | **15 %** | Bónus quando indicativo É captado (não penalização quando ausente) |
+| `recency` | **10 %** | Eventos mais recentes pesam mais |
+
+##### Categoria 3 — SSB (Voz)
+
+SSB partilha a limitação de varrimento sequencial do CW. A avaliação depende da deteção de voz, qualidade do SNR e nível de sinal.
+
+| Componente | Peso | Descrição |
+|---|---|---|
+| `traffic_volume` | **20 %** | SSB_TRAFFIC / VOICE_DETECTION = banda ativa |
+| `snr_quality` | **25 %** | SNR normalizado (floor +3 dB, ceiling +30 dB) |
+| `signal_strength` | **15 %** | Nível de sinal RF |
+| `voice_quality` | **20 %** | Qualidade da deteção de voz (clareza) |
+| `transcript` | **10 %** | Transcrição speech-to-text bem-sucedida = sinal inteligível |
+| `callsign_bonus` | **5 %** | Bónus quando indicativo É captado |
+| `recency` | **5 %** | Eventos mais recentes pesam mais |
+
+**Classificação (comum a todas as categorias)**:
 - **≥ 70**: Excellent 🟢 (Excelente)
 - **≥ 50**: Good 🟡 (Bom)
 - **≥ 30**: Fair 🟠 (Razoável)
 - **< 30**: Poor 🔴 (Fraco)
+
+> Referência completa com validação científica e fontes: [docs/propagation_scoring_reference.md](propagation_scoring_reference.md)
 
 ---
 
@@ -193,7 +219,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ### Pré-requisitos
 - SDR: RTL-SDR (recomendado), HackRF, Airspy ou outro hardware compatível com SoapySDR
-- Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Raspberry Pi OS 64-bit
+- Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - Sincronização de tempo NTP (obrigatório para FT8/FT4)
 
@@ -221,18 +247,222 @@ Ou via script de desenvolvimento:
 
 Abrir a interface no browser: `http://localhost:8000/`
 
-### Dashboard académico
+---
 
-Além da interface principal, existe uma página dedicada a análise académica:
+## Dashboard Academic Analytics
 
-- `http://localhost:8000/4ham_academic_analytics.html`
+### Objetivo
 
-Na secção **Hour of Day x Band Activity (Heatmap Pro)**:
-- Linhas = horas UTC (0 a 23)
-- Colunas = bandas
-- Cor da célula = volume de eventos
-- Hover destaca célula, linha e coluna para leitura cruzada
-- Barras marginais mostram totais por banda (topo) e por hora (lado direito)
+O Academic Analytics é uma ferramenta de análise agregada desenhada para responder a perguntas concretas sobre atividade de radioamador:
+
+- **Quais bandas estão mais ativas** neste momento, hoje, ou nos últimos 30 dias?
+- **A que horas UTC existe mais propagação** em cada banda? (fundamental para planear operações DX)
+- **Qual a qualidade real da propagação** — não apenas um pico de SNR, mas a consistência ao longo do tempo?
+- **Quais estações estão mais ativas** no período analisado?
+- **Como evoluiu a propagação** ao longo das horas ou dos dias?
+
+Ao contrário do dashboard principal (que mostra dados em tempo real, evento a evento), o Academic Analytics **agrega e sintetiza** grandes volumes de dados para revelar padrões e tendências que não são visíveis no fluxo de eventos individual.
+
+É especialmente útil para:
+- Radioamadores que querem **identificar os melhores horários e bandas** para operar
+- Análise pós-sessão de uma noite de operação ou de um contest
+- Trabalho académico ou relatórios sobre condições de propagação HF
+- Comparação da atividade entre bandas e modos ao longo de dias ou semanas
+
+### Acesso
+
+- Botão **Data Analysis** na barra de ferramentas (abre num novo separador)
+- Ou diretamente em `http://localhost:8000/4ham_academic_analytics.html`
+
+Os dados vêm do servidor e são **atualizados automaticamente a cada 60 segundos**. O cabeçalho mostra o timestamp da última consulta e um contador regressivo para o próximo refresh.
+
+### Seletor de período
+
+| Preset | Período | Resolução temporal |
+|---|---|---|
+| **1h** | Última hora (padrão no primeiro acesso) | Minuto |
+| **12h** | Últimas 12 horas | Hora |
+| **24h** | Últimas 24 horas | Hora |
+| **7d** | Últimos 7 dias | Hora |
+| **30d** | Últimos 30 dias | Dia |
+| **Custom** | Intervalo personalizado (data/hora de início e fim) | Automático |
+
+O preset ativo é memorizado na sessão do browser. A resolução temporal (minuto, hora, dia) é escolhida automaticamente para garantir que os gráficos tenham detalhe suficiente sem ficarem sobrecarregados.
+
+> **Dica:** Use **1h** para acompanhar a sessão de operação atual em tempo quase real. Use **7d** ou **30d** para estudar padrões de propagação sazonal.
+
+### Filtros de banda e modo
+
+- **Band** — filtrar por banda individual (160m … 70cm) ou **All** para ver todas
+- **Mode** — filtrar por modo (SSB, FT8, FT4, CW, WSPR) ou **All** para ver todos
+- Clicar em **Apply Filters** após alterar filtros ou o período personalizado
+
+Os filtros aplicam-se a **todos os gráficos e KPIs simultaneamente**. Isto permite análises focadas — por exemplo, ver apenas FT8 na banda dos 20m para avaliar se a propagação transatlântica está ativa.
+
+### Cartões KPI (resumo) — como interpretar
+
+Seis cartões no topo sumarizam o estado geral do período selecionado:
+
+| Cartão | O que mostra | Como interpretar |
+|---|---|---|
+| **Total events** | Número total de eventos (ocupações + indicativos) | Valores altos indicam bandas ativas e condições de propagação favoráveis. Compare com períodos anteriores para avaliar tendências |
+| **Unique callsigns** | Número de indicativos distintos descodificados | Quanto mais indicativos únicos, melhor a propagação — indica que sinais de múltiplas estações estão a chegar. Um valor alto com Total events alto indica propagação diversificada |
+| **Average SNR** | SNR médio ponderado em dB | Valores acima de 0 dB indicam sinais geralmente fortes. Valores negativos (ex.: -8 dB) indicam sinais fracos mas descodificáveis. Compare com o threshold do modo: FT8 descodifica até -20 dB, SSB precisa de pelo menos +3 dB |
+| **Time coverage** | Percentagem de horas UTC que tiveram atividade | 100% = atividade em todas as horas da janela. Valores baixos (ex.: 30%) indicam propagação esporádica — a banda só esteve aberta em algumas horas |
+| **Overall Propagation** | Score composto (0–100) | Avaliação global usando as 3 fórmulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). O badge colorido dá uma leitura rápida. Referência: [propagation_scoring_reference_pt.md](propagation_scoring_reference_pt.md) |
+| **Best band** | Banda com melhor score de propagação | Indica qual banda ofereceu as melhores condições no período. O sub-texto mostra o score e a estabilidade (%) — estabilidade alta significa propagação consistente, não apenas picos isolados |
+
+### Gráficos — como interpretar
+
+Cada gráfico tem um ícone **"i"** no canto do cabeçalho. Ao passar o rato sobre o ícone, aparece uma descrição detalhada. Ao passar o rato sobre elementos do gráfico (barras, células, pontos), aparece um tooltip com os valores exatos.
+
+#### Event Time Series (Série temporal de eventos)
+
+**O que mostra**: Volume de eventos ao longo do tempo, agregados por hora (ou minuto/dia conforme a resolução do período selecionado).
+
+**Como interpretar**:
+- **Picos** indicam momentos de alta atividade — provavelmente abertura de propagação ou contest
+- **Vales** indicam períodos sem atividade — propagação fechada ou scan parado
+- **Padrão cíclico** (picos repetidos às mesmas horas em dias diferentes) revela o ciclo solar diário normal — propagação HF aumenta após o nascer do sol e diminui à noite
+- **Linha ascendente** ao longo de vários dias pode indicar melhoria das condições solares
+
+#### Distribution by Band and Mode (Distribuição por banda e modo)
+
+**O que mostra**: Gráfico de barras empilhadas — uma barra por banda, dividida por cores de modo. Cores: SSB (azul), FT8 (verde), FT4 (púrpura), CW (âmbar), WSPR (rosa).
+
+**Como interpretar**:
+- **Barras altas** = bandas muito ativas no período
+- **Barras ausentes** = essa banda não teve atividade (propagação fechada, ou simplesmente não foi monitorizada)
+- **Composição da barra**: se uma banda é dominada por uma cor (ex.: tudo verde = FT8), os restantes modos não estiveram ativos nessa banda
+- **Comparar alturas entre bandas** para decidir onde operar — por exemplo, se 20m tem barra alta e 15m tem barra baixa, a propagação está melhor nos 20m
+
+> **Nota:** Apenas bandas+modo que tiveram um decoder a correr aparecem neste gráfico. Se nunca correu scan SSB nos 12m, não aparecerão eventos SSB nos 12m — isto não é um erro, é filtragem inteligente.
+
+#### Hour of Day × Band — Heatmap Pro
+
+**O que mostra**: Matriz interativa de 24 linhas (horas UTC 0–23) × colunas (bandas). Intensidade da cor = volume de eventos nessa hora+banda.
+
+**Como interpretar**:
+- **Células claras/brancas** = muita atividade nessa combinação hora+banda
+- **Células escuras/pretas** = pouca ou nenhuma atividade
+- **Linhas claras horizontais** = horas com muita atividade em todas as bandas (ex.: 14h–18h UTC nos 20m = alta propagação em Europa→América)
+- **Colunas claras verticais** = bandas ativas em muitas horas do dia (bandas com propagação consistente)
+- **Barras marginais**: no topo (**Σ band**) mostra o total por banda; à direita (**Σ hour**) mostra o total por hora
+- **Cross-highlighting**: ao passar o rato numa célula, a linha e coluna ficam destacadas para facilitar a leitura cruzada
+
+**Uso prático**: Identifique em que horas UTC a sua banda preferida está mais ativa. Exemplo: se a célula [15h UTC, 20m] está muito clara, esse é um bom horário para operar 20m.
+
+#### Top Callsigns in Period (Top 20 indicativos)
+
+**O que mostra**: Os 20 indicativos mais frequentemente detetados no período, ordenados por número de aparições.
+
+**Como interpretar**:
+- Indicativos com muitas aparições são estações que estiveram consistentemente ativas e com boa propagação até ao seu recetor
+- Útil para identificar beacons, estações de contest, ou super-estações DX
+- Se o seu próprio indicativo aparece (porque está a monitorizar outra estação que o vê), confirma que o seu sinal está a chegar
+
+#### Propagation Score by Band (Score de propagação por banda)
+
+**O que mostra**: Barra vertical com o score de propagação (0–100) para cada banda no período selecionado.
+
+**Como interpretar**:
+- **Barras altas** (≥ 70) = propagação excelente — descodificação consistente, bom SNR, muitos indicativos
+- **Barras médias** (50–69) = propagação boa — condições fiáveis para operação
+- **Barras baixas** (30–49) = propagação razoável — sinais marginais, descodificação intermitente
+- **Barras muito baixas** (< 30) = propagação fraca — poucos ou nenhuns decodes
+- **Comparar barras entre bandas** para escolher a melhor banda para operar agora
+- A etiqueta numérica acima de cada barra dá o valor exato
+
+#### Propagation Time Trend (Tendência temporal da propagação)
+
+**O que mostra**: Linha contínua mostrando como o score global de propagação variou ao longo do tempo. Linha tracejada horizontal = média do período.
+
+**Como interpretar**:
+- **Linha acima da média** = condições melhores que o habitual nesse momento
+- **Linha abaixo da média** = condições piores que o habitual
+- **Tendência ascendente** ao longo do dia = propagação a melhorar (típico nas horas matinais até ao pico solar)
+- **Tendência descendente** = propagação a deteriorar (típico após o pôr do sol em HF)
+- **Oscilações frequentes** = propagação instável
+- **Linha quase plana e alta** = condições estáveis e boas — ideal para operação
+
+### Como exportar dados
+
+O dashboard permite exportar os dados analisados em três formatos. Para exportar:
+
+1. Selecionar o **período** e **filtros** desejados (banda, modo)
+2. Clicar no botão **Export ▾** (canto superior direito da barra de controlos)
+3. Escolher o formato no menu dropdown:
+
+| Formato | Melhor para | Conteúdo |
+|---|---|---|
+| **CSV** | Abrir em Excel/LibreOffice, importar noutra ferramenta | Tabela simples com colunas: banda, modo, total de eventos, SNR pico, SNR médio |
+| **JSON** | Processamento programático (Python, JavaScript, etc.) | Objeto completo com: séries agregadas por banda+modo, eventos por bucket temporal, todos os eventos individuais (com indicativo, grid, SNR, frequência), scores de propagação por banda, e intervalo temporal |
+| **XLSX** | Relatórios profissionais, análise detalhada em Excel | Workbook com **4 folhas separadas**: |
+
+**Folhas do ficheiro XLSX:**
+
+| Folha | Conteúdo | Uso |
+|---|---|---|
+| **Events by Band-Mode** | Dados agregados por combinação banda+modo | Visão geral: quantos eventos em cada banda e modo |
+| **Aggregated Events** | Eventos agrupados por bucket temporal (hora/dia) | Análise de tendências temporais |
+| **All Events** | Todos os eventos individuais com: timestamp, indicativo, banda, modo, frequência, SNR, grid locator | Análise detalhada evento a evento, log completo |
+| **Propagation by Band** | Score de propagação e contagem de eventos por banda | Resumo da qualidade de propagação |
+
+O ficheiro é gerado no browser e descarregado automaticamente com o nome `4ham-analytics_{início}_{fim}.{ext}` (ex.: `4ham-analytics_2026-04-07-14-00_2026-04-08-14-00.xlsx`).
+
+### Metadados (rodapé)
+
+Quatro campos informativos no final da página:
+
+| Campo | Informação |
+|---|---|
+| **Data snapshot** | Timestamp UTC da última consulta ao servidor |
+| **Update frequency** | Frequência de atualização automática (cada 1 minuto) |
+| **Analyzed period** | Intervalo temporal completo da análise atual |
+| **Data quality** | Indicador de consistência dos dados |
+
+---
+
+## Scan Rotation (Rotação de Scan)
+
+### O que é?
+
+O Scan Rotation permite definir uma **sequência de slots (banda + modo)** que o sistema percorre automaticamente, mudando de banda/modo em intervalos configuráveis. É ideal para monitorizar múltiplas bandas e modos durante períodos longos sem intervenção manual.
+
+### Como configurar
+
+1. Clicar em **Config Scan Rotation** (botão na barra de scan).
+2. O painel de rotação expande-se com os seguintes controlos:
+   - **Modo de rotação** — `Band + Mode` (cada slot define banda e modo) ou `Band only` (rota apenas por bandas, mantendo o modo atual).
+   - **Banda e Modo** — selecionar a banda e modo para o próximo slot.
+   - **Dwell** — tempo de permanência em cada slot antes de mudar (30 s, 1 min, 2 min, 5 min, 10 min, 15 min, 30 min).
+   - **Loop** — se ativado, a rotação recomeça após o último slot; se desativado, para no final.
+3. Clicar em **+ Add New Slot** para adicionar cada combinação banda/modo à lista.
+4. Os slots aparecem como badges editáveis — clicar em **×** para remover um slot.
+5. Clicar em **Start Rotation** para iniciar.
+
+### Durante a rotação
+
+- A barra de estado mostra em tempo real: slot atual (banda + modo), tempo restante no countdown, e o próximo slot.
+- O indicador de pulsação vermelho confirma que a rotação está ativa.
+- O botão **Stop scanning** para a rotação (e o scan atual).
+- Os dados de todas as bandas/modos varridos acumulam-se na base de dados e aparecem nos dashboards analíticos.
+
+---
+
+## Mapa de Propagação — Seletor de Janela Temporal
+
+O mapa de propagação inclui um seletor de janela temporal que controla o período de eventos mostrados no globo:
+
+| Opção | Período |
+|---|---|
+| **1h** | Última hora |
+| **2h** | Últimas 2 horas |
+| **4h** | Últimas 4 horas |
+| **8h** | Últimas 8 horas |
+| **24h** | Últimas 24 horas (padrão) |
+
+Eventos fora da janela selecionada não aparecem no mapa. Isto permite focar na atividade recente ou alargar para uma visão diária.
 
 ---
 

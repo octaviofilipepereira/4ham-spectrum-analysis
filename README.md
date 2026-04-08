@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-05 UTC
+Last update: 2026-04-08 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -10,7 +10,7 @@ Web platform for amateur radio spectrum analysis, with DSP, real-time events, an
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
-It is designed to run on Raspberry Pi and Linux PC, with a modern web interface (currently English; Portuguese and Spanish planned).
+It is designed to run on Linux PC and Raspberry Pi (Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+), with a modern web interface (currently English; Portuguese and Spanish planned).
 
 ## Main requirements
 - Hardware: RTL-SDR (primary), with readiness for HackRF, Airspy, and transceivers with SDR interface.
@@ -29,6 +29,8 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 - Full installation manual: [docs/installation_manual.md](docs/installation_manual.md)
 - User manual (PT): [docs/user_manual.md](docs/user_manual.md)
 - User manual (EN): [docs/user_manual_en.md](docs/user_manual_en.md)
+- Propagation scoring reference (EN): [docs/propagation_scoring_reference.md](docs/propagation_scoring_reference.md)
+- Propagation scoring reference (PT): [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md)
 - Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
 
 ## Screenshots
@@ -89,14 +91,22 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.10.0
+- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
+- **Per-band×mode phantom mode elimination**: two-layer fix — occupancy events forced to match active decoder mode (prevents heuristic mis-classification), and confirmed_band_modes filter time-scoped to analysed period (prevents historical sessions from polluting charts).
+- **UTC fix for custom dates**: frontend custom date inputs now forced to UTC interpretation, preventing off-by-one-day boundary errors in non-UTC timezones.
+- **OS compatibility documentation**: all docs now list exact supported distributions (Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+).
+- **Propagation scoring reference v1.2**: exact mathematical formulas, verification penalty, complete SNR parameters table (15 modes), cross-referenced in all manuals.
+- **Comprehensive Academic Analytics documentation**: full interpretation guide, export walkthrough, and KPI reference in help.html and user manuals (PT/EN).
+
 ### v0.9.0
 - **3-formula propagation scoring**: separate Digital/CW/SSB formulas with tailored SNR normalisation. Server-computed scores.
 - **Export multi-format**: CSV, XLSX (Aggregated + All Events), and JSON export from Academic Analytics.
+- **Propagation map time window**: selectable 1h / 2h / 4h / 8h / 24h filter on the propagation globe.
 - **1 h / 12 h presets**: short-period options with minute-level bucketing for higher resolution.
 - **Loading overlay**: spinner shown while switching periods or applying filters.
 - **Callsign ITU validation**: two-branch regex rejects invalid callsigns (e.g. "5I5I").
-- **Heuristic mode filtering**: occupancy events from DSP heuristic only modes (no decoder confirmation) are now excluded.
-- **Empty analytics fix**: confirmed-modes pre-scan queries full DB, preventing blank dashboards for short periods.
+- **Comprehensive Academic Analytics documentation**: full chapter in PT/EN manuals and help.html — purpose, KPI interpretation, chart-by-chart guide, step-by-step export, metadata footer.
 - **Propagation scoring reference docs**: EN + PT with formulas, constants, implementation tables, and PDF exports.
 - **Frontend bug fixes**: CW_TRAFFIC in CW_MODES, FST4W/Q65/VOICE_DETECTION in SNR_PARAMS, verification threshold >5.
 - **Immediate preset switching**, **preset persistence**, **top 20 callsigns**, **Heatmap Pro improvements**.
@@ -545,19 +555,20 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] Digital decoding pipeline (FT8/FT4/APRS/CW) and SSB ASR baseline.
 - [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
+- [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
+- [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell and live status.
 
 ### Next milestones
-1. Occupancy alerts and analytics dashboards.
-2. Multi-node aggregation (multiple receivers feeding one backend).
-3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
-4. Deployment hardening (service templates + operational monitoring/retention defaults).
+1. Multi-node aggregation (multiple receivers feeding one backend).
+2. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
+3. Deployment hardening (service templates + operational monitoring/retention defaults).
 
 ## System requirements
 
 Full hardware and performance details: see [docs/hardware_requirements.md](docs/hardware_requirements.md).
 
 ### Operating system
-- **Linux** (Debian 11+ / Ubuntu 22.04+ / Raspberry Pi OS Bookworm) — primary and recommended.
+- **Linux** (Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+) — primary and recommended.
 - **Windows 10/11**: supported via WSL2 or native Python; SoapySDR driver support varies.
 - **Python**: 3.10 or later.
 - **Browser**: any modern browser (Chrome, Firefox, Edge) to access the web UI.
@@ -606,9 +617,7 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 - Stop unnecessary system services (databases, IDEs) on dedicated stations.
 
 ## Next steps
-- Map exact frequencies per band and region (IARU).
 - Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
-- Add occupancy alerts and analytics API/UI endpoints.
 - Add multi-node aggregation support (multiple receivers feeding one backend).
 - Improve SSB ASR confidence calibration for noisy channels and transceiver audio sources (FT-991A/IC-7300).
 - Add packaged operational defaults (retention, log rotation, service health checks).
@@ -616,6 +625,8 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 ## References
 - Installation: see [docs/install.md](docs/install.md).
 - SQLite schema: see [docs/sqlite_schema.sql](docs/sqlite_schema.sql).
+- Propagation scoring (EN): see [docs/propagation_scoring_reference.md](docs/propagation_scoring_reference.md).
+- Propagation scoring (PT): see [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md).
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
 - Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
 - Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).

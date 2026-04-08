@@ -87,9 +87,9 @@ Last update: 2026-02-22 16:27:19 UTC
                   <pre id="status" class="status-inline">Disconnected</pre>
                 </div>
               </div>
-              <!-- Scan controls -->
+              <!-- Scan controls: Start Single Scanning + band buttons -->
               <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center scan-controls-row">
-                <button class="btn btn-primary" id="startScan">Start scanning</button>
+                <button class="btn btn-primary" id="startScan">Start Single Scanning</button>
                 <div class="scan-quick-bands" aria-label="Quick band switch">
                   <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="160m">160m</button>
                   <button class="btn btn-outline-info btn-sm band-quick-btn" type="button" data-quick-band="80m">80m</button>
@@ -106,9 +106,9 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="login-status status-chip logout-chip d-none" id="logoutBtn" title="Log out (clear local session)" type="button">Logout</button>
                 <span class="ws-status status-chip" id="wsStatus">WS: disconnected</span>
               </div>
-              <!-- Mode selection controls -->
+              <!-- Rotation toggle + mode buttons -->
               <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center">
-                <div style="width: 138px;"></div>
+                <button class="btn btn-primary rotation-toggle-btn" type="button" id="rotationToggleBtn" title="Configure scan rotation between bands and modes">Config Scan Rotation</button>
                 <div class="scan-quick-modes" aria-label="Quick mode selection">
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="CW">CW</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="WSPR">WSPR</button>
@@ -125,6 +125,69 @@ Last update: 2026-02-22 16:27:19 UTC
                 <div class="d-none d-flex align-items-center gap-2" id="ssbScanParamsRow">
                   <label class="form-label mb-0" for="ssbMaxHolds" title="Maximum voice-signature focus holds per sweep pass (0 = auto-adaptive)">SSB Max Holds (max 12)</label>
                   <input type="number" id="ssbMaxHolds" value="0" min="0" max="12" step="1" class="form-control form-control-sm" style="width: 80px;" title="0 = auto (~1 per 50 kHz of band span, min 4, max 12)" />
+                </div>
+              </div>
+              <!-- Rotation configuration panel (collapsible) -->
+              <div class="col-12 d-none" id="rotationPanel">
+                <div class="rotation-panel">
+                  <div class="rotation-panel__header">
+                    <h3 class="h6 mb-0">Scan Rotation</h3>
+                    <div class="d-flex align-items-center gap-2">
+                      <select class="form-select form-select-sm" id="rotationModeSelect" style="width: auto;">
+                        <option value="bands">Bands × Modes</option>
+                        <option value="modes">Single Band × Modes</option>
+                      </select>
+                    </div>
+                  </div>
+                  <!-- Single-band selector (visible only in "modes" mode) -->
+                  <div class="d-none d-flex align-items-center gap-2 mb-3" id="rotationBandRow">
+                    <label class="form-label mb-0">Band:</label>
+                    <select class="form-select form-select-sm" id="rotationBand" style="width: auto;">
+                      <option value="160m">160m</option>
+                      <option value="80m">80m</option>
+                      <option value="40m">40m</option>
+                      <option value="20m" selected>20m</option>
+                      <option value="17m">17m</option>
+                      <option value="15m">15m</option>
+                      <option value="12m">12m</option>
+                      <option value="10m">10m</option>
+                    </select>
+                  </div>
+                  <!-- Default dwell + loop -->
+                  <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="d-flex align-items-center gap-1">
+                      <label class="form-label mb-0" for="rotationDwell">Dwell:</label>
+                      <select class="form-select form-select-sm" id="rotationDwell" style="width: auto;" title="Time to stay on each slot before switching">
+                        <option value="600">10 minutes</option>
+                        <option value="900" selected>15 minutes</option>
+                        <option value="1200">20 minutes</option>
+                        <option value="1800">30 minutes</option>
+                        <option value="2400">40 minutes</option>
+                        <option value="3000">50 minutes</option>
+                      </select>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" id="rotationLoop" checked />
+                      <label class="form-check-label" for="rotationLoop">Loop</label>
+                    </div>
+                  </div>
+                  <!-- Slot list -->
+                  <div id="rotationSlots" class="rotation-slots mb-3"></div>
+                  <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-outline-info btn-sm" type="button" id="rotationAddSlot">+ Add New Slot</button>
+                    <div class="ms-auto d-flex gap-2">
+                      <button class="btn btn-primary btn-sm" type="button" id="rotationStartBtn">Start Rotation</button>
+                      <button class="btn btn-danger btn-sm d-none" type="button" id="rotationStopBtn">Stop Rotation</button>
+                    </div>
+                  </div>
+                  <!-- Live status (visible while rotation is running) -->
+                  <div class="d-none rotation-live-status" id="rotationLiveStatus">
+                    <span class="rotation-live-status__dot"></span>
+                    <span class="rotation-live-status__slot" id="rotationLiveSlot">--</span>
+                    <span class="text-muted mx-1">→</span>
+                    <span id="rotationLiveNext" class="text-muted">--</span>
+                    <span class="rotation-live-status__countdown"><span style="color:#fff">Timer:</span> <span id="rotationLiveCountdown">--:--</span></span>
+                  </div>
                 </div>
               </div>
               <div class="col-12 scan-context" id="scanContext" aria-live="polite">
@@ -201,7 +264,16 @@ Last update: 2026-02-22 16:27:19 UTC
         <div class="col-12 col-propmap-custom">
           <div class="card panel h-100">
             <div class="card-body d-flex flex-column">
-              <h2 class="h5">Propagation Map</h2>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <h2 class="h5 mb-0">Propagation Map</h2>
+                <select id="mapWindowSelect" class="form-select form-select-sm" style="width:auto;">
+                  <option value="60" selected>1 h</option>
+                  <option value="120">2 h</option>
+                  <option value="240">4 h</option>
+                  <option value="480">8 h</option>
+                  <option value="1440">24 h</option>
+                </select>
+              </div>
               <p id="propagationScore" class="mb-1" style="font-size:1.125rem;">Score: --</p>
               <ul class="summary mb-3" id="propagationBands">
                 <li>No propagation data yet.</li>
@@ -869,7 +941,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
-    <script src="map.js?v=20260228104050"></script>
+    <script src="map.js?v=20260408120000"></script>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>

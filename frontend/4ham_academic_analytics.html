@@ -613,7 +613,7 @@ Last update: 2026-04-03 UTC
     </div>
     <div class="wrap">
       <section class="hero">
-        <h1 id="dashboardTitle">4ham Spectrum Analysis v0.9.0 - Academic Analytics</h1>
+        <h1 id="dashboardTitle">4ham Spectrum Analysis v0.10.0 - Academic Analytics</h1>
         <p id="apiLastFetchInfo">Last API data query: --</p>
         <p id="nextRefreshInfo">Time until next data refresh: --</p>
       </section>
@@ -856,7 +856,7 @@ Last update: 2026-04-03 UTC
       let dataSource = "simulated";
       let lastResolvedRange = null;
       let lastFilters = { band: "ALL", mode: "ALL" };
-      let currentPreset = sessionStorage.getItem("4ham_preset") || "24h";
+      let currentPreset = sessionStorage.getItem("4ham_preset") || "1h";
       let refreshCountdownTimer = null;
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
@@ -2161,8 +2161,8 @@ Last update: 2026-04-03 UTC
           return { start: new Date(end.getTime() - 30 * 24 * 3600 * 1000), end };
         }
 
-        const customStart = startInput.value ? new Date(startInput.value) : new Date(end.getTime() - 24 * 3600 * 1000);
-        const customEnd = endInput.value ? new Date(endInput.value) : end;
+        const customStart = startInput.value ? new Date(startInput.value + 'Z') : new Date(end.getTime() - 24 * 3600 * 1000);
+        const customEnd = endInput.value ? new Date(endInput.value + 'Z') : end;
         if (customEnd <= customStart) {
           return { start: new Date(customEnd.getTime() - 24 * 3600 * 1000), end: customEnd };
         }

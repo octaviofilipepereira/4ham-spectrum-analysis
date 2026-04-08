@@ -419,9 +419,16 @@ class Database:
         self.conn.commit()
 
     def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
-        """Thread-safe event retrieval with proper SQLite synchronization."""
+        """Thread-safe event retrieval with proper SQLite synchronization.
+
+        The limit is applied independently to each table (occupancy_events,
+        callsign_events) so that one table cannot crowd out the other when
+        they are merged.
+        """
         with self._lock:
             events = []
+            # Each table gets its own limit so neither can starve the other
+            per_table_limit = limit if limit is not None else -1
 
             # occupancy_events has no callsign column — skip entirely when filtering by callsign
             if not callsign:
@@ -502,7 +509,40 @@ class Database:
                 events.append(dict(row))
 
             events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-            return events if limit is None else events[:limit]
+            return events
+
+    def get_callsign_events(self, limit=None, offset=0, band=None, mode=None, start=None, end=None, snr_min=None):
+        """Fetch only callsign events (no occupancy). Used by map endpoint."""
+        with self._lock:
+            params = []
+            filters = []
+            if band:
+                filters.append("AND (UPPER(band) = UPPER(?) OR band IS NULL)")
+                params.append(band)
+            if mode:
+                filters.append("AND UPPER(mode) LIKE UPPER(?)")
+                params.append(f"%{mode}%")
+            if snr_min is not None:
+                filters.append("AND snr_db >= ?")
+                params.append(float(snr_min))
+            if start and end:
+                filters.append("AND timestamp BETWEEN ? AND ?")
+                params.append(start)
+                params.append(end)
+            params.extend([limit if limit is not None else -1, offset])
+            rows = self.conn.execute(
+                """
+                SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
+                       mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
+                       time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
+                FROM callsign_events
+                WHERE 1=1 {filters}
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+                """.format(filters=" ".join(filters)),
+                tuple(params)
+            )
+            return [dict(r) for r in rows]
 
     def count_events(self, band=None, mode=None, callsign=None, start=None, end=None):
         """Thread-safe event counting with proper SQLite synchronization."""

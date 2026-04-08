@@ -39,7 +39,7 @@ Frontend routes after install:
 
 ## Manual Installation
 
-### Linux (Ubuntu/Debian)
+### Linux (Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+)
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:
 	- `sudo apt update`

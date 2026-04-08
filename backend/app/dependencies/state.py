@@ -15,7 +15,7 @@ import collections
 import os
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from app.scan.engine import ScanEngine
 from app.sdr.controller import SDRController
@@ -102,6 +102,9 @@ scan_state = {
     "scan": None,
     "scan_id": None
 }
+
+# Scan rotation scheduler instance (set by rotation API on start)
+scan_rotation: Any = None
 
 
 # ═══════════════════════════════════════════════════════════════════

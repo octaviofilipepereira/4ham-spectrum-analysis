@@ -75,18 +75,17 @@ def map_contacts(
     now = datetime.now(timezone.utc)
     start = now - timedelta(minutes=safe_window)
 
-    rows = state.db.get_events(
+    rows = state.db.get_callsign_events(
         limit=safe_limit,
         start=start.isoformat(),
         end=now.isoformat(),
     )
 
     # ── Resolve each callsign → DXCC coords ─────────────────────────────────
-    seen: Dict[str, dict] = {}  # deduplicate by callsign, keep best SNR
+    # Deduplicate by (callsign, band) so the same station shows an arc per band
+    seen: Dict[str, dict] = {}
 
     for row in rows:
-        if str(row.get("type") or "") != "callsign":
-            continue
         cs = str(row.get("callsign") or "").strip().upper()
         if not cs:
             continue
@@ -106,9 +105,10 @@ def map_contacts(
         ts = str(row.get("timestamp") or "")
         distance_km = haversine_km(station_lat, station_lon, dest_lat, dest_lon)
 
-        existing = seen.get(cs)
+        key = f"{cs}|{band}"
+        existing = seen.get(key)
         if existing is None or (snr is not None and (existing["snr_db"] is None or snr > existing["snr_db"])):
-            seen[cs] = {
+            seen[key] = {
                 "callsign": cs,
                 "lat": dest_lat,
                 "lon": dest_lon,

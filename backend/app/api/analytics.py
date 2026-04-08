@@ -160,28 +160,33 @@ def academic_analytics(
     )
     events = sanitize_events_for_api(db_events)
 
-    # Pre-scan: determine which modes have decoder-confirmed callsigns
-    # across the ENTIRE database (not just the selected window).
-    # Occupancy events for modes without any real callsign decode are
-    # excluded — they come solely from the DSP bandwidth heuristic and
-    # mislead users into thinking a scan was performed for that mode.
-    confirmed_modes: set = set()
+    # Pre-scan: determine which (band, mode) pairs had a real decoder running.
+    # A pair is "confirmed" if it has ANY entries in callsign_events for that
+    # specific band — even with empty callsigns — because those records are
+    # only created by actual decoders (SSB ASR, CW detector, FT8 decoder).
+    # Occupancy events for (band, mode) pairs without decoder activity come
+    # purely from the DSP bandwidth heuristic and are excluded.
+    # This is per-band so that e.g. SSB scan on 15m doesn't "confirm"
+    # SSB occupancy on 12m where no SSB scan ever ran.
+    confirmed_band_modes: Optional[set] = set()  # set of (band, mode) tuples
     try:
         with state.db._lock:
-            rows = state.db._conn.execute(
-                "SELECT DISTINCT UPPER(mode) FROM callsign_events "
-                "WHERE callsign IS NOT NULL AND callsign != ''"
+            rows = state.db.conn.execute(
+                "SELECT DISTINCT UPPER(band), UPPER(mode) FROM callsign_events"
+                " WHERE timestamp BETWEEN ? AND ?",
+                (start_dt.isoformat(), end_dt.isoformat()),
             ).fetchall()
-        for (m,) in rows:
-            cs_mode = m.strip()
+        for band_val, mode_val in rows:
+            cs_band = band_val.strip()
+            cs_mode = mode_val.strip()
             if cs_mode == "SSB_TRAFFIC":
                 cs_mode = "SSB"
             elif cs_mode in ("CW_CANDIDATE", "CW_TRAFFIC"):
                 cs_mode = "CW"
-            confirmed_modes.add(cs_mode)
+            confirmed_band_modes.add((cs_band, cs_mode))
     except Exception:
         # On any DB error, fall back to showing all modes
-        confirmed_modes = None
+        confirmed_band_modes = None
 
     series_map: Dict[Tuple[str, str, str], Dict] = {}
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
@@ -221,11 +226,11 @@ def academic_analytics(
 
         event_type = str(event.get("type") or "").strip().lower()
 
-        # Skip events for modes without decoder-confirmed callsigns.
+        # Skip events for (band, mode) pairs without decoder activity.
         # Occupancy events are purely from the DSP bandwidth heuristic;
         # callsign events with empty callsign are voice-detection markers
         # that also lack decoder confirmation.
-        if confirmed_modes is not None and mode_name not in confirmed_modes:
+        if confirmed_band_modes is not None and (band_name.upper(), mode_name) not in confirmed_band_modes:
             if event_type == "occupancy":
                 continue
             if event_type == "callsign":

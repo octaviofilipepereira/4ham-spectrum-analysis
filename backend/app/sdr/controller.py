@@ -351,7 +351,20 @@ class SDRController:
 
         _last_rtl_generation = _detect_rtl_generation(selected_details)
 
-        device = SoapySDR.Device(device_args)
+        # Retry device open to tolerate USB release latency after a
+        # previous close (the kernel may need a moment to fully release
+        # the device after SoapySDR.Device is destroyed).
+        device = None
+        _open_attempts = 3
+        for _attempt in range(_open_attempts):
+            try:
+                device = SoapySDR.Device(device_args)
+                break
+            except Exception:
+                if _attempt == _open_attempts - 1:
+                    raise
+                _log.info("SoapySDR.Device open failed (attempt %d/%d), retrying...", _attempt + 1, _open_attempts)
+                time.sleep(0.5)
 
         # Detect V4 BEFORE applying any settings — critical for HF reception
         _is_rtlsdr_v4 = _detect_rtlsdr_v4(device, device_args)

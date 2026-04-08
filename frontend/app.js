@@ -1077,8 +1077,8 @@ async function fetchAndRenderSearchResults() {
   if (mode)     params.set("mode", mode);
   if (band)     params.set("band", band);
   if (snrMin !== "") params.set("snr_min", snrMin);
-  const startISO = start.length === 10 ? (() => { const [d,m,y] = start.split("/"); const dt = new Date(`${y}-${m}-${d}T00:00:00`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
-  const endISO   = end.length   === 10 ? (() => { const [d,m,y] = end.split("/");   const dt = new Date(`${y}-${m}-${d}T23:59:59`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  const startISO = start.length === 10 ? (() => { const [d,m,y] = start.split("/"); const dt = new Date(`${y}-${m}-${d}T00:00:00Z`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
+  const endISO   = end.length   === 10 ? (() => { const [d,m,y] = end.split("/");   const dt = new Date(`${y}-${m}-${d}T23:59:59Z`); return isNaN(dt) ? "" : dt.toISOString(); })() : "";
   if (startISO) params.set("start", startISO);
   if (endISO)   params.set("end",   endISO);
 
@@ -1729,7 +1729,9 @@ function updateScanButtonState() {
     startBtn.disabled = true;
     return;
   }
-  startBtn.textContent = isScanRunning ? "Stop scanning" : "Start scanning";
+  startBtn.textContent = isScanRunning
+    ? (rotationRunning ? "Stop Rotation Scanning" : "Stop Single Scanning")
+    : "Start Single Scanning";
   startBtn.disabled = false;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
@@ -1907,6 +1909,21 @@ async function syncScanState() {
       refreshQuickBandButtons();
     }
     renderScanContextSummary(data);
+    // Sync rotation state from backend (handles page refresh while rotation active)
+    if (data?.rotation?.running && !rotationRunning) {
+      rotationRunning = true;
+      // Restore slot list from backend so UI survives page refresh
+      if (data.rotation.slots && data.rotation.slots.length) {
+        rotationSlots = data.rotation.slots.map((s) => ({ band: s.band, mode: s.mode.toUpperCase() }));
+      }
+      renderRotationSlots();
+      updateRotationUI();
+      startRotationPoll();
+      if (rotationPanel.classList.contains("d-none")) {
+        rotationPanel.classList.remove("d-none");
+        rotationToggleBtn.classList.add("is-active");
+      }
+    }
   } catch (err) {
     return;
   }
@@ -1920,7 +1937,14 @@ async function toggleScan() {
   updateScanButtonState();
   try {
     if (isScanRunning) {
-      await stopScan();
+      if (rotationRunning) {
+        // Stop via rotation/stop to avoid scan_stop reopening preview
+        // (which holds the SDR device and blocks the next rotation start)
+        await stopRotation();
+        isScanRunning = false;
+      } else {
+        await stopScan();
+      }
     } else {
       await startScan();
     }
@@ -1986,6 +2010,256 @@ async function switchBandLive(selectedBand) {
     updateScanButtonState();
   }
 }
+
+// ── Scan Rotation ─────────────────────────────────────────────
+
+const rotationToggleBtn = document.getElementById("rotationToggleBtn");
+const rotationPanel = document.getElementById("rotationPanel");
+const rotationModeSelect = document.getElementById("rotationModeSelect");
+const rotationBandRow = document.getElementById("rotationBandRow");
+const rotationBand = document.getElementById("rotationBand");
+const rotationDwell = document.getElementById("rotationDwell");
+const rotationLoop = document.getElementById("rotationLoop");
+const rotationSlotsEl = document.getElementById("rotationSlots");
+const rotationAddSlotBtn = document.getElementById("rotationAddSlot");
+const rotationStartBtn = document.getElementById("rotationStartBtn");
+const rotationStopBtn = document.getElementById("rotationStopBtn");
+const rotationLiveStatus = document.getElementById("rotationLiveStatus");
+const rotationLiveSlot = document.getElementById("rotationLiveSlot");
+const rotationLiveNext = document.getElementById("rotationLiveNext");
+const rotationLiveCountdown = document.getElementById("rotationLiveCountdown");
+
+let rotationSlots = [
+  { band: "20m", mode: "FT8" },
+  { band: "40m", mode: "FT8" },
+];
+let rotationRunning = false;
+let _rotationPollTimer = null;
+
+const ROTATION_BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m"];
+const ROTATION_MODES = ["CW", "WSPR", "FT4", "FT8", "SSB"];
+
+function renderRotationSlots() {
+  const mode = rotationModeSelect.value;
+  rotationSlotsEl.innerHTML = "";
+  rotationSlots.forEach((slot, i) => {
+    const row = document.createElement("div");
+    row.className = "rotation-slot-row";
+    const idx = document.createElement("span");
+    idx.className = "slot-index";
+    idx.textContent = `${i + 1}.`;
+    row.appendChild(idx);
+
+    if (mode === "bands") {
+      const bandLabel = document.createElement("span");
+      bandLabel.className = "form-label mb-0 text-white";
+      bandLabel.textContent = "Band";
+      row.appendChild(bandLabel);
+
+      const bandSel = document.createElement("select");
+      bandSel.className = "form-select form-select-sm";
+      bandSel.style.width = "110px";
+      ROTATION_BANDS.forEach((b) => {
+        const opt = document.createElement("option");
+        opt.value = b; opt.textContent = b;
+        if (b === slot.band) opt.selected = true;
+        bandSel.appendChild(opt);
+      });
+      bandSel.addEventListener("change", () => { rotationSlots[i].band = bandSel.value; });
+      row.appendChild(bandSel);
+    }
+
+    const modeLabel = document.createElement("span");
+    modeLabel.className = "form-label mb-0 text-white";
+    modeLabel.textContent = "Mode";
+    row.appendChild(modeLabel);
+
+    const modeSel = document.createElement("select");
+    modeSel.className = "form-select form-select-sm";
+    modeSel.style.width = "110px";
+    ROTATION_MODES.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m; opt.textContent = m;
+      if (m === slot.mode) opt.selected = true;
+      modeSel.appendChild(opt);
+    });
+    modeSel.addEventListener("change", () => { rotationSlots[i].mode = modeSel.value; });
+    row.appendChild(modeSel);
+
+    if (rotationSlots.length > 2) {
+      const closeBtn = document.createElement("button");
+      closeBtn.type = "button";
+      closeBtn.className = "btn-close ms-auto";
+      closeBtn.title = "Remove slot";
+      closeBtn.addEventListener("click", () => {
+        rotationSlots.splice(i, 1);
+        renderRotationSlots();
+      });
+      row.appendChild(closeBtn);
+    }
+
+    rotationSlotsEl.appendChild(row);
+  });
+}
+
+rotationToggleBtn?.addEventListener("click", () => {
+  const panel = rotationPanel;
+  const isVisible = !panel.classList.contains("d-none");
+  panel.classList.toggle("d-none", isVisible);
+  rotationToggleBtn.classList.toggle("is-active", !isVisible);
+  if (!isVisible) {
+    renderRotationSlots();
+    if (rotationRunning) updateRotationUI();
+  }
+});
+
+rotationModeSelect?.addEventListener("change", () => {
+  const isModes = rotationModeSelect.value === "modes";
+  rotationBandRow?.classList.toggle("d-none", !isModes);
+  // In "modes" mode, slots only have mode (band comes from the single selector)
+  if (isModes) {
+    rotationSlots = rotationSlots.map((s) => ({ mode: s.mode }));
+  } else {
+    const band = rotationBand?.value || "20m";
+    rotationSlots = rotationSlots.map((s) => ({ band, mode: s.mode }));
+  }
+  renderRotationSlots();
+});
+
+rotationAddSlotBtn?.addEventListener("click", () => {
+  const mode = rotationModeSelect.value;
+  if (mode === "bands") {
+    rotationSlots.push({ band: "20m", mode: "FT8" });
+  } else {
+    rotationSlots.push({ mode: "FT8" });
+  }
+  renderRotationSlots();
+});
+
+async function startRotation() {
+  const dwell = parseInt(rotationDwell.value, 10) || 60;
+  const loop = rotationLoop.checked;
+  const mode = rotationModeSelect.value;
+  let payload;
+
+  if (mode === "bands") {
+    payload = {
+      rotation_mode: "bands",
+      dwell_s: dwell,
+      loop,
+      slots: rotationSlots.map((s) => {
+        const entry = { band: s.band, mode: s.mode.toLowerCase() };
+        if (s.dwell_s) entry.dwell_s = s.dwell_s;
+        return entry;
+      }),
+    };
+  } else {
+    payload = {
+      rotation_mode: "modes",
+      band: rotationBand.value,
+      dwell_s: dwell,
+      loop,
+      modes: rotationSlots.map((s) => s.mode.toLowerCase()),
+    };
+  }
+
+  try {
+    const resp = await fetch("/api/scan/rotation/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const msg = await parseApiError(resp, "Failed to start rotation");
+      throw new Error(msg);
+    }
+    rotationRunning = true;
+    updateRotationUI();
+    showToast("Rotation started");
+    logLine("Scan rotation started");
+    startRotationPoll();
+  } catch (err) {
+    showToastError(err?.message || "Rotation start failed");
+  }
+}
+
+async function stopRotation() {
+  try {
+    const resp = await fetch("/api/scan/rotation/stop", {
+      method: "POST",
+      headers: { ...getAuthHeader() },
+    });
+    if (!resp.ok) {
+      const msg = await parseApiError(resp, "Failed to stop rotation");
+      throw new Error(msg);
+    }
+    rotationRunning = false;
+    updateRotationUI();
+    showToast("Rotation stopped");
+    logLine("Scan rotation stopped");
+    stopRotationPoll();
+  } catch (err) {
+    showToastError(err?.message || "Rotation stop failed");
+  }
+}
+
+function updateRotationUI() {
+  rotationStartBtn?.classList.toggle("d-none", rotationRunning);
+  rotationStopBtn?.classList.toggle("d-none", !rotationRunning);
+  rotationLiveStatus?.classList.toggle("d-none", !rotationRunning);
+  // Lock/unlock panel editing via CSS class
+  const panel = document.querySelector(".rotation-panel");
+  if (panel) panel.classList.toggle("is-locked", rotationRunning);
+  rotationAddSlotBtn && (rotationAddSlotBtn.disabled = rotationRunning);
+  updateScanButtonState();
+}
+
+function formatRotationTime(totalSeconds) {
+  const s = Math.ceil(totalSeconds);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+async function pollRotationStatus() {
+  try {
+    const resp = await fetch("/api/scan/rotation/status", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.running) {
+      rotationRunning = true;
+      const cur = data.current_slot;
+      const nxt = data.next_slot;
+      rotationLiveSlot.textContent = cur ? `${cur.band} · ${cur.mode.toUpperCase()}` : "--";
+      rotationLiveNext.textContent = nxt ? `${nxt.band} · ${nxt.mode.toUpperCase()}` : "--";
+      const rem = data.time_remaining_s ?? 0;
+      rotationLiveCountdown.textContent = formatRotationTime(rem);
+    } else {
+      if (rotationRunning) {
+        rotationRunning = false;
+        updateRotationUI();
+        stopRotationPoll();
+      }
+    }
+    updateRotationUI();
+  } catch (_) { /* best effort */ }
+}
+
+function startRotationPoll() {
+  stopRotationPoll();
+  pollRotationStatus();
+  _rotationPollTimer = setInterval(pollRotationStatus, 2000);
+}
+
+function stopRotationPoll() {
+  if (_rotationPollTimer) {
+    clearInterval(_rotationPollTimer);
+    _rotationPollTimer = null;
+  }
+}
+
+rotationStartBtn?.addEventListener("click", () => startRotation());
+rotationStopBtn?.addEventListener("click", () => stopRotation());
 
 startBtn.addEventListener("click", () => {
   toggleScan();
@@ -2493,6 +2767,31 @@ function connectStatus() {
         }
         if (data.retention_completed) {
           showRetentionToast(data.retention_completed);
+        }
+        // Live rotation status from WebSocket (1s updates)
+        if (data.rotation && data.rotation.running) {
+          const cur = data.rotation.current_slot;
+          const nxt = data.rotation.next_slot;
+          if (rotationLiveSlot) rotationLiveSlot.textContent = cur ? `${cur.band} · ${cur.mode.toUpperCase()}` : "--";
+          if (rotationLiveNext) rotationLiveNext.textContent = nxt ? `${nxt.band} · ${nxt.mode.toUpperCase()}` : "--";
+          const rem = data.rotation.time_remaining_s ?? 0;
+          if (rotationLiveCountdown) rotationLiveCountdown.textContent = formatRotationTime(rem);
+          if (!rotationRunning) {
+            rotationRunning = true;
+            if (data.rotation.slots && data.rotation.slots.length) {
+              rotationSlots = data.rotation.slots.map((s) => ({ band: s.band, mode: s.mode.toUpperCase() }));
+            }
+            renderRotationSlots();
+            updateRotationUI();
+            if (rotationPanel.classList.contains("d-none")) {
+              rotationPanel.classList.remove("d-none");
+              rotationToggleBtn.classList.add("is-active");
+            }
+          }
+        } else if (rotationRunning && !data.rotation) {
+          rotationRunning = false;
+          updateRotationUI();
+          stopRotationPoll();
         }
       } catch (err) {
         setStatus("Status decode error");
