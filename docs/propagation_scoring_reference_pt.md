@@ -328,7 +328,8 @@ Tabela completa de pares piso/tecto utilizados por `normalise_snr()` na implemen
 
 4. **HamSCI** — Frissell, N. A. et al. (2014)  
    "Ionospheric Sounding Using Real-Time Amateur Radio Reporting Networks"  
-   Space Weather, 12(12), 651-656. DOI: 10.1002/2014SW001132
+   Space Weather, 12(12), 651-656. DOI: 10.1002/2014SW001132  
+   https://doi.org/10.1002/2014SW001132
 
 5. **VOACAP** — Voice of America Coverage Analysis Program  
    https://www.voacap.com/
