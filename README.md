@@ -10,7 +10,7 @@ Web platform for amateur radio spectrum analysis, with DSP, real-time events, an
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
-It is designed to run on Raspberry Pi and Linux PC, with a modern web interface (currently English; Portuguese and Spanish planned).
+It is designed to run on Linux PC and Raspberry Pi (Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+), with a modern web interface (currently English; Portuguese and Spanish planned).
 
 ## Main requirements
 - Hardware: RTL-SDR (primary), with readiness for HackRF, Airspy, and transceivers with SDR interface.
@@ -562,7 +562,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 Full hardware and performance details: see [docs/hardware_requirements.md](docs/hardware_requirements.md).
 
 ### Operating system
-- **Linux** (Debian 11+ / Ubuntu 22.04+ / Raspberry Pi OS Bookworm) — primary and recommended.
+- **Linux** (Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+) — primary and recommended.
 - **Windows 10/11**: supported via WSL2 or native Python; SoapySDR driver support varies.
 - **Python**: 3.10 or later.
 - **Browser**: any modern browser (Chrome, Firefox, Edge) to access the web UI.

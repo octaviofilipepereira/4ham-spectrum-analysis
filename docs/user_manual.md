@@ -219,7 +219,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ### Pré-requisitos
 - SDR: RTL-SDR (recomendado), HackRF, Airspy ou outro hardware compatível com SoapySDR
-- Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Raspberry Pi OS 64-bit
+- Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - Sincronização de tempo NTP (obrigatório para FT8/FT4)
 
