@@ -1,6 +1,6 @@
 # Referência de Pontuação de Propagação — Validação & Design
 
-> **Versão do documento**: 1.1 — 2026-04-06  
+> **Versão do documento**: 1.2 — 2026-04-08  
 > **Autor**: Octávio Filipe Gonçalves | Indicativo: CT7BFV / Projecto: 4ham-spectrum-analysis  
 > **Objectivo**: Documento de referência para o sistema de pontuação de propagação com 3 fórmulas, validado contra standards da indústria e investigação científica.
 
@@ -104,15 +104,29 @@ Estes modos descodificam **toda a banda simultaneamente**. Cada sinal na largura
 | `unique_callsigns` | **15%** | Suportada pela metodologia HamSCI |
 | `recency` | **10%** | Relevância para painel em tempo real |
 
+**Fórmula exacta:**
+
+```
+decode_rate    = callsign_events / total_events
+snr_component  = normalise_snr(median(snr_values), modo_dominante)
+callsign_norm  = clamp(ln(1 + unique_callsigns) / ln(21), 0, 1)
+recency        = avg_recency   (0–1, decaimento temporal)
+
+Score = 100 × (0.40 × decode_rate + 0.35 × snr_component + 0.15 × callsign_norm + 0.10 × recency)
+Score = clamp(Score, 0, 100)
+```
+
 **Normalização de SNR** (específica por modo):
+
+```
+snr_norm = clamp((SNR - piso) / (tecto - piso), 0, 1)
+```
 
 | Modo | Piso (limiar de descodificação) | Tecto | Gama |
 |---|---|---|---|
 | FT8 | -20 dB | +10 dB | 30 dB |
 | FT4 | -17,5 dB | +10 dB | 27,5 dB |
 | WSPR | -31 dB | +0 dB | 31 dB |
-
-Fórmula: `snr_norm = clamp((SNR - piso) / gama, 0, 1)`
 
 ### 4.2 Categoria 2: CW (Varrimento Sequencial de Banda Estreita)
 
@@ -132,6 +146,31 @@ A descodificação de callsigns CW é inerentemente menos fiável que FT8/FT4/WS
 | `callsign_bonus` | **15%** | Bónus quando callsign É capturado (não penalização quando ausente) |
 | `recency` | **10%** | Relevância para painel em tempo real |
 
+**Fórmula exacta:**
+
+```
+traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
+snr_component     = normalise_snr(median(snr_values), "CW")
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 se sem dados de potência]
+callsign_bonus    = min(1, callsign_events / total_events × 3)
+recency           = avg_recency   (0–1)
+
+Score = 100 × (0.30 × traffic_norm + 0.30 × snr_component + 0.15 × signal_component + 0.15 × callsign_bonus + 0.10 × recency)
+```
+
+**Penalização de verificação** (eventos só de ocupância não têm confirmação de callsign):
+
+```
+se total_events > 5:
+    conf_ratio = callsign_events / total_events
+    se conf_ratio < 0.03:
+        verification = 0.65 + 0.35 × (conf_ratio / 0.03)
+        Score = Score × verification
+Score = clamp(Score, 0, 100)
+```
+
+Esta penalização reduz a pontuação até 35% quando menos de 3% dos eventos têm callsigns confirmados — um indicador forte de que o scanner está a detectar ruído ou interferência, não tráfego CW real.
+
 **Normalização de SNR**: Piso = -15 dB, Tecto = +20 dB, Gama = 35 dB
 
 ### 4.3 Categoria 3: SSB (Varrimento Sequencial de Banda Estreita + Voz)
@@ -150,11 +189,72 @@ SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB n
 | `callsign_bonus` | **5%** | Bónus quando callsign É capturado |
 | `recency` | **5%** | Relevância para painel em tempo real |
 
+**Fórmula exacta:**
+
+```
+traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
+snr_component     = normalise_snr(median(snr_values), "SSB")
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 se sem dados de potência]
+voice_quality     = avg_confidence   (0–1, do detector de voz)
+transcript_bonus  = 1.0 se tem transcrição, 0.0 se não
+callsign_bonus    = min(1, callsign_events / total_events × 3)
+recency           = avg_recency   (0–1)
+
+Score = 100 × (0.20 × traffic_norm + 0.25 × snr_component + 0.15 × signal_component + 0.20 × voice_quality + 0.10 × transcript_bonus + 0.05 × callsign_bonus + 0.05 × recency)
+```
+
+**Penalização de verificação** (mesmo que CW):
+
+```
+se total_events > 5:
+    conf_ratio = callsign_events / total_events
+    se conf_ratio < 0.03:
+        verification = 0.65 + 0.35 × (conf_ratio / 0.03)
+        Score = Score × verification
+Score = clamp(Score, 0, 100)
+```
+
 **Normalização de SNR**: Piso = +3 dB, Tecto = +30 dB, Gama = 27 dB
 
 ---
 
-## 5. Limiares de Pontuação
+## 5. Agregação de Score por Banda
+
+Quando múltiplas categorias (digital, CW, SSB) estão presentes na mesma banda, o score final da banda é uma **média ponderada** pela contagem de eventos:
+
+```
+Band_Score = Σ(score_cat × events_cat) / Σ(events_cat)
+```
+
+Isto garante que categorias com mais actividade têm influencia proporcionalmente maior na avaliação global de propagação da banda.
+
+---
+
+## 6. Tabela Completa de Parâmetros SNR
+
+Tabela completa de pares piso/tecto utilizados por `normalise_snr()` na implementação:
+
+| Modo | Piso (dB) | Tecto (dB) | Gama (dB) | Fonte |
+|---|---|---|---|---|
+| FT8 | -20,0 | +10,0 | 30,0 | WSJT-X §17.2.10 |
+| FT4 | -17,5 | +10,0 | 27,5 | WSJT-X §17.2.10 |
+| WSPR | -31,0 | +0,0 | 31,0 | WSJT-X §17.2.10 |
+| JT65 | -25,0 | +5,0 | 30,0 | WSJT-X §17.2.10 |
+| JT9 | -26,0 | +5,0 | 31,0 | WSJT-X §17.2.10 |
+| FST4 | -28,0 | +2,0 | 30,0 | WSJT-X §17.2.10 |
+| FST4W | -33,0 | +0,0 | 33,0 | WSJT-X §17.2.10 |
+| Q65 | -22,0 | +8,0 | 30,0 | WSJT-X §17.2.10 |
+| CW | -15,0 | +20,0 | 35,0 | Estimativa operacional |
+| CW_CANDIDATE | -15,0 | +20,0 | 35,0 | Mesmo que CW |
+| SSB | +3,0 | +30,0 | 27,0 | Estimativa operacional |
+| SSB_TRAFFIC | +3,0 | +30,0 | 27,0 | Mesmo que SSB |
+| AM | +3,0 | +30,0 | 27,0 | Mesmo que SSB |
+| VOICE_DETECTION | +3,0 | +30,0 | 27,0 | Mesmo que SSB |
+| *(default)* | -20,0 | +10,0 | 30,0 | Fallback para modos desconhecidos |
+
+---
+
+## 7. Limiares de Pontuação
 
 | Gama de Pontuação | Estado | Descrição |
 |---|---|---|
@@ -165,7 +265,7 @@ SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB n
 
 ---
 
-## 6. Localizações da Implementação
+## 8. Localizações da Implementação
 
 ### 6.1 Backend (implementação canónica)
 
@@ -192,7 +292,7 @@ SSB partilha a limitação de varrimento sequencial do CW. Adicionalmente, SSB n
 
 ---
 
-## 7. Fontes & Referências
+## 9. Fontes & Referências
 
 1. **Especificação do Programador PSK Reporter** — Philip Gladstone, N1DQ  
    https://www.pskreporter.info/pskdev.html

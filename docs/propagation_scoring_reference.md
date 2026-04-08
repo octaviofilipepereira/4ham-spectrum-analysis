@@ -1,6 +1,6 @@
 # Propagation Scoring Reference — Validation & Design
 
-> **Document version**: 1.1 — 2026-04-06  
+> **Document version**: 1.2 — 2026-04-08  
 > **Author**: Octávio Filipe Gonçalves | Callsign: CT7BFV / Project: 4ham-spectrum-analysis  
 > **Purpose**: Reference document for the 3-formula propagation scoring system, validated against industry standards and scientific research.
 
@@ -104,15 +104,29 @@ These modes decode the **entire passband simultaneously**. Every signal in the 2
 | `unique_callsigns` | **15%** | Supported by HamSCI methodology |
 | `recency` | **10%** | Real-time dashboard relevance |
 
+**Exact formula:**
+
+```
+decode_rate    = callsign_events / total_events
+snr_component  = normalise_snr(median(snr_values), dominant_mode)
+callsign_norm  = clamp(ln(1 + unique_callsigns) / ln(21), 0, 1)
+recency        = avg_recency   (0–1, time-decayed)
+
+Score = 100 × (0.40 × decode_rate + 0.35 × snr_component + 0.15 × callsign_norm + 0.10 × recency)
+Score = clamp(Score, 0, 100)
+```
+
 **SNR Normalization** (mode-specific):
+
+```
+snr_norm = clamp((SNR - floor) / (ceiling - floor), 0, 1)
+```
 
 | Mode | Floor (decode threshold) | Ceiling | Range |
 |---|---|---|---|
 | FT8 | -20 dB | +10 dB | 30 dB |
 | FT4 | -17.5 dB | +10 dB | 27.5 dB |
 | WSPR | -31 dB | +0 dB | 31 dB |
-
-Formula: `snr_norm = clamp((SNR - floor) / range, 0, 1)`
 
 ### 4.2 Category 2: CW (Sequential Narrowband Scan)
 
@@ -132,6 +146,31 @@ CW callsign decoding is inherently less reliable than FT8/FT4/WSPR due to:
 | `callsign_bonus` | **15%** | Bonus when callsign IS captured (not penalty when absent) |
 | `recency` | **10%** | Real-time dashboard relevance |
 
+**Exact formula:**
+
+```
+traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
+snr_component     = normalise_snr(median(snr_values), "CW")
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 if no power data]
+callsign_bonus    = min(1, callsign_events / total_events × 3)
+recency           = avg_recency   (0–1)
+
+Score = 100 × (0.30 × traffic_norm + 0.30 × snr_component + 0.15 × signal_component + 0.15 × callsign_bonus + 0.10 × recency)
+```
+
+**Verification penalty** (occupancy-only events lack callsign confirmation):
+
+```
+if total_events > 5:
+    conf_ratio = callsign_events / total_events
+    if conf_ratio < 0.03:
+        verification = 0.65 + 0.35 × (conf_ratio / 0.03)
+        Score = Score × verification
+Score = clamp(Score, 0, 100)
+```
+
+This penalty reduces the score by up to 35% when less than 3% of events have confirmed callsigns — a strong indicator that the scanner is detecting noise or interference, not real CW traffic.
+
 **SNR Normalization**: Floor = -15 dB, Ceiling = +20 dB, Range = 35 dB
 
 ### 4.3 Category 3: SSB (Sequential Narrowband Scan + Voice)
@@ -150,11 +189,72 @@ SSB shares CW's sequential scanning limitation. Additionally, SSB has no structu
 | `callsign_bonus` | **5%** | Bonus when callsign IS captured |
 | `recency` | **5%** | Real-time dashboard relevance |
 
+**Exact formula:**
+
+```
+traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
+snr_component     = normalise_snr(median(snr_values), "SSB")
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 if no power data]
+voice_quality     = avg_confidence   (0–1, from voice detector)
+transcript_bonus  = 1.0 if has_transcript else 0.0
+callsign_bonus    = min(1, callsign_events / total_events × 3)
+recency           = avg_recency   (0–1)
+
+Score = 100 × (0.20 × traffic_norm + 0.25 × snr_component + 0.15 × signal_component + 0.20 × voice_quality + 0.10 × transcript_bonus + 0.05 × callsign_bonus + 0.05 × recency)
+```
+
+**Verification penalty** (same as CW):
+
+```
+if total_events > 5:
+    conf_ratio = callsign_events / total_events
+    if conf_ratio < 0.03:
+        verification = 0.65 + 0.35 × (conf_ratio / 0.03)
+        Score = Score × verification
+Score = clamp(Score, 0, 100)
+```
+
 **SNR Normalization**: Floor = +3 dB, Ceiling = +30 dB, Range = 27 dB
 
 ---
 
-## 5. Score Thresholds
+## 5. Band Score Aggregation
+
+When multiple categories (digital, CW, SSB) are present on the same band, the final band score is a **weighted average** by event count:
+
+```
+Band_Score = Σ(score_cat × events_cat) / Σ(events_cat)
+```
+
+This ensures that categories with more activity have proportionally more influence on the band's overall propagation assessment.
+
+---
+
+## 6. Complete SNR Parameters Table
+
+Full table of floor/ceiling pairs used by `normalise_snr()` in the implementation:
+
+| Mode | Floor (dB) | Ceiling (dB) | Range (dB) | Source |
+|---|---|---|---|---|
+| FT8 | -20.0 | +10.0 | 30.0 | WSJT-X §17.2.10 |
+| FT4 | -17.5 | +10.0 | 27.5 | WSJT-X §17.2.10 |
+| WSPR | -31.0 | +0.0 | 31.0 | WSJT-X §17.2.10 |
+| JT65 | -25.0 | +5.0 | 30.0 | WSJT-X §17.2.10 |
+| JT9 | -26.0 | +5.0 | 31.0 | WSJT-X §17.2.10 |
+| FST4 | -28.0 | +2.0 | 30.0 | WSJT-X §17.2.10 |
+| FST4W | -33.0 | +0.0 | 33.0 | WSJT-X §17.2.10 |
+| Q65 | -22.0 | +8.0 | 30.0 | WSJT-X §17.2.10 |
+| CW | -15.0 | +20.0 | 35.0 | Operational estimate |
+| CW_CANDIDATE | -15.0 | +20.0 | 35.0 | Same as CW |
+| SSB | +3.0 | +30.0 | 27.0 | Operational estimate |
+| SSB_TRAFFIC | +3.0 | +30.0 | 27.0 | Same as SSB |
+| AM | +3.0 | +30.0 | 27.0 | Same as SSB |
+| VOICE_DETECTION | +3.0 | +30.0 | 27.0 | Same as SSB |
+| *(default)* | -20.0 | +10.0 | 30.0 | Fallback for unknown modes |
+
+---
+
+## 7. Score Thresholds
 
 | Score Range | State | Description |
 |---|---|---|
@@ -165,7 +265,7 @@ SSB shares CW's sequential scanning limitation. Additionally, SSB has no structu
 
 ---
 
-## 6. Implementation Locations
+## 8. Implementation Locations
 
 ### 6.1 Backend (canonical implementation)
 
@@ -192,7 +292,7 @@ SSB shares CW's sequential scanning limitation. Additionally, SSB has no structu
 
 ---
 
-## 7. Sources & References
+## 9. Sources & References
 
 1. **PSK Reporter Developer Specification** — Philip Gladstone, N1DQ  
    https://www.pskreporter.info/pskdev.html
