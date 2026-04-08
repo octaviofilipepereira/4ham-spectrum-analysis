@@ -81,47 +81,66 @@ SNR = nível_do_sinal_dB - ruído_de_fundo_dB
 
 **O que é**: Avaliação **agregada** das condições de propagação baseada em **múltiplos eventos recentes**.
 
-**Como é calculado**:
+**Como é calculado (v0.9.0 — 3 fórmulas por categoria de modo)**:
 
-Para cada evento na janela temporal (60 minutos), o sistema calcula um score ponderado considerando:
+Desde a v0.9.0, o sistema usa **três fórmulas distintas** adaptadas às características de cada tipo de modo. Cada fórmula combina métricas ponderadas, normalizadas entre 0 e 1, e produz um score final entre 0 e 100.
 
-1. **SNR normalizado** (0 a 1):
-   ```
-   snr_norm = (SNR + 20) / 40
-   ```
-   - SNR -20 dB → 0.0 (0%)
-   - SNR 0 dB → 0.5 (50%)
-   - SNR 20 dB → 1.0 (100%)
-   - SNR ≥ 20 dB → 1.0 (limite máximo)
+##### Categoria 1 — Digital (FT8 / FT4 / WSPR / JT65 / JT9 / FST4 / FST4W / Q65)
 
-2. **Confidence** (confiança da descodificação):
-   - Mede quão "limpa" foi a descodificação do sinal
-   - Varia entre 0.01 e 0.99
+Estes modos descodificam toda a passband em paralelo. A taxa de descodificação (proporção de indicativos vs. eventos totais) é a métrica primária.
 
-3. **Recency weight** (peso temporal):
-   ```
-   recency = 1.0 - (idade_minutos / janela_minutos)
-   ```
-   - Evento recém-recebido: peso 1.0
-   - Evento há 60 minutos: peso 0.2
-   - **Sinais recentes têm mais influência no score**
+| Componente | Peso | Descrição |
+|---|---|---|
+| `decode_rate` | **40 %** | Proporção de eventos com indicativo vs. total de deteções |
+| `median_snr` | **35 %** | SNR mediano normalizado pelo limiar do modo |
+| `unique_callsigns` | **15 %** | Número de indicativos únicos (diversidade) |
+| `recency` | **10 %** | Eventos mais recentes pesam mais |
 
-4. **Base weight** (tipo de evento):
-   - **Callsign** (indicativo descodificado): peso 1.0
-   - **Occupancy** (ocupação detetada): peso 0.55
+**Normalização SNR (específica por modo)**:
 
-**Score final**:
+| Modo | Floor (limiar descodificação) | Ceiling | Faixa |
+|---|---|---|---|
+| FT8 | −20 dB | +10 dB | 30 dB |
+| FT4 | −17,5 dB | +10 dB | 27,5 dB |
+| WSPR | −31 dB | 0 dB | 31 dB |
+
 ```
-Score por evento = snr_norm × confidence × base_weight × recency_weight
-
-Propagation Score = (soma de todos os scores / soma dos pesos) × 100
+snr_norm = clamp((SNR - floor) / faixa, 0, 1)
 ```
 
-**Classificação**:
+##### Categoria 2 — CW (Morse)
+
+CW usa varrimento sequencial por frequência com dwell curto. Não captar um indicativo **não indica propagação fraca** — o operador pode simplesmente não ter transmitido o indicativo durante a janela de escuta.
+
+| Componente | Peso | Descrição |
+|---|---|---|
+| `traffic_volume` | **30 %** | CW_TRAFFIC detetado = banda ativa |
+| `snr_quality` | **30 %** | SNR normalizado (floor −15 dB, ceiling +20 dB) |
+| `signal_strength` | **15 %** | Nível de sinal RF como indicador de propagação |
+| `callsign_bonus` | **15 %** | Bónus quando indicativo É captado (não penalização quando ausente) |
+| `recency` | **10 %** | Eventos mais recentes pesam mais |
+
+##### Categoria 3 — SSB (Voz)
+
+SSB partilha a limitação de varrimento sequencial do CW. A avaliação depende da deteção de voz, qualidade do SNR e nível de sinal.
+
+| Componente | Peso | Descrição |
+|---|---|---|
+| `traffic_volume` | **20 %** | SSB_TRAFFIC / VOICE_DETECTION = banda ativa |
+| `snr_quality` | **25 %** | SNR normalizado (floor +3 dB, ceiling +30 dB) |
+| `signal_strength` | **15 %** | Nível de sinal RF |
+| `voice_quality` | **20 %** | Qualidade da deteção de voz (clareza) |
+| `transcript` | **10 %** | Transcrição speech-to-text bem-sucedida = sinal inteligível |
+| `callsign_bonus` | **5 %** | Bónus quando indicativo É captado |
+| `recency` | **5 %** | Eventos mais recentes pesam mais |
+
+**Classificação (comum a todas as categorias)**:
 - **≥ 70**: Excellent 🟢 (Excelente)
 - **≥ 50**: Good 🟡 (Bom)
 - **≥ 30**: Fair 🟠 (Razoável)
 - **< 30**: Poor 🔴 (Fraco)
+
+> Referência completa com validação científica e fontes: [docs/propagation_scoring_reference.md](propagation_scoring_reference.md)
 
 ---
 
@@ -233,6 +252,49 @@ Na secção **Hour of Day x Band Activity (Heatmap Pro)**:
 - Cor da célula = volume de eventos
 - Hover destaca célula, linha e coluna para leitura cruzada
 - Barras marginais mostram totais por banda (topo) e por hora (lado direito)
+
+---
+
+## Scan Rotation (Rotação de Scan)
+
+### O que é?
+
+O Scan Rotation permite definir uma **sequência de slots (banda + modo)** que o sistema percorre automaticamente, mudando de banda/modo em intervalos configuráveis. É ideal para monitorizar múltiplas bandas e modos durante períodos longos sem intervenção manual.
+
+### Como configurar
+
+1. Clicar em **Config Scan Rotation** (botão na barra de scan).
+2. O painel de rotação expande-se com os seguintes controlos:
+   - **Modo de rotação** — `Band + Mode` (cada slot define banda e modo) ou `Band only` (rota apenas por bandas, mantendo o modo atual).
+   - **Banda e Modo** — selecionar a banda e modo para o próximo slot.
+   - **Dwell** — tempo de permanência em cada slot antes de mudar (30 s, 1 min, 2 min, 5 min, 10 min, 15 min, 30 min).
+   - **Loop** — se ativado, a rotação recomeça após o último slot; se desativado, para no final.
+3. Clicar em **+ Add New Slot** para adicionar cada combinação banda/modo à lista.
+4. Os slots aparecem como badges editáveis — clicar em **×** para remover um slot.
+5. Clicar em **Start Rotation** para iniciar.
+
+### Durante a rotação
+
+- A barra de estado mostra em tempo real: slot atual (banda + modo), tempo restante no countdown, e o próximo slot.
+- O indicador de pulsação vermelho confirma que a rotação está ativa.
+- O botão **Stop scanning** para a rotação (e o scan atual).
+- Os dados de todas as bandas/modos varridos acumulam-se na base de dados e aparecem nos dashboards analíticos.
+
+---
+
+## Mapa de Propagação — Seletor de Janela Temporal
+
+O mapa de propagação inclui um seletor de janela temporal que controla o período de eventos mostrados no globo:
+
+| Opção | Período |
+|---|---|
+| **1h** | Última hora |
+| **2h** | Últimas 2 horas |
+| **4h** | Últimas 4 horas |
+| **8h** | Últimas 8 horas |
+| **24h** | Últimas 24 horas (padrão) |
+
+Eventos fora da janela selecionada não aparecem no mapa. Isto permite focar na atividade recente ou alargar para uma visão diária.
 
 ---
 

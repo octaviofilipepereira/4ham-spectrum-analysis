@@ -91,11 +91,13 @@ Default frontend routes:
 
 ### v0.9.0
 - **3-formula propagation scoring**: separate Digital/CW/SSB formulas with tailored SNR normalisation. Server-computed scores.
+- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
+- **Propagation map time window**: selectable 1h / 2h / 4h / 8h / 24h filter on the propagation globe.
+- **Per-band×mode heuristic filter**: Academic Analytics excludes phantom modes — only band+mode pairs confirmed by a running decoder are shown.
 - **Export multi-format**: CSV, XLSX (Aggregated + All Events), and JSON export from Academic Analytics.
 - **1 h / 12 h presets**: short-period options with minute-level bucketing for higher resolution.
 - **Loading overlay**: spinner shown while switching periods or applying filters.
 - **Callsign ITU validation**: two-branch regex rejects invalid callsigns (e.g. "5I5I").
-- **Heuristic mode filtering**: occupancy events from DSP heuristic only modes (no decoder confirmation) are now excluded.
 - **Empty analytics fix**: confirmed-modes pre-scan queries full DB, preventing blank dashboards for short periods.
 - **Propagation scoring reference docs**: EN + PT with formulas, constants, implementation tables, and PDF exports.
 - **Frontend bug fixes**: CW_TRAFFIC in CW_MODES, FST4W/Q65/VOICE_DETECTION in SNR_PARAMS, verification threshold >5.
@@ -545,12 +547,13 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] Digital decoding pipeline (FT8/FT4/APRS/CW) and SSB ASR baseline.
 - [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
+- [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
+- [x] Scan Rotation (v0.9.0): automated multi-band/mode cycling with configurable dwell and live status.
 
 ### Next milestones
-1. Occupancy alerts and analytics dashboards.
-2. Multi-node aggregation (multiple receivers feeding one backend).
-3. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
-4. Deployment hardening (service templates + operational monitoring/retention defaults).
+1. Multi-node aggregation (multiple receivers feeding one backend).
+2. Advanced SSB ASR (model profiles, confidence calibration, noise robustness, transceiver audio sources).
+3. Deployment hardening (service templates + operational monitoring/retention defaults).
 
 ## System requirements
 
@@ -606,9 +609,7 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 - Stop unnecessary system services (databases, IDEs) on dedicated stations.
 
 ## Next steps
-- Map exact frequencies per band and region (IARU).
 - Detail hardware-specific settings (RTL-SDR/HackRF/Airspy/transceiver).
-- Add occupancy alerts and analytics API/UI endpoints.
 - Add multi-node aggregation support (multiple receivers feeding one backend).
 - Improve SSB ASR confidence calibration for noisy channels and transceiver audio sources (FT-991A/IC-7300).
 - Add packaged operational defaults (retention, log rotation, service health checks).

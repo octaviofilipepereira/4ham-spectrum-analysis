@@ -81,47 +81,66 @@ SNR = signal_level_dB - noise_floor_dB
 
 **What it is**: An **aggregated** assessment of propagation conditions based on **multiple recent events**.
 
-**How it is calculated**:
+**How it is calculated (v0.9.0 — 3 formulas by mode category)**:
 
-For each event in the time window (60 minutes), the system calculates a weighted score considering:
+Since v0.9.0, the system uses **three distinct formulas** tailored to the characteristics of each mode type. Each formula combines weighted metrics, normalised between 0 and 1, and produces a final score between 0 and 100.
 
-1. **Normalised SNR** (0 to 1):
-   ```
-   snr_norm = (SNR + 20) / 40
-   ```
-   - SNR -20 dB → 0.0 (0%)
-   - SNR 0 dB → 0.5 (50%)
-   - SNR 20 dB → 1.0 (100%)
-   - SNR ≥ 20 dB → 1.0 (upper limit)
+##### Category 1 — Digital (FT8 / FT4 / WSPR / JT65 / JT9 / FST4 / FST4W / Q65)
 
-2. **Confidence** (decoding confidence):
-   - Measures how "clean" the signal decoding was
-   - Ranges between 0.01 and 0.99
+These modes decode the entire passband in parallel. The decode rate (ratio of callsigns to total events) is the primary metric.
 
-3. **Recency weight** (time-based weight):
-   ```
-   recency = 1.0 - (age_minutes / window_minutes)
-   ```
-   - Freshly received event: weight 1.0
-   - Event 60 minutes ago: weight 0.2
-   - **Recent signals carry more influence on the score**
+| Component | Weight | Description |
+|---|---|---|
+| `decode_rate` | **40%** | Ratio of events with callsign vs. total detections |
+| `median_snr` | **35%** | Median SNR normalised by mode-specific threshold |
+| `unique_callsigns` | **15%** | Number of unique callsigns (diversity) |
+| `recency` | **10%** | More recent events carry more weight |
 
-4. **Base weight** (event type):
-   - **Callsign** (decoded callsign): weight 1.0
-   - **Occupancy** (detected occupancy): weight 0.55
+**SNR Normalisation (mode-specific)**:
 
-**Final score**:
+| Mode | Floor (decode threshold) | Ceiling | Range |
+|---|---|---|---|
+| FT8 | −20 dB | +10 dB | 30 dB |
+| FT4 | −17.5 dB | +10 dB | 27.5 dB |
+| WSPR | −31 dB | 0 dB | 31 dB |
+
 ```
-Score per event = snr_norm × confidence × base_weight × recency_weight
-
-Propagation Score = (sum of all scores / sum of weights) × 100
+snr_norm = clamp((SNR - floor) / range, 0, 1)
 ```
 
-**Classification**:
+##### Category 2 — CW (Morse)
+
+CW uses sequential narrowband scanning with short dwell times. Not capturing a callsign **does not indicate weak propagation** — the operator may simply not have been transmitting their callsign during the short listening window.
+
+| Component | Weight | Description |
+|---|---|---|
+| `traffic_volume` | **30%** | CW_TRAFFIC detected = band is active |
+| `snr_quality` | **30%** | Normalised SNR (floor −15 dB, ceiling +20 dB) |
+| `signal_strength` | **15%** | RF signal level as propagation indicator |
+| `callsign_bonus` | **15%** | Bonus when callsign IS captured (not penalty when absent) |
+| `recency` | **10%** | More recent events carry more weight |
+
+##### Category 3 — SSB (Voice)
+
+SSB shares CW's sequential scanning limitation. Assessment relies on voice detection quality, SNR, and signal strength.
+
+| Component | Weight | Description |
+|---|---|---|
+| `traffic_volume` | **20%** | SSB_TRAFFIC / VOICE_DETECTION = band is active |
+| `snr_quality` | **25%** | Normalised SNR (floor +3 dB, ceiling +30 dB) |
+| `signal_strength` | **15%** | RF signal level |
+| `voice_quality` | **20%** | Quality of voice detection (clarity) |
+| `transcript` | **10%** | Successful speech-to-text = intelligible signal |
+| `callsign_bonus` | **5%** | Bonus when callsign IS captured |
+| `recency` | **5%** | More recent events carry more weight |
+
+**Classification (common to all categories)**:
 - **≥ 70**: Excellent 🟢
 - **≥ 50**: Good 🟡
 - **≥ 30**: Fair 🟠
 - **< 30**: Poor 🔴
+
+> Full reference with scientific validation and sources: [docs/propagation_scoring_reference.md](propagation_scoring_reference.md)
 
 ---
 
@@ -233,6 +252,49 @@ In the **Hour of Day x Band Activity (Heatmap Pro)** section:
 - Cell colour = event volume
 - Hover highlights cell, row and column for cross-reading
 - Marginal bars show totals per band (top) and per hour (right side)
+
+---
+
+## Scan Rotation
+
+### What is it?
+
+Scan Rotation lets you define a **sequence of slots (band + mode)** that the system cycles through automatically, switching band/mode at configurable intervals. It is ideal for monitoring multiple bands and modes over long periods without manual intervention.
+
+### How to configure
+
+1. Click **Config Scan Rotation** (button in the scan toolbar).
+2. The rotation panel expands with the following controls:
+   - **Rotation mode** — `Band + Mode` (each slot defines band and mode) or `Band only` (rotates through bands, keeping the current mode).
+   - **Band and Mode** — select the band and mode for the next slot.
+   - **Dwell** — time spent on each slot before switching (30 s, 1 min, 2 min, 5 min, 10 min, 15 min, 30 min).
+   - **Loop** — if enabled, rotation restarts after the last slot; if disabled, stops at the end.
+3. Click **+ Add New Slot** to add each band/mode combination to the list.
+4. Slots appear as editable badges — click **×** to remove a slot.
+5. Click **Start Rotation** to begin.
+
+### During rotation
+
+- The status bar shows in real time: current slot (band + mode), remaining countdown time, and the next slot.
+- A red pulsing dot confirms that rotation is active.
+- The **Stop scanning** button stops the rotation (and the current scan).
+- Data from all scanned bands/modes accumulates in the database and appears in the analytics dashboards.
+
+---
+
+## Propagation Map — Time Window Selector
+
+The propagation map includes a time window selector controlling which events appear on the globe:
+
+| Option | Period |
+|---|---|
+| **1h** | Last hour |
+| **2h** | Last 2 hours |
+| **4h** | Last 4 hours |
+| **8h** | Last 8 hours |
+| **24h** | Last 24 hours (default) |
+
+Events outside the selected window are not shown on the map. This allows focusing on recent activity or expanding to a full-day view.
 
 ---
 

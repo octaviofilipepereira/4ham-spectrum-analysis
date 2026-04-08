@@ -60,6 +60,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#overview">Overview</a></li>
       <li><a href="#interface">Interface tour</a></li>
       <li><a href="#scan-modes">Scan modes</a></li>
+      <li><a href="#rotation">Scan Rotation</a></li>
       <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
       <li><a href="#events">Events log</a></li>
       <li><a href="#voice-sig">SSB Voice Signature &amp; Whisper ASR</a></li>
@@ -198,9 +199,43 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </div>
   </section>
 
-  <!-- 4. WATERFALL -->
+  <!-- 4. SCAN ROTATION -->
+  <section id="rotation">
+    <h2 class="section-title">4 · Scan Rotation</h2>
+    <p>
+      Scan Rotation lets you define a <strong>sequence of slots (band + mode)</strong> that the system cycles through automatically,
+      switching band and mode at configurable intervals. It is ideal for unattended monitoring of multiple bands over long periods.
+    </p>
+
+    <h3 class="sub-title">Configuring rotation</h3>
+    <ol>
+      <li>Click <strong>Config Scan Rotation</strong> in the scan toolbar.</li>
+      <li>Select the rotation mode: <strong>Band + Mode</strong> (each slot defines band and mode) or <strong>Band only</strong> (rotates through bands, keeping the current mode).</li>
+      <li>Choose a <strong>Band</strong> and <strong>Mode</strong>, then click <strong>+ Add New Slot</strong>.</li>
+      <li>Repeat to build your rotation sequence. Slots appear as editable badges — click <strong>×</strong> to remove one.</li>
+      <li>Set the <strong>Dwell</strong> time (30 s, 1 min, 2 min, 5 min, 10 min, 15 min, or 30 min).</li>
+      <li>Enable <strong>Loop</strong> to restart the sequence after the last slot, or disable it to stop at the end.</li>
+      <li>Click <strong>Start Rotation</strong>.</li>
+    </ol>
+
+    <h3 class="sub-title">Live status</h3>
+    <p>While rotation is running:</p>
+    <ul>
+      <li>A <span style="color:#e74c3c">●</span> red pulsing dot and the current <strong>band + mode</strong> are shown in the rotation status bar.</li>
+      <li>A <strong>countdown timer</strong> shows the remaining time on the current slot.</li>
+      <li>The <strong>next slot</strong> (band + mode) is displayed for reference.</li>
+      <li>Click <strong>Stop scanning</strong> to stop the rotation and the current scan.</li>
+    </ul>
+    <p>Data from all scanned slots accumulates in the database and appears in the propagation map and analytics dashboards.</p>
+
+    <div class="info-box">
+      💡 <strong>Tip:</strong> Combine rotation with the Academic Analytics dashboard to see propagation patterns across bands over time — the Heatmap Pro and activity timeline charts are particularly useful with multi-band rotation data.
+    </div>
+  </section>
+
+  <!-- 5. WATERFALL -->
   <section id="waterfall">
-    <h2 class="section-title">4 · Waterfall &amp; spectrum display</h2>
+    <h2 class="section-title">5 · Waterfall &amp; spectrum display</h2>
 
     <h3 class="sub-title">Layout</h3>
     <ul>
@@ -234,9 +269,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>When switching bands or modes, a transition overlay appears over the waterfall while the backend reconfigures. This is normal — the spinner disappears once the new spectrum stream arrives.</p>
   </section>
 
-  <!-- 5. EVENTS LOG -->
+  <!-- 6. EVENTS LOG -->
   <section id="events">
-    <h2 class="section-title">5 · Events log</h2>
+    <h2 class="section-title">6 · Events log</h2>
     <p>All decoded signals and detected occupancy events are stored in the SQLite database and displayed in the Events card in real time.</p>
 
     <h3 class="sub-title">Type filter dropdown</h3>
@@ -284,9 +319,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>The band favourite buttons below the events table provide one-click filtering to a specific band without opening the full filter panel.</p>
   </section>
 
-  <!-- 6. VOICE SIGNATURE -->
+  <!-- 7. VOICE SIGNATURE -->
   <section id="voice-sig">
-    <h2 class="section-title">6 · SSB Voice Signature &amp; Whisper ASR</h2>
+    <h2 class="section-title">7 · SSB Voice Signature &amp; Whisper ASR</h2>
     <p>
       Since v0.8.0, the system can detect and transcribe SSB voice transmissions using VAD (Voice Activity Detection)
       and OpenAI Whisper automatic speech recognition.
@@ -337,9 +372,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </div>
   </section>
 
-  <!-- 7. METRICS -->
+  <!-- 8. METRICS -->
   <section id="metrics">
-    <h2 class="section-title">7 · Metrics explained</h2>
+    <h2 class="section-title">8 · Metrics explained</h2>
 
     <h3 class="sub-title">SNR (Signal-to-Noise Ratio)</h3>
     <p>Instantaneous measurement of a single signal relative to the noise floor, in dB.</p>
@@ -357,8 +392,18 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <h3 class="sub-title">Propagation Score (0–100)</h3>
     <p>
       An aggregated quality score for a band, computed from all events in the last 60 minutes.
-      Each event contributes a weighted score based on SNR, decode confidence, and how recently it occurred.
-      Recent, high-confidence events with strong SNR push the score up.
+      Since v0.9.0, the system uses <strong>three distinct formulas</strong> tailored to each mode category:
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Category</th><th>Modes</th><th>Primary Metrics</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Digital</strong></td><td>FT8, FT4, WSPR, JT65, JT9, FST4, FST4W, Q65</td><td>Decode rate (40%), median SNR (35%), unique callsigns (15%), recency (10%)</td></tr>
+        <tr><td><strong>CW</strong></td><td>CW, CW_CANDIDATE, CW_TRAFFIC</td><td>Traffic volume (30%), SNR (30%), signal strength (15%), callsign bonus (15%), recency (10%)</td></tr>
+        <tr><td><strong>SSB</strong></td><td>SSB, SSB_TRAFFIC, AM, VOICE_DETECTION</td><td>Traffic (20%), SNR (25%), signal (15%), voice quality (20%), transcript (10%), callsign bonus (5%), recency (5%)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Each mode uses <strong>mode-specific SNR normalisation</strong> based on the actual decode threshold for that mode (e.g. FT8: −20 dB floor, CW: −15 dB, SSB: +3 dB).
     </p>
     <table class="manual-table">
       <thead><tr><th>Score</th><th>Classification</th></tr></thead>
@@ -374,9 +419,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </div>
   </section>
 
-  <!-- 8. EXPORT -->
+  <!-- 9. EXPORT -->
   <section id="export">
-    <h2 class="section-title">8 · Export &amp; reports</h2>
+    <h2 class="section-title">9 · Export &amp; reports</h2>
 
     <h3 class="sub-title">Search &amp; Export Data</h3>
     <p>Accessed via <strong>Logs &amp; Reports → Search &amp; Export Data</strong>. Apply filters and then export matching events as:</p>
@@ -408,9 +453,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </ul>
   </section>
 
-  <!-- 9. ADMIN -->
+  <!-- 10. ADMIN -->
   <section id="admin">
-    <h2 class="section-title">9 · Admin &amp; configuration</h2>
+    <h2 class="section-title">10 · Admin &amp; configuration</h2>
     <div class="info-box">
       🔒 Admin settings require authentication. Log in with the admin password configured during installation.
     </div>
@@ -486,9 +531,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>This runs at most once every 24 hours. You can trigger it manually via the Admin Config panel.</p>
   </section>
 
-  <!-- 10. KEYBOARD SHORTCUTS -->
+  <!-- 11. KEYBOARD SHORTCUTS -->
   <section id="shortcuts">
-    <h2 class="section-title">10 · Keyboard shortcuts</h2>
+    <h2 class="section-title">11 · Keyboard shortcuts</h2>
     <table class="manual-table">
       <thead><tr><th>Key</th><th>Action</th></tr></thead>
       <tbody>
@@ -500,9 +545,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <p>All shortcuts are case-insensitive and do not fire when focus is inside a text input.</p>
   </section>
 
-  <!-- 11. ACADEMIC ANALYTICS -->
+  <!-- 12. ACADEMIC ANALYTICS -->
   <section id="analytics">
-    <h2 class="section-title">11 · Academic Analytics dashboard</h2>
+    <h2 class="section-title">12 · Academic Analytics dashboard</h2>
     <p>
       Accessible via the <strong>Data Analysis</strong> button in the toolbar (opens in a new tab), or directly at
       <code>http://&lt;host&gt;:8000/4ham_academic_analytics.html</code>.
@@ -525,9 +570,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </p>
   </section>
 
-  <!-- 12. DESKTOP LAUNCHER -->
+  <!-- 13. DESKTOP LAUNCHER -->
   <section id="launcher">
-    <h2 class="section-title">12 · Desktop launcher</h2>
+    <h2 class="section-title">13 · Desktop launcher</h2>
     <p>
       On systems with a graphical desktop (GNOME, Cinnamon, XFCE, KDE, MATE, LXQt), the installer offers to create a
       <strong>desktop shortcut</strong>. Double-clicking it opens an interactive terminal menu:
@@ -546,9 +591,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </p>
   </section>
 
-  <!-- 13. FAQ -->
+  <!-- 14. FAQ -->
   <section id="faq">
-    <h2 class="section-title">13 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">14 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>
