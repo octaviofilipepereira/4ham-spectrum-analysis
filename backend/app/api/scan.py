@@ -909,13 +909,61 @@ async def rotation_start(
 
 @router.post("/rotation/stop")
 async def rotation_stop(_: None = Depends(verify_basic_auth)) -> Dict:
-    """Stop scan rotation. The scan stays on the current slot."""
+    """Stop scan rotation and the active scan, releasing the SDR device."""
     if not state.scan_rotation or not state.scan_rotation.running:
         raise HTTPException(status_code=400, detail="No rotation is running")
 
     await state.scan_rotation.stop()
+    # Stop all decoders that might be running
+    await _stop_ft_external_decoder()
+    await _stop_cw_decoder()
+    await _stop_ssb_detector()
+    # Stop the active scan to release the SDR device
+    await state.scan_engine.stop_async()
+    state.scan_state["state"] = "stopped"
+    state.scan_state["decoder_mode"] = ""
+    state.scan_state["scan"] = None
+    state.scan_state["device"] = None
+    state.voice_marker_cache.clear()
+    state.db.end_scan(
+        state.scan_state.get("scan_id"),
+        datetime.now(timezone.utc).isoformat()
+    )
+
     status = state.scan_rotation.status()
     log("rotation_stopped")
+
+    # Reopen preview mode so the waterfall keeps showing data
+    try:
+        sdr_devices = [
+            d for d in state.controller.list_devices()
+            if str(d.get("type", "")).lower() not in ("audio",)
+        ]
+        if sdr_devices:
+            preview_sr = int(os.getenv("PREVIEW_SAMPLE_RATE", "2048000"))
+            preview_hz = int(os.getenv("PREVIEW_CENTER_HZ", "14175000"))
+            preview_start = int(os.getenv("PREVIEW_START_HZ", "14000000"))
+            preview_end = int(os.getenv("PREVIEW_END_HZ", "14350000"))
+            opened = await state.scan_engine.preview_open(
+                device_id=sdr_devices[0]["id"],
+                sample_rate=preview_sr,
+                center_hz=preview_hz,
+                start_hz=preview_start,
+                end_hz=preview_end,
+            )
+            if opened:
+                state.scan_state["state"] = "preview"
+                state.scan_state["scan"] = {
+                    "band": "20m",
+                    "center_hz": preview_hz,
+                    "start_hz": preview_start,
+                    "end_hz": preview_end,
+                    "sample_rate": preview_sr,
+                    "mode": "fixed",
+                }
+    except Exception:
+        pass
+
     return status
 
 

@@ -1729,7 +1729,9 @@ function updateScanButtonState() {
     startBtn.disabled = true;
     return;
   }
-  startBtn.textContent = isScanRunning ? "Stop Single Scanning" : "Start Single Scanning";
+  startBtn.textContent = isScanRunning
+    ? (rotationRunning ? "Stop Rotation Scanning" : "Stop Single Scanning")
+    : "Start Single Scanning";
   startBtn.disabled = false;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
@@ -1935,7 +1937,14 @@ async function toggleScan() {
   updateScanButtonState();
   try {
     if (isScanRunning) {
-      await stopScan();
+      if (rotationRunning) {
+        // Stop via rotation/stop to avoid scan_stop reopening preview
+        // (which holds the SDR device and blocks the next rotation start)
+        await stopRotation();
+        isScanRunning = false;
+      } else {
+        await stopScan();
+      }
     } else {
       await startScan();
     }
@@ -2202,6 +2211,7 @@ function updateRotationUI() {
   const panel = document.querySelector(".rotation-panel");
   if (panel) panel.classList.toggle("is-locked", rotationRunning);
   rotationAddSlotBtn && (rotationAddSlotBtn.disabled = rotationRunning);
+  updateScanButtonState();
 }
 
 async function pollRotationStatus() {
