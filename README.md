@@ -91,12 +91,18 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.10.0
+- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
+- **Per-band×mode phantom mode elimination**: two-layer fix — occupancy events forced to match active decoder mode (prevents heuristic mis-classification), and confirmed_band_modes filter time-scoped to analysed period (prevents historical sessions from polluting charts).
+- **UTC fix for custom dates**: frontend custom date inputs now forced to UTC interpretation, preventing off-by-one-day boundary errors in non-UTC timezones.
+- **OS compatibility documentation**: all docs now list exact supported distributions (Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+).
+- **Propagation scoring reference v1.2**: exact mathematical formulas, verification penalty, complete SNR parameters table (15 modes), cross-referenced in all manuals.
+- **Comprehensive Academic Analytics documentation**: full interpretation guide, export walkthrough, and KPI reference in help.html and user manuals (PT/EN).
+
 ### v0.9.0
 - **3-formula propagation scoring**: separate Digital/CW/SSB formulas with tailored SNR normalisation. Server-computed scores.
-- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
-- **Propagation map time window**: selectable 1h / 2h / 4h / 8h / 24h filter on the propagation globe.
-- **Per-band×mode phantom mode elimination**: two-layer fix — occupancy events forced to match active decoder mode (prevents heuristic mis-classification), and confirmed_band_modes filter time-scoped to analysed period (prevents historical sessions from polluting charts).
 - **Export multi-format**: CSV, XLSX (Aggregated + All Events), and JSON export from Academic Analytics.
+- **Propagation map time window**: selectable 1h / 2h / 4h / 8h / 24h filter on the propagation globe.
 - **1 h / 12 h presets**: short-period options with minute-level bucketing for higher resolution.
 - **Loading overlay**: spinner shown while switching periods or applying filters.
 - **Callsign ITU validation**: two-branch regex rejects invalid callsigns (e.g. "5I5I").
@@ -550,7 +556,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
 - [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
-- [x] Scan Rotation (v0.9.0): automated multi-band/mode cycling with configurable dwell and live status.
+- [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell and live status.
 
 ### Next milestones
 1. Multi-node aggregation (multiple receivers feeding one backend).

@@ -7,6 +7,25 @@ Last update: 2026-04-06 UTC
 
 # Changelog
 
+## v0.10.0 - 2026-04-08
+
+### Added
+- **Scan Rotation scheduler** — automated multi-band/mode cycling with configurable dwell time, loop option, and live countdown status bar. Full UI panel with slot editor and WebSocket sync.
+- **Comprehensive Academic Analytics documentation** — full interpretation guide, export walkthrough, and KPI reference in help.html and user manuals (PT/EN).
+- **Propagation scoring reference v1.2** — exact mathematical formulas, verification penalty, band score aggregation, and complete SNR parameters table (15 modes). Cross-referenced in README, help.html, and both user manuals.
+- **OS compatibility documentation** — all docs now list exact supported distributions matching installer validation: Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+.
+
+### Fixed
+- **Phantom modes in analytics charts** (two-layer fix) — occupancy events forced to match active decoder mode in events.py (prevents DSP bandwidth heuristic mis-classification as SSB during FT8/CW scans); confirmed_band_modes SQL query time-scoped to analysed period in analytics.py (prevents historical sessions from polluting current charts).
+- **UTC interpretation of custom date inputs** — frontend datetime-local inputs now append 'Z' suffix, forcing UTC interpretation. Prevents off-by-one-day boundary errors for users in non-UTC timezones (e.g. Europe/Lisbon UTC+1). Fixed in both Academic Analytics and Events Search.
+- **SDR device release on rotation stop/start** — proper device release and preview restore when stopping/restarting rotation scan.
+- **Map per-table event limit** — prevents band starvation with dedup by callsign+band.
+
+### Changed
+- **Rotation panel UX** — disabled state styling, API URL fix, device auto-detection, page refresh persistence.
+- **Scan controls layout** — reorganised buttons and renamed for clarity.
+- **Help panel** updated to v0.10.0.
+
 ## v0.9.0 - 2026-04-06
 
 ### Added
