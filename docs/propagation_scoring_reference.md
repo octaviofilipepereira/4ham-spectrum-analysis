@@ -112,7 +112,12 @@ snr_component  = normalise_snr(median(snr_values), dominant_mode)
 callsign_norm  = clamp(ln(1 + unique_callsigns) / ln(21), 0, 1)
 recency        = avg_recency   (0–1, time-decayed)
 
-Score = 100 × (0.40 × decode_rate + 0.35 × snr_component + 0.15 × callsign_norm + 0.10 × recency)
+Score = 100 × (
+    0.40 × decode_rate
+  + 0.35 × snr_component
+  + 0.15 × callsign_norm
+  + 0.10 × recency
+)
 Score = clamp(Score, 0, 100)
 ```
 
@@ -151,11 +156,18 @@ CW callsign decoding is inherently less reliable than FT8/FT4/WSPR due to:
 ```
 traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
 snr_component     = normalise_snr(median(snr_values), "CW")
-signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 if no power data]
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)
+                    [default 0.3 if no power data]
 callsign_bonus    = min(1, callsign_events / total_events × 3)
 recency           = avg_recency   (0–1)
 
-Score = 100 × (0.30 × traffic_norm + 0.30 × snr_component + 0.15 × signal_component + 0.15 × callsign_bonus + 0.10 × recency)
+Score = 100 × (
+    0.30 × traffic_norm
+  + 0.30 × snr_component
+  + 0.15 × signal_component
+  + 0.15 × callsign_bonus
+  + 0.10 × recency
+)
 ```
 
 **Verification penalty** (occupancy-only events lack callsign confirmation):
@@ -194,13 +206,22 @@ SSB shares CW's sequential scanning limitation. Additionally, SSB has no structu
 ```
 traffic_norm      = clamp(ln(1 + total_events) / ln(101), 0, 1)
 snr_component     = normalise_snr(median(snr_values), "SSB")
-signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)   [default 0.3 if no power data]
+signal_component  = clamp((median_power_dBm + 120) / 70, 0, 1)
+                    [default 0.3 if no power data]
 voice_quality     = avg_confidence   (0–1, from voice detector)
 transcript_bonus  = 1.0 if has_transcript else 0.0
 callsign_bonus    = min(1, callsign_events / total_events × 3)
 recency           = avg_recency   (0–1)
 
-Score = 100 × (0.20 × traffic_norm + 0.25 × snr_component + 0.15 × signal_component + 0.20 × voice_quality + 0.10 × transcript_bonus + 0.05 × callsign_bonus + 0.05 × recency)
+Score = 100 × (
+    0.20 × traffic_norm
+  + 0.25 × snr_component
+  + 0.15 × signal_component
+  + 0.20 × voice_quality
+  + 0.10 × transcript_bonus
+  + 0.05 × callsign_bonus
+  + 0.05 × recency
+)
 ```
 
 **Verification penalty** (same as CW):
