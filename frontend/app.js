@@ -2214,6 +2214,13 @@ function updateRotationUI() {
   updateScanButtonState();
 }
 
+function formatRotationTime(totalSeconds) {
+  const s = Math.ceil(totalSeconds);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
 async function pollRotationStatus() {
   try {
     const resp = await fetch("/api/scan/rotation/status", { headers: { ...getAuthHeader() } });
@@ -2226,7 +2233,7 @@ async function pollRotationStatus() {
       rotationLiveSlot.textContent = cur ? `${cur.band} · ${cur.mode.toUpperCase()}` : "--";
       rotationLiveNext.textContent = nxt ? `${nxt.band} · ${nxt.mode.toUpperCase()}` : "--";
       const rem = data.time_remaining_s ?? 0;
-      rotationLiveCountdown.textContent = `${Math.ceil(rem)}s`;
+      rotationLiveCountdown.textContent = formatRotationTime(rem);
     } else {
       if (rotationRunning) {
         rotationRunning = false;
@@ -2768,7 +2775,7 @@ function connectStatus() {
           if (rotationLiveSlot) rotationLiveSlot.textContent = cur ? `${cur.band} · ${cur.mode.toUpperCase()}` : "--";
           if (rotationLiveNext) rotationLiveNext.textContent = nxt ? `${nxt.band} · ${nxt.mode.toUpperCase()}` : "--";
           const rem = data.rotation.time_remaining_s ?? 0;
-          if (rotationLiveCountdown) rotationLiveCountdown.textContent = `${Math.ceil(rem)}s`;
+          if (rotationLiveCountdown) rotationLiveCountdown.textContent = formatRotationTime(rem);
           if (!rotationRunning) {
             rotationRunning = true;
             if (data.rotation.slots && data.rotation.slots.length) {

@@ -472,26 +472,35 @@ h1,
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.5rem;
-  padding: 0.4rem 0.65rem;
+  padding: 0.5rem 0.75rem;
   background: rgba(69, 214, 197, 0.08);
   border: 1px solid rgba(69, 214, 197, 0.25);
   border-radius: 6px;
   font-size: 0.85rem;
 }
 
+.rotation-live-status__slot {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  letter-spacing: 0.02em;
+}
+
 .rotation-live-status__dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--accent-2);
+  background: #e74c3c;
   animation: rotation-pulse 1.5s ease-in-out infinite;
 }
 
 .rotation-live-status__countdown {
   margin-left: auto;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 @keyframes rotation-pulse {
