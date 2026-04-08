@@ -173,6 +173,8 @@ def academic_analytics(
         with state.db._lock:
             rows = state.db.conn.execute(
                 "SELECT DISTINCT UPPER(band), UPPER(mode) FROM callsign_events"
+                " WHERE timestamp BETWEEN ? AND ?",
+                (start_dt.isoformat(), end_dt.isoformat()),
             ).fetchall()
         for band_val, mode_val in rows:
             cs_band = band_val.strip()

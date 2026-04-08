@@ -435,6 +435,16 @@ async def _run_occupancy_detection_loop() -> None:
             if freq_hint:
                 mode_name = freq_hint
 
+            # When a non-SSB decoder mode is explicitly active (rotation
+            # or manual), force occupancy events to use the active decoder
+            # mode.  The bandwidth heuristic often mis-classifies signals
+            # (e.g. labels wideband noise as "SSB" on a band scanning FT8),
+            # creating phantom modes in analytics charts.
+            if selected_decoder_mode in ("ft8", "ft4", "wspr"):
+                mode_name = selected_decoder_mode.upper()
+            elif selected_decoder_mode == "cw":
+                mode_name = "CW"
+
             # In explicit SSB scan mode, treat voice-like occupancy classes as SSB_TRAFFIC
             # (raw occupancy candidates, not yet confirmed).
             if selected_decoder_mode == "ssb" and mode_name in {"SSB", "AM"}:
