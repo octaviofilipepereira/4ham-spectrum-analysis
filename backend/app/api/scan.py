@@ -981,7 +981,7 @@ def rotation_status(
 
 @router.get("/rotation/presets")
 def list_rotation_presets(
-    _: None = Depends(verify_basic_auth),
+    _: bool = Depends(optional_verify_basic_auth),
 ) -> List[Dict]:
     """List all saved rotation presets."""
     return state.db.get_rotation_presets()
