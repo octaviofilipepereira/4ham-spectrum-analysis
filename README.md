@@ -202,7 +202,7 @@ Default frontend routes:
 - Added quick band switching row near Start scanning for faster operator workflow.
 - Implemented live band switching with automatic stop/start while scan is running.
 - Improved scan startup resilience with sample-rate safeguards and clearer error behavior.
-- Added operational tooling with `run_dev.sh` (`start|stop|logs|status`).
+- Added operational tooling with `server_control.sh` (`start|stop|restart|status|logs`).
 - Added production `systemd` packaging tooling and service management scripts.
 
 ### v0.2.3
@@ -635,4 +635,4 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 - Propagation scoring (PT): see [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md).
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
 - Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
-- Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).
+- Server control: see [scripts/server_control.sh](scripts/server_control.sh).
