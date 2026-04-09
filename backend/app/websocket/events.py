@@ -124,7 +124,7 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
         int(frequency_hz / 2000),
     )
     last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
-    if (now_ts - last_emit_ts) < 8.0:
+    if (now_ts - last_emit_ts) < 60.0:
         return None
     _ssb_traffic_last_emit[bucket_key] = now_ts
 
@@ -136,6 +136,8 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
 
     base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    if snr_db < 8.0:
+        return None
     snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
     if mode_name == "SSB":
         mode_bonus = 0.12
