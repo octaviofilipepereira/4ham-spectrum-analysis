@@ -556,11 +556,15 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
         if state.scan_state.get("state") != "running":
             continue
         
-        # Filter events by selected decoder mode (case-insensitive)
+        # Filter events by selected decoder mode (case-insensitive).
+        # FT8 and FT4 are treated as the same family — selecting either
+        # mode accepts events from both sub-modes.
+        _FT_FAMILY = {"FT8", "FT4"}
         event_mode = str(event.get("mode", "")).strip().upper()
         selected_mode = str(state.scan_state.get("decoder_mode", "")).strip().upper()
         if selected_mode and event_mode != selected_mode:
-            continue  # Ignore events from different decoder modes
+            if not (event_mode in _FT_FAMILY and selected_mode in _FT_FAMILY):
+                continue  # Ignore events from different decoder modes
         
         # Save event
         touch_decoder_source(event.get("source"))

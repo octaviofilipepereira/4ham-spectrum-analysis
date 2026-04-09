@@ -328,14 +328,20 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 log("scan_cw_decoder_stopped:switching_to_ft_mode")
             await _stop_ssb_detector()
             decoder_mode_upper = decoder_mode.upper()
+            # FT8 and FT4 share the same frequency segments — always
+            # decode both so that events from either sub-mode are captured.
+            if decoder_mode_upper in ("FT8", "FT4"):
+                active_modes = ["FT8", "FT4"]
+            else:
+                active_modes = [decoder_mode_upper]
             if state.ft_external_decoder is not None:
-                state.ft_external_decoder.set_modes([decoder_mode_upper])
+                state.ft_external_decoder.set_modes(active_modes)
             else:
                 result = await _start_ft_external_decoder(force=True)
                 log(f"scan_ft_external_decoder_started:{result}")
                 if state.ft_external_decoder:
-                    state.ft_external_decoder.set_modes([decoder_mode_upper])
-            state.ft_external_modes[:] = [decoder_mode_upper]
+                    state.ft_external_decoder.set_modes(active_modes)
+            state.ft_external_modes[:] = active_modes
         else:
             # Other modes (SSB, APRS): stop FT/CW and start SSB detector for SSB
             if state.cw_decoder is not None:
