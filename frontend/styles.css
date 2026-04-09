@@ -508,6 +508,14 @@ h1,
   50% { opacity: 0.3; }
 }
 
+.rotation-preset-preview {
+  padding: 0.4rem 0.6rem;
+  background: rgba(69, 214, 197, 0.06);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
 .waterfall {
   margin-top: 0;
   padding: 44px 16px 16px;

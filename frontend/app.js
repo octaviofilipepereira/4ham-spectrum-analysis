@@ -2254,6 +2254,139 @@ function stopRotationPoll() {
   }
 }
 
+// ── Scan Rotation Presets ──────────────────────────────────────
+const rotationPresetName = document.getElementById("rotationPresetName");
+const rotationPresetSelect = document.getElementById("rotationPresetSelect");
+const rotationPresetSaveBtn = document.getElementById("rotationPresetSaveBtn");
+const rotationPresetLoadBtn = document.getElementById("rotationPresetLoadBtn");
+const rotationPresetDeleteBtn = document.getElementById("rotationPresetDeleteBtn");
+const rotationPresetPreview = document.getElementById("rotationPresetPreview");
+
+const ROTATION_PRESETS_KEY = "rotationPresets";
+
+function _getRotationPresets() {
+  try { return JSON.parse(localStorage.getItem(ROTATION_PRESETS_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function _saveRotationPresets(list) {
+  localStorage.setItem(ROTATION_PRESETS_KEY, JSON.stringify(list));
+}
+
+function loadRotationPresetsList() {
+  if (!rotationPresetSelect) return;
+  const presets = _getRotationPresets();
+  rotationPresetSelect.innerHTML = "";
+  if (!presets.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No presets saved";
+    rotationPresetSelect.appendChild(opt);
+  } else {
+    presets.forEach((p, i) => {
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = p.name;
+      rotationPresetSelect.appendChild(opt);
+    });
+  }
+  _updateRotationPresetActions();
+  _showRotationPresetPreview();
+}
+
+function _updateRotationPresetActions() {
+  const presets = _getRotationPresets();
+  const hasPresets = presets.length > 0;
+  if (rotationPresetLoadBtn) rotationPresetLoadBtn.disabled = !hasPresets;
+  if (rotationPresetDeleteBtn) rotationPresetDeleteBtn.disabled = !hasPresets;
+}
+
+function _showRotationPresetPreview() {
+  if (!rotationPresetPreview) return;
+  const presets = _getRotationPresets();
+  const idx = Number(rotationPresetSelect?.value);
+  if (!presets.length || isNaN(idx) || idx < 0 || idx >= presets.length) {
+    rotationPresetPreview.textContent = "";
+    return;
+  }
+  const p = presets[idx];
+  const mode = p.rotationMode === "modes" ? "Single Band" : "Bands × Modes";
+  const slotsDesc = (p.slots || []).map(s => s.band ? `${s.band}·${s.mode}` : s.mode).join(" → ");
+  const dwellLabel = { "600": "10 min", "900": "15 min", "1200": "20 min", "1800": "30 min", "2400": "40 min", "3000": "50 min" }[String(p.dwell)] || `${p.dwell}s`;
+  rotationPresetPreview.textContent = `${mode} | Dwell: ${dwellLabel} | Loop: ${p.loop ? "Yes" : "No"} | Slots: ${slotsDesc || "—"}`;
+}
+
+function saveRotationPreset() {
+  const name = (rotationPresetName?.value || "").trim();
+  if (!name) { showToast("Enter a preset name"); return; }
+  const preset = {
+    name,
+    rotationMode: rotationModeSelect?.value || "bands",
+    band: rotationBand?.value || "20m",
+    dwell: Number(rotationDwell?.value || 900),
+    loop: rotationLoop?.checked ?? true,
+    slots: rotationSlots.map(s => ({ ...s })),
+  };
+  const presets = _getRotationPresets();
+  presets.push(preset);
+  _saveRotationPresets(presets);
+  loadRotationPresetsList();
+  rotationPresetSelect.value = String(presets.length - 1);
+  _showRotationPresetPreview();
+  if (rotationPresetName) rotationPresetName.value = "";
+  showToast(`Preset "${name}" saved`);
+  logLine(`Rotation preset saved: ${name}`);
+}
+
+function loadRotationPreset() {
+  const presets = _getRotationPresets();
+  const idx = Number(rotationPresetSelect?.value);
+  if (isNaN(idx) || idx < 0 || idx >= presets.length) { showToast("Select a preset to load"); return; }
+  const p = presets[idx];
+  // Apply to rotation panel
+  if (rotationModeSelect) rotationModeSelect.value = p.rotationMode || "bands";
+  if (rotationBandRow) rotationBandRow.classList.toggle("d-none", p.rotationMode !== "modes");
+  if (rotationBand && p.band) rotationBand.value = p.band;
+  if (rotationDwell) rotationDwell.value = String(p.dwell || 900);
+  if (rotationLoop) rotationLoop.checked = p.loop ?? true;
+  rotationSlots = (p.slots || []).map(s => ({ ...s }));
+  renderRotationSlots();
+  // Open the rotation config panel so user sees the loaded config
+  if (rotationPanel?.classList.contains("d-none")) {
+    rotationPanel.classList.remove("d-none");
+    rotationToggleBtn?.classList.add("is-active");
+  }
+  // Close the modal
+  const modalEl = document.getElementById("rotationPresetsModal");
+  if (modalEl) {
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    if (bsModal) bsModal.hide();
+  }
+  showToast(`Preset "${p.name}" loaded`);
+  logLine(`Rotation preset loaded: ${p.name}`);
+}
+
+function deleteRotationPreset() {
+  const presets = _getRotationPresets();
+  const idx = Number(rotationPresetSelect?.value);
+  if (isNaN(idx) || idx < 0 || idx >= presets.length) { showToast("Select a preset to delete"); return; }
+  const name = presets[idx].name;
+  if (!window.confirm(`Delete preset "${name}"?`)) return;
+  presets.splice(idx, 1);
+  _saveRotationPresets(presets);
+  loadRotationPresetsList();
+  showToast(`Preset "${name}" deleted`);
+  logLine(`Rotation preset deleted: ${name}`);
+}
+
+rotationPresetSaveBtn?.addEventListener("click", saveRotationPreset);
+rotationPresetLoadBtn?.addEventListener("click", loadRotationPreset);
+rotationPresetDeleteBtn?.addEventListener("click", deleteRotationPreset);
+rotationPresetSelect?.addEventListener("change", _showRotationPresetPreview);
+
+// Load presets list on modal open
+document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", loadRotationPresetsList);
+
 rotationStartBtn?.addEventListener("click", () => startRotation());
 rotationStopBtn?.addEventListener("click", () => stopRotation());
 
