@@ -4132,9 +4132,10 @@ if (logoutBtnEl) {
   await startApplication();
 })();
 
-const loginModalSaveBtnEl = document.getElementById("loginModalSave");
-if (loginModalSaveBtnEl) {
-  loginModalSaveBtnEl.addEventListener("click", async () => {
+const loginFormEl = document.getElementById("loginForm");
+if (loginFormEl) {
+  loginFormEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
     const user = (document.getElementById("loginModalUser")?.value || "").trim();
     const pass = (document.getElementById("loginModalPass")?.value || "").trim();
     const errEl = document.getElementById("loginModalError");

@@ -316,20 +316,22 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="modal-header">
             <h5 class="modal-title" id="loginModalLabel">Authentication required</h5>
           </div>
+          <form id="loginForm" autocomplete="on">
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label" for="loginModalUser">Username</label>
-              <input type="text" id="loginModalUser" class="form-control" autocomplete="username" />
+              <input type="text" id="loginModalUser" name="username" class="form-control" autocomplete="username" required />
             </div>
             <div class="mb-3">
               <label class="form-label" for="loginModalPass">Password</label>
-              <input type="password" id="loginModalPass" class="form-control" autocomplete="current-password" />
+              <input type="password" id="loginModalPass" name="password" class="form-control" autocomplete="current-password" required />
             </div>
             <div id="loginModalError" class="alert alert-danger py-1 d-none"></div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
+            <button type="submit" class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
           </div>
+          </form>
         </div>
       </div>
     </div>
