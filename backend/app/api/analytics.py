@@ -188,6 +188,11 @@ def academic_analytics(
         # On any DB error, fall back to showing all modes
         confirmed_band_modes = None
 
+    # Digital decoder modes have their mode label set by the active decoder
+    # config, not the DSP bandwidth heuristic, so they are inherently
+    # decoder-confirmed even when 0 callsigns are decoded in a window.
+    _DECODER_CONFIRMED_MODES = frozenset({"FT8", "FT4", "WSPR"})
+
     series_map: Dict[Tuple[str, str, str], Dict] = {}
     callsign_map: Dict[Tuple[str, str, str, str], Dict] = {}
     timeline_totals: Dict[str, int] = {}
@@ -230,7 +235,13 @@ def academic_analytics(
         # Occupancy events are purely from the DSP bandwidth heuristic;
         # callsign events with empty callsign are voice-detection markers
         # that also lack decoder confirmation.
-        if confirmed_band_modes is not None and (band_name.upper(), mode_name) not in confirmed_band_modes:
+        # Exception: digital decoder modes are always allowed through
+        # (see _DECODER_CONFIRMED_MODES above).
+        if (
+            confirmed_band_modes is not None
+            and mode_name not in _DECODER_CONFIRMED_MODES
+            and (band_name.upper(), mode_name) not in confirmed_band_modes
+        ):
             if event_type == "occupancy":
                 continue
             if event_type == "callsign":

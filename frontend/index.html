@@ -181,14 +181,16 @@ Last update: 2026-02-22 16:27:19 UTC
                       <button class="btn btn-danger btn-sm d-none" type="button" id="rotationStopBtn">Stop Rotation</button>
                     </div>
                   </div>
-                  <!-- Live status (visible while rotation is running) -->
-                  <div class="d-none rotation-live-status" id="rotationLiveStatus">
-                    <span class="rotation-live-status__dot"></span>
-                    <span class="rotation-live-status__slot" id="rotationLiveSlot">--</span>
-                    <span class="text-muted mx-1">→</span>
-                    <span id="rotationLiveNext" class="text-muted">--</span>
-                    <span class="rotation-live-status__countdown"><span style="color:#fff">Timer:</span> <span id="rotationLiveCountdown">--:--</span></span>
-                  </div>
+                </div>
+              </div>
+              <!-- Live rotation status (outside panel so it stays visible when config is collapsed) -->
+              <div class="col-12 d-none" id="rotationLiveStatus">
+                <div class="rotation-live-status">
+                  <span class="rotation-live-status__dot"></span>
+                  <span class="rotation-live-status__slot" id="rotationLiveSlot">--</span>
+                  <span class="text-muted mx-1">→</span>
+                  <span id="rotationLiveNext" class="text-muted">--</span>
+                  <span class="rotation-live-status__countdown"><span style="color:#fff">Timer:</span> <span id="rotationLiveCountdown">--:--</span></span>
                 </div>
               </div>
               <div class="col-12 scan-context" id="scanContext" aria-live="polite">
