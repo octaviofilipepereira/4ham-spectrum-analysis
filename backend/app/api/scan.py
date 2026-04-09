@@ -234,6 +234,9 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         )
         scan["start_hz"] = clipped_start_hz
         scan["end_hz"] = clipped_end_hz
+        # Update band_display to match SSB subband so the VFO center is correct
+        scan["band_display_start_hz"] = clipped_start_hz
+        scan["band_display_end_hz"] = clipped_end_hz
         # Candidate-focus SSB scanning: keep fast sweep, but hold longer when
         # repeated occupancy candidates are detected on the current block.
         scan.setdefault("ssb_focus_enable", True)
