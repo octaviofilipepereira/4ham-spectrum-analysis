@@ -240,14 +240,14 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         # Candidate-focus SSB scanning: keep fast sweep, but hold longer when
         # repeated occupancy candidates are detected on the current block.
         scan.setdefault("ssb_focus_enable", True)
-        scan.setdefault("ssb_focus_hold_ms", 15000)
+        scan.setdefault("ssb_focus_hold_ms", 10000)
         scan.setdefault("ssb_focus_hits_required", 2)
         scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
         scan.setdefault("ssb_focus_cooldown_s", 20.0)
         scan.setdefault("ssb_focus_bucket_hz", 2000)
         # NOTE: ssb_focus_max_holds_per_pass is intentionally NOT set here.
-        # The engine computes it adaptively (~1 hold per 50 kHz of scan span,
-        # min 4, max 12).  If the frontend sends an explicit value it will be
+        # The engine computes it adaptively (~1 hold per 15 kHz of scan span,
+        # min 4, max 16).  If the frontend sends an explicit value it will be
         # honoured as an override.
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
@@ -800,7 +800,7 @@ async def _rotation_switch_slot(slot: RotationSlot) -> bool:
         # SSB focus params
         if new_mode == "ssb":
             new_scan["ssb_focus_enable"] = True
-            new_scan.setdefault("ssb_focus_hold_ms", 15000)
+            new_scan.setdefault("ssb_focus_hold_ms", 10000)
             new_scan.setdefault("ssb_focus_hits_required", 2)
             new_scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
             new_scan.setdefault("ssb_focus_cooldown_s", 20.0)
