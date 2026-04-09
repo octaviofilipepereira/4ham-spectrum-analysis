@@ -720,7 +720,10 @@ Last update: 2026-04-03 UTC
           <article class="chart-panel span-5">
             <div class="chart-header">
               <h3>Distribution by Band and Mode</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Distribution by Band and Mode chart" data-help-title="Distribution by Band and Mode" data-help-text="Each bar represents one band and each color segment represents mode contribution inside that band. Total bar height is total activity for the band. Use it to see which bands dominate and which modes are driving each band profile.">i</button>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button type="button" class="helper-icon" id="stackedToggle" title="Toggle absolute / percentage view" style="font-size:11px;width:22px;height:22px;line-height:20px;padding:0;text-align:center;">%</button>
+                <button type="button" class="helper-icon" aria-label="Explain Distribution by Band and Mode chart" data-help-title="Distribution by Band and Mode" data-help-text="Each bar represents one band and each color segment represents mode contribution inside that band. Total bar height is total activity for the band. Use it to see which bands dominate and which modes are driving each band profile. Click '%' to toggle percentage view — makes minority modes visible when one mode dominates.">i</button>
+              </div>
             </div>
             <p>Stacked bars with a breakdown by mode.</p>
             <div class="legend">
@@ -1257,6 +1260,16 @@ Last update: 2026-04-03 UTC
         }
       }
 
+      let stackedPercentMode = false;
+      let _lastStackedRows = [];
+
+      document.getElementById("stackedToggle")?.addEventListener("click", () => {
+        stackedPercentMode = !stackedPercentMode;
+        const btn = document.getElementById("stackedToggle");
+        if (btn) btn.textContent = stackedPercentMode ? "#" : "%";
+        drawStackedByBandMode(_lastStackedRows);
+      });
+
       function renderFromCurrentRange() {
         const range = lastResolvedRange || resolvePeriodRange();
         const start = range.start;
@@ -1692,6 +1705,7 @@ Last update: 2026-04-03 UTC
       }
 
       function drawStackedByBandMode(rows) {
+        _lastStackedRows = rows;
         const svg = d3.select("#stackedChart");
         svg.selectAll("*").remove();
 
@@ -1706,13 +1720,35 @@ Last update: 2026-04-03 UTC
           for (const mode of MODES) {
             row[mode] = d3.sum(rows.filter((d) => d.band === band && d.mode === mode), (d) => d.count);
           }
+          row._total = MODES.reduce((acc, m) => acc + row[m], 0);
           return row;
         });
 
-        const stack = d3.stack().keys(MODES)(byBand);
+        const pct = stackedPercentMode;
+        let plotData;
+        if (pct) {
+          plotData = byBand.map((row) => {
+            const out = { band: row.band, _total: row._total, _abs: {} };
+            for (const m of MODES) {
+              out._abs[m] = row[m];
+              out[m] = row._total > 0 ? (row[m] / row._total) * 100 : 0;
+            }
+            return out;
+          });
+        } else {
+          plotData = byBand.map((row) => {
+            const out = { ...row, _abs: {} };
+            for (const m of MODES) out._abs[m] = row[m];
+            return out;
+          });
+        }
+
+        const stack = d3.stack().keys(MODES)(plotData);
 
         const x = d3.scaleBand().domain(BANDS).range([0, innerW]).padding(0.2);
-        const yMax = Math.max(10, d3.max(byBand, (d) => MODES.reduce((acc, m) => acc + d[m], 0)) || 0);
+        const yMax = pct
+          ? 100
+          : Math.max(10, d3.max(byBand, (d) => d._total) || 0);
         const y = d3.scaleLinear().domain([0, yMax]).nice().range([innerH, 0]);
 
         const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -1724,7 +1760,7 @@ Last update: 2026-04-03 UTC
           .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
 
         g.append("g")
-          .call(d3.axisLeft(y).ticks(5))
+          .call(d3.axisLeft(y).ticks(5).tickFormat(pct ? (d) => d + "%" : d3.format(",")))
           .call((axis) => axis.selectAll("text").attr("fill", "#9fb4c8"))
           .call((axis) => axis.selectAll("line,path").attr("stroke", "#28445a"));
 
@@ -1748,11 +1784,13 @@ Last update: 2026-04-03 UTC
           .on("mousemove", function (event, d) {
             const layer = d3.select(this.parentNode).datum();
             const mode = layer ? layer.key : "N/A";
-            const events = d.data && mode && Number.isFinite(d.data[mode]) ? d.data[mode] : 0;
+            const absCount = d.data._abs && Number.isFinite(d.data._abs[mode]) ? d.data._abs[mode] : 0;
+            const total = d.data._total || 0;
+            const pctVal = total > 0 ? ((absCount / total) * 100).toFixed(1) : "0.0";
             showChartValueToast([
               `Band: ${d.data.band}`,
               `Mode: ${mode}`,
-              `Events: ${formatInt(events)}`,
+              `Events: ${formatInt(absCount)} (${pctVal}%)`,
             ], event);
           })
           .on("mouseleave", hideChartValueToast);
