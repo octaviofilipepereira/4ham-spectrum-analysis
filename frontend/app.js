@@ -1919,10 +1919,6 @@ async function syncScanState() {
       renderRotationSlots();
       updateRotationUI();
       startRotationPoll();
-      if (rotationPanel.classList.contains("d-none")) {
-        rotationPanel.classList.remove("d-none");
-        rotationToggleBtn.classList.add("is-active");
-      }
     }
   } catch (err) {
     return;
@@ -2783,10 +2779,6 @@ function connectStatus() {
             }
             renderRotationSlots();
             updateRotationUI();
-            if (rotationPanel.classList.contains("d-none")) {
-              rotationPanel.classList.remove("d-none");
-              rotationToggleBtn.classList.add("is-active");
-            }
           }
         } else if (rotationRunning && !data.rotation) {
           rotationRunning = false;
