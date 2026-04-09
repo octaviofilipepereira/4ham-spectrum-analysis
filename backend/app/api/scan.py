@@ -975,3 +975,39 @@ def rotation_status(
     if not state.scan_rotation:
         return {"running": False}
     return state.scan_rotation.status()
+
+
+# ── Rotation Presets CRUD ──────────────────────────────────────
+
+@router.get("/rotation/presets")
+def list_rotation_presets(
+    _: None = Depends(verify_basic_auth),
+) -> List[Dict]:
+    """List all saved rotation presets."""
+    return state.db.get_rotation_presets()
+
+
+@router.post("/rotation/presets")
+def create_rotation_preset(
+    body: Dict,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Save a new rotation preset."""
+    name = str(body.get("name") or "").strip()
+    config = body.get("config")
+    if not name:
+        raise HTTPException(status_code=400, detail="Preset name is required")
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=400, detail="Preset config is required")
+    return state.db.save_rotation_preset(name, config)
+
+
+@router.delete("/rotation/presets/{preset_id}")
+def delete_rotation_preset(
+    preset_id: int,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Delete a rotation preset by ID."""
+    if not state.db.delete_rotation_preset(preset_id):
+        raise HTTPException(status_code=404, detail="Preset not found")
+    return {"ok": True}

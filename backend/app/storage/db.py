@@ -96,6 +96,13 @@ CREATE TABLE IF NOT EXISTS callsign_events (
 CREATE INDEX IF NOT EXISTS idx_occ_time ON occupancy_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_callsign_time ON callsign_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_callsign_value ON callsign_events(callsign);
+
+CREATE TABLE IF NOT EXISTS rotation_presets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  config TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 """
 
 
@@ -220,6 +227,31 @@ class Database:
                 (key, value),
             )
             self.conn.commit()
+
+    # ── Rotation Presets CRUD ──────────────────────────────────────
+
+    def get_rotation_presets(self):
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT id, name, config, created_at FROM rotation_presets ORDER BY id"
+            ).fetchall()
+        return [{"id": r[0], "name": r[1], "config": json.loads(r[2]), "created_at": r[3]} for r in rows]
+
+    def save_rotation_preset(self, name: str, config: dict) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO rotation_presets(name, config, created_at) VALUES (?, ?, ?)",
+                (name, json.dumps(config), now),
+            )
+            self.conn.commit()
+        return {"id": cur.lastrowid, "name": name, "config": config, "created_at": now}
+
+    def delete_rotation_preset(self, preset_id: int) -> bool:
+        with self._lock:
+            cur = self.conn.execute("DELETE FROM rotation_presets WHERE id = ?", (preset_id,))
+            self.conn.commit()
+        return cur.rowcount > 0
 
     def get_auth_config(self):
         """Return stored auth credentials and enable flag."""
