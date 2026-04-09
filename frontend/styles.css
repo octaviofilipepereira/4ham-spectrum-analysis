@@ -214,11 +214,13 @@ h1,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 148px;
+  width: auto;
+  min-width: 148px;
 }
 
 .menu-toolbar .dropdown-toggle {
-  width: 148px;
+  width: auto;
+  min-width: 148px;
 }
 
 .menu-toolbar .dropdown-menu {
