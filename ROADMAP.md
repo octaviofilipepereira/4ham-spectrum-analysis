@@ -18,35 +18,45 @@ Last update: 2026-04-10
 
 ### Current State
 - ✅ Modular backend (FastAPI, 58 Python modules, 203 tests — 100% pass)
-- ✅ Frontend with ES6 modules (app.js + 10 modules in `modules/` and `utils/`)
-- ✅ 56+ API routes
+- ✅ Frontend with ES6 modules (app.js + 9 modules in `modules/` and `utils/`)
+- ✅ 64 API routes
 - ✅ Interactive TUI installer (whiptail) — Ubuntu/Debian/Mint/RPi OS
 - ✅ SSB Voice Signature Detection with hold-validation pipeline
 - ✅ Whisper ASR pipeline (FT-991A / IC-7300 USB)
 - ✅ Propagation Map with 3D globe & 3-formula scoring (Digital/CW/SSB)
 - ✅ Academic Analytics dashboard with multi-format export (CSV/XLSX/JSON)
-- ✅ Scan Rotation scheduler (multi-band/mode cycling)
-- ✅ Decoders: FT8, FT4, WSPR, CW, SSB integrated
-- ✅ Callsign ITU validation (letter-start + digit-start patterns)
+- ✅ Scan Rotation scheduler (multi-band/mode cycling with dwell time, loop, presets)
+- ✅ Decoders: FT8, FT4, WSPR, CW, SSB, APRS integrated
+- ✅ Callsign ITU validation + DXCC prefix lookup (4528 prefixes)
+- ✅ Session-cookie authentication with bcrypt (replaced Basic Auth in v0.6.0)
+- ✅ Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- ✅ CORS middleware (env-var-driven origins, credentials support)
+- ✅ Rate limiting via slowapi (global + per-route: 300/min events, 10/min exports)
+- ✅ Data retention system (age-based + count-based purge, auto-export before deletion)
+- ✅ Log rotation (RotatingFileHandler, 10 MB × 5 backups)
+- ✅ Region profile system (YAML, JSON schema validation, CLI flag)
 - ✅ Desktop launcher shortcut (GNOME/Cinnamon/XFCE/KDE/MATE/LXQt)
 - ✅ Check for Updates button (git pull + auto-restart)
 - ✅ SSB BW cap at 2800 Hz (phantom event elimination)
 - ✅ SSB focus hold system (auto formula span÷15k, max 16 holds/pass)
+- ✅ Responsive CSS layout (Bootstrap + media queries at 991 px / 575 px)
+- ✅ Toast notification system (success/error/warning/info)
 - ✅ Documentation: install, user manuals (PT/EN), help.html, propagation scoring (PT/EN)
 - ⚠️ Frontend app.js still 4230 lines (partially modularised)
-- ⚠️ Middleware directory placeholder (only `__init__.py`)
+- ⚠️ Middleware implementations live in `main.py`, not in the `middleware/` package
 
 ### Version History
 | Version | Date | Milestone |
 |---------|------|-----------|
 | v0.3.1 | 2026-02-23 | Modular backend, 54 tests, CI/CD |
-| v0.6.0 | 2026-03-14 | Waterfall WebGL, retention, i18n EN |
+| v0.5.0 | 2026-03-10 | CW decoder (Butterworth BPF, Hilbert envelope, Morse table, sweep) |
+| v0.6.0 | 2026-03-14 | Waterfall WebGL, data retention, session-cookie auth, i18n EN |
 | v0.7.0 | 2026-03-15 | Linux-only target, TUI installer |
 | v0.8.0 | 2026-03-22 | SSB Voice Signature, Whisper ASR, SNR gate |
 | v0.8.3 | 2026-04-02 | VOICE DETECTED waterfall markers, mode-filtered events |
 | v0.8.5 | 2026-04-03 | Academic Analytics dashboard |
 | v0.8.7 | 2026-04-05 | Desktop launcher, Check for Updates |
-| v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export |
+| v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
 | v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
 
 ---
@@ -64,16 +74,32 @@ Last update: 2026-04-10
 - Automated multi-band/mode cycling with configurable dwell time
 - Loop option and live countdown status bar
 - Full UI panel with slot editor and WebSocket sync
+- Rotation presets (save/load/delete)
 
 ### Academic Analytics ✅ (v0.8.5 – v0.9.0)
 - Full analytics dashboard with activity timeline, band distribution, heatmap, propagation map
 - 3-formula propagation scoring (Digital/CW/SSB with tailored SNR normalisation)
 - Multi-format export (CSV/XLSX/JSON), 1 h / 12 h presets
-- Callsign ITU validation
+- Callsign ITU validation + DXCC prefix lookup
 
 ### Phantom Mode Fix ✅ (v0.10.0)
 - Occupancy events forced to match active decoder mode
 - Confirmed band modes SQL time-scoped to analysed period
+
+### Previously completed (up to v0.8.3)
+- CW decoder subsystem (Butterworth BPF, Hilbert envelope, Morse table, CW sweep)
+- APRS decoder (Direwolf KISS frame parsing, APRS line parser)
+- Region profile system (YAML config, JSON schema, CLI `--region-profile-path`)
+- Session-cookie authentication with bcrypt (login/logout/status endpoints)
+- Security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- CORS middleware (env-var-driven origins via `CORS_ORIGINS`, toggle via `CORS_ENABLED`)
+- Rate limiting via slowapi (global limiter + per-route limits)
+- Data retention system (age + count purge, auto CSV export before deletion)
+- Log rotation (RotatingFileHandler, configurable via `LOG_MAX_BYTES` / `LOG_BACKUP_COUNT`)
+- Export file rotation (max 50 files, max 7 days age)
+- Toast notification system (frontend)
+- Responsive CSS layout (Bootstrap + media queries)
+- `main_legacy.py` removed (architecture cleanup)
 
 ---
 
@@ -130,7 +156,7 @@ Last update: 2026-04-10
 ### 3. Frontend Modularisation (Phase 2) 📦
 **Goal**: Continue refactoring app.js (still 4230 lines) into smaller ES6 modules
 
-**Current state**: 10 modules already extracted (`waterfall.js`, `api.js`, `websocket.js`, `config.js`, `constants.js`, `dom.js`, `ui.js`, `utils.js`, `presets.js`). Main orchestrator still too large.
+**Current state**: 9 modules already extracted (`waterfall.js`, `api.js`, `websocket.js`, `config.js`, `constants.js`, `dom.js`, `ui.js`, `utils.js`, `presets.js`). Main orchestrator still too large.
 
 **Tasks**:
 - [ ] 3.1. Extract `events.js` module (event table management)
@@ -145,19 +171,22 @@ Last update: 2026-04-10
 
 ---
 
-### 4. Custom Middleware Implementation 🛡️
-**Goal**: Add middleware for logging, metrics, and security
+### 4. Middleware Consolidation 🛡️
+**Goal**: Move existing middleware from `main.py` into the `middleware/` package and add missing pieces
+
+**Current state**: Security headers, CORS, and rate limiting are already implemented in `main.py` but not organised in the middleware package.
 
 **Tasks**:
-- [ ] 4.1. RequestLoggingMiddleware (structured per-request logs)
-- [ ] 4.2. SecurityHeadersMiddleware (HSTS, CSP, X-Frame-Options)
-- [ ] 4.3. CORSMiddleware refined (production-ready, origin whitelist)
-- [ ] 4.4. RateLimitMiddleware (abuse protection)
-- [ ] 4.5. Environment-based configuration (dev/staging/prod)
-- [ ] 4.6. Middleware tests
-- [ ] 4.7. Documentation
+- [ ] 4.1. Move security headers middleware to `middleware/security.py`
+- [ ] 4.2. Add missing HSTS and CSP headers
+- [ ] 4.3. Move CORS config to `middleware/cors.py`
+- [ ] 4.4. Move rate limiter to `middleware/ratelimit.py`
+- [ ] 4.5. Add RequestLoggingMiddleware (structured per-request logs)
+- [ ] 4.6. Environment-based configuration (dev/staging/prod)
+- [ ] 4.7. Middleware tests
+- [ ] 4.8. Documentation
 
-**Benefit**: Observability, security, compliance
+**Benefit**: Code organisation, observability, complete security headers (HSTS, CSP)
 
 ---
 
@@ -179,7 +208,7 @@ Last update: 2026-04-10
 ---
 
 ### 6. Monitoring Dashboard 📈
-**Goal**: Production observability
+**Goal**: Production observability beyond current logging
 
 **Tasks**:
 - [ ] 6.1. Prometheus/Grafana integration
@@ -220,20 +249,20 @@ Last update: 2026-04-10
 - [ ] Callsign and locator configuration
 - [ ] Rate limiting and validation
 
-#### 8.3. Scan Scheduler
-- [ ] Schedule scans by hour/day
-- [ ] Programmable scan profiles
-- [ ] Important event notifications
+#### 8.3. Push Notifications
+- [ ] Browser push notifications for important events (rare DX, new band opening)
+- [ ] Configurable notification filters (by mode, band, callsign pattern)
+- [ ] Email/webhook notification option
 
-#### 8.4. Mobile-Responsive UI
-- [ ] Responsive layout for tablets
-- [ ] Smartphone-optimised UI
-- [ ] Touch-friendly controls
-
-#### 8.5. Themes & Customisation
+#### 8.4. Themes & Customisation
 - [ ] Dark/Light theme switcher
 - [ ] Waterfall colour customisation
 - [ ] Configurable layout (drag-and-drop panels)
+
+#### 8.5. Mobile UI Enhancements
+- [ ] Tablet-optimised layout (landscape/portrait)
+- [ ] Smartphone touch-friendly controls
+- [ ] Progressive Web App (PWA) support
 
 ---
 
@@ -245,32 +274,28 @@ Last update: 2026-04-10
 - [ ] Persistence volumes
 - [ ] Health checks
 
-#### 9.2. Automated Backups
-- [ ] Automatic SQLite backups
-- [ ] Backup rotation (7 days, 4 weeks)
-- [ ] Restore scripts
-- [ ] Integrity verification
+#### 9.2. SQLite Backup & Restore
+- [ ] Automated SQLite full-database backups (complementing existing event CSV auto-export)
+- [ ] Restore scripts with integrity verification
+- [ ] Scheduled backup rotation
 
 ---
 
 ### 10. Security Enhancements 🔒
 
-#### 10.1. OAuth2/JWT Authentication
-- [ ] Replace Basic Auth with JWT
+#### 10.1. JWT Authentication
+- [ ] Replace current session-cookie auth with JWT tokens
 - [ ] Refresh tokens
 - [ ] Role-based access control (RBAC)
-- [ ] Session management
 
 #### 10.2. Security Audit
 - [ ] Vulnerability scan (OWASP Top 10)
 - [ ] Dependency updates
 - [ ] Penetration testing
-- [ ] Security headers audit
 
 #### 10.3. Advanced Rate Limiting
 - [ ] Per-user rate limits
 - [ ] IP-based throttling
-- [ ] Distributed rate limiting (Redis)
 - [ ] Adaptive rate limiting
 
 ---
@@ -296,3 +321,4 @@ Last update: 2026-04-10
 3. **WebSocket Delta Compression** — Current strategy maintained (efficient, tested, functional).
 4. **SSB BW Cap at 2800 Hz** — Standard SSB filter 2400 Hz + wide 2700 Hz + 100 Hz FFT margin. Signals above 2800 Hz are noise/interference.
 5. **SSB SNR Gate at 8 dB** — Calibrated for good antenna setups. Will become configurable (see item 1).
+6. **Session-Cookie Auth** — Replaced Basic Auth in v0.6.0. JWT upgrade planned (see item 10.1).

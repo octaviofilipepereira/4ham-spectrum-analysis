@@ -18,35 +18,45 @@ Indicativo: CT7BFV
 
 ### Estado Atual
 - ✅ Backend modular (FastAPI, 58 módulos Python, 203 testes — 100% sucesso)
-- ✅ Frontend com módulos ES6 (app.js + 10 módulos em `modules/` e `utils/`)
-- ✅ 56+ rotas API
+- ✅ Frontend com módulos ES6 (app.js + 9 módulos em `modules/` e `utils/`)
+- ✅ 64 rotas API
 - ✅ Instalador interactivo TUI (whiptail) — Ubuntu/Debian/Mint/RPi OS
 - ✅ Detecção de Voz SSB com pipeline de hold-validation
 - ✅ Pipeline Whisper ASR (FT-991A / IC-7300 USB)
 - ✅ Mapa de Propagação com globo 3D e scoring a 3 fórmulas (Digital/CW/SSB)
 - ✅ Dashboard Academic Analytics com exportação multi-formato (CSV/XLSX/JSON)
-- ✅ Scheduler de Rotação de Scan (ciclo multi-banda/modo)
-- ✅ Decoders: FT8, FT4, WSPR, CW, SSB integrados
-- ✅ Validação ITU de indicativos (padrões letter-start + digit-start)
+- ✅ Scheduler de Rotação de Scan (ciclo multi-banda/modo com dwell time, loop, presets)
+- ✅ Decoders: FT8, FT4, WSPR, CW, SSB, APRS integrados
+- ✅ Validação ITU de indicativos + lookup DXCC (4528 prefixos)
+- ✅ Autenticação session-cookie com bcrypt (substituiu Basic Auth em v0.6.0)
+- ✅ Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- ✅ Middleware CORS (origins via variável de ambiente, suporte a credentials)
+- ✅ Rate limiting via slowapi (global + per-route: 300/min eventos, 10/min exports)
+- ✅ Sistema de retenção de dados (purga por idade + contagem, auto-export antes de eliminação)
+- ✅ Rotação de logs (RotatingFileHandler, 10 MB × 5 backups)
+- ✅ Sistema de perfis regionais (YAML, validação JSON schema, flag CLI)
 - ✅ Atalho Desktop (GNOME/Cinnamon/XFCE/KDE/MATE/LXQt)
 - ✅ Botão Check for Updates (git pull + auto-restart)
 - ✅ BW cap SSB a 2800 Hz (eliminação de eventos fantasma)
 - ✅ Sistema de focus hold SSB (fórmula auto span÷15k, máx. 16 holds/passagem)
+- ✅ Layout CSS responsivo (Bootstrap + media queries a 991 px / 575 px)
+- ✅ Sistema de notificações toast (success/error/warning/info)
 - ✅ Documentação: install, manuais de utilizador (PT/EN), help.html, scoring de propagação (PT/EN)
 - ⚠️ Frontend app.js ainda com 4230 linhas (parcialmente modularizado)
-- ⚠️ Directório middleware placeholder (apenas `__init__.py`)
+- ⚠️ Implementações de middleware vivem em `main.py`, não no pacote `middleware/`
 
 ### Histórico de Versões
 | Versão | Data | Marco |
 |--------|------|-------|
 | v0.3.1 | 2026-02-23 | Backend modular, 54 testes, CI/CD |
-| v0.6.0 | 2026-03-14 | Waterfall WebGL, retenção, i18n EN |
+| v0.5.0 | 2026-03-10 | CW decoder (Butterworth BPF, envelope Hilbert, tabela Morse, sweep) |
+| v0.6.0 | 2026-03-14 | Waterfall WebGL, retenção de dados, autenticação session-cookie, i18n EN |
 | v0.7.0 | 2026-03-15 | Target Linux-only, instalador TUI |
 | v0.8.0 | 2026-03-22 | SSB Voice Signature, Whisper ASR, gate SNR |
 | v0.8.3 | 2026-04-02 | Markers VOICE DETECTED no waterfall, eventos filtrados por modo |
 | v0.8.5 | 2026-04-03 | Dashboard Academic Analytics |
 | v0.8.7 | 2026-04-05 | Atalho Desktop, Check for Updates |
-| v0.9.0 | 2026-04-06 | Scoring de propagação 3 fórmulas, exportação multi-formato |
+| v0.9.0 | 2026-04-06 | Scoring de propagação 3 fórmulas, exportação multi-formato, validação ITU |
 | v0.10.0 | 2026-04-08 | Scheduler de Rotação de Scan, correção de modos fantasma |
 
 ---
@@ -64,16 +74,32 @@ Indicativo: CT7BFV
 - Ciclo automatizado multi-banda/modo com tempo de permanência configurável
 - Opção de loop e barra de status com contagem regressiva
 - Painel UI completo com editor de slots e sincronização WebSocket
+- Presets de rotação (guardar/carregar/eliminar)
 
 ### Academic Analytics ✅ (v0.8.5 – v0.9.0)
 - Dashboard completo com timeline de actividade, distribuição por banda, heatmap, mapa de propagação
 - Scoring a 3 fórmulas (Digital/CW/SSB com normalização SNR específica)
 - Exportação multi-formato (CSV/XLSX/JSON), presets 1 h / 12 h
-- Validação ITU de indicativos
+- Validação ITU de indicativos + lookup DXCC
 
 ### Correção de Modos Fantasma ✅ (v0.10.0)
 - Eventos de ocupação forçados a corresponder ao modo do decoder activo
 - Query SQL de modos confirmados limitada ao período analisado
+
+### Anteriormente concluído (até v0.8.3)
+- Subsistema CW decoder (Butterworth BPF, envelope Hilbert, tabela Morse, CW sweep)
+- Decoder APRS (parsing de frames Direwolf KISS, parser de linhas APRS)
+- Sistema de perfis regionais (config YAML, JSON schema, flag CLI `--region-profile-path`)
+- Autenticação session-cookie com bcrypt (endpoints login/logout/status)
+- Middleware de security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- Middleware CORS (origins via `CORS_ORIGINS`, toggle via `CORS_ENABLED`)
+- Rate limiting via slowapi (limiter global + limites per-route)
+- Sistema de retenção de dados (purga idade + contagem, auto-export CSV antes de eliminação)
+- Rotação de logs (RotatingFileHandler, configurável via `LOG_MAX_BYTES` / `LOG_BACKUP_COUNT`)
+- Rotação de ficheiros de exportação (máx. 50 ficheiros, máx. 7 dias idade)
+- Sistema de notificações toast (frontend)
+- Layout CSS responsivo (Bootstrap + media queries)
+- `main_legacy.py` removido (limpeza de arquitectura)
 
 ---
 
@@ -130,7 +156,7 @@ Indicativo: CT7BFV
 ### 3. Modularização Frontend (Fase 2) 📦
 **Objetivo**: Continuar a refatoração do app.js (ainda 4230 linhas) em módulos ES6 mais pequenos
 
-**Estado actual**: 10 módulos já extraídos (`waterfall.js`, `api.js`, `websocket.js`, `config.js`, `constants.js`, `dom.js`, `ui.js`, `utils.js`, `presets.js`). Orquestrador principal ainda demasiado grande.
+**Estado actual**: 9 módulos já extraídos (`waterfall.js`, `api.js`, `websocket.js`, `config.js`, `constants.js`, `dom.js`, `ui.js`, `utils.js`, `presets.js`). Orquestrador principal ainda demasiado grande.
 
 **Tarefas**:
 - [ ] 3.1. Extrair módulo `events.js` (gestão da tabela de eventos)
@@ -145,19 +171,22 @@ Indicativo: CT7BFV
 
 ---
 
-### 4. Implementação de Middleware Customizado 🛡️
-**Objetivo**: Adicionar middleware para logging, métricas e segurança
+### 4. Consolidação de Middleware 🛡️
+**Objetivo**: Mover middleware existente de `main.py` para o pacote `middleware/` e adicionar peças em falta
+
+**Estado actual**: Security headers, CORS e rate limiting já estão implementados em `main.py` mas não organizados no pacote middleware.
 
 **Tarefas**:
-- [ ] 4.1. RequestLoggingMiddleware (logs estruturados por request)
-- [ ] 4.2. SecurityHeadersMiddleware (HSTS, CSP, X-Frame-Options)
-- [ ] 4.3. CORSMiddleware refinado (production-ready, origin whitelist)
-- [ ] 4.4. RateLimitMiddleware (protecção contra abuso)
-- [ ] 4.5. Configuração por ambiente (dev/staging/prod)
-- [ ] 4.6. Testes de middleware
-- [ ] 4.7. Documentação
+- [ ] 4.1. Mover middleware de security headers para `middleware/security.py`
+- [ ] 4.2. Adicionar headers HSTS e CSP em falta
+- [ ] 4.3. Mover config CORS para `middleware/cors.py`
+- [ ] 4.4. Mover rate limiter para `middleware/ratelimit.py`
+- [ ] 4.5. Adicionar RequestLoggingMiddleware (logs estruturados por request)
+- [ ] 4.6. Configuração por ambiente (dev/staging/prod)
+- [ ] 4.7. Testes de middleware
+- [ ] 4.8. Documentação
 
-**Benefício**: Observabilidade, segurança, compliance
+**Benefício**: Organização do código, observabilidade, security headers completos (HSTS, CSP)
 
 ---
 
@@ -179,7 +208,7 @@ Indicativo: CT7BFV
 ---
 
 ### 6. Dashboard de Monitorização 📈
-**Objetivo**: Observabilidade em produção
+**Objetivo**: Observabilidade em produção para além do logging actual
 
 **Tarefas**:
 - [ ] 6.1. Integração com Prometheus/Grafana
@@ -220,20 +249,20 @@ Indicativo: CT7BFV
 - [ ] Configuração de indicativo e locator
 - [ ] Rate limiting e validação
 
-#### 8.3. Agendador de Scans
-- [ ] Agendamento de scans por hora/dia
-- [ ] Perfis de scan programáveis
-- [ ] Notificações de eventos importantes
+#### 8.3. Notificações Push
+- [ ] Notificações push do browser para eventos importantes (DX raro, abertura de banda)
+- [ ] Filtros de notificação configuráveis (por modo, banda, padrão de indicativo)
+- [ ] Opção de notificação por email/webhook
 
-#### 8.4. UI Mobile-Responsive
-- [ ] Layout responsivo para tablets
-- [ ] UI otimizada para smartphones
-- [ ] Controlos touch-friendly
-
-#### 8.5. Temas e Personalização
+#### 8.4. Temas e Personalização
 - [ ] Alternador tema Dark/Light
 - [ ] Personalização de cores do waterfall
 - [ ] Layout configurável (painéis drag-and-drop)
+
+#### 8.5. Melhorias UI Mobile
+- [ ] Layout otimizado para tablets (landscape/portrait)
+- [ ] Controlos touch-friendly para smartphones
+- [ ] Suporte Progressive Web App (PWA)
 
 ---
 
@@ -245,32 +274,28 @@ Indicativo: CT7BFV
 - [ ] Volumes para persistência
 - [ ] Health checks
 
-#### 9.2. Backups Automatizados
-- [ ] Backup automático de SQLite
-- [ ] Rotação de backups (7 dias, 4 semanas)
-- [ ] Scripts de restore
-- [ ] Verificação de integridade
+#### 9.2. Backup e Restore SQLite
+- [ ] Backups automáticos da base de dados SQLite completa (complementando auto-export CSV existente)
+- [ ] Scripts de restore com verificação de integridade
+- [ ] Rotação de backups agendada
 
 ---
 
 ### 10. Melhorias de Segurança 🔒
 
-#### 10.1. Autenticação OAuth2/JWT
-- [ ] Substituir Basic Auth por JWT
+#### 10.1. Autenticação JWT
+- [ ] Substituir autenticação actual session-cookie por tokens JWT
 - [ ] Refresh tokens
 - [ ] Controlo de acesso baseado em roles (RBAC)
-- [ ] Gestão de sessões
 
 #### 10.2. Auditoria de Segurança
 - [ ] Scan de vulnerabilidades (OWASP Top 10)
 - [ ] Atualização de dependências
 - [ ] Testes de penetração
-- [ ] Auditoria de security headers
 
 #### 10.3. Rate Limiting Avançado
 - [ ] Limites por utilizador
 - [ ] Throttling por IP
-- [ ] Rate limiting distribuído (Redis)
 - [ ] Rate limiting adaptativo
 
 ---
@@ -296,3 +321,4 @@ Indicativo: CT7BFV
 3. **WebSocket Delta Compression** — Estratégia actual mantida (eficiente, testada, funcional).
 4. **BW Cap SSB a 2800 Hz** — Filtro SSB standard 2400 Hz + wide 2700 Hz + 100 Hz margem FFT. Sinais acima de 2800 Hz são ruído/interferência.
 5. **Gate SNR SSB a 8 dB** — Calibrado para setups com boa antena. Será tornado configurável (ver item 1).
+6. **Autenticação Session-Cookie** — Substituiu Basic Auth em v0.6.0. Upgrade para JWT planeado (ver item 10.1).
