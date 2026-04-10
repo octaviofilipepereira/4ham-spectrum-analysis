@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-08 UTC
+Last update: 2026-04-10 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -96,6 +96,12 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.11.1
+- **SQLite concurrency fix**: eliminated ~705 `sqlite3.InterfaceError`/day in auth/session methods. CPU 243%→37%, memory 1.63 GB→580 MB.
+- **SSB signal quality hardening**: 60 s debounce + SNR ≥ 8 dB gate, BW cap 2800 Hz across 4 filtering points, phantom SSB event elimination.
+- **Focus hold improvement**: `hold_ms` 15→10 s, auto formula `span÷15k`, max 16.
+- **Roadmap bilingual audit**: 15+ inaccuracies corrected (EN/PT).
 
 ### v0.10.0
 - **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
@@ -563,6 +569,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
 - [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
 - [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell and live status.
+- [x] Production stabilisation (v0.11.1): SQLite concurrency fix, SSB signal hardening.
 
 ### Next milestones
 1. Multi-node aggregation (multiple receivers feeding one backend).

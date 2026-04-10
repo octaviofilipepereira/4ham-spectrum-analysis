@@ -8,9 +8,9 @@ Last update: 2026-04-10
 
 > **Also available in:** [Português](ROADMAP_PT.md)
 
-**Current Version**: v0.10.0  
+**Current Version**: v0.11.1  
 **Last Update**: 2026-04-10  
-**Status**: 🟢 Production-Ready (unstable branch)
+**Status**: 🟢 Production-Ready (main branch)
 
 ---
 
@@ -58,12 +58,13 @@ Last update: 2026-04-10
 | v0.8.7 | 2026-04-05 | Desktop launcher, Check for Updates |
 | v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
 | v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
+| v0.11.1 | 2026-04-10 | SQLite concurrency fix, SSB signal quality hardening, production stabilisation |
 
 ---
 
 ## ✅ COMPLETED (since v0.8.3)
 
-### SSB Signal Quality Hardening ✅ (unstable, 2026-04-10)
+### SSB Signal Quality Hardening ✅ (v0.11.1)
 - SSB marker flood fix — 60 s debounce + SNR ≥ 8 dB gate
 - Voice marker cache preserved before debounce
 - Backend `band_display` updated after SSB subband clipping

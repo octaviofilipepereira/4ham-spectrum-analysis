@@ -8,9 +8,9 @@ Indicativo: CT7BFV
 
 > **Also available in:** [English](ROADMAP.md)
 
-**Versão Atual**: v0.10.0  
+**Versão Atual**: v0.11.1  
 **Última Atualização**: 2026-04-10  
-**Estado**: 🟢 Produção-Ready (branch unstable)
+**Estado**: 🟢 Produção-Ready (branch main)
 
 ---
 
@@ -58,12 +58,13 @@ Indicativo: CT7BFV
 | v0.8.7 | 2026-04-05 | Atalho Desktop, Check for Updates |
 | v0.9.0 | 2026-04-06 | Scoring de propagação 3 fórmulas, exportação multi-formato, validação ITU |
 | v0.10.0 | 2026-04-08 | Scheduler de Rotação de Scan, correção de modos fantasma |
+| v0.11.1 | 2026-04-10 | Correção concorrência SQLite, qualidade sinal SSB, estabilização produção |
 
 ---
 
 ## ✅ CONCLUÍDO (desde v0.8.3)
 
-### Qualidade de Sinal SSB ✅ (unstable, 2026-04-10)
+### Qualidade de Sinal SSB ✅ (v0.11.1)
 - Correção do flood de markers SSB — debounce 60 s + gate SNR ≥ 8 dB
 - Cache de voice markers preservada antes do debounce
 - `band_display` backend atualizado após clipping de sub-banda SSB

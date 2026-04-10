@@ -2,10 +2,24 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-06 UTC
+Last update: 2026-04-10 UTC
 -->
 
 # Changelog
+
+## v0.11.1 - 2026-04-10
+
+### Fixed
+- **SQLite concurrency fix** — added `self._lock` to 5 auth/session database methods (`get_auth_config`, `save_auth_config`, `get_auth_session`, `save_auth_session`, `clear_auth_session`) that were missing thread-safety protection. Eliminated ~705 `sqlite3.InterfaceError` per day (8.3% of requests). CPU usage dropped from 243% to 37%, memory from 1.63 GB to 580 MB.
+- **SSB marker flood fix** — 60 s debounce + SNR ≥ 8 dB gate on voice markers; voice marker cache preserved before debounce.
+- **Phantom SSB event elimination** — BW cap at 2800 Hz across all 4 filtering points (pipeline, events, decoders, helpers).
+- **Backend `band_display` update** after SSB subband clipping.
+- **Focus hold coverage improvement** — `hold_ms` 15→10 s, auto formula `span÷15k`, max 16.
+
+### Changed
+- **Help panel** updated to v0.11.1.
+- **Academic Analytics** version header updated.
+- **Roadmap** (EN/PT) bilingual audit — 15+ inaccuracies corrected against codebase.
 
 ## v0.10.0 - 2026-04-08
 
