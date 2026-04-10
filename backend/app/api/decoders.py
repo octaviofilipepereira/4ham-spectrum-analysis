@@ -361,9 +361,9 @@ async def _run_ssb_detector_loop() -> None:
             candidates = []
             for candidate in occupancy:
                 bw_hz = int(safe_float(candidate.get("bandwidth_hz"), 0) or 0)
-                # Accept voice-like bandwidths: 1200–5000 Hz covers SSB, AM,
-                # and most voice modes seen on HF.
-                if bw_hz < 1200 or bw_hz > 5000:
+                # Accept SSB voice bandwidths only: 1200–3200 Hz.
+                # Wider signals (3200-5000 Hz) are broadband noise, not SSB.
+                if bw_hz < 1200 or bw_hz > 3200:
                     continue
                 candidates.append(candidate)
             if not candidates:

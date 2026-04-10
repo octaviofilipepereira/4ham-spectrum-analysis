@@ -818,8 +818,8 @@ def is_plausible_occupancy_event(event: Dict[str, Any]) -> bool:
     hf_bands = {"160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"}
     
     if band in hf_bands:
-        # HF: typical modes 150 Hz (CW) to 5 kHz (SSB)
-        if bw < 150 or bw > 5000:
+        # HF: typical modes 150 Hz (CW) to 3.2 kHz (SSB voice ceiling)
+        if bw < 150 or bw > 3200:
             return False
     else:
         # VHF/UHF: reject very wide signals (likely interference)

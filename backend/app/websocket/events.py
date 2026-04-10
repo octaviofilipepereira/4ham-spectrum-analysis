@@ -392,9 +392,10 @@ async def _run_occupancy_detection_loop() -> None:
             # roll-off artefacts into mega-segments that must be discarded.
             _center = state.scan_engine.center_hz or 0
             _valid = []
+            _bw_cap = 3200 if selected_decoder_mode == "ssb" else 5000
             for seg in occupancy:
                 bw = int(seg.get("bandwidth_hz") or 0)
-                if bw > 5000 or bw < min_bw_hz:
+                if bw > _bw_cap or bw < min_bw_hz:
                     continue
                 _off = seg.get("offset_hz")
                 _freq = int(_center + float(_off)) if _off is not None else _center
