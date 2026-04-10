@@ -361,9 +361,9 @@ async def _run_ssb_detector_loop() -> None:
             candidates = []
             for candidate in occupancy:
                 bw_hz = int(safe_float(candidate.get("bandwidth_hz"), 0) or 0)
-                # Accept voice-like bandwidths: 1200–5000 Hz covers SSB, AM,
-                # and most voice modes seen on HF.
-                if bw_hz < 1200 or bw_hz > 5000:
+                # Accept SSB voice bandwidths only: 1200–2800 Hz.
+                # Wider signals are broadband noise, not SSB.
+                if bw_hz < 1200 or bw_hz > 2800:
                     continue
                 candidates.append(candidate)
             if not candidates:
@@ -556,11 +556,15 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
         if state.scan_state.get("state") != "running":
             continue
         
-        # Filter events by selected decoder mode (case-insensitive)
+        # Filter events by selected decoder mode (case-insensitive).
+        # FT8 and FT4 are treated as the same family — selecting either
+        # mode accepts events from both sub-modes.
+        _FT_FAMILY = {"FT8", "FT4"}
         event_mode = str(event.get("mode", "")).strip().upper()
         selected_mode = str(state.scan_state.get("decoder_mode", "")).strip().upper()
         if selected_mode and event_mode != selected_mode:
-            continue  # Ignore events from different decoder modes
+            if not (event_mode in _FT_FAMILY and selected_mode in _FT_FAMILY):
+                continue  # Ignore events from different decoder modes
         
         # Save event
         touch_decoder_source(event.get("source"))

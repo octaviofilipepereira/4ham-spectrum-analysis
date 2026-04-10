@@ -39,12 +39,13 @@ def classify_mode_heuristic(bandwidth_hz, snr_db=None, frequency_hz=None):
         mode = "Unknown"
 
     # On HF amateur bands (< 30 MHz) AM is virtually unused — reclassify
-    # bandwidth-only "AM" as "SSB".  The only HF AM allocation is a small
-    # 10 m window (29.0-29.7 MHz) which we preserve.
+    # bandwidth-only "AM" as "SSB" ONLY when the measured bandwidth is
+    # still within SSB voice range (≤ 2800 Hz).  Wider signals are
+    # broadband noise / interference, not SSB voice.
     if mode == "AM" and frequency_hz is not None:
         freq = float(frequency_hz)
         _is_10m_am_window = 29_000_000 <= freq <= 29_700_000
-        if freq < 30_000_000 and not _is_10m_am_window:
+        if freq < 30_000_000 and not _is_10m_am_window and bw <= 2800:
             mode = "SSB"
 
     snr = 0.0 if snr_db is None else float(max(0.0, snr_db))

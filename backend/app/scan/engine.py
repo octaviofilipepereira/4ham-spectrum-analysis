@@ -62,7 +62,7 @@ class ScanEngine:
         # SSB candidate focus mode: keep scan dwell short globally, but extend
         # dwell on frequencies repeatedly flagged as active SSB traffic.
         self._ssb_focus_enabled: bool = False
-        self._ssb_focus_hold_ms: int = 15000
+        self._ssb_focus_hold_ms: int = 10000
         self._ssb_focus_candidate_ttl_s: float = 20.0
         self._ssb_focus_hits_required: int = 2
         self._ssb_focus_cooldown_s: float = 20.0
@@ -94,7 +94,7 @@ class ScanEngine:
         self.current_hz = self.center_hz
         self._ssb_focus_enabled = bool(self.config.get("ssb_focus_enable", False))
         self._ssb_focus_hold_ms = max(
-            int(self.config.get("ssb_focus_hold_ms", 15000) or 15000),
+            int(self.config.get("ssb_focus_hold_ms", 10000) or 10000),
             0,
         )
         self._ssb_focus_candidate_ttl_s = max(
@@ -115,13 +115,13 @@ class ScanEngine:
         )
         # Adaptive max holds: if not explicitly configured, compute from the
         # scan span so wider bands (e.g. 10m = 1.4 MHz) get proportionally
-        # more holds.  Rule: ~1 hold per 50 kHz of span, minimum 4, max 12.
+        # more holds.  Rule: ~1 hold per 15 kHz of span, minimum 4, max 16.
         _explicit_max_holds = self.config.get("ssb_focus_max_holds_per_pass")
         if _explicit_max_holds is not None:
             self._ssb_focus_max_holds_per_pass = max(int(_explicit_max_holds), 1)
         else:
             _span_hz = max(0, self.end_hz - self.start_hz)
-            _auto = max(4, min(12, _span_hz // 50_000))
+            _auto = max(4, min(16, _span_hz // 15_000))
             self._ssb_focus_max_holds_per_pass = _auto
         self._ssb_focus_holds_in_pass = 0
         self._ssb_focus_candidates.clear()

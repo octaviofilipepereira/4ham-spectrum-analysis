@@ -1,343 +1,325 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-04-02
+Last update: 2026-04-10
 -->
 
-# 🗺️ ROADMAP - 4ham-spectrum-analysis
-## Estrutura de Trabalhos Seguintes
+# 🗺️ ROADMAP — 4ham-spectrum-analysis
 
-**Versão Atual**: v0.8.3  
-**Última Atualização**: 2026-04-02  
-**Status**: 🟢 Produção-Ready
+> **Also available in:** [Português](ROADMAP_PT.md)
+
+**Current Version**: v0.11.1  
+**Last Update**: 2026-04-10  
+**Status**: 🟢 Production-Ready (main branch)
 
 ---
 
-## 📊 VISÃO GERAL DO PROJETO
+## 📊 PROJECT OVERVIEW
 
-### Estado Atual
-- ✅ Backend modular e funcional (FastAPI, 55 módulos Python)
-- ✅ Frontend funcional (Vanilla JS + WebGL)
-- ✅ 56 rotas API implementadas
-- ✅ 184 testes (100% sucesso)
-- ✅ Instalador interactivo TUI (whiptail)
-- ✅ Documentação abrangente (install, user manual, help.html)
-- ✅ SSB Voice Signature Detection com hold-validation pipeline
-- ✅ Whisper ASR pipeline preparado (FT-991A / IC-7300 USB)
-- ✅ Propagation Map com globo 3D
-- ✅ Decoders FT8/FT4/WSPR/CW/SSB integrados
-- ✅ main_legacy.py removido (arquitetura limpa)
-- ⚠️ Frontend monolítico (5349 linhas em app.js)
-- ⚠️ Middleware placeholder (apenas __init__.py)
+### Current State
+- ✅ Modular backend (FastAPI, 58 Python modules, 203 tests — 100% pass)
+- ✅ Frontend with ES6 modules (app.js + 9 modules in `modules/` and `utils/`)
+- ✅ 64 API routes
+- ✅ Interactive TUI installer (whiptail) — Ubuntu/Debian/Mint/RPi OS
+- ✅ SSB Voice Signature Detection with hold-validation pipeline
+- ✅ Whisper ASR pipeline (FT-991A / IC-7300 USB)
+- ✅ Propagation Map with 3D globe & 3-formula scoring (Digital/CW/SSB)
+- ✅ Academic Analytics dashboard with multi-format export (CSV/XLSX/JSON)
+- ✅ Scan Rotation scheduler (multi-band/mode cycling with dwell time, loop, presets)
+- ✅ Decoders: FT8, FT4, WSPR, CW, SSB, APRS integrated
+- ✅ Callsign ITU validation + DXCC prefix lookup (4528 prefixes)
+- ✅ Session-cookie authentication with bcrypt (replaced Basic Auth in v0.6.0)
+- ✅ Security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- ✅ CORS middleware (env-var-driven origins, credentials support)
+- ✅ Rate limiting via slowapi (global + per-route: 300/min events, 10/min exports)
+- ✅ Data retention system (age-based + count-based purge, auto-export before deletion)
+- ✅ Log rotation (RotatingFileHandler, 10 MB × 5 backups)
+- ✅ Region profile system (YAML, JSON schema validation, CLI flag)
+- ✅ Desktop launcher shortcut (GNOME/Cinnamon/XFCE/KDE/MATE/LXQt)
+- ✅ Check for Updates button (git pull + auto-restart)
+- ✅ SSB BW cap at 2800 Hz (phantom event elimination)
+- ✅ SSB focus hold system (auto formula span÷15k, max 16 holds/pass)
+- ✅ Responsive CSS layout (Bootstrap + media queries at 991 px / 575 px)
+- ✅ Toast notification system (success/error/warning/info)
+- ✅ Documentation: install, user manuals (PT/EN), help.html, propagation scoring (PT/EN)
+- ⚠️ Frontend app.js still 4230 lines (partially modularised)
+- ⚠️ Middleware implementations live in `main.py`, not in the `middleware/` package
 
-### Histórico de Versões Relevantes
-| Versão | Data | Milestone |
-|--------|------|-----------|
-| v0.3.1 | 2026-02-23 | Backend modular, 54 testes, CI/CD |
-| v0.6.0 | 2026-03-14 | Waterfall WebGL, retention, i18n EN |
-| v0.7.0 | 2026-03-15 | Linux-only target, instalador TUI |
+### Version History
+| Version | Date | Milestone |
+|---------|------|-----------|
+| v0.3.1 | 2026-02-23 | Modular backend, 54 tests, CI/CD |
+| v0.5.0 | 2026-03-10 | CW decoder (Butterworth BPF, Hilbert envelope, Morse table, sweep) |
+| v0.6.0 | 2026-03-14 | Waterfall WebGL, data retention, session-cookie auth, i18n EN |
+| v0.7.0 | 2026-03-15 | Linux-only target, TUI installer |
 | v0.8.0 | 2026-03-22 | SSB Voice Signature, Whisper ASR, SNR gate |
 | v0.8.3 | 2026-04-02 | VOICE DETECTED waterfall markers, mode-filtered events |
+| v0.8.5 | 2026-04-03 | Academic Analytics dashboard |
+| v0.8.7 | 2026-04-05 | Desktop launcher, Check for Updates |
+| v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
+| v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
+| v0.11.1 | 2026-04-10 | SQLite concurrency fix, SSB signal quality hardening, production stabilisation |
 
 ---
 
-## ✅ CONCLUÍDO (desde v0.3.1)
+## ✅ COMPLETED (since v0.8.3)
 
-### ~~Remoção de main_legacy.py~~ ✅
-- Ficheiro removido. Funcionalidade útil migrada para `main.py` (250 linhas).
-- Testes revalidados.
+### SSB Signal Quality Hardening ✅ (v0.11.1)
+- SSB marker flood fix — 60 s debounce + SNR ≥ 8 dB gate
+- Voice marker cache preserved before debounce
+- Backend `band_display` updated after SSB subband clipping
+- Focus hold coverage improvement (hold_ms 15→10 s, auto formula span÷15k, max 16)
+- Phantom SSB event elimination — BW cap at 2800 Hz across all 4 filtering points (pipeline, events, decoders, helpers)
 
-### SSB Voice Signature Detection ✅ (v0.8.0)
-- Hold-validation pipeline com 15 s de confirmação
-- SSB candidate-focus mode com bucket/cooldown
-- SNR gate a 6 dB (eventos) / 8 dB (markers)
-- Alinhamento de defaults `ssb_focus_hits_required=2` (API + engine)
+### Scan Rotation ✅ (v0.10.0)
+- Automated multi-band/mode cycling with configurable dwell time
+- Loop option and live countdown status bar
+- Full UI panel with slot editor and WebSocket sync
+- Rotation presets (save/load/delete)
 
-### Hotfixes v0.8.0 ✅
-- AM→SSB reclassification em HF <30 MHz
-- Occupancy flood suppression (rate limiter backend)
-- False-positive marker fix + event restoration
-- SSB threshold tuning para sinais curtos (unstable branch)
+### Academic Analytics ✅ (v0.8.5 – v0.9.0)
+- Full analytics dashboard with activity timeline, band distribution, heatmap, propagation map
+- 3-formula propagation scoring (Digital/CW/SSB with tailored SNR normalisation)
+- Multi-format export (CSV/XLSX/JSON), 1 h / 12 h presets
+- Callsign ITU validation + DXCC prefix lookup
 
----
+### Phantom Mode Fix ✅ (v0.10.0)
+- Occupancy events forced to match active decoder mode
+- Confirmed band modes SQL time-scoped to analysed period
 
-## 🎯 PRIORIDADES ESTRATÉGICAS
-
-### 🔴 Prioridade ALTA (Próximos 1-2 sprints)
-Trabalhos críticos para manutenibilidade e qualidade
-
-### 🟡 Prioridade MÉDIA (2-4 sprints)
-Melhorias importantes mas não bloqueantes
-
-### 🟢 Prioridade BAIXA (Backlog)
-Features nice-to-have e otimizações
-
----
-
-## 🔴 PRIORIDADE ALTA
-
-### 1. Migração Frontend para Módulos ES6 📦
-**Objetivo**: Refatorar app.js monolítico (5349 linhas) para arquitetura modular
-
-**Tarefas**:
-- [ ] 1.1. Criar módulo `waterfall.js` (renderização WebGL)
-- [ ] 1.2. Criar módulo `events.js` (gestão de eventos e tabela)
-- [ ] 1.3. Criar módulo `controls.js` (painel de controlo de scan)
-- [ ] 1.4. Criar módulo `charts.js` (gráficos e visualizações)
-- [ ] 1.5. Criar módulo `websocket.js` (gestão de conexões WS)
-- [ ] 1.6. Criar módulo `propagation.js` (mapa e propagação)
-- [ ] 1.7. Atualizar `index.html` com imports ES6
-- [ ] 1.8. Migrar lógica de `app.js` para módulos
-- [ ] 1.9. Manter `app.js` como orchestrator minimalista (<300 linhas)
-- [ ] 1.10. Atualizar testes frontend
-- [ ] 1.11. Validar funcionalidade completa pós-migração
-
-**Benefícios**: Manutenibilidade +80%, Testabilidade +60%, Legibilidade +90%
+### Previously completed (up to v0.8.3)
+- CW decoder subsystem (Butterworth BPF, Hilbert envelope, Morse table, CW sweep)
+- APRS decoder (Direwolf KISS frame parsing, APRS line parser)
+- Region profile system (YAML config, JSON schema, CLI `--region-profile-path`)
+- Session-cookie authentication with bcrypt (login/logout/status endpoints)
+- Security headers middleware (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy)
+- CORS middleware (env-var-driven origins via `CORS_ORIGINS`, toggle via `CORS_ENABLED`)
+- Rate limiting via slowapi (global limiter + per-route limits)
+- Data retention system (age + count purge, auto CSV export before deletion)
+- Log rotation (RotatingFileHandler, configurable via `LOG_MAX_BYTES` / `LOG_BACKUP_COUNT`)
+- Export file rotation (max 50 files, max 7 days age)
+- Toast notification system (frontend)
+- Responsive CSS layout (Bootstrap + media queries)
+- `main_legacy.py` removed (architecture cleanup)
 
 ---
 
-### 2. Implementação de Middleware Customizado 🛡️
-**Objetivo**: Adicionar middleware para logging, metrics e security
+## 🎯 PRIORITY LEGEND
 
-**Tarefas**:
-- [ ] 2.1. RequestLoggingMiddleware (logs estruturados por request)
-- [ ] 2.2. SecurityHeadersMiddleware (HSTS, CSP, X-Frame-Options)
-- [ ] 2.3. CORSMiddleware refinado (production-ready, origin whitelist)
-- [ ] 2.4. RateLimitMiddleware (protecção contra abuse)
-- [ ] 2.5. Configuração por ambiente (dev/staging/prod)
-- [ ] 2.6. Testes de middleware
-- [ ] 2.7. Documentação
-
-**Benefícios**: Observabilidade, segurança, compliance
+- 🔴 **HIGH** — Next 1–2 sprints, critical for quality or usability
+- 🟡 **MEDIUM** — 2–4 sprints, important but not blocking
+- 🟢 **LOW** — Backlog, nice-to-have
 
 ---
 
-### 3. Validação Real-Band SSB (unstable) 🎙️
-**Objetivo**: Validar os novos limiares SSB com testes de antena em banda real
+## 🔴 HIGH PRIORITY
 
-**Tarefas**:
-- [ ] 3.1. Scan SSB 40m durante período de actividade (18h-22h UTC)
-- [ ] 3.2. Scan SSB 20m durante período de actividade (10h-16h UTC)
-- [ ] 3.3. Medir taxa de markers por minuto (falsos vs legítimos)
-- [ ] 3.4. Medir tempo até primeiro evento confirmado
-- [ ] 3.5. Testar detecção de QSOs curtos (3-5 s)
-- [ ] 3.6. Ajustar `MARKER_MIN_SNR_DB` via env var se necessário
-- [ ] 3.7. Merge unstable → main quando validado
+### 1. Configurable SSB SNR Gate 🎛️
+**Goal**: Make the SSB SNR threshold user-configurable so it adapts to each station's antenna/receiver setup
 
-**Benefícios**: Confiança nos limiares, merge seguro
+**Context**: The SSB event gate is hardcoded at 8 dB in 4 code points. With a good antenna (e.g. Prosistel PST-1524VC), 45% of events fall in the 8–10 dB range. A station with a modest antenna (wire, indoor) would have signals at 4–6 dB — the current gate would reject almost everything.
 
----
+**Production data (2026-04-10)**: 1820 SSB events — 17.6% at 6–8 dB, 45.3% at 8–10 dB, max SNR 27.5 dB.
 
-## 🟡 PRIORIDADE MÉDIA
+**Tasks**:
+- [ ] 1.1. Add `ssb_snr_gate_db` to `state.py` (env var `SSB_SNR_GATE_DB`, default 8.0)
+- [ ] 1.2. Replace all 4 hardcoded gates (8.0 dB) with `state.ssb_snr_gate_db`
+  - `events.py` — voice marker cache gate
+  - `events.py` — SSB event emission (post-debounce)
+  - `events.py` — general occupancy SSB gate (6.0 dB → derive from gate)
+  - `decoders.py` — SSB detector loop
+- [ ] 1.3. Expose in `/api/settings` (GET/PUT)
+- [ ] 1.4. Add control in frontend (Settings → SSB → SNR Gate)
+- [ ] 1.5. Validation: range 3.0–20.0 dB
+- [ ] 1.6. Unit tests (gate at 4, 8, 12 dB)
+- [ ] 1.7. Documentation (install.md, help.html)
 
-### 4. Testes End-to-End (E2E) 🧪
-**Objetivo**: Adicionar testes de integração completos
-
-**Tarefas**:
-- [ ] 4.1. Setup Playwright ou Cypress
-- [ ] 4.2. Testes de fluxo de scan completo
-- [ ] 4.3. Testes de export (CSV/JSON)
-- [ ] 4.4. Testes de gestão de decoders
-- [ ] 4.5. Testes de WebSocket real-time
-- [ ] 4.6. Testes de autenticação
-- [ ] 4.7. Integração no CI/CD
-- [ ] 4.8. Screenshots em caso de falha
-
-**Benefícios**: Confiança em releases, detecção precoce de bugs
+**Benefit**: Adapts to any antenna/receiver setup — fewer false positives on strong stations, weaker signals captured on modest setups
 
 ---
 
-### 5. Dashboard de Métricas e Monitorização 📈
-**Objetivo**: Observabilidade em produção
+### 2. Real-Band SSB Validation 🎙️
+**Goal**: Validate SSB thresholds with real antenna tests across bands
 
-**Tarefas**:
-- [ ] 5.1. Integração com Prometheus/Grafana
-- [ ] 5.2. Métricas de sistema (CPU, RAM, disk)
-- [ ] 5.3. Métricas de aplicação (requests/s, latency)
-- [ ] 5.4. Métricas de decoder (eventos/min, SNR médio)
-- [ ] 5.5. Métricas de SDR (sample rate, overflows)
-- [ ] 5.6. Alertas automáticos (email/webhook)
-- [ ] 5.7. Dashboard Grafana personalizado
+**Tasks**:
+- [ ] 2.1. SSB scan 40 m during activity period (18–22 UTC)
+- [ ] 2.2. SSB scan 20 m during activity period (10–16 UTC)
+- [ ] 2.3. Measure marker rate (false vs legitimate) per minute
+- [ ] 2.4. Measure time to first confirmed event
+- [ ] 2.5. Test detection of short QSOs (3–5 s)
+- [ ] 2.6. Adjust SNR gate via new configurable setting if needed
+- [ ] 2.7. Merge unstable → main when validated
 
-**Benefícios**: Visibilidade operacional, diagnóstico rápido
-
----
-
-### 6. Otimização de Performance 🚀
-**Objetivo**: Melhorar throughput e reduzir latência
-
-**Tarefas**:
-- [ ] 6.1. Profiling de endpoints lentos
-- [ ] 6.2. Otimização de queries SQLite (índices)
-- [ ] 6.3. Caching de dados frequentes (Redis opcional)
-- [ ] 6.4. Compressão de respostas HTTP (gzip/brotli)
-- [ ] 6.5. WebSocket message batching
-- [ ] 6.6. Lazy loading de dados históricos
-- [ ] 6.7. Benchmarks antes/depois
-
-**Benefícios**: Latência -30%, throughput +50%, UX melhorada
+**Benefit**: Confidence in thresholds, safe merge to main
 
 ---
 
-## 🟢 PRIORIDADE BAIXA
+### 3. Frontend Modularisation (Phase 2) 📦
+**Goal**: Continue refactoring app.js (still 4230 lines) into smaller ES6 modules
 
-### 7. Features Novas 🎁
+**Current state**: 9 modules already extracted (`waterfall.js`, `api.js`, `websocket.js`, `config.js`, `constants.js`, `dom.js`, `ui.js`, `utils.js`, `presets.js`). Main orchestrator still too large.
 
-#### 7.1. Multi-Device Support
-- [ ] Scan simultâneo em múltiplos SDRs
-- [ ] Agregação de dados multi-device
-- [ ] UI para gestão de múltiplos dispositivos
+**Tasks**:
+- [ ] 3.1. Extract `events.js` module (event table management)
+- [ ] 3.2. Extract `controls.js` module (scan control panel)
+- [ ] 3.3. Extract `charts.js` module (visualisations)
+- [ ] 3.4. Extract `propagation.js` module (map and propagation)
+- [ ] 3.5. Reduce app.js to orchestrator (<500 lines)
+- [ ] 3.6. Update frontend tests
+- [ ] 3.7. Validate full functionality post-migration
 
-#### 7.2. Integração com PSKReporter
-- [ ] Envio automático de spots para PSKReporter
-- [ ] Configuração de callsign e locator
-- [ ] Rate limiting e validação
+**Benefit**: Maintainability, testability, readability
 
-#### 7.3. Scheduler de Scans
-- [ ] Agendamento de scans por hora/dia
-- [ ] Perfis de scan programáveis
-- [ ] Notificações de eventos importantes
+---
 
-#### 7.4. Mobile-Responsive UI
-- [ ] Layout responsivo para tablets
-- [ ] UI otimizada para smartphones
-- [ ] Touch-friendly controls
+### 4. Middleware Consolidation 🛡️
+**Goal**: Move existing middleware from `main.py` into the `middleware/` package and add missing pieces
 
-#### 7.5. Themes e Customização
+**Current state**: Security headers, CORS, and rate limiting are already implemented in `main.py` but not organised in the middleware package.
+
+**Tasks**:
+- [ ] 4.1. Move security headers middleware to `middleware/security.py`
+- [ ] 4.2. Add missing HSTS and CSP headers
+- [ ] 4.3. Move CORS config to `middleware/cors.py`
+- [ ] 4.4. Move rate limiter to `middleware/ratelimit.py`
+- [ ] 4.5. Add RequestLoggingMiddleware (structured per-request logs)
+- [ ] 4.6. Environment-based configuration (dev/staging/prod)
+- [ ] 4.7. Middleware tests
+- [ ] 4.8. Documentation
+
+**Benefit**: Code organisation, observability, complete security headers (HSTS, CSP)
+
+---
+
+## 🟡 MEDIUM PRIORITY
+
+### 5. End-to-End (E2E) Tests 🧪
+**Goal**: Add full integration tests
+
+**Tasks**:
+- [ ] 5.1. Setup Playwright or Cypress
+- [ ] 5.2. Full scan flow tests
+- [ ] 5.3. Export tests (CSV/JSON/XLSX)
+- [ ] 5.4. Decoder management tests
+- [ ] 5.5. Real-time WebSocket tests
+- [ ] 5.6. Authentication tests
+- [ ] 5.7. CI/CD integration
+- [ ] 5.8. Screenshots on failure
+
+---
+
+### 6. Monitoring Dashboard 📈
+**Goal**: Production observability beyond current logging
+
+**Tasks**:
+- [ ] 6.1. Prometheus/Grafana integration
+- [ ] 6.2. System metrics (CPU, RAM, disk)
+- [ ] 6.3. Application metrics (requests/s, latency)
+- [ ] 6.4. Decoder metrics (events/min, avg SNR)
+- [ ] 6.5. SDR metrics (sample rate, overflows)
+- [ ] 6.6. Automated alerts (email/webhook)
+- [ ] 6.7. Custom Grafana dashboard
+
+---
+
+### 7. Performance Optimisation 🚀
+**Goal**: Improve throughput, reduce latency
+
+**Tasks**:
+- [ ] 7.1. Profile slow endpoints
+- [ ] 7.2. SQLite query optimisation (indices)
+- [ ] 7.3. Frequent data caching (optional Redis)
+- [ ] 7.4. HTTP response compression (gzip/brotli)
+- [ ] 7.5. WebSocket message batching
+- [ ] 7.6. Lazy loading of historical data
+- [ ] 7.7. Before/after benchmarks
+
+---
+
+## 🟢 LOW PRIORITY
+
+### 8. New Features 🎁
+
+#### 8.1. Multi-Device Support
+- [ ] Simultaneous scan on multiple SDRs
+- [ ] Multi-device data aggregation
+- [ ] Multi-device management UI
+
+#### 8.2. PSKReporter Integration
+- [ ] Automatic spot submission to PSKReporter
+- [ ] Callsign and locator configuration
+- [ ] Rate limiting and validation
+
+#### 8.3. Push Notifications
+- [ ] Browser push notifications for important events (rare DX, new band opening)
+- [ ] Configurable notification filters (by mode, band, callsign pattern)
+- [ ] Email/webhook notification option
+
+#### 8.4. Themes & Customisation
 - [ ] Dark/Light theme switcher
-- [ ] Customização de cores do waterfall
-- [ ] Layout configurável (drag-and-drop panels)
+- [ ] Waterfall colour customisation
+- [ ] Configurable layout (drag-and-drop panels)
+
+#### 8.5. Mobile UI Enhancements
+- [ ] Tablet-optimised layout (landscape/portrait)
+- [ ] Smartphone touch-friendly controls
+- [ ] Progressive Web App (PWA) support
 
 ---
 
-### 8. Otimizações de Infraestrutura 🏗️
+### 9. Infrastructure Optimisations 🏗️
 
-#### 8.1. Docker Compose Stack
-- [ ] Dockerfile multi-stage otimizado
-- [ ] docker-compose.yml completo
-- [ ] Volumes para persistência
+#### 9.1. Docker Compose Stack
+- [ ] Optimised multi-stage Dockerfile
+- [ ] Complete docker-compose.yml
+- [ ] Persistence volumes
 - [ ] Health checks
 
-#### 8.2. Automated Backups
-- [ ] Backup automático de SQLite
-- [ ] Rotação de backups (7 dias, 4 semanas)
-- [ ] Restore scripts
-- [ ] Verificação de integridade
+#### 9.2. SQLite Backup & Restore
+- [ ] Automated SQLite full-database backups (complementing existing event CSV auto-export)
+- [ ] Restore scripts with integrity verification
+- [ ] Scheduled backup rotation
 
 ---
 
-### 9. Melhorias de Segurança 🔒
+### 10. Security Enhancements 🔒
 
-#### 9.1. OAuth2/JWT Authentication
-- [ ] Substituir Basic Auth por JWT
+#### 10.1. JWT Authentication
+- [ ] Replace current session-cookie auth with JWT tokens
 - [ ] Refresh tokens
 - [ ] Role-based access control (RBAC)
-- [ ] Session management
 
 #### 10.2. Security Audit
-- [ ] Scan de vulnerabilidades (OWASP Top 10)
+- [ ] Vulnerability scan (OWASP Top 10)
 - [ ] Dependency updates
 - [ ] Penetration testing
-- [ ] Security headers audit
 
-**Estimativa**: 4-6 horas
-
-#### 10.3. Rate Limiting Avançado
+#### 10.3. Advanced Rate Limiting
 - [ ] Per-user rate limits
 - [ ] IP-based throttling
-- [ ] Distributed rate limiting (Redis)
 - [ ] Adaptive rate limiting
 
-**Estimativa**: 4-5 horas
+---
+
+## 🎯 SUCCESS METRICS
+
+| Category | Metric | Target |
+|----------|--------|--------|
+| **Testing** | Test coverage | >80% |
+| **API** | Response time (p95) | <100 ms |
+| **UI** | Page load time | <2 s |
+| **Security** | Critical vulnerabilities | 0 |
+| **Uptime** | Availability | >99.5% |
+| **Deploy** | Deploy time | <5 min |
+| **Ops** | MTTR | <30 min |
 
 ---
 
-## 📅 CRONOGRAMA SUGERIDO
+## 📝 ARCHITECTURAL DECISIONS
 
-### Sprint 1 (Semana 1-2) - Refactoring Core
-- ✅ Tarefa 1: Migração Frontend ES6 (80%)
-- ✅ Tarefa 2: Remoção main_legacy.py (100%)
-
-### Sprint 2 (Semana 3-4) - Infrastructure
-- 🔄 Tarefa 3: Middleware (100%)
-- 🔄 Tarefa 5: Dashboard métricas (50%)
-
-### Sprint 3 (Semana 5-6) - Quality
-- 📋 Tarefa 4: Testes E2E (0%)
-- 📋 Tarefa 6: Otimização performance (0%)
-
-### Sprint 4 (Semana 7-8) - Documentation & Polish
-- 📋 Tarefa 7: Documentação utilizador (0%)
-- 📋 Features prioritárias do backlog
-
----
-
-## 🎯 MÉTRICAS DE SUCESSO
-
-### Técnicas
-- Cobertura de testes: >80%
-- Tempo de resposta API: <100ms (p95)
-- Tempo de carregamento UI: <2s
-- Zero critical vulnerabilities
-- Uptime: >99.5%
-
-### Qualidade de Código
-- Complexidade ciclomática: <10
-- Duplicação de código: <3%
-- Type hints coverage: >90%
-- Documentação: 100% endpoints
-
-### Operacionais
-- Deploy time: <5 min
-- MTTR (Mean Time To Repair): <30 min
-- CI/CD pipeline: <10 min
-- Zero-downtime deployments
-
----
-
-## 📝 NOTAS E DECISÕES
-
-### Decisões Arquiteturais
-1. **Manter Vanilla JS**: Não adicionar framework (React/Vue) por enquanto
-   - Justificação: Projeto pequeno, performance excelente sem framework
-   
-2. **SQLite em Produção**: Aceitável para uso single-instance
-   - Justificação: Simplicidade, backups fáceis, performance adequada
-   
-3. **WebSocket Delta Compression**: Manter estratégia atual
-   - Justificação: Eficiente, testado, funcional
-
-### Technical Debt Identificado
-- ⚠️ Frontend monolítico (3744 linhas) - **RESOLVER SPRINT 1**
-- ⚠️ main_legacy.py (2000+ linhas) - **RESOLVER SPRINT 1**
-- ⚠️ Falta de middleware customizado - **RESOLVER SPRINT 2**
-- ⚠️ Ausência de testes E2E - **RESOLVER SPRINT 3**
-- ✅ Endpoints API faltantes - **RESOLVIDO v0.3.1**
-
----
-
-## 🔄 PROCESSO DE ATUALIZAÇÃO
-
-Este roadmap deve ser revisto e atualizado:
-- ✅ Após cada sprint completo
-- ✅ Quando surgirem bugs críticos
-- ✅ Quando houver feedback de utilizadores
-- ✅ Quando houver mudanças de prioridade
-
-**Responsável**: CT7BFV (Octávio Filipe Gonçalves)  
-**Próxima Revisão**: 2026-03-09 (2 semanas)
-
----
-
-## 📞 FEEDBACK E CONTRIBUIÇÕES
-
-Para sugerir novos trabalhos ou alterar prioridades:
-1. Criar issue no repositório
-2. Adicionar label apropriada (enhancement, bug, documentation)
-3. Discussão na próxima reunião de sprint planning
-
----
-
-**Versão**: 1.0  
-**Estado**: 🟢 Aprovado para execução  
-**Última atualização**: 2026-02-23
+1. **Keep Vanilla JS** — No framework (React/Vue) for now. Small project, excellent performance without it.
+2. **SQLite in Production** — Acceptable for single-instance use. Simple backups, adequate performance.
+3. **WebSocket Delta Compression** — Current strategy maintained (efficient, tested, functional).
+4. **SSB BW Cap at 2800 Hz** — Standard SSB filter 2400 Hz + wide 2700 Hz + 100 Hz FFT margin. Signals above 2800 Hz are noise/interference.
+5. **SSB SNR Gate at 8 dB** — Calibrated for good antenna setups. Will become configurable (see item 1).
+6. **Session-Cookie Auth** — Replaced Basic Auth in v0.6.0. JWT upgrade planned (see item 10.1).

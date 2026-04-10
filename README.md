@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-08 UTC
+Last update: 2026-04-10 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -96,6 +96,12 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.11.1
+- **SQLite concurrency fix**: eliminated ~705 `sqlite3.InterfaceError`/day in auth/session methods. CPU 243%→37%, memory 1.63 GB→580 MB.
+- **SSB signal quality hardening**: 60 s debounce + SNR ≥ 8 dB gate, BW cap 2800 Hz across 4 filtering points, phantom SSB event elimination.
+- **Focus hold improvement**: `hold_ms` 15→10 s, auto formula `span÷15k`, max 16.
+- **Roadmap bilingual audit**: 15+ inaccuracies corrected (EN/PT).
 
 ### v0.10.0
 - **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
@@ -202,7 +208,7 @@ Default frontend routes:
 - Added quick band switching row near Start scanning for faster operator workflow.
 - Implemented live band switching with automatic stop/start while scan is running.
 - Improved scan startup resilience with sample-rate safeguards and clearer error behavior.
-- Added operational tooling with `run_dev.sh` (`start|stop|logs|status`).
+- Added operational tooling with `server_control.sh` (`start|stop|restart|status|logs`).
 - Added production `systemd` packaging tooling and service management scripts.
 
 ### v0.2.3
@@ -563,6 +569,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
 - [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
 - [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell and live status.
+- [x] Production stabilisation (v0.11.1): SQLite concurrency fix, SSB signal hardening.
 
 ### Next milestones
 1. Multi-node aggregation (multiple receivers feeding one backend).
@@ -635,4 +642,4 @@ Full hardware and performance details: see [docs/hardware_requirements.md](docs/
 - Propagation scoring (PT): see [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md).
 - Prefix validation: see [docs/prefix_validation.md](docs/prefix_validation.md).
 - Basic DSP tests: see [backend/tests/test_dsp.py](backend/tests/test_dsp.py).
-- Development runner: see [scripts/run_dev.sh](scripts/run_dev.sh).
+- Server control: see [scripts/server_control.sh](scripts/server_control.sh).

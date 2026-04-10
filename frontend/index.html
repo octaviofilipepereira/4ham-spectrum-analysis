@@ -29,7 +29,15 @@ Last update: 2026-02-22 16:27:19 UTC
         <nav class="card panel menu-toolbar">
           <div class="card-body">
             <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
-            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Band Config</button>
+            <div class="dropdown">
+              <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Band &amp; Scan Config
+              </button>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Bands Config</button></li>
+                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#rotationPresetsModal">Scan Rotation Presets</button></li>
+              </ul>
+            </div>
             <button class="btn btn-outline-info btn-sm d-none" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
             <div class="dropdown">
               <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -308,20 +316,22 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="modal-header">
             <h5 class="modal-title" id="loginModalLabel">Authentication required</h5>
           </div>
+          <form id="loginForm" autocomplete="on">
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label" for="loginModalUser">Username</label>
-              <input type="text" id="loginModalUser" class="form-control" autocomplete="username" />
+              <input type="text" id="loginModalUser" name="username" class="form-control" autocomplete="username" required />
             </div>
             <div class="mb-3">
               <label class="form-label" for="loginModalPass">Password</label>
-              <input type="password" id="loginModalPass" class="form-control" autocomplete="current-password" />
+              <input type="password" id="loginModalPass" name="password" class="form-control" autocomplete="current-password" required />
             </div>
             <div id="loginModalError" class="alert alert-danger py-1 d-none"></div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
+            <button type="submit" class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
           </div>
+          </form>
         </div>
       </div>
     </div>
@@ -665,6 +675,39 @@ Last update: 2026-02-22 16:27:19 UTC
                     <button class="btn btn-outline-info" id="saveBand">Save band</button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scan Rotation Presets modal -->
+    <div class="modal fade app-modal" id="rotationPresetsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Scan Rotation Presets</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="card panel">
+              <div class="card-body">
+                <!-- Save current rotation config as preset -->
+                <h3 class="h6 mb-3">Save Current Config as Preset</h3>
+                <div class="d-flex align-items-center gap-2 mb-4">
+                  <input type="text" id="rotationPresetName" placeholder="e.g. Morning HF Scan" class="form-control form-control-sm" style="max-width: 280px;" />
+                  <button class="btn btn-outline-info btn-sm" type="button" id="rotationPresetSaveBtn">Save</button>
+                </div>
+                <hr />
+                <!-- Load / delete saved presets -->
+                <h3 class="h6 mb-3">Saved Presets</h3>
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <select class="form-select form-select-sm" id="rotationPresetSelect" style="max-width: 280px;"></select>
+                  <button class="btn btn-primary btn-sm" type="button" id="rotationPresetLoadBtn">Load</button>
+                  <button class="btn btn-outline-danger btn-sm" type="button" id="rotationPresetDeleteBtn">Delete</button>
+                </div>
+                <div id="rotationPresetPreview" class="rotation-preset-preview text-muted small"></div>
               </div>
             </div>
           </div>

@@ -118,13 +118,36 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     if frequency_hz <= 0:
         return None
 
+    snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+
+    # Refresh waterfall marker cache on every valid call (independent of DB
+    # debounce) so SSB_VOICE markers stay visible between event emissions.
+    if snr_db >= 8.0:
+        try:
+            _bucket = str(round(frequency_hz / 1000) * 1000)
+            base_conf = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
+            _snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
+            _mode_bonus = 0.12 if mode_name == "SSB" else 0.04
+            _score = min(0.78, max(0.35, base_conf + _snr_bonus + _mode_bonus))
+            state.voice_marker_cache[_bucket] = {
+                "frequency_hz": float(frequency_hz),
+                "offset_hz": 0.0,
+                "mode": "SSB_VOICE",
+                "snr_db": float(snr_db),
+                "bandwidth_hz": float(safe_float(occupancy_event.get("bandwidth_hz"), 2800.0) or 2800.0),
+                "confidence": round(_score, 3),
+                "seen_at": _time_mod.time(),
+            }
+        except Exception:
+            pass
+
     now_ts = datetime.now(timezone.utc).timestamp()
     bucket_key = (
         str(occupancy_event.get("band") or ""),
         int(frequency_hz / 2000),
     )
     last_emit_ts = _ssb_traffic_last_emit.get(bucket_key, 0.0)
-    if (now_ts - last_emit_ts) < 8.0:
+    if (now_ts - last_emit_ts) < 60.0:
         return None
     _ssb_traffic_last_emit[bucket_key] = now_ts
 
@@ -136,6 +159,8 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
 
     base_confidence = float(safe_float(occupancy_event.get("confidence"), 0.35) or 0.35)
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
+    if snr_db < 8.0:
+        return None
     snr_bonus = min(0.25, max(0.0, snr_db / 40.0))
     if mode_name == "SSB":
         mode_bonus = 0.12
@@ -195,21 +220,6 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     state.db.insert_callsign(event)
     touch_decoder_source(event.get("source"))
     record_decoder_event_saved(event)
-
-    # Inject SSB VOICE marker into spectrum frame waterfall markers
-    try:
-        _bucket = str(round(frequency_hz / 1000) * 1000)
-        state.voice_marker_cache[_bucket] = {
-            "frequency_hz": float(frequency_hz),
-            "offset_hz": 0.0,
-            "mode": "SSB_VOICE",
-            "snr_db": float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0),
-            "bandwidth_hz": float(safe_float(occupancy_event.get("bandwidth_hz"), 2800.0) or 2800.0),
-            "confidence": round(ssb_score, 3),
-            "seen_at": _time_mod.time(),
-        }
-    except Exception:
-        pass
 
     return event
 
@@ -382,9 +392,10 @@ async def _run_occupancy_detection_loop() -> None:
             # roll-off artefacts into mega-segments that must be discarded.
             _center = state.scan_engine.center_hz or 0
             _valid = []
+            _bw_cap = 2800 if selected_decoder_mode == "ssb" else 5000
             for seg in occupancy:
                 bw = int(seg.get("bandwidth_hz") or 0)
-                if bw > 5000 or bw < min_bw_hz:
+                if bw > _bw_cap or bw < min_bw_hz:
                     continue
                 _off = seg.get("offset_hz")
                 _freq = int(_center + float(_off)) if _off is not None else _center

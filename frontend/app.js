@@ -2254,6 +2254,140 @@ function stopRotationPoll() {
   }
 }
 
+// ── Scan Rotation Presets ──────────────────────────────────────
+const rotationPresetName = document.getElementById("rotationPresetName");
+const rotationPresetSelect = document.getElementById("rotationPresetSelect");
+const rotationPresetSaveBtn = document.getElementById("rotationPresetSaveBtn");
+const rotationPresetLoadBtn = document.getElementById("rotationPresetLoadBtn");
+const rotationPresetDeleteBtn = document.getElementById("rotationPresetDeleteBtn");
+const rotationPresetPreview = document.getElementById("rotationPresetPreview");
+
+let _rotationPresetsCache = [];
+
+async function _fetchRotationPresets() {
+  try {
+    const resp = await fetch("/api/scan/rotation/presets", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) return [];
+    return await resp.json();
+  } catch { return []; }
+}
+
+async function loadRotationPresetsList() {
+  if (!rotationPresetSelect) return;
+  _rotationPresetsCache = await _fetchRotationPresets();
+  rotationPresetSelect.innerHTML = "";
+  if (!_rotationPresetsCache.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No presets saved";
+    rotationPresetSelect.appendChild(opt);
+  } else {
+    _rotationPresetsCache.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = String(p.id);
+      opt.textContent = p.name;
+      rotationPresetSelect.appendChild(opt);
+    });
+  }
+  _updateRotationPresetActions();
+  _showRotationPresetPreview();
+}
+
+function _updateRotationPresetActions() {
+  const hasPresets = _rotationPresetsCache.length > 0;
+  if (rotationPresetLoadBtn) rotationPresetLoadBtn.disabled = !hasPresets;
+  if (rotationPresetDeleteBtn) rotationPresetDeleteBtn.disabled = !hasPresets;
+}
+
+function _showRotationPresetPreview() {
+  if (!rotationPresetPreview) return;
+  const id = Number(rotationPresetSelect?.value);
+  const p = _rotationPresetsCache.find(pr => pr.id === id);
+  if (!p) { rotationPresetPreview.textContent = ""; return; }
+  const cfg = p.config || {};
+  const mode = cfg.rotationMode === "modes" ? "Single Band" : "Bands × Modes";
+  const slotsDesc = (cfg.slots || []).map(s => s.band ? `${s.band}·${s.mode}` : s.mode).join(" → ");
+  const dwellLabel = { "600": "10 min", "900": "15 min", "1200": "20 min", "1800": "30 min", "2400": "40 min", "3000": "50 min" }[String(cfg.dwell)] || `${cfg.dwell}s`;
+  rotationPresetPreview.textContent = `${mode} | Dwell: ${dwellLabel} | Loop: ${cfg.loop ? "Yes" : "No"} | Slots: ${slotsDesc || "—"}`;
+}
+
+async function saveRotationPreset() {
+  const name = (rotationPresetName?.value || "").trim();
+  if (!name) { showToast("Enter a preset name"); return; }
+  const config = {
+    rotationMode: rotationModeSelect?.value || "bands",
+    band: rotationBand?.value || "20m",
+    dwell: Number(rotationDwell?.value || 900),
+    loop: rotationLoop?.checked ?? true,
+    slots: rotationSlots.map(s => ({ ...s })),
+  };
+  try {
+    const resp = await fetch("/api/scan/rotation/presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ name, config }),
+    });
+    if (!resp.ok) { showToastError("Failed to save preset"); return; }
+    await loadRotationPresetsList();
+    // Select the newly created preset
+    const last = _rotationPresetsCache[_rotationPresetsCache.length - 1];
+    if (last) rotationPresetSelect.value = String(last.id);
+    _showRotationPresetPreview();
+    if (rotationPresetName) rotationPresetName.value = "";
+    showToast(`Preset "${name}" saved`);
+    logLine(`Rotation preset saved: ${name}`);
+  } catch { showToastError("Failed to save preset"); }
+}
+
+function loadRotationPreset() {
+  const id = Number(rotationPresetSelect?.value);
+  const p = _rotationPresetsCache.find(pr => pr.id === id);
+  if (!p) { showToast("Select a preset to load"); return; }
+  const cfg = p.config || {};
+  if (rotationModeSelect) rotationModeSelect.value = cfg.rotationMode || "bands";
+  if (rotationBandRow) rotationBandRow.classList.toggle("d-none", cfg.rotationMode !== "modes");
+  if (rotationBand && cfg.band) rotationBand.value = cfg.band;
+  if (rotationDwell) rotationDwell.value = String(cfg.dwell || 900);
+  if (rotationLoop) rotationLoop.checked = cfg.loop ?? true;
+  rotationSlots = (cfg.slots || []).map(s => ({ ...s }));
+  renderRotationSlots();
+  if (rotationPanel?.classList.contains("d-none")) {
+    rotationPanel.classList.remove("d-none");
+    rotationToggleBtn?.classList.add("is-active");
+  }
+  const modalEl = document.getElementById("rotationPresetsModal");
+  if (modalEl) {
+    const bsModal = bootstrap.Modal.getInstance(modalEl);
+    if (bsModal) bsModal.hide();
+  }
+  showToast(`Preset "${p.name}" loaded`);
+  logLine(`Rotation preset loaded: ${p.name}`);
+}
+
+async function deleteRotationPreset() {
+  const id = Number(rotationPresetSelect?.value);
+  const p = _rotationPresetsCache.find(pr => pr.id === id);
+  if (!p) { showToast("Select a preset to delete"); return; }
+  if (!window.confirm(`Delete preset "${p.name}"?`)) return;
+  try {
+    const resp = await fetch(`/api/scan/rotation/presets/${id}`, {
+      method: "DELETE",
+      headers: { ...getAuthHeader() },
+    });
+    if (!resp.ok) { showToastError("Failed to delete preset"); return; }
+    await loadRotationPresetsList();
+    showToast(`Preset "${p.name}" deleted`);
+    logLine(`Rotation preset deleted: ${p.name}`);
+  } catch { showToastError("Failed to delete preset"); }
+}
+
+rotationPresetSaveBtn?.addEventListener("click", saveRotationPreset);
+rotationPresetLoadBtn?.addEventListener("click", loadRotationPreset);
+rotationPresetDeleteBtn?.addEventListener("click", deleteRotationPreset);
+rotationPresetSelect?.addEventListener("change", _showRotationPresetPreview);
+
+document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", loadRotationPresetsList);
+
 rotationStartBtn?.addEventListener("click", () => startRotation());
 rotationStopBtn?.addEventListener("click", () => stopRotation());
 
@@ -3998,9 +4132,10 @@ if (logoutBtnEl) {
   await startApplication();
 })();
 
-const loginModalSaveBtnEl = document.getElementById("loginModalSave");
-if (loginModalSaveBtnEl) {
-  loginModalSaveBtnEl.addEventListener("click", async () => {
+const loginFormEl = document.getElementById("loginForm");
+if (loginFormEl) {
+  loginFormEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
     const user = (document.getElementById("loginModalUser")?.value || "").trim();
     const pass = (document.getElementById("loginModalPass")?.value || "").trim();
     const errEl = document.getElementById("loginModalError");

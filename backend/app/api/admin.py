@@ -408,11 +408,49 @@ async def admin_update_apply(
 
 
 async def _schedule_restart() -> None:
-    """Restart the systemd service after a short delay to allow the HTTP response to be sent."""
+    """Restart the server via scripts/server_control.sh (fully detached).
+
+    Uses a UNIX double-fork so the restart process is re-parented to PID 1
+    and survives the shutdown of the current process tree.  This works
+    regardless of whether the server is managed by systemd or started
+    manually.
+    """
+    import logging
+
+    logger = logging.getLogger("admin")
+
+    script = _REPO_ROOT / "scripts" / "server_control.sh"
+    if not script.is_file():
+        logger.error("server_control.sh not found at %s — cannot auto-restart", script)
+        return
+
+    if not hasattr(os, "fork"):
+        logger.error("os.fork unavailable on this platform — cannot auto-restart")
+        return
+
     await asyncio.sleep(3)
-    service_name = os.environ.get("SERVICE_NAME", "4ham-spectrum-analysis")
-    subprocess.Popen(
-        ["systemctl", "restart", service_name],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    logger.info("Initiating server restart via %s", script)
+
+    pid = os.fork()
+    if pid == 0:
+        # ── first child ──────────────────────────────────────────
+        try:
+            os.setsid()
+            pid2 = os.fork()
+            if pid2 == 0:
+                # ── grandchild (fully detached, ppid → 1) ────────
+                devnull = os.open(os.devnull, os.O_RDWR)
+                for fd in (0, 1, 2):
+                    os.dup2(devnull, fd)
+                if devnull > 2:
+                    os.close(devnull)
+                os.execvp(
+                    "bash",
+                    ["bash", "-c", f'sleep 1; exec "{script}" restart'],
+                )
+            else:
+                os._exit(0)
+        except Exception:
+            os._exit(1)
+    else:
+        os.waitpid(pid, 0)

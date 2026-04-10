@@ -234,17 +234,20 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         )
         scan["start_hz"] = clipped_start_hz
         scan["end_hz"] = clipped_end_hz
+        # Update band_display to match SSB subband so the VFO center is correct
+        scan["band_display_start_hz"] = clipped_start_hz
+        scan["band_display_end_hz"] = clipped_end_hz
         # Candidate-focus SSB scanning: keep fast sweep, but hold longer when
         # repeated occupancy candidates are detected on the current block.
         scan.setdefault("ssb_focus_enable", True)
-        scan.setdefault("ssb_focus_hold_ms", 15000)
+        scan.setdefault("ssb_focus_hold_ms", 10000)
         scan.setdefault("ssb_focus_hits_required", 2)
         scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
         scan.setdefault("ssb_focus_cooldown_s", 20.0)
         scan.setdefault("ssb_focus_bucket_hz", 2000)
         # NOTE: ssb_focus_max_holds_per_pass is intentionally NOT set here.
-        # The engine computes it adaptively (~1 hold per 50 kHz of scan span,
-        # min 4, max 12).  If the frontend sends an explicit value it will be
+        # The engine computes it adaptively (~1 hold per 15 kHz of scan span,
+        # min 4, max 16).  If the frontend sends an explicit value it will be
         # honoured as an override.
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
@@ -328,14 +331,20 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 log("scan_cw_decoder_stopped:switching_to_ft_mode")
             await _stop_ssb_detector()
             decoder_mode_upper = decoder_mode.upper()
+            # FT8 and FT4 share the same frequency segments — always
+            # decode both so that events from either sub-mode are captured.
+            if decoder_mode_upper in ("FT8", "FT4"):
+                active_modes = ["FT8", "FT4"]
+            else:
+                active_modes = [decoder_mode_upper]
             if state.ft_external_decoder is not None:
-                state.ft_external_decoder.set_modes([decoder_mode_upper])
+                state.ft_external_decoder.set_modes(active_modes)
             else:
                 result = await _start_ft_external_decoder(force=True)
                 log(f"scan_ft_external_decoder_started:{result}")
                 if state.ft_external_decoder:
-                    state.ft_external_decoder.set_modes([decoder_mode_upper])
-            state.ft_external_modes[:] = [decoder_mode_upper]
+                    state.ft_external_decoder.set_modes(active_modes)
+            state.ft_external_modes[:] = active_modes
         else:
             # Other modes (SSB, APRS): stop FT/CW and start SSB detector for SSB
             if state.cw_decoder is not None:
@@ -791,7 +800,7 @@ async def _rotation_switch_slot(slot: RotationSlot) -> bool:
         # SSB focus params
         if new_mode == "ssb":
             new_scan["ssb_focus_enable"] = True
-            new_scan.setdefault("ssb_focus_hold_ms", 15000)
+            new_scan.setdefault("ssb_focus_hold_ms", 10000)
             new_scan.setdefault("ssb_focus_hits_required", 2)
             new_scan.setdefault("ssb_focus_candidate_ttl_s", 25.0)
             new_scan.setdefault("ssb_focus_cooldown_s", 20.0)
@@ -975,3 +984,39 @@ def rotation_status(
     if not state.scan_rotation:
         return {"running": False}
     return state.scan_rotation.status()
+
+
+# ── Rotation Presets CRUD ──────────────────────────────────────
+
+@router.get("/rotation/presets")
+def list_rotation_presets(
+    _: bool = Depends(optional_verify_basic_auth),
+) -> List[Dict]:
+    """List all saved rotation presets."""
+    return state.db.get_rotation_presets()
+
+
+@router.post("/rotation/presets")
+def create_rotation_preset(
+    body: Dict,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Save a new rotation preset."""
+    name = str(body.get("name") or "").strip()
+    config = body.get("config")
+    if not name:
+        raise HTTPException(status_code=400, detail="Preset name is required")
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=400, detail="Preset config is required")
+    return state.db.save_rotation_preset(name, config)
+
+
+@router.delete("/rotation/presets/{preset_id}")
+def delete_rotation_preset(
+    preset_id: int,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Delete a rotation preset by ID."""
+    if not state.db.delete_rotation_preset(preset_id):
+        raise HTTPException(status_code=404, detail="Preset not found")
+    return {"ok": True}

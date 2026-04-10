@@ -240,9 +240,9 @@ source .venv/bin/activate
 python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
 ```
 
-Or via the development script:
+Or via the server control script:
 ```bash
-./scripts/run_dev.sh start
+./scripts/server_control.sh start
 ```
 
 Open the interface in the browser: `http://localhost:8000/`
