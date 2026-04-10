@@ -255,10 +255,11 @@ class Database:
 
     def get_auth_config(self):
         """Return stored auth credentials and enable flag."""
-        rows = self.conn.execute(
-            "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
-            ("_auth_user", "_auth_pass_hash", "_auth_enabled"),
-        ).fetchall()
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
+                ("_auth_user", "_auth_pass_hash", "_auth_enabled"),
+            ).fetchall()
         result = {"auth_user": "", "auth_pass_hash": "", "auth_enabled": False}
         for row in rows:
             if row[0] == "_auth_user":
@@ -271,36 +272,38 @@ class Database:
 
     def save_auth_config(self, user: str, pass_hash: str) -> None:
         """Persist auth credentials and enable state. Pass empty strings to clear."""
-        if user and pass_hash:
-            self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_user", user),
-            )
-            self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_pass_hash", pass_hash),
-            )
-            self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_enabled", "1"),
-            )
-        else:
-            self.conn.execute(
-                "DELETE FROM settings WHERE key IN (?, ?)",
-                ("_auth_user", "_auth_pass_hash"),
-            )
-            self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_enabled", "0"),
-            )
-            self.clear_auth_session()
-        self.conn.commit()
+        with self._lock:
+            if user and pass_hash:
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                    ("_auth_user", user),
+                )
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                    ("_auth_pass_hash", pass_hash),
+                )
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                    ("_auth_enabled", "1"),
+                )
+            else:
+                self.conn.execute(
+                    "DELETE FROM settings WHERE key IN (?, ?)",
+                    ("_auth_user", "_auth_pass_hash"),
+                )
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                    ("_auth_enabled", "0"),
+                )
+                self.clear_auth_session()
+            self.conn.commit()
 
     def get_auth_session(self):
-        rows = self.conn.execute(
-            "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
-            ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
-        ).fetchall()
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
+                ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
+            ).fetchall()
         result = {"session_hash": "", "expires_at": "", "user": ""}
         for row in rows:
             if row[0] == "_auth_session_hash":
@@ -312,26 +315,28 @@ class Database:
         return result
 
     def save_auth_session(self, session_hash: str, expires_at: str, user: str) -> None:
-        self.conn.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-            ("_auth_session_hash", session_hash),
-        )
-        self.conn.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-            ("_auth_session_expires_at", expires_at),
-        )
-        self.conn.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-            ("_auth_session_user", user),
-        )
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("_auth_session_hash", session_hash),
+            )
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("_auth_session_expires_at", expires_at),
+            )
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("_auth_session_user", user),
+            )
+            self.conn.commit()
 
     def clear_auth_session(self) -> None:
-        self.conn.execute(
-            "DELETE FROM settings WHERE key IN (?, ?, ?)",
-            ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
-        )
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(
+                "DELETE FROM settings WHERE key IN (?, ?, ?)",
+                ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
+            )
+            self.conn.commit()
 
     def upsert_band(self, band):
         self.conn.execute(
