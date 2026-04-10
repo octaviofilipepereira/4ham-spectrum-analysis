@@ -118,12 +118,6 @@ def _emit_ssb_traffic_event_from_occupancy(occupancy_event: dict, asr_text: str 
     if frequency_hz <= 0:
         return None
 
-    # BW gate: reject phantom events with bandwidth outside SSB voice range.
-    # Real SSB voice occupies ~2400-3000 Hz; allow up to 3200 Hz for margin.
-    _bw_hz = safe_float(occupancy_event.get("bandwidth_hz"), 0.0) or 0.0
-    if _bw_hz > 0 and (_bw_hz < 1200 or _bw_hz > 3200):
-        return None
-
     snr_db = float(safe_float(occupancy_event.get("snr_db"), 0.0) or 0.0)
 
     # Refresh waterfall marker cache on every valid call (independent of DB
