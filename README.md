@@ -104,7 +104,7 @@ Default frontend routes:
 - **Roadmap bilingual audit**: 15+ inaccuracies corrected (EN/PT).
 
 ### v0.10.0
-- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar.
+- **Scan Rotation**: automated multi-band/mode rotation with configurable dwell, loop, live countdown status bar. Rotation presets (save/load/delete) for quick multi-band schedule recall.
 - **Per-band×mode phantom mode elimination**: two-layer fix — occupancy events forced to match active decoder mode (prevents heuristic mis-classification), and confirmed_band_modes filter time-scoped to analysed period (prevents historical sessions from polluting charts).
 - **UTC fix for custom dates**: frontend custom date inputs now forced to UTC interpretation, preventing off-by-one-day boundary errors in non-UTC timezones.
 - **OS compatibility documentation**: all docs now list exact supported distributions (Ubuntu 20.04+, Debian 11+, Linux Mint 20+, Raspberry Pi OS 11+).
@@ -568,7 +568,7 @@ Detailed specification: see [docs/websocket_spec.md](docs/websocket_spec.md).
 - [x] API/WebSocket streaming, compression, storage exports, and QA/Ops baseline.
 - [x] SSB Voice Signature detection (v0.8.0): real-time VAD + Whisper ASR, Voice Signature badge, occupancy flood protection.
 - [x] 3-formula propagation scoring (v0.9.0): Digital/CW/SSB formulas, mode-specific SNR normalisation, academic analytics.
-- [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell and live status.
+- [x] Scan Rotation (v0.10.0): automated multi-band/mode cycling with configurable dwell, live status, and rotation presets (save/load/delete).
 - [x] Production stabilisation (v0.11.1): SQLite concurrency fix, SSB signal hardening.
 
 ### Next milestones
