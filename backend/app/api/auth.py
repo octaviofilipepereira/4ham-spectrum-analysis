@@ -40,8 +40,14 @@ def _set_session_cookie(response: Response, user: str) -> None:
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
-    state.db.clear_auth_session()
+def _clear_session_cookie(response: Response, request: Request = None) -> None:
+    if request:
+        token = request.cookies.get(SESSION_COOKIE_NAME, "")
+        if token:
+            token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            state.db.clear_auth_session(token_hash)
+    else:
+        state.db.clear_auth_session()
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
 
 
@@ -112,8 +118,8 @@ def auth_login(payload: dict, response: Response) -> Dict:
 
 
 @router.post("/logout")
-def auth_logout(response: Response) -> Dict:
-    _clear_session_cookie(response)
+def auth_logout(request: Request, response: Response) -> Dict:
+    _clear_session_cookie(response, request)
     return {"status": "ok", "authenticated": False}
 
 
@@ -182,5 +188,5 @@ def set_credentials(payload: dict, request: Request, response: Response) -> Dict
     # Empty user or password → clear credentials
     state.db.save_auth_config("", "")
     state.reload_auth_from_db()
-    _clear_session_cookie(response)
+    _clear_session_cookie(response, request)
     return {"status": "ok", "auth_required": False, "authenticated": False, "user": None, "message": "Credentials cleared"}

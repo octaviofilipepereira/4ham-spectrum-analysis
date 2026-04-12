@@ -103,6 +103,12 @@ CREATE TABLE IF NOT EXISTS rotation_presets (
   config TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  session_hash TEXT PRIMARY KEY,
+  user TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
 """
 
 
@@ -299,43 +305,52 @@ class Database:
             self.conn.commit()
 
     def get_auth_session(self):
+        """Legacy compat — return first non-expired session or empty dict."""
         with self._lock:
-            rows = self.conn.execute(
-                "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
-                ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
-            ).fetchall()
-        result = {"session_hash": "", "expires_at": "", "user": ""}
-        for row in rows:
-            if row[0] == "_auth_session_hash":
-                result["session_hash"] = row[1]
-            elif row[0] == "_auth_session_expires_at":
-                result["expires_at"] = row[1]
-            elif row[0] == "_auth_session_user":
-                result["user"] = row[1]
-        return result
+            row = self.conn.execute(
+                "SELECT session_hash, user, expires_at FROM auth_sessions ORDER BY expires_at DESC LIMIT 1",
+            ).fetchone()
+        if not row:
+            return {"session_hash": "", "expires_at": "", "user": ""}
+        return {"session_hash": row[0], "user": row[1], "expires_at": row[2]}
+
+    def get_auth_session_by_hash(self, session_hash: str) -> dict:
+        """Look up a specific session by its hash."""
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT session_hash, user, expires_at FROM auth_sessions WHERE session_hash = ?",
+                (session_hash,),
+            ).fetchone()
+        if not row:
+            return {}
+        return {"session_hash": row[0], "user": row[1], "expires_at": row[2]}
 
     def save_auth_session(self, session_hash: str, expires_at: str, user: str) -> None:
+        now_iso = datetime.now(timezone.utc).isoformat()
         with self._lock:
+            # Purge expired sessions
             self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_session_hash", session_hash),
+                "DELETE FROM auth_sessions WHERE expires_at <= ?", (now_iso,)
             )
             self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_session_expires_at", expires_at),
-            )
-            self.conn.execute(
-                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
-                ("_auth_session_user", user),
+                "INSERT OR REPLACE INTO auth_sessions(session_hash, user, expires_at) VALUES (?, ?, ?)",
+                (session_hash, user, expires_at),
             )
             self.conn.commit()
 
-    def clear_auth_session(self) -> None:
+    def clear_auth_session(self, session_hash: str = None) -> None:
         with self._lock:
-            self.conn.execute(
-                "DELETE FROM settings WHERE key IN (?, ?, ?)",
-                ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
-            )
+            if session_hash:
+                self.conn.execute(
+                    "DELETE FROM auth_sessions WHERE session_hash = ?", (session_hash,)
+                )
+            else:
+                self.conn.execute("DELETE FROM auth_sessions")
+                # Clean up legacy settings-based session keys
+                self.conn.execute(
+                    "DELETE FROM settings WHERE key IN (?, ?, ?)",
+                    ("_auth_session_hash", "_auth_session_expires_at", "_auth_session_user"),
+                )
             self.conn.commit()
 
     def upsert_band(self, band):

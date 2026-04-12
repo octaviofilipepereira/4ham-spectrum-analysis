@@ -39,37 +39,39 @@ def _parse_cookie_header(cookie_header: str) -> dict:
     return {key: morsel.value for key, morsel in cookie.items()}
 
 
-def verify_session_token(session_token: str) -> bool:
+def verify_session_token(session_token: str) -> str | None:
+    """Verify a session token.  Return the username on success, None on failure."""
     if not session_token:
-        return False
-    session = state.db.get_auth_session()
-    if not session.get("session_hash") or not session.get("expires_at"):
-        return False
+        return None
+    token_hash = hashlib.sha256(session_token.encode("utf-8")).hexdigest()
+    session = state.db.get_auth_session_by_hash(token_hash)
+    if not session.get("expires_at"):
+        return None
     try:
         expires_at = datetime.fromisoformat(session["expires_at"])
     except ValueError:
-        state.db.clear_auth_session()
-        return False
+        state.db.clear_auth_session(token_hash)
+        return None
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at <= datetime.now(timezone.utc):
-        state.db.clear_auth_session()
-        return False
-    session_hash = hashlib.sha256(session_token.encode("utf-8")).hexdigest()
-    return session_hash == session.get("session_hash")
+        state.db.clear_auth_session(token_hash)
+        return None
+    return session.get("user") or state.auth_user
 
 
 def verify_session_cookie_header(cookie_header: str) -> bool:
     cookies = _parse_cookie_header(cookie_header)
-    return verify_session_token(cookies.get(SESSION_COOKIE_NAME, ""))
+    return bool(verify_session_token(cookies.get(SESSION_COOKIE_NAME, "")))
 
 
 def get_authenticated_user(request: Request) -> str | None:
     if not state.auth_required:
         return None
     session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
-    if verify_session_token(session_token):
-        return state.db.get_auth_session().get("user") or state.auth_user
+    user = verify_session_token(session_token)
+    if user:
+        return user
     authorization = request.headers.get("authorization", "")
     credentials = parse_basic_auth(authorization)
     if not credentials:
