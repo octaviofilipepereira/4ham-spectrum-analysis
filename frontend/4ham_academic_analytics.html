@@ -894,8 +894,12 @@ Last update: 2026-04-03 UTC
             <div class="value" id="kpiCallsigns">--</div>
           </div>
           <div class="card">
-            <span class="label" data-i18n="kpi_avg_snr">Average SNR</span>
-            <div class="value" id="kpiSnr">--</div>
+            <span class="label" data-i18n="kpi_avg_snr_digital">Avg SNR Digital</span>
+            <div class="value" id="kpiSnrDigital">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="kpi_avg_snr_analog">Avg SNR CW/SSB</span>
+            <div class="value" id="kpiSnrAnalog">--</div>
           </div>
           <div class="card">
             <span class="label" data-i18n="kpi_time_coverage">Time coverage</span>
@@ -1133,7 +1137,8 @@ Last update: 2026-04-03 UTC
 
       const kpiEvents = document.getElementById("kpiEvents");
       const kpiCallsigns = document.getElementById("kpiCallsigns");
-      const kpiSnr = document.getElementById("kpiSnr");
+      const kpiSnrDigital = document.getElementById("kpiSnrDigital");
+      const kpiSnrAnalog = document.getElementById("kpiSnrAnalog");
       const kpiCoverage = document.getElementById("kpiCoverage");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
@@ -2440,9 +2445,15 @@ Last update: 2026-04-03 UTC
       }
 
       function updateKpis(seriesRows, callsignRows, start, end) {
+        const DIGITAL_KPI = new Set(["FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"]);
         const totalEvents = d3.sum(seriesRows, (d) => d.count);
-        const snrWeighted = d3.sum(seriesRows, (d) => d.count * d.snr);
-        const snrAvg = totalEvents > 0 ? snrWeighted / totalEvents : 0;
+
+        const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
+        const anaRows = seriesRows.filter((d) => !DIGITAL_KPI.has(d.mode));
+        const digEvents = d3.sum(digRows, (d) => d.count);
+        const anaEvents = d3.sum(anaRows, (d) => d.count);
+        const snrDigital = digEvents > 0 ? d3.sum(digRows, (d) => d.count * d.snr) / digEvents : null;
+        const snrAnalog = anaEvents > 0 ? d3.sum(anaRows, (d) => d.count * d.snr) / anaEvents : null;
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
@@ -2454,7 +2465,8 @@ Last update: 2026-04-03 UTC
 
         kpiEvents.textContent = formatInt(totalEvents);
         kpiCallsigns.textContent = formatInt(uniqueCallsigns);
-        kpiSnr.textContent = `${snrAvg.toFixed(1)} dB`;
+        kpiSnrDigital.textContent = snrDigital != null ? `${snrDigital.toFixed(1)} dB` : "--";
+        kpiSnrAnalog.textContent = snrAnalog != null ? `${snrAnalog.toFixed(1)} dB` : "--";
         kpiCoverage.textContent = `${coveragePct.toFixed(1)}%`;
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;

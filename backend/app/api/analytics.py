@@ -204,6 +204,10 @@ def academic_analytics(
     total_events = 0
     snr_weighted_sum = 0.0
     snr_weight_total = 0
+    snr_digital_sum = 0.0
+    snr_digital_count = 0
+    snr_analog_sum = 0.0
+    snr_analog_count = 0
     unique_callsigns = set()
     buckets_seen = set()
 
@@ -260,6 +264,12 @@ def academic_analytics(
         if snr_db is not None:
             snr_weighted_sum += snr_db
             snr_weight_total += 1
+            if _mode_category(mode_name) == "digital":
+                snr_digital_sum += snr_db
+                snr_digital_count += 1
+            else:
+                snr_analog_sum += snr_db
+                snr_analog_count += 1
 
         # Collect individual event for raw export
         raw_ev = {
@@ -452,6 +462,8 @@ def academic_analytics(
     coverage_pct = clamp((len(buckets_seen) / expected_buckets) * 100.0, 0.0, 100.0)
 
     snr_avg = (snr_weighted_sum / snr_weight_total) if snr_weight_total > 0 else 0.0
+    snr_avg_digital = (snr_digital_sum / snr_digital_count) if snr_digital_count > 0 else None
+    snr_avg_analog = (snr_analog_sum / snr_analog_count) if snr_analog_count > 0 else None
 
     overall_prop = 0.0
     if propagation_band_rows:
@@ -484,6 +496,8 @@ def academic_analytics(
             "total_events": int(total_events),
             "unique_callsigns": int(len(unique_callsigns)),
             "snr_avg": round(snr_avg, 3),
+            "snr_avg_digital": round(snr_avg_digital, 3) if snr_avg_digital is not None else None,
+            "snr_avg_analog": round(snr_avg_analog, 3) if snr_avg_analog is not None else None,
             "coverage_pct": round(coverage_pct, 3),
             "propagation_score": round(overall_prop, 3),
             "propagation_state": _propagation_state(overall_prop),
