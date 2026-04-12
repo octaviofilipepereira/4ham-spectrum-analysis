@@ -76,19 +76,30 @@ def _kp_condition(kp: float) -> str:
 # Physics: SFI → foF2 → MUF estimates
 # ═══════════════════════════════════════════════════════════════════
 
-def _estimate_fof2(sfi: float) -> float:
+def _estimate_fof2(sfi: float, utc_hour: float = 12.0) -> float:
     """
-    Estimate foF2 (critical frequency of F2 layer) from SFI using the
-    empirical Kouris–Muggleton relation:
+    Estimate foF2 (critical frequency of F2 layer) from SFI.
 
-        foF2 ≈ 0.121 * SFI^0.6   (MHz, mid-latitude daytime average)
+    Method:
+      1. Convert SFI → SSN (sunspot number) via ITU-R relation
+      2. Compute noon foF2 using Rawer empirical model (mid-latitude)
+      3. Apply cos(χ) day/night scaling
 
-    This is a simplified daytime mid-latitude approximation.
-    Night-time values are typically 30-50% lower.
+    For SFI=149, noon foF2 ≈ 11 MHz, midnight ≈ 4 MHz.
     """
     if sfi <= 0:
         return 3.0  # safe minimum
-    return 0.121 * (sfi ** 0.6)
+    # SFI → SSN (ITU-R approximation)
+    ssn = max(0.0, (sfi - 63.7) / 0.727)
+    # Rawer model: noon mid-latitude foF2
+    fof2_noon = 4.35 + 0.058 * ssn
+    # Day/night factor from simplified solar zenith angle
+    # Assumes solar noon ≈ 12 UTC (Western Europe)
+    hour_angle = (utc_hour - 12.0) * (math.pi / 12.0)
+    chi_factor = max(0.0, math.cos(hour_angle))
+    # Night floor: ~35% of noon value
+    fof2 = fof2_noon * (0.35 + 0.65 * chi_factor)
+    return round(max(fof2, 2.0), 2)
 
 
 def _muf_for_distance(fof2: float, distance_km: float) -> float:
@@ -164,7 +175,6 @@ class IonosphericCache:
         self.kp: Optional[float] = None
         self.kp_condition: str = "Unknown"
         self.sfi: Optional[float] = None
-        self.fof2_est: Optional[float] = None
         self.last_update: Optional[str] = None
         self._lock = asyncio.Lock()
 
@@ -200,13 +210,15 @@ class IonosphericCache:
                             sfi_val = float(latest.get("flux", 0))
                             if sfi_val > 0:
                                 self.sfi = round(sfi_val, 1)
-                                self.fof2_est = round(_estimate_fof2(sfi_val), 2)
 
                     self.last_update = datetime.now(timezone.utc).isoformat()
+                    now_h = datetime.now(timezone.utc)
+                    utc_hour = now_h.hour + now_h.minute / 60.0
+                    fof2_now = _estimate_fof2(self.sfi or 0, utc_hour)
                     _log.info(
                         "Ionospheric data updated: Kp=%.1f (%s), SFI=%.0f, foF2≈%.1f MHz",
                         self.kp or 0, self.kp_condition,
-                        self.sfi or 0, self.fof2_est or 0,
+                        self.sfi or 0, fof2_now,
                     )
             except Exception as exc:
                 _log.warning("Ionospheric fetch failed: %s", exc)
@@ -215,7 +227,10 @@ class IonosphericCache:
         """Return current ionospheric context with per-band status."""
         kp = self.kp if self.kp is not None else 0.0
         sfi = self.sfi if self.sfi is not None else 0.0
-        fof2 = self.fof2_est if self.fof2_est is not None else 3.0
+        # Compute foF2 dynamically based on current UTC hour
+        now = datetime.now(timezone.utc)
+        utc_hour = now.hour + now.minute / 60.0
+        fof2 = _estimate_fof2(sfi, utc_hour)
 
         bands: Dict[str, Dict] = {}
         for band_name, freq_mhz in _HF_BANDS_MHZ.items():
