@@ -17,7 +17,7 @@
     "kpi_avg_snr_digital": "Avg SNR FT4/FT8/WSPR",
     "kpi_avg_snr_analog": "Avg SNR CW/SSB",
     "kpi_time_coverage": "Time coverage",
-    "kpi_overall_prop": "Overall Propagation score",
+    "kpi_overall_prop": "Global Propagation",
     "kpi_best_band": "Best band",
     "kpi_prop_note": "Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.",
 
@@ -130,7 +130,7 @@
     "kpi_avg_snr_digital": "SNR médio FT4/FT8/WSPR",
     "kpi_avg_snr_analog": "SNR médio CW/SSB",
     "kpi_time_coverage": "Cobertura temporal",
-    "kpi_overall_prop": "Propagação global",
+    "kpi_overall_prop": "Propagação Global",
     "kpi_best_band": "Melhor banda",
     "kpi_prop_note": "Apenas descodificações confirmadas (indicativo verificado).<br>Sem indicativo = ocupação de banda.",
 
