@@ -56,5 +56,5 @@ backend/app/main_legacy.py
 # Private benchmark experiments (never publish)
 benchmarks/
 
-# Personal monitor tool (contains credentials — never commit)
-monitor_4ham/
+# External academic analytics deployment (never commit)
+external_academic_analytics/
