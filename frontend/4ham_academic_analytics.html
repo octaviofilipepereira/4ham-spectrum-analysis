@@ -1125,31 +1125,38 @@ Last update: 2026-04-03 UTC
       loadAndRender();
 
       function initChartHelp() {
-        const helperIcons = document.querySelectorAll(".helper-icon[data-help-title][data-help-text]");
+        const helperIcons = document.querySelectorAll(".helper-icon[data-help-title]");
         for (const icon of helperIcons) {
           const helpTitle = icon.getAttribute("data-help-title") || "Chart Help";
           const helpText = icon.getAttribute("data-help-text") || "";
+          const helpHtml = icon.getAttribute("data-help-html") || "";
+          const useHtml = !!helpHtml;
+          const content = helpHtml || helpText;
 
           icon.addEventListener("mouseenter", (event) => {
-            showChartHelpLayer(helpTitle, helpText, event, icon);
+            showChartHelpLayer(helpTitle, content, event, icon, useHtml);
           });
           icon.addEventListener("mousemove", (event) => {
             positionChartHelpLayer(event.clientX, event.clientY);
           });
           icon.addEventListener("focus", () => {
-            showChartHelpLayer(helpTitle, helpText, null, icon);
+            showChartHelpLayer(helpTitle, content, null, icon, useHtml);
           });
           icon.addEventListener("mouseleave", hideChartHelpLayer);
           icon.addEventListener("blur", hideChartHelpLayer);
         }
       }
 
-      function showChartHelpLayer(title, text, pointerEvent, anchorEl) {
+      function showChartHelpLayer(title, text, pointerEvent, anchorEl, useHtml) {
         if (!chartHelpLayer || !chartHelpLayerTitle || !chartHelpLayerText) {
           return;
         }
         chartHelpLayerTitle.textContent = title;
-        chartHelpLayerText.textContent = text;
+        if (useHtml) {
+          chartHelpLayerText.innerHTML = text;
+        } else {
+          chartHelpLayerText.textContent = text;
+        }
         chartHelpLayer.classList.add("visible");
 
         const fallbackRect = anchorEl ? anchorEl.getBoundingClientRect() : null;
@@ -1347,9 +1354,18 @@ Last update: 2026-04-03 UTC
             `<span class="iono-item">foF2≈ <span class="iono-val">${fof2} MHz</span></span>`,
             `<span class="iono-sep">·</span>`,
             `<span class="iono-item iono-bands">${bandTags}</span>`,
-            `<span style="margin-left:auto;font-size:10px;color:var(--muted);">NOAA SWPC</span>`,
+            `<span style="margin-left:auto;"><button type="button" class="helper-icon" style="font-size:10px;width:18px;height:18px;line-height:16px;padding:0;" data-help-title="Ionospheric Context (NOAA SWPC)" data-help-html="Real-time space weather data from &lt;strong&gt;NOAA Space Weather Prediction Center&lt;/strong&gt;, adapted to your QTH position using Local Solar Time.&lt;br&gt;&lt;br&gt;&lt;strong&gt;SFI&lt;/strong&gt; — Solar Flux Index (10.7 cm). Higher = better HF propagation.&lt;br&gt;&lt;strong&gt;Kp&lt;/strong&gt; — Planetary geomagnetic index (0–9). Lower = calmer ionosphere.&lt;br&gt;&lt;strong&gt;foF2&lt;/strong&gt; — Critical frequency of F2 layer. Bands below foF2 support NVIS.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Band status legend:&lt;/strong&gt;&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Open&lt;/strong&gt; — Well below MUF, good propagation expected&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Marginal&lt;/strong&gt; — Near MUF limit (80–100%), unstable propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Closed&lt;/strong&gt; — Above MUF, no F2 propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Absorbed&lt;/strong&gt; — Daytime D-layer absorption (low bands)">i</button></span>`,
           ].join("");
           el.style.display = "flex";
+          // Bind help tooltip on the dynamically-injected helper icon
+          const helpBtn = el.querySelector(".helper-icon[data-help-title]");
+          if (helpBtn) {
+            const ht = helpBtn.getAttribute("data-help-title");
+            const hh = helpBtn.getAttribute("data-help-html") || "";
+            helpBtn.addEventListener("mouseenter", (ev) => showChartHelpLayer(ht, hh, ev, helpBtn, true));
+            helpBtn.addEventListener("mousemove", (ev) => positionChartHelpLayer(ev.clientX, ev.clientY));
+            helpBtn.addEventListener("mouseleave", hideChartHelpLayer);
+          }
         } catch (e) { el.style.display = "none"; }
       }
 
