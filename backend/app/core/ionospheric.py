@@ -242,6 +242,16 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
             max_distance_km = round(300 + max(0, freq_mhz - 5.5) * 150)  # ~300-975 km
             # Mark as still open (NVIS) even though 0 F2 hops
 
+    # Re-evaluate status after D-layer absorption has limited max_hops.
+    # If D-layer wiped out all F2 hops, the band is effectively absorbed
+    # for DX even if MUF-wise it was "Open".
+    if status == "Open" and max_hops == 0 and max_distance_km == 0:
+        status = "Absorbed"
+        band_open = False
+    elif status == "Open" and max_hops == 0 and max_distance_km > 0:
+        # NVIS-only mode — limited propagation, not truly "Open" for DX
+        status = "Marginal"
+
     # Three-zone model for gradient patches
     # Zones are proportions of max_distance_km (which already includes
     # D-layer and NVIS caps), so they always look right on the map.
