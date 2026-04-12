@@ -569,30 +569,30 @@ Last update: 2026-04-03 UTC
         background: rgba(34, 197, 94, 0.07);
         border: 1px solid rgba(34, 197, 94, 0.25);
         border-radius: 10px;
-        padding: 12px 14px;
-        font-size: 12px;
+        padding: 14px 16px;
+        font-size: 15px;
         color: var(--muted);
         line-height: 1.5;
         margin-bottom: 0;
         height: 100%;
         box-sizing: border-box;
       }
-      .iono-badge .iono-item { display: flex; align-items: center; gap: 4px; }
+      .iono-badge .iono-item { display: flex; align-items: center; gap: 6px; font-size: 15px; }
       .iono-badge .iono-sep  { display: none; }
-      .iono-badge .iono-val  { color: var(--fg); font-weight: 600; }
-      .iono-badge .iono-cond { padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+      .iono-badge .iono-val  { color: var(--fg); font-weight: 600; font-size: 16px; }
+      .iono-badge .iono-cond { padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: 600; }
       .iono-badge .iono-quiet      { background: rgba(34,197,94,0.18);  color: #4ade80; }
       .iono-badge .iono-unsettled   { background: rgba(234,179,8,0.18);  color: #facc15; }
       .iono-badge .iono-active      { background: rgba(249,115,22,0.18); color: #fb923c; }
       .iono-badge .iono-storm       { background: rgba(239,68,68,0.18);  color: #f87171; }
-      .iono-badge .iono-bands { display: flex; flex-direction: column; gap: 2px; }
-      .iono-badge .iono-band  { padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: 600; cursor: default; text-align: center; line-height: 1.3; }
+      .iono-badge .iono-bands { display: flex; flex-direction: column; gap: 3px; }
+      .iono-badge .iono-band  { padding: 3px 6px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: default; text-align: center; line-height: 1.3; }
       .iono-badge .iono-band-open     { background: rgba(34,197,94,0.2);  color: #4ade80; }
       .iono-badge .iono-band-marginal { background: rgba(234,179,8,0.2);  color: #facc15; }
       .iono-badge .iono-band-closed   { background: rgba(100,116,139,0.2); color: #94a3b8; }
       .iono-badge .iono-band-absorbed { background: rgba(249,115,22,0.15); color: #fb923c; }
       .iono-badge .iono-section-title {
-        font-size: 10px;
+        font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: var(--muted);
@@ -602,18 +602,18 @@ Last update: 2026-04-03 UTC
       .iono-badge .iono-legend {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px 8px;
+        gap: 5px 10px;
         margin-top: auto;
         padding-top: 8px;
         border-top: 1px solid rgba(255,255,255,0.08);
-        font-size: 9px;
+        font-size: 12px;
         color: var(--muted);
         opacity: 0.7;
       }
       .iono-badge .iono-legend-dot {
         display: inline-block;
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 2px;
         margin-right: 3px;
         vertical-align: middle;
@@ -1517,7 +1517,7 @@ Last update: 2026-04-03 UTC
             `<span><span class="iono-legend-dot" style="background:#94a3b8"></span>Closed</span>`,
             `<span><span class="iono-legend-dot" style="background:#fb923c"></span>Absorbed</span>`,
             `</div>`,
-            `<div style="font-size:9px;color:var(--muted);opacity:0.5;text-align:center;margin-top:2px">⟳ Auto-refresh every 15 min</div>`,
+            `<div style="font-size:11px;color:var(--muted);opacity:0.5;text-align:center;margin-top:2px">⟳ Auto-refresh every 15 min</div>`,
           ].join("");
           el.style.display = "flex";
           // Bind help tooltip on the dynamically-injected helper icon
