@@ -1606,9 +1606,13 @@ Last update: 2026-04-03 UTC
           _pmIonoData = await ionoResp.json();
           _pmContactData = await contactResp.json();
 
-          // Initialize band visibility (none selected — user picks)
+          // Initialize band visibility — restore from session or default none
           if (Object.keys(_pmBandVis).length === 0 && _pmIonoData.bands) {
-            for (const b of Object.keys(_pmIonoData.bands)) _pmBandVis[b] = false;
+            let saved = null;
+            try { saved = JSON.parse(sessionStorage.getItem("pmBandVis")); } catch {}
+            for (const b of Object.keys(_pmIonoData.bands)) {
+              _pmBandVis[b] = (saved && saved[b] === true) ? true : false;
+            }
           }
 
           drawPropMap(wrap, world);
@@ -1965,6 +1969,7 @@ Last update: 2026-04-03 UTC
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
             _pmBandVis[band] = !_pmBandVis[band];
+            try { sessionStorage.setItem("pmBandVis", JSON.stringify(_pmBandVis)); } catch {}
             const on = _pmBandVis[band];
             btn.classList.toggle("off", !on);
             btn.style.background = on ? _pmColor(band) + "33" : "rgba(255,255,255,0.08)";
