@@ -3511,8 +3511,18 @@ saveSettingsBtn.addEventListener("click", async () => {
     showToastError("Invalid callsign format");
     return;
   }
+  if (!stationLocatorInput.value.trim()) {
+    showToastError("Locator/Grid is required (e.g. IN51 or IN51ab)");
+    stationLocatorInput.focus();
+    return;
+  }
   if (!isValidLocator(stationLocatorInput.value)) {
     showToastError("Invalid locator format (use IN51 or IN51ab)");
+    return;
+  }
+  if (!stationQthInput.value.trim()) {
+    showToastError("QTH is required (e.g. Lisboa)");
+    stationQthInput.focus();
     return;
   }
 
