@@ -1686,6 +1686,7 @@ Last update: 2026-04-03 UTC
         const arcG   = svg.append("g").attr("class", "arcs");
         const dotG   = svg.append("g").attr("class", "dots");
         const homeG  = svg.append("g").attr("class", "home");
+        const gratLabelG = svg.append("g").attr("class", "grat-labels");
 
         // Tooltip
         let tip = document.getElementById("propMapTooltip");
@@ -1716,8 +1717,9 @@ Last update: 2026-04-03 UTC
           nightG.selectAll("*").remove();
           const subSolar = _pmSubSolar();
           // Night hemisphere — dark overlay (no line)
+          const antiLon = ((subSolar.lon + 180 + 540) % 360) - 180;
           const nightCircle = d3.geoCircle()
-            .center([-subSolar.lon, -subSolar.lat])
+            .center([antiLon, -subSolar.lat])
             .radius(90).precision(1)();
           nightG.append("path")
             .datum(nightCircle)
@@ -1876,6 +1878,34 @@ Last update: 2026-04-03 UTC
                 .attr("fill", "#facc15").attr("font-size", "11px")
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(station.callsign || "QTH");
+            }
+          }
+
+          // ── Graticule degree labels ──────────────────────────────────
+          gratLabelG.selectAll("*").remove();
+          const labelColor = "#4a6a8a";
+          // Latitude labels every 30° along the central meridian
+          for (let lat = -60; lat <= 60; lat += 30) {
+            if (lat === 0) continue;
+            const pt = proj([center[0], lat]);
+            if (pt) {
+              gratLabelG.append("text").attr("x", pt[0] + 3).attr("y", pt[1] - 3)
+                .attr("fill", labelColor).attr("font-size", "9px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(Math.abs(lat) + "°" + (lat > 0 ? "N" : "S"));
+            }
+          }
+          // Longitude labels every 30° along the equator
+          for (let lon = -180; lon < 180; lon += 30) {
+            if (lon === 0) continue;
+            const dist = d3.geoDistance([lon, 0], center);
+            if (dist > Math.PI / 2 - 0.15) continue;
+            const pt = proj([lon, 0]);
+            if (pt) {
+              gratLabelG.append("text").attr("x", pt[0] + 3).attr("y", pt[1] + 11)
+                .attr("fill", labelColor).attr("font-size", "9px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(Math.abs(lon) + "°" + (lon > 0 ? "E" : "W"));
             }
           }
         }
