@@ -1552,27 +1552,29 @@ Last update: 2026-04-03 UTC
         const rect = wrap.getBoundingClientRect();
         const W = rect.width || 800;
         const H = rect.height || 520;
-        const baseScale = Math.min(W, H) * 0.40;
+        const baseScale = Math.min(W, H) * 0.44;
         let kScale = 1;
 
-        // Azimuthal equidistant — QTH at centre, distances preserved radially
-        const proj = d3.geoAzimuthalEquidistant()
+        // Orthographic projection — 3D globe, same as main map
+        const proj = d3.geoOrthographic()
           .rotate([-sLon, -sLat])
           .scale(baseScale)
           .translate([W / 2, H / 2])
-          .clipAngle(180);
+          .clipAngle(90);
 
         const path = d3.geoPath().projection(proj);
         const graticule = d3.geoGraticule()();
 
+        // ── SVG scaffold ──────────────────────────────────────────────
+        const gradId = "propOcean_" + wrap.id;
         const svg = d3.select(wrap).append("svg")
           .attr("width", "100%").attr("height", "100%")
           .attr("viewBox", `0 0 ${W} ${H}`)
           .attr("preserveAspectRatio", "xMidYMid meet")
-          .style("cursor", "grab");
+          .style("background", "#0d1117").style("border-radius", "6px")
+          .style("cursor", "grab").style("display", "block");
 
-        // Ocean background
-        const gradId = "propOcean";
+        // Radial gradient for ocean depth effect
         const defs = svg.append("defs");
         const grad = defs.append("radialGradient")
           .attr("id", gradId)
@@ -1594,13 +1596,10 @@ Last update: 2026-04-03 UTC
             .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
         }
 
-        // Coverage rings group (behind contacts)
+        // Layer groups (draw order: rings → arcs → dots → home)
         const ringG = svg.append("g").attr("class", "rings");
-        // Great-circle arcs
-        const arcG = svg.append("g").attr("class", "arcs");
-        // Contact dots
-        const dotG = svg.append("g").attr("class", "dots");
-        // Home marker
+        const arcG  = svg.append("g").attr("class", "arcs");
+        const dotG  = svg.append("g").attr("class", "dots");
         const homeG = svg.append("g").attr("class", "home");
 
         // Tooltip
@@ -1615,13 +1614,9 @@ Last update: 2026-04-03 UTC
           document.body.appendChild(tip);
         }
 
-        function kmToProjectedRadius(km) {
-          // In azimuthal equidistant projection, distance is linear from center
-          // Scale factor: proj.scale() corresponds to Earth's radius subtending some angle
-          // For geoAzimuthalEquidistant: scale = R_pixels / (π), so 1 radian = scale pixels
-          // km → radians: km / 6371
-          const radians = km / 6371.0;
-          return radians * proj.scale();
+        // Convert km distance to degrees for d3.geoCircle radius
+        function kmToDeg(km) {
+          return (km / 6371.0) * (180.0 / Math.PI);
         }
 
         function redraw() {
@@ -1630,10 +1625,11 @@ Last update: 2026-04-03 UTC
           if (countryPaths) countryPaths.attr("d", path);
           grad.attr("r", proj.scale());
 
-          // ── Coverage rings from ionospheric data ──────────────────────
+          const center = proj.invert([W / 2, H / 2]);
+
+          // ── Coverage rings (geodesic circles on globe) ────────────────
           ringG.selectAll("*").remove();
           const bands = iono.bands || {};
-          const center = proj([sLon, sLat]);
 
           for (const [band, info] of Object.entries(bands)) {
             if (!_pmBandVis[band]) continue;
@@ -1642,52 +1638,63 @@ Last update: 2026-04-03 UTC
             const skipKm = info.skip_km || 0;
             if (maxKm <= 0) continue;
 
-            const rOuter = kmToProjectedRadius(maxKm);
-            const rInner = kmToProjectedRadius(skipKm);
             const color = _pmColor(band);
 
-            // Outer ring (max coverage)
-            if (center) {
-              ringG.append("circle")
-                .attr("cx", center[0]).attr("cy", center[1]).attr("r", rOuter)
-                .attr("fill", "none")
-                .attr("stroke", color)
-                .attr("stroke-width", 1.5)
-                .attr("stroke-dasharray", "6,3")
-                .attr("opacity", 0.5);
+            // Outer ring — max coverage radius (geodesic circle)
+            const outerCircle = d3.geoCircle()
+              .center([sLon, sLat])
+              .radius(kmToDeg(maxKm))
+              .precision(2)();
 
-              // Coverage area (donut between skip and max)
-              if (rInner > 0 && rInner < rOuter) {
-                // Inner skip zone boundary
-                ringG.append("circle")
-                  .attr("cx", center[0]).attr("cy", center[1]).attr("r", rInner)
-                  .attr("fill", "none")
-                  .attr("stroke", color)
-                  .attr("stroke-width", 0.8)
-                  .attr("stroke-dasharray", "3,3")
-                  .attr("opacity", 0.3);
-              }
+            ringG.append("path")
+              .datum(outerCircle)
+              .attr("d", path)
+              .attr("fill", color)
+              .attr("fill-opacity", 0.06)
+              .attr("stroke", color)
+              .attr("stroke-width", 1.5)
+              .attr("stroke-dasharray", "6,3")
+              .attr("stroke-opacity", 0.55);
 
-              // Faint fill between skip and max
-              const arc = d3.arc()
-                .innerRadius(rInner)
-                .outerRadius(rOuter)
-                .startAngle(0)
-                .endAngle(2 * Math.PI);
+            // Inner ring — skip distance (if any)
+            if (skipKm > 0 && skipKm < maxKm) {
+              const innerCircle = d3.geoCircle()
+                .center([sLon, sLat])
+                .radius(kmToDeg(skipKm))
+                .precision(2)();
 
               ringG.append("path")
-                .attr("d", arc)
-                .attr("transform", `translate(${center[0]},${center[1]})`)
-                .attr("fill", color)
-                .attr("opacity", 0.06);
+                .datum(innerCircle)
+                .attr("d", path)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", 0.8)
+                .attr("stroke-dasharray", "3,3")
+                .attr("stroke-opacity", 0.35);
+            }
 
-              // Label
-              ringG.append("text")
-                .attr("x", center[0]).attr("y", center[1] - rOuter - 3)
-                .attr("text-anchor", "middle")
-                .attr("fill", color).attr("font-size", "9px")
-                .attr("font-family", "monospace").attr("opacity", 0.7)
-                .text(band);
+            // Band label on top of outer ring
+            const labelPt = d3.geoCircle()
+              .center([sLon, sLat])
+              .radius(kmToDeg(maxKm))
+              .precision(360)();  // 1 point = north pole of circle
+            if (labelPt && labelPt.coordinates && labelPt.coordinates[0]) {
+              const coords = labelPt.coordinates[0];
+              // Pick the topmost point (smallest latitude = northward)
+              let best = coords[0];
+              for (const c of coords) {
+                if (c[1] > best[1]) best = c;
+              }
+              const lp = proj(best);
+              if (lp && d3.geoDistance(best, center) < Math.PI / 2) {
+                ringG.append("text")
+                  .attr("x", lp[0]).attr("y", lp[1] - 4)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", color).attr("font-size", "9px")
+                  .attr("font-family", "monospace").attr("opacity", 0.8)
+                  .attr("pointer-events", "none")
+                  .text(band);
+              }
             }
           }
 
@@ -1698,7 +1705,6 @@ Last update: 2026-04-03 UTC
           contacts.forEach((c) => {
             if (c.lat == null || c.lon == null) return;
             const cBand = (c.band || "").toLowerCase();
-            // Only show contact if its band is visible
             const matchBand = Object.keys(_pmBandVis).find(b => b.toLowerCase() === cBand);
             if (matchBand && !_pmBandVis[matchBand]) return;
 
@@ -1714,24 +1720,25 @@ Last update: 2026-04-03 UTC
                 const maxD = bInfo.max_distance_km || 0;
                 corr = distKm <= maxD ? "confirmed" : "anomaly";
               } else if (bSt === "Closed" || bSt === "Absorbed") {
-                corr = "anomaly"; // contact despite closed/absorbed = anomaly
+                corr = "anomaly";
               }
             }
 
-            // Arc
+            // Great-circle arc — D3 clips automatically on orthographic
             arcG.append("path")
               .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
               .attr("d", path)
               .attr("fill", "none")
               .attr("stroke", color)
-              .attr("stroke-width", corr === "anomaly" ? 2.2 : 1.4)
-              .attr("stroke-opacity", corr === "anomaly" ? 0.95 : 0.65);
+              .attr("stroke-width", corr === "anomaly" ? 2.2 : 1.8)
+              .attr("stroke-opacity", corr === "anomaly" ? 0.95 : 0.85);
 
-            // Dot
+            // Dot — only on visible hemisphere
+            if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
             const pp = proj([c.lon, c.lat]);
             if (!pp) return;
 
-            const dotR = corr === "anomaly" ? 5.5 : 4;
+            const dotR = corr === "anomaly" ? 5.5 : 4.5;
             const dotStroke = corr === "anomaly" ? "#f87171" : "#fff";
             const dotStrokeW = corr === "anomaly" ? 1.8 : 0.7;
 
@@ -1741,12 +1748,12 @@ Last update: 2026-04-03 UTC
               .attr("stroke-width", dotStrokeW).attr("opacity", 0.92)
               .style("cursor", "pointer")
               .on("mousemove", (evt) => {
-                const snrStr  = c.snr_db != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
-                const distStr = distKm ? `${distKm.toLocaleString()} km` : "—";
-                const corrLabel = corr === "confirmed" ? "✓ Confirmed"
-                  : corr === "anomaly" ? "⚠ Anomaly" : "";
-                tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country || ""}<br>`
-                  + `${c.band || ""} · ${c.mode || ""} · SNR ${snrStr} · ${distStr}`
+                const snrStr  = c.snr_db != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "\u2014";
+                const distStr = distKm ? `${distKm.toLocaleString()} km` : "\u2014";
+                const corrLabel = corr === "confirmed" ? "\u2713 Confirmed"
+                  : corr === "anomaly" ? "\u26A0 Anomaly" : "";
+                tip.innerHTML = `<strong>${c.callsign}</strong> \u00b7 ${c.country || ""}<br>`
+                  + `${c.band || ""} \u00b7 ${c.mode || ""} \u00b7 SNR ${snrStr} \u00b7 ${distStr}`
                   + (corrLabel ? `<br><span style="color:${corr === "anomaly" ? "#f87171" : "#4ade80"}">${corrLabel}</span>` : "");
                 tip.style.display = "block";
                 tip.style.left = evt.clientX + 14 + "px";
@@ -1757,13 +1764,16 @@ Last update: 2026-04-03 UTC
 
           // ── Home marker ──────────────────────────────────────────────
           homeG.selectAll("*").remove();
-          if (center) {
-            homeG.append("circle").attr("cx", center[0]).attr("cy", center[1]).attr("r", 7)
-              .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
-            homeG.append("text").attr("x", center[0] + 10).attr("y", center[1] + 5)
-              .attr("fill", "#facc15").attr("font-size", "11px")
-              .attr("font-family", "monospace").attr("pointer-events", "none")
-              .text(station.callsign || "QTH");
+          if (d3.geoDistance([sLon, sLat], center) < Math.PI / 2) {
+            const home = proj([sLon, sLat]);
+            if (home) {
+              homeG.append("circle").attr("cx", home[0]).attr("cy", home[1]).attr("r", 7)
+                .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
+              homeG.append("text").attr("x", home[0] + 10).attr("y", home[1] + 5)
+                .attr("fill", "#facc15").attr("font-size", "11px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(station.callsign || "QTH");
+            }
           }
         }
 
@@ -1781,8 +1791,8 @@ Last update: 2026-04-03 UTC
             .on("end", () => svg.style("cursor", "grab"))
         );
 
-        // ── Scroll zoom ────────────────────────────────────────────────
-        wrap.addEventListener("wheel", (event) => {
+        // ── Scroll wheel zoom ──────────────────────────────────────────
+        svg.node().addEventListener("wheel", (event) => {
           event.preventDefault();
           const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
           kScale = Math.max(0.25, Math.min(12, kScale * factor));
