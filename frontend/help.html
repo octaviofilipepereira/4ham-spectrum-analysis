@@ -660,7 +660,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </ul>
 
     <h3 class="sub-title">Propagation Score by Band</h3>
-    <p>Vertical bar chart showing the propagation score (0–100) for each band. Numeric labels above each bar.</p>
+    <p>Vertical bar chart showing the propagation score (0–100) for each band, calculated <strong>exclusively from digital mode decodes</strong> (FT8, FT4, WSPR). A successful decode confirms a callsign, grid reference, and SNR — the only reliable basis for assessing a real propagation path. <strong>CW and SSB detections indicate band occupancy only</strong> and do not contribute to this score.</p>
     <ul>
       <li><strong>≥ 70</strong> = excellent — consistent decoding, good SNR, many callsigns.</li>
       <li><strong>50–69</strong> = good — reliable conditions.</li>
@@ -670,7 +670,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </ul>
 
     <h3 class="sub-title">Propagation Time Trend</h3>
-    <p>Line chart showing how the global propagation score varied over time. A dashed horizontal line marks the period average.</p>
+    <p>Line chart showing how the global propagation score varied over time. Score is derived <strong>exclusively from digital mode decodes</strong> (FT8, FT4, WSPR). CW and SSB events provide band occupancy data only and are not reflected in this chart. A dashed horizontal line marks the period average.</p>
     <ul>
       <li><strong>Line above average</strong> = conditions better than usual at that moment.</li>
       <li><strong>Line below average</strong> = conditions worse than usual.</li>

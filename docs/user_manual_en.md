@@ -86,6 +86,11 @@ SNR = signal_level_dB - noise_floor_dB
 
 #### 🌍 Propagation Score
 
+> **⚠️ Important note on data source:**
+> The Propagation Score is calculated **exclusively from digital modes** (FT8, FT4, WSPR). These modes decode the entire passband in parallel and each successful decode yields a callsign, grid reference, and SNR — the only reliable basis for assessing a real propagation path.
+>
+> **CW and SSB** capture **band occupancy**: they confirm that the band is active with traffic, but due to sequential narrowband scanning (short dwell per frequency), a callsign is rarely captured during the listening window. Without a callsign + grid it is not possible to confirm the ionospheric path, so these events **do not contribute to the propagation score**.
+
 **What it is**: An **aggregated** assessment of propagation conditions based on **multiple recent events**.
 
 **How it is calculated (v0.9.0 — 3 formulas by mode category)**:
@@ -115,7 +120,7 @@ These modes decode the entire passband in parallel. The decode rate (ratio of ca
 snr_norm = clamp((SNR - floor) / range, 0, 1)
 ```
 
-##### Category 2 — CW (Morse)
+##### Category 2 — CW (Morse) — Band Occupancy
 
 CW uses sequential narrowband scanning with short dwell times. Not capturing a callsign **does not indicate weak propagation** — the operator may simply not have been transmitting their callsign during the short listening window.
 
@@ -127,7 +132,7 @@ CW uses sequential narrowband scanning with short dwell times. Not capturing a c
 | `callsign_bonus` | **15%** | Bonus when callsign IS captured (not penalty when absent) |
 | `recency` | **10%** | More recent events carry more weight |
 
-##### Category 3 — SSB (Voice)
+##### Category 3 — SSB (Voice) — Band Occupancy
 
 SSB shares CW's sequential scanning limitation. Assessment relies on voice detection quality, SNR, and signal strength.
 

@@ -86,6 +86,11 @@ SNR = nível_do_sinal_dB - ruído_de_fundo_dB
 
 #### 🌍 Propagation Score (Score de Propagação)
 
+> **⚠️ Nota importante sobre a origem dos dados:**
+> O Propagation Score é calculado **exclusivamente com base em modos digitais** (FT8, FT4, WSPR). Estes modos descodificam toda a passband em paralelo e, em cada descodificação bem-sucedida, fornecem indicativo + grid + SNR — o único fundamento fiável para avaliar um caminho de propagação real.
+>
+> **CW e SSB** capturam **ocupação de banda** (*band occupancy*): confirmam que a banda está activa com tráfego, mas devido ao varrimento sequencial de banda estreita (dwell curto por frequência), raramente captam o indicativo durante a janela de escuta. Sem indicativo + grid não é possível confirmar o caminho ionosférico e, portanto, estes eventos **não contribuem para o cálculo de propagação**.
+
 **O que é**: Avaliação **agregada** das condições de propagação baseada em **múltiplos eventos recentes**.
 
 **Como é calculado (v0.9.0 — 3 fórmulas por categoria de modo)**:
@@ -115,7 +120,7 @@ Estes modos descodificam toda a passband em paralelo. A taxa de descodificação
 snr_norm = clamp((SNR - floor) / faixa, 0, 1)
 ```
 
-##### Categoria 2 — CW (Morse)
+##### Categoria 2 — CW (Morse) — Ocupação de Banda
 
 CW usa varrimento sequencial por frequência com dwell curto. Não captar um indicativo **não indica propagação fraca** — o operador pode simplesmente não ter transmitido o indicativo durante a janela de escuta.
 
@@ -127,7 +132,7 @@ CW usa varrimento sequencial por frequência com dwell curto. Não captar um ind
 | `callsign_bonus` | **15 %** | Bónus quando indicativo É captado (não penalização quando ausente) |
 | `recency` | **10 %** | Eventos mais recentes pesam mais |
 
-##### Categoria 3 — SSB (Voz)
+##### Categoria 3 — SSB (Voz) — Ocupação de Banda
 
 SSB partilha a limitação de varrimento sequencial do CW. A avaliação depende da deteção de voz, qualidade do SNR e nível de sinal.
 

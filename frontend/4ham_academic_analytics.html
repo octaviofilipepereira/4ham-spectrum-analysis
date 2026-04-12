@@ -536,6 +536,22 @@ Last update: 2026-04-03 UTC
         color: #fca5a5;
       }
 
+      .prop-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(99, 102, 241, 0.30);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-bottom: 14px;
+      }
+      .prop-notice strong { color: var(--fg); }
+      .prop-notice .pn-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
       @media (max-width: 1100px) {
         .controls {
           grid-template-columns: 1fr 1fr;
@@ -699,6 +715,7 @@ Last update: 2026-04-03 UTC
             <span class="label">Overall Propagation score</span>
             <div class="value" id="kpiPropScore">--</div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Digital modes only (FT8/FT4/WSPR).<br>CW &amp; SSB = band occupancy.</div>
           </div>
           <div class="card">
             <span class="label">Best band</span>
@@ -755,20 +772,21 @@ Last update: 2026-04-03 UTC
           </article>
 
           <article class="chart-panel span-6">
+            <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span>Propagation scores are based on <strong>digital modes only</strong> (FT8 / FT4 / WSPR). <strong>CW</strong> and <strong>SSB</strong> detections reflect <strong>band occupancy</strong> — they confirm that the band is active but do not contribute to propagation calculation, as no confirmed transmission path (callsign + grid) is available from sequential narrowband scanning.</span></div>
             <div class="chart-header">
               <h3>Propagation Score by Band</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows computed propagation quality score for each band on a 0 to 100 scale, combining signal quality and activity weighting. Higher bars suggest better expected propagation conditions. Compare bands to choose the most favorable operating band for the selected period.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows the propagation quality score (0-100) per band, calculated exclusively from digital mode decodes (FT8, FT4, WSPR). A successful decode provides a confirmed callsign, grid, and SNR - the only reliable basis for propagation assessment. CW and SSB events indicate band occupancy only and do not contribute to this score. Higher bars mean better propagation on that band.">i</button>
             </div>
-            <p>Weighted average by activity in the selected period.</p>
+            <p>Digital modes only (FT8/FT4/WSPR) — weighted average by activity in the selected period.</p>
             <svg id="propagationBandChart"></svg>
           </article>
 
           <article class="chart-panel span-6">
             <div class="chart-header">
               <h3>Propagation Time Trend</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots global propagation score over time at hourly resolution for the selected window. Rising segments suggest improving propagation and falling segments suggest degradation. The dashed line marks the average score, helping you compare short-term fluctuations against overall conditions.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots the global propagation score over time at hourly resolution. Score is derived exclusively from digital mode decodes (FT8, FT4, WSPR) - the only modes that provide confirmed transmission paths. CW and SSB contribute band occupancy data only and are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average.">i</button>
             </div>
-            <p>Global propagation score curve per hour (0 to 100).</p>
+            <p>Global propagation score per hour — digital modes only (FT8/FT4/WSPR).</p>
             <svg id="propagationTrendChart"></svg>
           </article>
         </div>
