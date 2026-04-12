@@ -574,6 +574,12 @@ Last update: 2026-04-03 UTC
       .iono-badge .iono-unsettled   { background: rgba(234,179,8,0.18);  color: #facc15; }
       .iono-badge .iono-active      { background: rgba(249,115,22,0.18); color: #fb923c; }
       .iono-badge .iono-storm       { background: rgba(239,68,68,0.18);  color: #f87171; }
+      .iono-badge .iono-bands { display: flex; flex-wrap: wrap; gap: 3px; }
+      .iono-badge .iono-band  { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: default; }
+      .iono-badge .iono-band-open     { background: rgba(34,197,94,0.2);  color: #4ade80; }
+      .iono-badge .iono-band-marginal { background: rgba(234,179,8,0.2);  color: #facc15; }
+      .iono-badge .iono-band-closed   { background: rgba(100,116,139,0.2); color: #94a3b8; }
+      .iono-badge .iono-band-absorbed { background: rgba(249,115,22,0.15); color: #fb923c; }
 
       @media (max-width: 1100px) {
         .controls {
@@ -1322,12 +1328,16 @@ Last update: 2026-04-03 UTC
           else if (kp >= 4) condClass = "iono-active";
           else if (kp >= 2) condClass = "iono-unsettled";
 
-          // Open bands summary
+          // Band status summary with color coding
           const bands = d.bands || {};
-          const openBands = Object.entries(bands)
-            .filter(([, v]) => v.open)
-            .map(([b]) => b)
-            .join(", ") || "none";
+          const bandTags = Object.entries(bands).map(([b, v]) => {
+            const st = v.status || (v.open ? "Open" : "Closed");
+            let cls = "iono-band-closed";
+            if (st === "Open") cls = "iono-band-open";
+            else if (st === "Marginal") cls = "iono-band-marginal";
+            else if (st === "Absorbed") cls = "iono-band-absorbed";
+            return `<span class="iono-band ${cls}" title="${st} — MUF ${v.muf_at_3000km || '?'} MHz">${b}</span>`;
+          }).join("");
 
           el.innerHTML = [
             `<span class="iono-item">☀️ SFI: <span class="iono-val">${sfi}</span></span>`,
@@ -1336,7 +1346,7 @@ Last update: 2026-04-03 UTC
             `<span class="iono-sep">·</span>`,
             `<span class="iono-item">foF2≈ <span class="iono-val">${fof2} MHz</span></span>`,
             `<span class="iono-sep">·</span>`,
-            `<span class="iono-item">Open: <span class="iono-val">${openBands}</span></span>`,
+            `<span class="iono-item iono-bands">${bandTags}</span>`,
             `<span style="margin-left:auto;font-size:10px;color:var(--muted);">NOAA SWPC</span>`,
           ].join("");
           el.style.display = "flex";

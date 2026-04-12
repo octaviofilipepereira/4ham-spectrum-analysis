@@ -143,25 +143,55 @@ def _skip_distance_km(freq_mhz: float, fof2: float) -> float:
     return 2.0 * _HV_F2_KM * math.sqrt(ratio ** 2 - 1.0)
 
 
-def _band_status(freq_mhz: float, fof2: float, kp: float) -> Dict[str, Any]:
-    """Compute propagation status for a single band."""
+def _band_status(freq_mhz: float, fof2: float, kp: float,
+                  local_solar_hour: float) -> Dict[str, Any]:
+    """Compute propagation status for a single band.
+
+    Status values:
+      - "Open"      — freq well below effective MUF, no absorption
+      - "Marginal"  — freq between 80-100% of effective MUF
+      - "Closed"    — freq above effective MUF
+      - "Absorbed"  — daytime D-layer absorption blocks low-band DX
+    """
     muf_3000 = _muf_for_distance(fof2, 3000.0)
+
+    # Apply geomagnetic degradation to effective MUF
+    # Higher Kp → ionospheric disturbance → lower effective MUF
+    geo_factor = max(0.0, 1.0 - (kp / 9.0))
+    effective_muf = muf_3000 * (0.7 + 0.3 * geo_factor)  # 70-100% of MUF
+
     skip_km = _skip_distance_km(freq_mhz, fof2)
 
-    # Max usable single-hop distance (~4000 km for F2)
-    max_distance_km = 4000.0 if freq_mhz <= muf_3000 else 0.0
+    # D-layer absorption: daytime kills low-frequency DX
+    # D-layer exists when sun is above horizon (roughly LST 06-18)
+    is_daytime = 6.0 <= local_solar_hour <= 18.0
+    d_layer_cutoff_mhz = 5.5 if is_daytime else 0.0
+    absorbed = is_daytime and freq_mhz < d_layer_cutoff_mhz
 
-    # Is the band theoretically open?
-    band_open = freq_mhz <= muf_3000
-
-    # Geomagnetic degradation factor
-    geo_factor = max(0.0, 1.0 - (kp / 9.0))
+    # Determine status
+    if absorbed:
+        status = "Absorbed"
+        band_open = False
+        max_distance_km = 0
+    elif freq_mhz > effective_muf:
+        status = "Closed"
+        band_open = False
+        max_distance_km = 0
+    elif freq_mhz > effective_muf * 0.8:
+        status = "Marginal"
+        band_open = True
+        max_distance_km = 2000  # reduced range near MUF limit
+    else:
+        status = "Open"
+        band_open = True
+        max_distance_km = 4000
 
     return {
         "open": band_open,
+        "status": status,
         "skip_km": round(skip_km),
-        "max_distance_km": round(max_distance_km) if band_open else 0,
-        "muf_at_3000km": round(muf_3000, 1),
+        "max_distance_km": round(max_distance_km),
+        "muf_at_3000km": round(effective_muf, 1),
         "geo_factor": round(geo_factor, 2),
     }
 
@@ -230,10 +260,11 @@ class IonosphericCache:
         now = datetime.now(timezone.utc)
         utc_hour = now.hour + now.minute / 60.0
         fof2 = _estimate_fof2(sfi, utc_hour, longitude)
+        local_solar_hour = (utc_hour + longitude / 15.0) % 24.0
 
         bands: Dict[str, Dict] = {}
         for band_name, freq_mhz in _HF_BANDS_MHZ.items():
-            bands[band_name] = _band_status(freq_mhz, fof2, kp)
+            bands[band_name] = _band_status(freq_mhz, fof2, kp, local_solar_hour)
 
         return {
             "kp": kp,
