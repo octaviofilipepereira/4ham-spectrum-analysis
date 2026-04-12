@@ -98,6 +98,11 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.12.2
+- **SNR KPI split**: separate "Avg SNR FT4/FT8/WSPR" and "Avg SNR CW/SSB" cards (incompatible measurement scales).
+- **Removed Time Coverage KPI card**, renamed "Overall Propagation score" → "Global Propagation".
+- **Documentation**: embedding Academic Dashboard on external websites (Apache+PHP, Nginx).
+
 ### v0.12.1
 - **QTH-Centric Propagation Map redesign**: DR2W-style irregular solar-shaped propagation zones per band — 3 intensity layers (Strong / Moderate / Fringe) shaped by solar elevation, with day/night terminator and dark-hemisphere overlay.
 - **NOAA SWPC Ionospheric Space Weather sidebar**: real-time SFI, Kp, foF2, and per-band status pills (Open / Marginal / Closed / Absorbed). Auto-refresh every 15 minutes.

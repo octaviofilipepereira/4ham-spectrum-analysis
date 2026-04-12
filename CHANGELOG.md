@@ -7,6 +7,19 @@ Last update: 2026-04-12 UTC
 
 # Changelog
 
+## v0.12.2 - 2026-04-12
+
+### Changed
+- **SNR KPI split**: replaced single "Average SNR" card with two separate cards — "Avg SNR FT4/FT8/WSPR" (WSJT-X 2500 Hz BW reference) and "Avg SNR CW/SSB" (DSP real bandwidth). Prevents mixing incompatible measurement scales.
+- **Backend API**: new fields `snr_avg_digital` and `snr_avg_analog` in `/api/analytics/academic` KPIs response (backward-compatible: `snr_avg` retained).
+- **Removed Time Coverage KPI card** (redundant — gaps visible in Event Time Series chart).
+- **Renamed** "Overall Propagation score" → "Global Propagation".
+
+### Documentation
+- **User manuals** (EN/PT): new section "Embedding the Academic Dashboard on an External Website" — covers Apache+PHP and Nginx reverse proxy setup, architecture, security, and troubleshooting.
+
+---
+
 ## v0.12.1 - 2026-04-12
 
 ### Added
