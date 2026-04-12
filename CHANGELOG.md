@@ -7,7 +7,7 @@ Last update: 2026-04-12 UTC
 
 # Changelog
 
-## v0.12.0 - 2026-04-12
+## v0.12.1 - 2026-04-12
 
 ### Added
 - **QTH-Centric Propagation Map — complete redesign**: DR2W-style irregular solar-shaped propagation zones per band with 3 intensity layers (Strong / Moderate / Fringe), shaped by solar elevation angle. Zone boundaries computed from real-time NOAA SWPC indices via a calibrated ionospheric model.
@@ -31,10 +31,10 @@ Last update: 2026-04-12 UTC
 - **Propagation zones**: opacities calibrated — weak 0.08, moderate 0.14, strong 0.22.
 
 ### Documentation
-- **help.html** updated to v0.12.0 — new sections: *QTH-Centric Propagation Map* and *Ionospheric Space Weather panel*.
+- **help.html** updated to v0.12.1 — new sections: *QTH-Centric Propagation Map* and *Ionospheric Space Weather panel*.
 - **User manuals** (EN/PT) updated — new chapters on propagation map, ionospheric model, and band status interpretation.
-- **README** changelog updated to v0.12.0.
-- **ROADMAP** (EN/PT) updated — v0.12.0 milestone added.
+- **README** changelog updated to v0.12.1.
+- **ROADMAP** (EN/PT) updated — v0.12.1 milestone added.
 
 ---
 

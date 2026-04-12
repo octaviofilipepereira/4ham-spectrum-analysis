@@ -98,7 +98,7 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
-### v0.12.0
+### v0.12.1
 - **QTH-Centric Propagation Map redesign**: DR2W-style irregular solar-shaped propagation zones per band — 3 intensity layers (Strong / Moderate / Fringe) shaped by solar elevation, with day/night terminator and dark-hemisphere overlay.
 - **NOAA SWPC Ionospheric Space Weather sidebar**: real-time SFI, Kp, foF2, and per-band status pills (Open / Marginal / Closed / Absorbed). Auto-refresh every 15 minutes.
 - **Backend ionospheric model** (`/api/map/ionospheric`): foF2 = 3.5 + 0.6 × √SSN (ionosonde-calibrated, 45 % night floor); SSN-dependent D-layer absorption; multi-hop skip model (2 500 km/hop, max 4 hops); NVIS cap for bands < 8 MHz; band status re-evaluated after absorption.

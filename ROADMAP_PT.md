@@ -8,7 +8,7 @@ Indicativo: CT7BFV
 
 > **Also available in:** [English](ROADMAP.md)
 
-**Versão Atual**: v0.12.0  
+**Versão Atual**: v0.12.1  
 **Última Atualização**: 2026-04-12  
 **Estado**: 🟢 Produção-Ready (branch main)
 
@@ -60,7 +60,7 @@ Indicativo: CT7BFV
 | v0.9.0 | 2026-04-06 | Scoring de propagação 3 fórmulas, exportação multi-formato, validação ITU |
 | v0.10.0 | 2026-04-08 | Scheduler de Rotação de Scan, correção de modos fantasma |
 | v0.11.1 | 2026-04-10 | Correção concorrência SQLite, qualidade sinal SSB, estabilização produção |
-| v0.12.0 | 2026-04-12 | Redesenho Mapa Propagação QTH-Cêtrico, modelo ionosférico NOAA SWPC, painel clima espacial |
+| v0.12.1 | 2026-04-12 | Redesenho Mapa Propagação QTH-Cêtrico, modelo ionosférico NOAA SWPC, painel clima espacial |
 
 ---
 
