@@ -625,11 +625,11 @@ Last update: 2026-04-03 UTC
             <label>Period</label>
             <div class="preset-row" id="presetRow">
               <button class="preset-btn" data-preset="1h">1h</button>
+              <button class="preset-btn" data-preset="2h">2h</button>
+              <button class="preset-btn" data-preset="6h">6h</button>
               <button class="preset-btn" data-preset="12h">12h</button>
               <button class="preset-btn" data-preset="24h">24h</button>
-              <button class="preset-btn" data-preset="7d">7d</button>
-              <button class="preset-btn" data-preset="30d">30d</button>
-              <button class="preset-btn" data-preset="custom">Custom</button>
+              <button class="preset-btn" data-preset="custom">Custom Period</button>
             </div>
             <div class="custom-range" id="customRange" style="display:none;">
               <input type="datetime-local" id="startInput" />
@@ -2187,17 +2187,17 @@ Last update: 2026-04-03 UTC
         if (currentPreset === "1h") {
           return { start: new Date(end.getTime() - 1 * 3600 * 1000), end };
         }
+        if (currentPreset === "2h") {
+          return { start: new Date(end.getTime() - 2 * 3600 * 1000), end };
+        }
+        if (currentPreset === "6h") {
+          return { start: new Date(end.getTime() - 6 * 3600 * 1000), end };
+        }
         if (currentPreset === "12h") {
           return { start: new Date(end.getTime() - 12 * 3600 * 1000), end };
         }
         if (currentPreset === "24h") {
           return { start: new Date(end.getTime() - 24 * 3600 * 1000), end };
-        }
-        if (currentPreset === "7d") {
-          return { start: new Date(end.getTime() - 7 * 24 * 3600 * 1000), end };
-        }
-        if (currentPreset === "30d") {
-          return { start: new Date(end.getTime() - 30 * 24 * 3600 * 1000), end };
         }
 
         const customStart = startInput.value ? new Date(startInput.value + 'Z') : new Date(end.getTime() - 24 * 3600 * 1000);

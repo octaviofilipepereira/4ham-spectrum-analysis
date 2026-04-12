@@ -52,3 +52,6 @@ docs/*_migration_plan.md
 
 # Legacy / superseded code
 backend/app/main_legacy.py
+
+# Private benchmark experiments (never publish)
+benchmarks/
