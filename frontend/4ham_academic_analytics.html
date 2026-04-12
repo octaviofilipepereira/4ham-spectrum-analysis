@@ -409,6 +409,14 @@ Last update: 2026-04-03 UTC
         grid-column: span 6;
       }
 
+      .span-9 {
+        grid-column: span 9;
+      }
+
+      .span-3 {
+        grid-column: span 3;
+      }
+
       .span-12 {
         grid-column: span 12;
       }
@@ -554,32 +562,43 @@ Last update: 2026-04-03 UTC
 
       .iono-badge {
         display: flex;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        flex-wrap: nowrap;
         background: rgba(34, 197, 94, 0.07);
         border: 1px solid rgba(34, 197, 94, 0.25);
         border-radius: 10px;
-        padding: 8px 14px;
+        padding: 12px 14px;
         font-size: 12px;
         color: var(--muted);
         line-height: 1.5;
-        margin-bottom: 10px;
+        margin-bottom: 0;
+        height: 100%;
+        box-sizing: border-box;
       }
       .iono-badge .iono-item { display: flex; align-items: center; gap: 4px; }
-      .iono-badge .iono-sep  { color: var(--muted); opacity: 0.4; font-size: 16px; }
+      .iono-badge .iono-sep  { display: none; }
       .iono-badge .iono-val  { color: var(--fg); font-weight: 600; }
       .iono-badge .iono-cond { padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; }
       .iono-badge .iono-quiet      { background: rgba(34,197,94,0.18);  color: #4ade80; }
       .iono-badge .iono-unsettled   { background: rgba(234,179,8,0.18);  color: #facc15; }
       .iono-badge .iono-active      { background: rgba(249,115,22,0.18); color: #fb923c; }
       .iono-badge .iono-storm       { background: rgba(239,68,68,0.18);  color: #f87171; }
-      .iono-badge .iono-bands { display: flex; flex-wrap: wrap; gap: 3px; }
-      .iono-badge .iono-band  { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: default; }
+      .iono-badge .iono-bands { display: flex; flex-direction: column; gap: 3px; }
+      .iono-badge .iono-band  { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: default; text-align: center; }
       .iono-badge .iono-band-open     { background: rgba(34,197,94,0.2);  color: #4ade80; }
       .iono-badge .iono-band-marginal { background: rgba(234,179,8,0.2);  color: #facc15; }
       .iono-badge .iono-band-closed   { background: rgba(100,116,139,0.2); color: #94a3b8; }
       .iono-badge .iono-band-absorbed { background: rgba(249,115,22,0.15); color: #fb923c; }
+      .iono-badge .iono-section-title {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--muted);
+        opacity: 0.6;
+        margin-top: 4px;
+      }
 
       /* ── Propagation Map ────────────────────────── */
       .propmap-wrap {
@@ -695,7 +714,9 @@ Last update: 2026-04-03 UTC
 
         .span-7,
         .span-5,
-        .span-6 {
+        .span-6,
+        .span-9,
+        .span-3 {
           grid-column: span 12;
         }
 
@@ -922,9 +943,7 @@ Last update: 2026-04-03 UTC
             <svg id="propagationTrendChart"></svg>
           </article>
 
-          <div id="ionoBadge" class="iono-badge span-12" style="display:none;"></div>
-
-          <article class="chart-panel span-12">
+          <article class="chart-panel span-9">
             <div class="chart-header">
               <h3>QTH-Centric Propagation Map</h3>
               <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen.">i</button>
@@ -932,6 +951,8 @@ Last update: 2026-04-03 UTC
             <p>NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom.</p>
             <div class="propmap-wrap" id="propMapWrap"></div>
           </article>
+
+          <div id="ionoBadge" class="iono-badge span-3" style="display:none;"></div>
         </div>
 
         <section class="meta">
@@ -1462,14 +1483,15 @@ Last update: 2026-04-03 UTC
           }).join("");
 
           el.innerHTML = [
+            `<div style="display:flex;align-items:center;justify-content:space-between">`,
+            `<span class="iono-section-title">Space Weather</span>`,
+            `<button type="button" class="helper-icon" style="font-size:10px;width:18px;height:18px;line-height:16px;padding:0;" data-help-title="Ionospheric Context (NOAA SWPC)" data-help-html="Real-time space weather data from &lt;strong&gt;NOAA Space Weather Prediction Center&lt;/strong&gt;, adapted to your QTH position using Local Solar Time.&lt;br&gt;&lt;br&gt;&lt;strong&gt;SFI&lt;/strong&gt; — Solar Flux Index (10.7 cm). Higher = better HF propagation.&lt;br&gt;&lt;strong&gt;Kp&lt;/strong&gt; — Planetary geomagnetic index (0–9). Lower = calmer ionosphere.&lt;br&gt;&lt;strong&gt;foF2&lt;/strong&gt; — Critical frequency of F2 layer. Bands below foF2 support NVIS.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Band status legend:&lt;/strong&gt;&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Open&lt;/strong&gt; — Well below MUF, good propagation expected&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Marginal&lt;/strong&gt; — Near MUF limit (80–100%), unstable propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Closed&lt;/strong&gt; — Above MUF, no F2 propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Absorbed&lt;/strong&gt; — Daytime D-layer absorption (low bands)">i</button>`,
+            `</div>`,
             `<span class="iono-item">☀️ SFI: <span class="iono-val">${sfi}</span></span>`,
-            `<span class="iono-sep">·</span>`,
             `<span class="iono-item">Kp: <span class="iono-val">${kp}</span> <span class="iono-cond ${condClass}">${cond}</span></span>`,
-            `<span class="iono-sep">·</span>`,
-            `<span class="iono-item">foF2≈ <span class="iono-val">${fof2} MHz</span></span>`,
-            `<span class="iono-sep">·</span>`,
-            `<span class="iono-item iono-bands">${bandTags}</span>`,
-            `<span style="margin-left:auto;"><button type="button" class="helper-icon" style="font-size:10px;width:18px;height:18px;line-height:16px;padding:0;" data-help-title="Ionospheric Context (NOAA SWPC)" data-help-html="Real-time space weather data from &lt;strong&gt;NOAA Space Weather Prediction Center&lt;/strong&gt;, adapted to your QTH position using Local Solar Time.&lt;br&gt;&lt;br&gt;&lt;strong&gt;SFI&lt;/strong&gt; — Solar Flux Index (10.7 cm). Higher = better HF propagation.&lt;br&gt;&lt;strong&gt;Kp&lt;/strong&gt; — Planetary geomagnetic index (0–9). Lower = calmer ionosphere.&lt;br&gt;&lt;strong&gt;foF2&lt;/strong&gt; — Critical frequency of F2 layer. Bands below foF2 support NVIS.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Band status legend:&lt;/strong&gt;&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Open&lt;/strong&gt; — Well below MUF, good propagation expected&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Marginal&lt;/strong&gt; — Near MUF limit (80–100%), unstable propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Closed&lt;/strong&gt; — Above MUF, no F2 propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Absorbed&lt;/strong&gt; — Daytime D-layer absorption (low bands)">i</button></span>`,
+            `<span class="iono-item">foF2 ≈ <span class="iono-val">${fof2} MHz</span></span>`,
+            `<span class="iono-section-title" style="margin-top:6px">Band Status</span>`,
+            `<div class="iono-bands">${bandTags}</div>`,
           ].join("");
           el.style.display = "flex";
           // Bind help tooltip on the dynamically-injected helper icon
