@@ -1712,10 +1712,10 @@ Last update: 2026-04-03 UTC
 
           const center = proj.invert([W / 2, H / 2]);
 
-          // ── Day/night terminator (always visible) ───────────────────
+          // ── Day/night overlay (always visible) ───────────────────────
           nightG.selectAll("*").remove();
           const subSolar = _pmSubSolar();
-          // Night hemisphere — dark overlay
+          // Night hemisphere — dark overlay (no line)
           const nightCircle = d3.geoCircle()
             .center([-subSolar.lon, -subSolar.lat])
             .radius(90).precision(1)();
@@ -1724,18 +1724,6 @@ Last update: 2026-04-03 UTC
             .attr("d", path)
             .attr("fill", "rgba(0,0,20,0.30)")
             .attr("stroke", "none");
-          // Terminator line (yellow dashed)
-          const termLine = d3.geoCircle()
-            .center([subSolar.lon, subSolar.lat])
-            .radius(90).precision(1)();
-          nightG.append("path")
-            .datum(termLine)
-            .attr("d", path)
-            .attr("fill", "none")
-            .attr("stroke", "#fbbf24")
-            .attr("stroke-width", 1.2)
-            .attr("stroke-opacity", 0.7)
-            .attr("stroke-dasharray", "6,4");
 
           // ── DR2W-style propagation patches (multi-zone, solar-shaped) ─
           ringG.selectAll("*").remove();
