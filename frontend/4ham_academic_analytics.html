@@ -1890,8 +1890,9 @@ Last update: 2026-04-03 UTC
             .on("end", () => svg.style("cursor", "grab"))
         );
 
-        // ── Scroll wheel zoom ──────────────────────────────────────────
+        // ── Ctrl + Scroll wheel zoom ─────────────────────────────────
         svg.node().addEventListener("wheel", (event) => {
+          if (!event.ctrlKey) return;
           event.preventDefault();
           const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
           kScale = Math.max(0.25, Math.min(12, kScale * factor));
