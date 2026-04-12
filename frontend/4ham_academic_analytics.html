@@ -1107,6 +1107,9 @@ Last update: 2026-04-03 UTC
         localStorage.setItem("4ham_lang", lang);
         applyI18n();
         // Re-run dynamic string builders
+        if (dashboardTitle && _appVersion) {
+          dashboardTitle.textContent = t("dashboard_title_tpl", { version: _appVersion });
+        }
         updateMetaUpdateFrequency();
         updateHourBandDescription();
         if (typeof fetchIonosphericBadge === "function") fetchIonosphericBadge();
@@ -1140,6 +1143,7 @@ Last update: 2026-04-03 UTC
       const metaSnapshot = document.getElementById("metaSnapshot");
       const metaUpdateFrequency = document.getElementById("metaUpdateFrequency");
       const dashboardTitle = document.getElementById("dashboardTitle");
+      let _appVersion = "";
       const apiLastFetchInfo = document.getElementById("apiLastFetchInfo");
       const nextRefreshInfo = document.getElementById("nextRefreshInfo");
       const chartHelpLayer = document.getElementById("chartHelpLayer");
@@ -2326,6 +2330,7 @@ Last update: 2026-04-03 UTC
           }
 
           const appVersion = String(payload?.app_version || "").trim();
+          _appVersion = appVersion;
           if (dashboardTitle && appVersion) {
             dashboardTitle.textContent = t("dashboard_title_tpl", { version: appVersion });
           }
