@@ -902,10 +902,6 @@ Last update: 2026-04-03 UTC
             <div class="value" id="kpiSnrAnalog">--</div>
           </div>
           <div class="card">
-            <span class="label" data-i18n="kpi_time_coverage">Time coverage</span>
-            <div class="value" id="kpiCoverage">--</div>
-          </div>
-          <div class="card">
             <span class="label" data-i18n="kpi_overall_prop">Overall Propagation score</span>
             <div class="value" id="kpiPropScore">--</div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
@@ -1139,7 +1135,6 @@ Last update: 2026-04-03 UTC
       const kpiCallsigns = document.getElementById("kpiCallsigns");
       const kpiSnrDigital = document.getElementById("kpiSnrDigital");
       const kpiSnrAnalog = document.getElementById("kpiSnrAnalog");
-      const kpiCoverage = document.getElementById("kpiCoverage");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
       const kpiBestBand = document.getElementById("kpiBestBand");
@@ -2457,17 +2452,10 @@ Last update: 2026-04-03 UTC
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
-        const hourlyCoverage = new Set(
-          seriesRows.map((d) => `${d.ts.getUTCFullYear()}-${d.ts.getUTCMonth()}-${d.ts.getUTCDate()}-${d.ts.getUTCHours()}`)
-        ).size;
-        const hoursWindow = Math.max(1, Math.round((end - start) / 3600000));
-        const coveragePct = Math.min(100, (hourlyCoverage / hoursWindow) * 100);
-
         kpiEvents.textContent = formatInt(totalEvents);
         kpiCallsigns.textContent = formatInt(uniqueCallsigns);
         kpiSnrDigital.textContent = snrDigital != null ? `${snrDigital.toFixed(1)} dB` : "--";
         kpiSnrAnalog.textContent = snrAnalog != null ? `${snrAnalog.toFixed(1)} dB` : "--";
-        kpiCoverage.textContent = `${coveragePct.toFixed(1)}%`;
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
       }
