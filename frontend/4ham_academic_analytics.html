@@ -1680,11 +1680,12 @@ Last update: 2026-04-03 UTC
             .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
         }
 
-        // Layer groups (draw order: rings → arcs → dots → home)
-        const ringG = svg.append("g").attr("class", "rings");
-        const arcG  = svg.append("g").attr("class", "arcs");
-        const dotG  = svg.append("g").attr("class", "dots");
-        const homeG = svg.append("g").attr("class", "home");
+        // Layer groups (draw order: night → rings → arcs → dots → home)
+        const nightG = svg.append("g").attr("class", "night");
+        const ringG  = svg.append("g").attr("class", "rings");
+        const arcG   = svg.append("g").attr("class", "arcs");
+        const dotG   = svg.append("g").attr("class", "dots");
+        const homeG  = svg.append("g").attr("class", "home");
 
         // Tooltip
         let tip = document.getElementById("propMapTooltip");
@@ -1711,10 +1712,34 @@ Last update: 2026-04-03 UTC
 
           const center = proj.invert([W / 2, H / 2]);
 
+          // ── Day/night terminator (always visible) ───────────────────
+          nightG.selectAll("*").remove();
+          const subSolar = _pmSubSolar();
+          // Night hemisphere — dark overlay
+          const nightCircle = d3.geoCircle()
+            .center([-subSolar.lon, -subSolar.lat])
+            .radius(90).precision(1)();
+          nightG.append("path")
+            .datum(nightCircle)
+            .attr("d", path)
+            .attr("fill", "rgba(0,0,20,0.30)")
+            .attr("stroke", "none");
+          // Terminator line (yellow dashed)
+          const termLine = d3.geoCircle()
+            .center([subSolar.lon, subSolar.lat])
+            .radius(90).precision(1)();
+          nightG.append("path")
+            .datum(termLine)
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", "#fbbf24")
+            .attr("stroke-width", 1.2)
+            .attr("stroke-opacity", 0.7)
+            .attr("stroke-dasharray", "6,4");
+
           // ── DR2W-style propagation patches (multi-zone, solar-shaped) ─
           ringG.selectAll("*").remove();
           const bands = iono.bands || {};
-          const subSolar = _pmSubSolar();
 
           // Sort by weak_km descending — largest zones render behind
           const sortedBands = Object.entries(bands)
@@ -1787,19 +1812,6 @@ Last update: 2026-04-03 UTC
               }
             }
           }
-
-          // ── Day/night terminator ─────────────────────────────────────
-          const terminator = d3.geoCircle()
-            .center([subSolar.lon, subSolar.lat])
-            .radius(90).precision(1)();
-          ringG.append("path")
-            .datum(terminator)
-            .attr("d", path)
-            .attr("fill", "rgba(0,0,0,0.15)")
-            .attr("stroke", "#fbbf24")
-            .attr("stroke-width", 0.8)
-            .attr("stroke-opacity", 0.45)
-            .attr("stroke-dasharray", "5,3");
 
           // ── Contact arcs & dots ──────────────────────────────────────
           arcG.selectAll("path").remove();
