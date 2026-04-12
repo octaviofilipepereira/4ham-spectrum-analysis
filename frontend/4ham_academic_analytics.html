@@ -1628,20 +1628,21 @@ Last update: 2026-04-03 UTC
 
           const center = proj.invert([W / 2, H / 2]);
 
-          // ── Coverage rings (geodesic circles on globe) ────────────────
+          // ── Coverage patches (solid filled geodesic zones) ────────────
           ringG.selectAll("*").remove();
           const bands = iono.bands || {};
 
-          for (const [band, info] of Object.entries(bands)) {
-            if (!_pmBandVis[band]) continue;
-            if (info.status === "Closed" || info.status === "Absorbed") continue;
+          // Sort bands by max_distance descending so largest patches render behind
+          const sortedBands = Object.entries(bands)
+            .filter(([b, info]) => _pmBandVis[b] && info.status !== "Closed" && info.status !== "Absorbed" && (info.max_distance_km || 0) > 0)
+            .sort((a, b) => (b[1].max_distance_km || 0) - (a[1].max_distance_km || 0));
+
+          for (const [band, info] of sortedBands) {
             const maxKm = info.max_distance_km || 0;
             const skipKm = info.skip_km || 0;
-            if (maxKm <= 0) continue;
-
             const color = _pmColor(band);
 
-            // Outer ring — max coverage radius (geodesic circle)
+            // Outer patch — solid fill for max coverage
             const outerCircle = d3.geoCircle()
               .center([sLon, sLat])
               .radius(kmToDeg(maxKm))
@@ -1651,13 +1652,12 @@ Last update: 2026-04-03 UTC
               .datum(outerCircle)
               .attr("d", path)
               .attr("fill", color)
-              .attr("fill-opacity", 0.06)
+              .attr("fill-opacity", 0.16)
               .attr("stroke", color)
-              .attr("stroke-width", 1.5)
-              .attr("stroke-dasharray", "6,3")
-              .attr("stroke-opacity", 0.55);
+              .attr("stroke-width", 1)
+              .attr("stroke-opacity", 0.5);
 
-            // Inner ring — skip distance (if any)
+            // Skip-zone cutout — dark inner zone where no propagation occurs
             if (skipKm > 0 && skipKm < maxKm) {
               const innerCircle = d3.geoCircle()
                 .center([sLon, sLat])
@@ -1667,35 +1667,25 @@ Last update: 2026-04-03 UTC
               ringG.append("path")
                 .datum(innerCircle)
                 .attr("d", path)
-                .attr("fill", "none")
+                .attr("fill", "#1a1a2e")
+                .attr("fill-opacity", 0.25)
                 .attr("stroke", color)
-                .attr("stroke-width", 0.8)
-                .attr("stroke-dasharray", "3,3")
-                .attr("stroke-opacity", 0.35);
+                .attr("stroke-width", 0.6)
+                .attr("stroke-opacity", 0.3);
             }
 
-            // Band label on top of outer ring
-            const labelPt = d3.geoCircle()
-              .center([sLon, sLat])
-              .radius(kmToDeg(maxKm))
-              .precision(360)();  // 1 point = north pole of circle
-            if (labelPt && labelPt.coordinates && labelPt.coordinates[0]) {
-              const coords = labelPt.coordinates[0];
-              // Pick the topmost point (smallest latitude = northward)
-              let best = coords[0];
-              for (const c of coords) {
-                if (c[1] > best[1]) best = c;
-              }
-              const lp = proj(best);
-              if (lp && d3.geoDistance(best, center) < Math.PI / 2) {
-                ringG.append("text")
-                  .attr("x", lp[0]).attr("y", lp[1] - 4)
-                  .attr("text-anchor", "middle")
-                  .attr("fill", color).attr("font-size", "9px")
-                  .attr("font-family", "monospace").attr("opacity", 0.8)
-                  .attr("pointer-events", "none")
-                  .text(band);
-              }
+            // Band label at north edge of patch
+            const northPt = [sLon, sLat + kmToDeg(maxKm)];
+            const lp = proj(northPt);
+            if (lp && d3.geoDistance(northPt, center) < Math.PI / 2) {
+              ringG.append("text")
+                .attr("x", lp[0]).attr("y", lp[1] - 4)
+                .attr("text-anchor", "middle")
+                .attr("fill", color).attr("font-size", "9px")
+                .attr("font-weight", "bold")
+                .attr("font-family", "monospace").attr("opacity", 0.9)
+                .attr("pointer-events", "none")
+                .text(band);
             }
           }
 
