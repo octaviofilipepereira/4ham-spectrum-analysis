@@ -798,16 +798,28 @@ Last update: 2026-04-03 UTC
         font-size: 0.95rem;
         letter-spacing: 0.04em;
       }
+      .lang-btn.active {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
     <div class="loading-overlay" id="loadingOverlay">
       <div class="loading-spinner"></div>
-      <span class="loading-text">Loading data…</span>
+      <span class="loading-text" data-i18n="loading">Loading data…</span>
     </div>
     <div class="wrap">
       <section class="hero">
-        <h1 id="dashboardTitle">4ham Spectrum Analysis v0.12.1 - Academic Analytics</h1>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+          <h1 id="dashboardTitle">4ham Spectrum Analysis v0.12.1 - Academic Analytics</h1>
+          <div class="lang-toggle" style="display:inline-flex;gap:4px;">
+            <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
+            <button type="button" class="lang-btn" data-lang="pt" onclick="setLang('pt')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">PT</button>
+          </div>
+        </div>
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
         <p id="apiLastFetchInfo">Last API data query: --</p>
         <p id="nextRefreshInfo">Time until next data refresh: --</p>
@@ -816,14 +828,14 @@ Last update: 2026-04-03 UTC
       <section class="panel">
         <div class="controls">
           <div class="field">
-            <label>Period</label>
+            <label data-i18n="period">Period</label>
             <div class="preset-row" id="presetRow">
               <button class="preset-btn" data-preset="1h">1h</button>
               <button class="preset-btn" data-preset="2h">2h</button>
               <button class="preset-btn" data-preset="6h">6h</button>
               <button class="preset-btn" data-preset="12h">12h</button>
               <button class="preset-btn" data-preset="24h">24h</button>
-              <button class="preset-btn" data-preset="custom">Custom Period</button>
+              <button class="preset-btn" data-preset="custom" data-i18n="custom_period">Custom Period</button>
             </div>
             <div class="custom-range" id="customRange" style="display:none;">
               <input type="datetime-local" id="startInput" />
@@ -832,9 +844,9 @@ Last update: 2026-04-03 UTC
           </div>
 
           <div class="field">
-            <label>Band</label>
+            <label data-i18n="band">Band</label>
             <select id="bandFilter">
-              <option value="ALL">All</option>
+              <option value="ALL" data-i18n="all">All</option>
               <option>160m</option>
               <option>80m</option>
               <option>40m</option>
@@ -849,9 +861,9 @@ Last update: 2026-04-03 UTC
           </div>
 
           <div class="field">
-            <label>Mode</label>
+            <label data-i18n="mode">Mode</label>
             <select id="modeFilter">
-              <option value="ALL">All</option>
+              <option value="ALL" data-i18n="all">All</option>
               <option>SSB</option>
               <option>FT8</option>
               <option>FT4</option>
@@ -860,10 +872,10 @@ Last update: 2026-04-03 UTC
             </select>
           </div>
 
-          <button class="apply-btn" id="applyBtn">Apply Filters</button>
+          <button class="apply-btn" id="applyBtn" data-i18n="apply_filters">Apply Filters</button>
 
           <div class="export-wrap" id="exportWrap">
-            <button class="apply-btn export-btn" id="exportBtn" type="button">Export ▾</button>
+            <button class="apply-btn export-btn" id="exportBtn" type="button" data-i18n="export">Export ▾</button>
             <ul class="export-menu" id="exportMenu" role="menu">
               <li><button data-fmt="csv">CSV</button></li>
               <li><button data-fmt="xlsx">XLSX</button></li>
@@ -874,29 +886,29 @@ Last update: 2026-04-03 UTC
 
         <div class="cards">
           <div class="card">
-            <span class="label">Total events</span>
+            <span class="label" data-i18n="kpi_total_events">Total events</span>
             <div class="value" id="kpiEvents">--</div>
           </div>
           <div class="card">
-            <span class="label">Unique callsigns</span>
+            <span class="label" data-i18n="kpi_unique_callsigns">Unique callsigns</span>
             <div class="value" id="kpiCallsigns">--</div>
           </div>
           <div class="card">
-            <span class="label">Average SNR</span>
+            <span class="label" data-i18n="kpi_avg_snr">Average SNR</span>
             <div class="value" id="kpiSnr">--</div>
           </div>
           <div class="card">
-            <span class="label">Time coverage</span>
+            <span class="label" data-i18n="kpi_time_coverage">Time coverage</span>
             <div class="value" id="kpiCoverage">--</div>
           </div>
           <div class="card">
-            <span class="label">Overall Propagation score</span>
+            <span class="label" data-i18n="kpi_overall_prop">Overall Propagation score</span>
             <div class="value" id="kpiPropScore">--</div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
+            <div id="kpiPropNote" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;" data-i18n-html="kpi_prop_note">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
           </div>
           <div class="card">
-            <span class="label">Best band</span>
+            <span class="label" data-i18n="kpi_best_band">Best band</span>
             <div class="value" id="kpiBestBand">--</div>
             <div class="prop-state"><span id="kpiBestBandScore">--</span></div>
           </div>
@@ -905,10 +917,10 @@ Last update: 2026-04-03 UTC
         <div class="grid">
           <article class="chart-panel span-9">
             <div class="chart-header">
-              <h3>QTH-Centric Propagation Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom (CTRL+ Mouse Wheel) · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen.">i</button>
+              <h3 data-i18n="chart_propmap">QTH-Centric Propagation Map</h3>
+              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom (CTRL+ Mouse Wheel) · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen." data-i18n-help-html="help_propmap" data-i18n-help-title="chart_propmap">i</button>
             </div>
-            <p>NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom (CTRL+ Mouse Wheel).</p>
+            <p data-i18n="chart_propmap_desc">NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom (CTRL+ Mouse Wheel).</p>
             <div class="propmap-wrap" id="propMapWrap"></div>
           </article>
 
@@ -916,22 +928,22 @@ Last update: 2026-04-03 UTC
 
           <article class="chart-panel span-7">
             <div class="chart-header">
-              <h3>Event Time Series</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Event Time Series chart" data-help-title="Event Time Series" data-help-text="Shows total event count aggregated by hour for the selected period and active filters. The X axis is UTC time and the Y axis is event volume. Use peaks and troughs to identify active and quiet windows, and compare different periods to detect temporal shifts.">i</button>
+              <h3 data-i18n="chart_timeline">Event Time Series</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Event Time Series chart" data-help-title="Event Time Series" data-help-text="Shows total event count aggregated by hour for the selected period and active filters. The X axis is UTC time and the Y axis is event volume. Use peaks and troughs to identify active and quiet windows, and compare different periods to detect temporal shifts." data-i18n-help-text="help_timeline" data-i18n-help-title="chart_timeline">i</button>
             </div>
-            <p>Total hourly volume for the selected period.</p>
+            <p data-i18n="chart_timeline_desc">Total hourly volume for the selected period.</p>
             <svg id="timelineChart"></svg>
           </article>
 
           <article class="chart-panel span-5">
             <div class="chart-header">
-              <h3>Distribution by Band and Mode</h3>
+              <h3 data-i18n="chart_stacked">Distribution by Band and Mode</h3>
               <div style="display:flex;align-items:center;gap:6px;">
                 <button type="button" class="helper-icon" id="stackedToggle" title="Toggle absolute / percentage view" style="font-size:11px;width:22px;height:22px;line-height:20px;padding:0;text-align:center;">%</button>
-                <button type="button" class="helper-icon" aria-label="Explain Distribution by Band and Mode chart" data-help-title="Distribution by Band and Mode" data-help-text="Each bar represents one band and each color segment represents mode contribution inside that band. Total bar height is total activity for the band. Use it to see which bands dominate and which modes are driving each band profile. Click '%' to toggle percentage view — makes minority modes visible when one mode dominates.">i</button>
+                <button type="button" class="helper-icon" aria-label="Explain Distribution by Band and Mode chart" data-help-title="Distribution by Band and Mode" data-help-text="Each bar represents one band and each color segment represents mode contribution inside that band. Total bar height is total activity for the band. Use it to see which bands dominate and which modes are driving each band profile. Click '%' to toggle percentage view — makes minority modes visible when one mode dominates." data-i18n-help-text="help_stacked" data-i18n-help-title="chart_stacked">i</button>
               </div>
             </div>
-            <p>Stacked bars with a breakdown by mode.</p>
+            <p data-i18n="chart_stacked_desc">Stacked bars with a breakdown by mode.</p>
             <div class="legend">
               <span><span class="dot" style="background:var(--mode-ssb);"></span> SSB</span>
               <span><span class="dot" style="background:var(--mode-ft8);"></span> FT8</span>
@@ -944,38 +956,38 @@ Last update: 2026-04-03 UTC
 
           <article class="chart-panel span-6">
             <div class="chart-header">
-              <h3 id="hourBandTitle">Hour of Day x Band Activity (Heatmap Pro)</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Hour of Day x Band Activity chart" data-help-title="Hour of Day x Band Activity (Heatmap Pro)" data-help-text="Rows are UTC hours (0 to 23) and columns are bands. Cell color intensity represents event count. On hover, the active cell is highlighted and the full row/hour and column/band are emphasized to make patterns easier to read. Side bars show per-hour and per-band totals for quick comparison.">i</button>
+              <h3 id="hourBandTitle" data-i18n="chart_heatmap">Hour of Day x Band Activity (Heatmap Pro)</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Hour of Day x Band Activity chart" data-help-title="Hour of Day x Band Activity (Heatmap Pro)" data-help-text="Rows are UTC hours (0 to 23) and columns are bands. Cell color intensity represents event count. On hover, the active cell is highlighted and the full row/hour and column/band are emphasized to make patterns easier to read. Side bars show per-hour and per-band totals for quick comparison." data-i18n-help-text="help_heatmap" data-i18n-help-title="chart_heatmap">i</button>
             </div>
-            <p id="hourBandDescription">High-contrast heatmap with cross-highlighting and marginal totals.</p>
+            <p id="hourBandDescription" data-i18n="chart_heatmap_desc">High-contrast heatmap with cross-highlighting and marginal totals.</p>
             <svg id="heatmapChart"></svg>
           </article>
 
           <article class="chart-panel chart-panel-fill span-6">
             <div class="chart-header">
-              <h3>Top Callsigns in Period</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Top Callsigns in Period chart" data-help-title="Top Callsigns in Period" data-help-text="Ranks the top 20 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change.">i</button>
+              <h3 data-i18n="chart_top_callsigns">Top Callsigns in Period</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Top Callsigns in Period chart" data-help-title="Top Callsigns in Period" data-help-text="Ranks the top 20 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change." data-i18n-help-text="help_top_callsigns" data-i18n-help-title="chart_top_callsigns">i</button>
             </div>
-            <p>Top 20 callsigns by number of occurrences.</p>
+            <p data-i18n="chart_top_callsigns_desc">Top 20 callsigns by number of occurrences.</p>
             <svg id="topCallsignsChart"></svg>
           </article>
 
           <article class="chart-panel span-6">
-            <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span>Propagation scores are based on <strong>confirmed decodes only</strong> — events with a <strong>verified callsign</strong>, regardless of mode. Detections without a callsign reflect <strong>band occupancy</strong> and do not contribute to propagation calculation.</span></div>
+            <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span data-i18n-html="prop_notice">Propagation scores are based on <strong>confirmed decodes only</strong> — events with a <strong>verified callsign</strong>, regardless of mode. Detections without a callsign reflect <strong>band occupancy</strong> and do not contribute to propagation calculation.</span></div>
             <div class="chart-header">
-              <h3>Propagation Score by Band</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows the propagation quality score (0-100) per band, based on confirmed decodes only — events with a verified callsign, regardless of mode. Higher bars mean better propagation on that band. Events without a callsign reflect band occupancy and do not contribute to this score.">i</button>
+              <h3 data-i18n="chart_prop_band">Propagation Score by Band</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows the propagation quality score (0-100) per band, based on confirmed decodes only — events with a verified callsign, regardless of mode. Higher bars mean better propagation on that band. Events without a callsign reflect band occupancy and do not contribute to this score." data-i18n-help-text="help_prop_band" data-i18n-help-title="chart_prop_band">i</button>
             </div>
-            <p>Confirmed decodes only (verified callsign) — weighted average by activity in the selected period.</p>
+            <p data-i18n="chart_prop_band_desc">Confirmed decodes only (verified callsign) — weighted average by activity in the selected period.</p>
             <svg id="propagationBandChart"></svg>
           </article>
 
           <article class="chart-panel span-6">
             <div class="chart-header">
-              <h3>Propagation Time Trend</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots the global propagation score over time at hourly resolution. Score is derived from confirmed decodes only — events with a verified callsign, regardless of mode. Events without a callsign are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average.">i</button>
+              <h3 data-i18n="chart_prop_trend">Propagation Time Trend</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots the global propagation score over time at hourly resolution. Score is derived from confirmed decodes only — events with a verified callsign, regardless of mode. Events without a callsign are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average." data-i18n-help-text="help_prop_trend" data-i18n-help-title="chart_prop_trend">i</button>
             </div>
-            <p>Global propagation score per hour — confirmed decodes only (verified callsign).</p>
+            <p data-i18n="chart_prop_trend_desc">Global propagation score per hour — confirmed decodes only (verified callsign).</p>
             <svg id="propagationTrendChart"></svg>
           </article>
         </div>
@@ -983,20 +995,20 @@ Last update: 2026-04-03 UTC
         <section class="meta">
           <div class="meta-grid">
             <div class="meta-item">
-              <span class="k">Data snapshot</span>
+              <span class="k" data-i18n="meta_snapshot">Data snapshot</span>
               <span class="v" id="metaSnapshot">2026-04-03 12:10 UTC</span>
             </div>
             <div class="meta-item">
-              <span class="k">Update frequency</span>
+              <span class="k" data-i18n="meta_frequency">Update frequency</span>
               <span class="v" id="metaUpdateFrequency">--</span>
             </div>
             <div class="meta-item">
-              <span class="k">Analyzed period</span>
+              <span class="k" data-i18n="meta_period">Analyzed period</span>
               <span class="v" id="metaPeriod">--</span>
             </div>
             <div class="meta-item">
-              <span class="k">Data quality</span>
-              <span class="v">Consistency: 99.2%</span>
+              <span class="k" data-i18n="meta_quality">Data quality</span>
+              <span class="v" data-i18n="meta_consistency">Consistency: 99.2%</span>
             </div>
           </div>
           <div class="footnote">
@@ -1030,6 +1042,72 @@ Last update: 2026-04-03 UTC
         CW: getCssVar("--mode-cw"),
         WSPR: getCssVar("--mode-wspr"),
       };
+
+      // ── i18n engine ────────────────────────────────────────────────
+      let _i18nStrings = {};
+      let _i18nLang = localStorage.getItem("4ham_lang") || "en";
+
+      async function loadI18n() {
+        try {
+          const resp = await fetch("/i18n/academic_analytics.json");
+          if (resp.ok) _i18nStrings = await resp.json();
+        } catch (_) { /* fallback: hardcoded EN strings stay in HTML */ }
+      }
+
+      function t(key, params) {
+        const dict = _i18nStrings[_i18nLang] || _i18nStrings["en"] || {};
+        let s = dict[key] || (_i18nStrings["en"] || {})[key] || key;
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            s = s.replaceAll(`{${k}}`, v);
+          }
+        }
+        return s;
+      }
+
+      function applyI18n() {
+        document.documentElement.lang = _i18nLang;
+        document.title = t("page_title");
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+          const key = el.getAttribute("data-i18n");
+          if (key) el.textContent = t(key);
+        });
+        document.querySelectorAll("[data-i18n-html]").forEach(el => {
+          const key = el.getAttribute("data-i18n-html");
+          if (key) el.innerHTML = t(key);
+        });
+        document.querySelectorAll("[data-i18n-help-text]").forEach(el => {
+          const key = el.getAttribute("data-i18n-help-text");
+          if (key) el.setAttribute("data-help-text", t(key));
+        });
+        document.querySelectorAll("[data-i18n-help-html]").forEach(el => {
+          const key = el.getAttribute("data-i18n-help-html");
+          if (key) el.setAttribute("data-help-html", t(key));
+        });
+        document.querySelectorAll("[data-i18n-help-title]").forEach(el => {
+          const key = el.getAttribute("data-i18n-help-title");
+          if (key) el.setAttribute("data-help-title", t(key));
+        });
+        // Update lang toggle buttons
+        document.querySelectorAll(".lang-btn").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.lang === _i18nLang);
+        });
+      }
+
+      function setLang(lang) {
+        _i18nLang = lang;
+        localStorage.setItem("4ham_lang", lang);
+        applyI18n();
+        // Re-run dynamic string builders
+        updateMetaUpdateFrequency();
+        updateHourBandDescription();
+        if (typeof fetchIonosphericBadge === "function") fetchIonosphericBadge();
+        if (typeof refreshPropMap === "function") refreshPropMap();
+        if (lastResolvedRange) renderFromCurrentRange();
+        const queryAt = new Date();
+        if (apiLastFetchInfo) apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
+      }
+      // ── end i18n ───────────────────────────────────────────────────
 
       const presetRow = document.getElementById("presetRow");
       const customRange = document.getElementById("customRange");
@@ -1268,10 +1346,10 @@ Last update: 2026-04-03 UTC
           const wsAgg = XLSX.utils.json_to_sheet(data.agg_events);
           const wsAll = XLSX.utils.json_to_sheet(data.all_events);
           const wsProp = XLSX.utils.json_to_sheet(data.propagation_by_band);
-          XLSX.utils.book_append_sheet(wb, wsEvents, "Events by Band-Mode");
-          XLSX.utils.book_append_sheet(wb, wsAgg, "Aggregated Events");
-          XLSX.utils.book_append_sheet(wb, wsAll, "All Events");
-          XLSX.utils.book_append_sheet(wb, wsProp, "Propagation by Band");
+          XLSX.utils.book_append_sheet(wb, wsEvents, t("export_sheet_events"));
+          XLSX.utils.book_append_sheet(wb, wsAgg, t("export_sheet_agg"));
+          XLSX.utils.book_append_sheet(wb, wsAll, t("export_sheet_all"));
+          XLSX.utils.book_append_sheet(wb, wsProp, t("export_sheet_prop"));
           XLSX.writeFile(wb, exportFilename("xlsx"));
         }
       }
@@ -1279,27 +1357,36 @@ Last update: 2026-04-03 UTC
 
       window.addEventListener("resize", debounce(renderFromCurrentRange, 120));
 
-      initChartHelp();
-      startAutoRefresh();
-      updateHourBandDescription();
-      loadAndRender();
+      (async () => {
+        await loadI18n();
+        applyI18n();
+        initChartHelp();
+        startAutoRefresh();
+        updateMetaUpdateFrequency();
+        updateHourBandDescription();
+        loadAndRender();
+      })();
 
       function initChartHelp() {
         const helperIcons = document.querySelectorAll(".helper-icon[data-help-title]");
         for (const icon of helperIcons) {
-          const helpTitle = icon.getAttribute("data-help-title") || "Chart Help";
-          const helpText = icon.getAttribute("data-help-text") || "";
-          const helpHtml = icon.getAttribute("data-help-html") || "";
-          const useHtml = !!helpHtml;
-          const content = helpHtml || helpText;
-
           icon.addEventListener("mouseenter", (event) => {
+            const helpTitle = icon.getAttribute("data-help-title") || "Chart Help";
+            const helpHtml = icon.getAttribute("data-help-html") || "";
+            const helpText = icon.getAttribute("data-help-text") || "";
+            const useHtml = !!helpHtml;
+            const content = helpHtml || helpText;
             showChartHelpLayer(helpTitle, content, event, icon, useHtml);
           });
           icon.addEventListener("mousemove", (event) => {
             positionChartHelpLayer(event.clientX, event.clientY);
           });
           icon.addEventListener("focus", () => {
+            const helpTitle = icon.getAttribute("data-help-title") || "Chart Help";
+            const helpHtml = icon.getAttribute("data-help-html") || "";
+            const helpText = icon.getAttribute("data-help-text") || "";
+            const useHtml = !!helpHtml;
+            const content = helpHtml || helpText;
             showChartHelpLayer(helpTitle, content, null, icon, useHtml);
           });
           icon.addEventListener("mouseleave", hideChartHelpLayer);
@@ -1430,10 +1517,10 @@ Last update: 2026-04-03 UTC
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         if (minutes > 0 && seconds === 0) {
-          metaUpdateFrequency.textContent = `Every ${minutes} minute${minutes === 1 ? "" : "s"} (dashboard auto-refresh)`;
+          metaUpdateFrequency.textContent = t("update_freq_min", { n: minutes, s: minutes === 1 ? "" : "s" });
           return;
         }
-        metaUpdateFrequency.textContent = `Every ${totalSeconds} seconds (dashboard auto-refresh)`;
+        metaUpdateFrequency.textContent = t("update_freq_sec", { n: totalSeconds });
       }
 
       function updateHourBandDescription() {
@@ -1444,9 +1531,9 @@ Last update: 2026-04-03 UTC
           hourBandChartSvg.style.height = `${HOUR_BAND_HEATMAP_HEIGHT_PX}px`;
         }
         if (hourBandTitle) {
-          hourBandTitle.textContent = "Hour of Day x Band Activity (Heatmap Pro)";
+          hourBandTitle.textContent = t("chart_heatmap");
         }
-        hourBandDescription.textContent = "High-contrast heatmap with cross-highlighting and marginal totals.";
+        hourBandDescription.textContent = t("chart_heatmap_desc");
       }
 
       async function loadAndRender() {
@@ -1466,7 +1553,7 @@ Last update: 2026-04-03 UTC
           const loaded = await fetchAcademicDataset(start, end, selectedBand, selectedMode);
           if (!loaded && metaSnapshot) {
             dataSource = "simulated";
-            metaSnapshot.textContent = "Simulated dataset (API fallback)";
+            metaSnapshot.textContent = t("simulated_fallback");
           }
           renderFromCurrentRange();
           fetchIonosphericBadge();
@@ -1509,21 +1596,21 @@ Last update: 2026-04-03 UTC
 
           el.innerHTML = [
             `<div style="display:flex;align-items:center;justify-content:space-between">`,
-            `<span class="iono-section-title">NOAA SWPC — Space Weather</span>`,
-            `<button type="button" class="helper-icon" style="font-size:10px;width:18px;height:18px;line-height:16px;padding:0;" data-help-title="Ionospheric Context (NOAA SWPC)" data-help-html="Real-time space weather data from &lt;strong&gt;NOAA Space Weather Prediction Center&lt;/strong&gt;, adapted to your QTH position using Local Solar Time.&lt;br&gt;&lt;br&gt;&lt;strong&gt;SFI&lt;/strong&gt; — Solar Flux Index (10.7 cm). Higher = better HF propagation.&lt;br&gt;&lt;strong&gt;Kp&lt;/strong&gt; — Planetary geomagnetic index (0–9). Lower = calmer ionosphere.&lt;br&gt;&lt;strong&gt;foF2&lt;/strong&gt; — Critical frequency of F2 layer. Bands below foF2 support NVIS.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Band status legend:&lt;/strong&gt;&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Open&lt;/strong&gt; — Well below MUF, good propagation expected&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Marginal&lt;/strong&gt; — Near MUF limit (80–100%), unstable propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Closed&lt;/strong&gt; — Above MUF, no F2 propagation&lt;br&gt;&lt;span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'&gt;&lt;/span&gt; &lt;strong&gt;Absorbed&lt;/strong&gt; — Daytime D-layer absorption (low bands)">i</button>`,
+            `<span class="iono-section-title">${t("iono_title")}</span>`,
+            `<button type="button" class="helper-icon" style="font-size:10px;width:18px;height:18px;line-height:16px;padding:0;" data-help-title="Ionospheric Context (NOAA SWPC)" data-help-html="${t("help_iono").replace(/"/g, "&quot;")}">i</button>`,
             `</div>`,
             `<span class="iono-item">☀️ SFI: <span class="iono-val">${sfi}</span></span>`,
             `<span class="iono-item">Kp: <span class="iono-val">${kp}</span> <span class="iono-cond ${condClass}">${cond}</span></span>`,
             `<span class="iono-item">foF2 ≈ <span class="iono-val">${fof2} MHz</span></span>`,
-            `<span class="iono-section-title" style="margin-top:6px">Band Status</span>`,
+            `<span class="iono-section-title" style="margin-top:6px">${t("iono_band_status")}</span>`,
             `<div class="iono-bands">${bandTags}</div>`,
             `<div class="iono-legend">`,
-            `<span><span class="iono-legend-dot" style="background:#4ade80"></span>Open</span>`,
-            `<span><span class="iono-legend-dot" style="background:#facc15"></span>Marginal</span>`,
-            `<span><span class="iono-legend-dot" style="background:#94a3b8"></span>Closed</span>`,
-            `<span><span class="iono-legend-dot" style="background:#fb923c"></span>Absorbed</span>`,
+            `<span><span class="iono-legend-dot" style="background:#4ade80"></span>${t("iono_open")}</span>`,
+            `<span><span class="iono-legend-dot" style="background:#facc15"></span>${t("iono_marginal")}</span>`,
+            `<span><span class="iono-legend-dot" style="background:#94a3b8"></span>${t("iono_closed")}</span>`,
+            `<span><span class="iono-legend-dot" style="background:#fb923c"></span>${t("iono_absorbed")}</span>`,
             `</div>`,
-            `<div style="font-size:11px;color:var(--muted);opacity:0.5;text-align:center;margin-top:2px">⟳ Auto-refresh every 15 min</div>`,
+            `<div style="font-size:11px;color:var(--muted);opacity:0.5;text-align:center;margin-top:2px">${t("iono_auto_refresh")}</div>`,
           ].join("");
           el.style.display = "flex";
           // Bind help tooltip on the dynamically-injected helper icon
@@ -1932,8 +2019,8 @@ Last update: 2026-04-03 UTC
               .on("mousemove", (evt) => {
                 const snrStr  = c.snr_db != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "\u2014";
                 const distStr = distKm ? `${distKm.toLocaleString()} km` : "\u2014";
-                const corrLabel = corr === "confirmed" ? "\u2713 Confirmed"
-                  : corr === "anomaly" ? "\u26A0 Anomaly" : "";
+                const corrLabel = corr === "confirmed" ? t("pm_tt_confirmed")
+                  : corr === "anomaly" ? t("pm_tt_anomaly") : "";
                 tip.innerHTML = `<strong>${c.callsign}</strong> \u00b7 ${c.country || ""}<br>`
                   + `${c.band || ""} \u00b7 ${c.mode || ""} \u00b7 SNR ${snrStr} \u00b7 ${distStr}`
                   + (corrLabel ? `<br><span style="color:${corr === "anomaly" ? "#f87171" : "#4ade80"}">${corrLabel}</span>` : "");
@@ -1954,7 +2041,7 @@ Last update: 2026-04-03 UTC
               homeG.append("text").attr("x", home[0] + 10).attr("y", home[1] + 5)
                 .attr("fill", "#facc15").attr("font-size", "11px")
                 .attr("font-family", "monospace").attr("pointer-events", "none")
-                .text(station.callsign || "QTH");
+                .text(station.callsign || t("pm_qth"));
             }
           }
 
@@ -2030,19 +2117,19 @@ Last update: 2026-04-03 UTC
           b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
           return b;
         };
-        ctrl.appendChild(mkBtn("+", "Zoom in", () => {
+        ctrl.appendChild(mkBtn("+", t("pm_zoom_in"), () => {
           kScale = Math.min(kScale * 1.6, 12);
           proj.scale(baseScale * kScale); redraw(); _pmSaveView();
         }));
-        ctrl.appendChild(mkBtn("−", "Zoom out", () => {
+        ctrl.appendChild(mkBtn("−", t("pm_zoom_out"), () => {
           kScale = Math.max(kScale / 1.6, 0.25);
           proj.scale(baseScale * kScale); redraw(); _pmSaveView();
         }));
-        ctrl.appendChild(mkBtn("↻", "Reset view", () => {
+        ctrl.appendChild(mkBtn("↻", t("pm_reset"), () => {
           proj.rotate([-sLon, -sLat]).scale(baseScale);
           kScale = 1; redraw(); _pmSaveView();
         }));
-        ctrl.appendChild(mkBtn("⤢", "Fullscreen", () => {
+        ctrl.appendChild(mkBtn("⤢", t("pm_fullscreen"), () => {
           _pmIsFullscreen = !_pmIsFullscreen;
           wrap.classList.toggle("fullscreen", _pmIsFullscreen);
           if (_pmIsFullscreen) {
@@ -2109,9 +2196,9 @@ Last update: 2026-04-03 UTC
         const winLabel = winMin >= 1440 ? Math.round(winMin / 1440) + "d" : winMin >= 60 ? Math.round(winMin / 60) + "h" : winMin + "min";
 
         [
-          ["#facc15", "QTH"],
-          ["#4ade80", `Confirmed: ${confirmed}`],
-          ["#f87171", `Anomalies: ${anomalies}`],
+          ["#facc15", t("pm_qth")],
+          ["#4ade80", t("pm_confirmed", { n: confirmed })],
+          ["#f87171", t("pm_anomalies", { n: anomalies })],
         ].forEach(([color, label]) => {
           const item = document.createElement("div");
           item.className = "propmap-legend-item";
@@ -2121,7 +2208,7 @@ Last update: 2026-04-03 UTC
         const countNote = document.createElement("div");
         countNote.className = "propmap-legend-item";
         countNote.style.cssText = "font-size:10px;opacity:0.55;margin-top:3px";
-        countNote.textContent = `${contacts.length} contacts · ${winLabel}`;
+        countNote.textContent = t("pm_contacts", { n: contacts.length, window: winLabel });
         legendL.appendChild(countNote);
         wrap.appendChild(legendL);
 
@@ -2130,10 +2217,10 @@ Last update: 2026-04-03 UTC
         legendR.className = "propmap-legend propmap-legend-right";
         const repR = 64, repG = 224, repB = 208;  // #40e0d0 (20m)
         [
-          [`rgba(${repR},${repG},${repB},0.65)`, "Strong (inner)"],
-          [`rgba(${repR},${repG},${repB},0.42)`, "Moderate"],
-          [`rgba(${repR},${repG},${repB},0.22)`, "Fringe (outer)"],
-          ["rgba(0,0,20,0.35)", "Night hemisphere"],
+          [`rgba(${repR},${repG},${repB},0.65)`, t("pm_strong")],
+          [`rgba(${repR},${repG},${repB},0.42)`, t("pm_moderate")],
+          [`rgba(${repR},${repG},${repB},0.22)`, t("pm_fringe")],
+          ["rgba(0,0,20,0.35)", t("pm_night")],
         ].forEach(([color, label]) => {
           const item = document.createElement("div");
           item.className = "propmap-legend-item";
@@ -2143,7 +2230,7 @@ Last update: 2026-04-03 UTC
         const note = document.createElement("div");
         note.className = "propmap-legend-item";
         note.style.cssText = "font-size:10px;opacity:0.55;margin-top:3px;font-style:italic";
-        note.textContent = "Each band has its own colour";
+        note.textContent = t("pm_band_note");
         legendR.appendChild(note);
         wrap.appendChild(legendR);
       }
@@ -2232,7 +2319,7 @@ Last update: 2026-04-03 UTC
 
           const appVersion = String(payload?.app_version || "").trim();
           if (dashboardTitle && appVersion) {
-            dashboardTitle.textContent = `4ham Spectrum Analysis v${appVersion} - Academic Analytics`;
+            dashboardTitle.textContent = t("dashboard_title_tpl", { version: appVersion });
           }
 
           const series = Array.isArray(payload.data.series) ? payload.data.series : [];
@@ -2308,7 +2395,7 @@ Last update: 2026-04-03 UTC
         if (!apiLastFetchInfo) {
           return;
         }
-        apiLastFetchInfo.textContent = `Last API data query: ${fmtDateUtc(queryAt)}`;
+        apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
         nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
         updateNextRefreshInfo();
         startAutoRefresh();
@@ -2319,14 +2406,14 @@ Last update: 2026-04-03 UTC
           return;
         }
         if (!nextRefreshDeadlineMs) {
-          nextRefreshInfo.textContent = "Time until next data refresh: --";
+          nextRefreshInfo.textContent = t("next_refresh", { time: "--" });
           return;
         }
 
         const remainingMs = nextRefreshDeadlineMs - Date.now();
         if (remainingMs <= 0) {
           if (!isLoading) {
-            nextRefreshInfo.textContent = "Refreshing data...";
+            nextRefreshInfo.textContent = t("refreshing");
             nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
             loadAndRender();
           }
@@ -2336,7 +2423,7 @@ Last update: 2026-04-03 UTC
         const totalSeconds = Math.ceil(remainingMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
-        nextRefreshInfo.textContent = `Time until next data refresh: ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        nextRefreshInfo.textContent = t("next_refresh", { time: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` });
       }
 
       function updateKpis(seriesRows, callsignRows, start, end) {
@@ -2474,10 +2561,10 @@ Last update: 2026-04-03 UTC
       }
 
       function propagationState(score) {
-        if (score >= 70) return { label: "Excellent", className: "excellent" };
-        if (score >= 50) return { label: "Good", className: "good" };
-        if (score >= 30) return { label: "Fair", className: "fair" };
-        return { label: "Poor", className: "poor" };
+        if (score >= 70) return { label: t("state_excellent"), className: "excellent" };
+        if (score >= 50) return { label: t("state_good"), className: "good" };
+        if (score >= 30) return { label: t("state_fair"), className: "fair" };
+        return { label: t("state_poor"), className: "poor" };
       }
 
       function drawTimeline(rows, start, end) {
@@ -2579,9 +2666,9 @@ Last update: 2026-04-03 UTC
                 .style("display", null);
 
               showChartValueToast([
-                "Event Timeline",
+                t("tt_event_timeline"),
                 fmtDateUtc(nearest.ts),
-                `Events: ${formatInt(nearest.total)}`,
+                t("tt_events", { n: formatInt(nearest.total) }),
               ], event);
             })
             .on("mouseleave", () => {
@@ -2676,9 +2763,9 @@ Last update: 2026-04-03 UTC
             const total = d.data._total || 0;
             const pctVal = total > 0 ? ((absCount / total) * 100).toFixed(1) : "0.0";
             showChartValueToast([
-              `Band: ${d.data.band}`,
-              `Mode: ${mode}`,
-              `Events: ${formatInt(absCount)} (${pctVal}%)`,
+              t("tt_band", { band: d.data.band }),
+              t("tt_mode", { mode: mode }),
+              t("tt_events", { n: `${formatInt(absCount)} (${pctVal}%)` }),
             ], event);
           })
           .on("mouseleave", hideChartValueToast);
@@ -2758,9 +2845,9 @@ Last update: 2026-04-03 UTC
               .attr("x", x(d.band))
               .style("display", null);
             showChartValueToast([
-              `Band: ${d.band}`,
-              `UTC hour: ${String(d.hour).padStart(2, "0")}:00`,
-              `Events: ${formatInt(d.value)}`,
+              t("tt_band", { band: d.band }),
+              t("tt_utc_hour", { hour: `${String(d.hour).padStart(2, "0")}:00` }),
+              t("tt_events", { n: formatInt(d.value) }),
             ], event);
           })
           .on("mouseleave", () => {
@@ -2789,8 +2876,8 @@ Last update: 2026-04-03 UTC
               .attr("x", x(band))
               .style("display", null);
             showChartValueToast([
-              `Band: ${band}`,
-              `Total events (all hours): ${formatInt(bandTotals.get(band) || 0)}`,
+              t("tt_band", { band: band }),
+              t("tt_total_events_hours", { n: formatInt(bandTotals.get(band) || 0) }),
             ], event);
           })
           .on("mouseleave", () => {
@@ -2817,8 +2904,8 @@ Last update: 2026-04-03 UTC
               .attr("y", y(hour))
               .style("display", null);
             showChartValueToast([
-              `UTC hour: ${String(hour).padStart(2, "0")}:00`,
-              `Total events (all bands): ${formatInt(hourTotals.get(hour) || 0)}`,
+              t("tt_utc_hour", { hour: `${String(hour).padStart(2, "0")}:00` }),
+              t("tt_total_events_bands", { n: formatInt(hourTotals.get(hour) || 0) }),
             ], event);
           })
           .on("mouseleave", () => {
@@ -2832,7 +2919,7 @@ Last update: 2026-04-03 UTC
           .attr("fill", "#9fb4c8")
           .attr("font-size", 12)
           .attr("font-weight", 700)
-          .text("Σ hour");
+          .text(t("tt_sum_hour"));
 
         svg.append("text")
           .attr("x", margin.left - 2)
@@ -2840,7 +2927,7 @@ Last update: 2026-04-03 UTC
           .attr("fill", "#9fb4c8")
           .attr("font-size", 12)
           .attr("font-weight", 700)
-          .text("Σ band");
+          .text(t("tt_sum_band"));
 
         g.append("g")
           .attr("transform", `translate(0,${innerH})`)
@@ -2897,8 +2984,8 @@ Last update: 2026-04-03 UTC
           .attr("fill", "#34d399")
           .on("mousemove", (event, d) => {
             showChartValueToast([
-              `Callsign: ${d.callsign}`,
-              `Total hits: ${formatInt(d.total)}`,
+              t("tt_callsign", { cs: d.callsign }),
+              t("tt_total_hits", { n: formatInt(d.total) }),
             ], event);
           })
           .on("mouseleave", hideChartValueToast);
@@ -2941,9 +3028,9 @@ Last update: 2026-04-03 UTC
           .attr("fill", "var(--prop-band)")
           .on("mousemove", (event, d) => {
             showChartValueToast([
-              `Band: ${d.band}`,
-              `Propagation score: ${d.score.toFixed(1)} / 100`,
-              `Events: ${formatInt(d.events)}`,
+              t("tt_band", { band: d.band }),
+              t("tt_prop_score", { score: d.score.toFixed(1) }),
+              t("tt_events", { n: formatInt(d.events) }),
             ], event);
           })
           .on("mouseleave", hideChartValueToast);
@@ -3015,7 +3102,7 @@ Last update: 2026-04-03 UTC
           .attr("text-anchor", "end")
           .attr("fill", "#fcd34d")
           .attr("font-size", 11)
-          .text(`avg ${avg.toFixed(1)}`);
+          .text(t("avg_label", { score: avg.toFixed(1) }));
 
         if (data.length > 0) {
           const hoverLine = g.append("line")
@@ -3057,9 +3144,9 @@ Last update: 2026-04-03 UTC
                 .style("display", null);
 
               showChartValueToast([
-                "Propagation Trend",
+                t("tt_prop_trend"),
                 fmtDateUtc(nearest.ts),
-                `Score: ${nearest.score.toFixed(1)} / 100`,
+                t("tt_score", { score: nearest.score.toFixed(1) }),
               ], event);
             })
             .on("mouseleave", () => {
