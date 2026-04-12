@@ -28,8 +28,28 @@ router = APIRouter()
 def map_ionospheric(
     _: bool = Depends(optional_verify_basic_auth),
 ) -> Dict:
-    """Return current ionospheric conditions with per-band MUF/skip estimates."""
-    return ionospheric_cache.get_summary()
+    """Return current ionospheric conditions with per-band MUF/skip estimates.
+    Calculations are centred on the user's QTH (from settings)."""
+    # Resolve QTH from saved settings (same logic as map_contacts)
+    settings = state.db.get_settings()
+    station = settings.get("station") or {}
+    locator = str(station.get("locator") or "").strip().upper()
+    station_callsign = str(station.get("callsign") or "").strip().upper()
+
+    station_lat, station_lon = None, None
+    if locator:
+        pos = maidenhead_to_latlon(locator)
+        if pos:
+            station_lat, station_lon = pos
+    if station_lat is None and station_callsign:
+        dxcc = callsign_to_dxcc(station_callsign)
+        if dxcc:
+            station_lat = dxcc.get("lat")
+            station_lon = dxcc.get("lon")
+    if station_lat is None or station_lon is None:
+        station_lat, station_lon = 39.5, -8.0  # fallback: Portugal
+
+    return ionospheric_cache.get_summary(latitude=station_lat, longitude=station_lon)
 
 
 @router.get("/map/contacts")

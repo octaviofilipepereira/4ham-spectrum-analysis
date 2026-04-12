@@ -76,16 +76,17 @@ def _kp_condition(kp: float) -> str:
 # Physics: SFI → foF2 → MUF estimates
 # ═══════════════════════════════════════════════════════════════════
 
-def _estimate_fof2(sfi: float, utc_hour: float = 12.0) -> float:
+def _estimate_fof2(sfi: float, utc_hour: float = 12.0, longitude: float = 0.0) -> float:
     """
     Estimate foF2 (critical frequency of F2 layer) from SFI.
 
     Method:
       1. Convert SFI → SSN (sunspot number) via ITU-R relation
       2. Compute noon foF2 using Rawer empirical model (mid-latitude)
-      3. Apply cos(χ) day/night scaling
+      3. Compute Local Solar Time from UTC + QTH longitude
+      4. Apply cos(χ) day/night scaling relative to local solar noon
 
-    For SFI=149, noon foF2 ≈ 11 MHz, midnight ≈ 4 MHz.
+    For SFI=149, local noon foF2 ≈ 11 MHz, local midnight ≈ 4 MHz.
     """
     if sfi <= 0:
         return 3.0  # safe minimum
@@ -93,9 +94,10 @@ def _estimate_fof2(sfi: float, utc_hour: float = 12.0) -> float:
     ssn = max(0.0, (sfi - 63.7) / 0.727)
     # Rawer model: noon mid-latitude foF2
     fof2_noon = 4.35 + 0.058 * ssn
-    # Day/night factor from simplified solar zenith angle
-    # Assumes solar noon ≈ 12 UTC (Western Europe)
-    hour_angle = (utc_hour - 12.0) * (math.pi / 12.0)
+    # Local Solar Time: LST = UTC + longitude/15
+    local_solar_hour = (utc_hour + longitude / 15.0) % 24.0
+    # Hour angle from local solar noon
+    hour_angle = (local_solar_hour - 12.0) * (math.pi / 12.0)
     chi_factor = max(0.0, math.cos(hour_angle))
     # Night floor: ~35% of noon value
     fof2 = fof2_noon * (0.35 + 0.65 * chi_factor)
@@ -212,25 +214,22 @@ class IonosphericCache:
                                 self.sfi = round(sfi_val, 1)
 
                     self.last_update = datetime.now(timezone.utc).isoformat()
-                    now_h = datetime.now(timezone.utc)
-                    utc_hour = now_h.hour + now_h.minute / 60.0
-                    fof2_now = _estimate_fof2(self.sfi or 0, utc_hour)
                     _log.info(
-                        "Ionospheric data updated: Kp=%.1f (%s), SFI=%.0f, foF2≈%.1f MHz",
+                        "Ionospheric data updated: Kp=%.1f (%s), SFI=%.0f",
                         self.kp or 0, self.kp_condition,
-                        self.sfi or 0, fof2_now,
+                        self.sfi or 0,
                     )
             except Exception as exc:
                 _log.warning("Ionospheric fetch failed: %s", exc)
 
-    def get_summary(self) -> Dict[str, Any]:
-        """Return current ionospheric context with per-band status."""
+    def get_summary(self, latitude: float = 39.5, longitude: float = -8.0) -> Dict[str, Any]:
+        """Return current ionospheric context with per-band status for a QTH."""
         kp = self.kp if self.kp is not None else 0.0
         sfi = self.sfi if self.sfi is not None else 0.0
-        # Compute foF2 dynamically based on current UTC hour
+        # Compute foF2 dynamically using QTH Local Solar Time
         now = datetime.now(timezone.utc)
         utc_hour = now.hour + now.minute / 60.0
-        fof2 = _estimate_fof2(sfi, utc_hour)
+        fof2 = _estimate_fof2(sfi, utc_hour, longitude)
 
         bands: Dict[str, Dict] = {}
         for band_name, freq_mhz in _HF_BANDS_MHZ.items():
@@ -241,6 +240,7 @@ class IonosphericCache:
             "kp_condition": self.kp_condition,
             "sfi": sfi,
             "fof2_estimated_mhz": fof2,
+            "qth": {"lat": latitude, "lon": longitude},
             "bands": bands,
             "last_update": self.last_update,
             "source": "NOAA SWPC",
