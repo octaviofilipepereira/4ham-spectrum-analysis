@@ -25,6 +25,9 @@ python-dotenv
 bcrypt
 slowapi
 
+# HTTP client (ionospheric data fetch)
+httpx
+
 # System utilities
 psutil
 
