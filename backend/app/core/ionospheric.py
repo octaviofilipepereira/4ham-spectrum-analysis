@@ -169,9 +169,18 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
 
     # D-layer absorption: daytime kills low-frequency DX
     # D-layer exists when sun is above horizon (roughly LST 06-18)
+    # and peaks at local noon.  Absorption per hop ∝ 1/f² and
+    # reaches ~20-30 dB per hop at 7 MHz midday, making multi-hop
+    # impossible and even single-hop very lossy.
     is_daytime = 6.0 <= local_solar_hour <= 18.0
     d_layer_cutoff_mhz = 5.5 if is_daytime else 0.0
     absorbed = is_daytime and freq_mhz < d_layer_cutoff_mhz
+
+    # Solar elevation factor for D-layer: stronger near noon, weak at dawn/dusk
+    _solar_elev = 0.0
+    if is_daytime:
+        # Sinusoidal model: peaks at 12, zero at 6 and 18
+        _solar_elev = math.sin(math.pi * (local_solar_hour - 6.0) / 12.0)
 
     # Multi-hop distance computation based on MUF margin
     # Each F2 hop covers ~2000-3000 km (average ~2500 km).
@@ -203,31 +212,44 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
         else:
             max_hops = 1
 
-    # D-layer attenuation: during daytime, lower frequencies suffer
-    # progressive absorption proportional to ~1/f².  This reduces the
-    # effective number of hops for bands below ~15 MHz (40m, 30m …)
-    # without fully blocking them (which only happens below 5.5 MHz).
-    if is_daytime and not absorbed and freq_mhz < 15.0 and max_hops > 1:
-        d_atten = (freq_mhz / 15.0) ** 2   # 0.22 @7MHz, 0.45 @10MHz, 0.90 @14MHz
-        max_hops = max(1, round(max_hops * d_atten))
+    # D-layer attenuation model (VOACAP-style, simplified)
+    # Absorption per hop ≈ (k / f²) × cos(χ), where χ is solar zenith.
+    # This destroys multi-hop on 40m/80m during the day and reduces 30m/20m.
+    # At night, D-layer vanishes → full hop count restored.
+    if is_daytime and not absorbed and max_hops >= 1:
+        # D-layer absorption factor: how many hops survive?
+        # Absorption per hop in dB ≈ 220/f² × solar_elev (empirical fit)
+        # Tolerable total absorption ≈ 30 dB (S9 → S3)
+        abs_per_hop_db = (220.0 / (freq_mhz ** 2)) * _solar_elev
+        if abs_per_hop_db > 0:
+            tolerable_hops = max(0, int(30.0 / abs_per_hop_db))
+            max_hops = min(max_hops, tolerable_hops)
+        # Below ~8 MHz at midday, cap effective range to NVIS (~500 km)
+        if freq_mhz < 8.0 and _solar_elev > 0.5 and max_hops <= 1:
+            max_distance_km_cap = round(500 + (freq_mhz - 5.5) * 200)
+            # will be applied after max_distance_km calculation
 
     max_distance_km = round(max_hops * _HOP_KM)
 
+    # Apply NVIS cap for low bands during peak daytime
+    if is_daytime and not absorbed and freq_mhz < 8.0 and _solar_elev > 0.5:
+        nvis_cap = round(500 + max(0, freq_mhz - 5.5) * 200)  # ~500-1000 km
+        max_distance_km = min(max_distance_km, max(nvis_cap, max_distance_km if max_hops == 0 else nvis_cap))
+
     # Three-zone model for gradient patches
-    # Strong: first 1-2 hops (best SNR)
-    # Moderate: next 1-2 hops (acceptable SNR)
-    # Weak: outermost hops (fringe, barely copyable)
-    if max_hops >= 3:
-        strong_km = round(min(2, max_hops) * _HOP_KM * 0.7)
-        moderate_km = round(min(3, max_hops) * _HOP_KM * 0.85)
+    # Zones are proportions of max_distance_km (which already includes
+    # D-layer and NVIS caps), so they always look right on the map.
+    if max_distance_km > 0 and max_hops >= 3:
+        strong_km = round(max_distance_km * 0.35)
+        moderate_km = round(max_distance_km * 0.65)
         weak_km = max_distance_km
-    elif max_hops == 2:
-        strong_km = round(_HOP_KM * 0.7)
-        moderate_km = round(_HOP_KM * 1.5)
+    elif max_distance_km > 0 and max_hops == 2:
+        strong_km = round(max_distance_km * 0.40)
+        moderate_km = round(max_distance_km * 0.70)
         weak_km = max_distance_km
-    elif max_hops == 1:
-        strong_km = round(_HOP_KM * 0.45)
-        moderate_km = round(_HOP_KM * 0.75)
+    elif max_distance_km > 0:
+        strong_km = round(max_distance_km * 0.40)
+        moderate_km = round(max_distance_km * 0.70)
         weak_km = max_distance_km
     else:
         strong_km = 0
