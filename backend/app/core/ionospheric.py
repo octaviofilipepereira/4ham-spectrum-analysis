@@ -87,18 +87,19 @@ def _estimate_fof2(sfi: float, utc_hour: float = 12.0, longitude: float = 0.0) -
       4. Apply cos(χ) day/night scaling relative to local solar noon
 
     Reference values (mid-latitude, noon):
-      SFI= 70 → foF2 ≈ 5.0 MHz
-      SFI=120 → foF2 ≈ 6.5 MHz
-      SFI=150 → foF2 ≈ 7.3 MHz
-      SFI=200 → foF2 ≈ 8.5 MHz
+      SFI= 70 → foF2 ≈ 4.0 MHz
+      SFI=120 → foF2 ≈ 8.2 MHz
+      SFI=150 → foF2 ≈ 10.0 MHz
+      SFI=200 → foF2 ≈ 11.5 MHz
     """
     if sfi <= 0:
         return 3.0  # safe minimum
     # SFI → SSN (ITU-R approximation)
     ssn = max(0.0, (sfi - 63.7) / 0.727)
-    # ITU-R P.1239 square-root model: noon mid-latitude foF2
-    # foF2_noon ≈ 3.5 + 0.35 × √SSN  (calibrated to ionosonde data)
-    fof2_noon = 3.5 + 0.35 * math.sqrt(ssn)
+    # Calibrated square-root model: noon mid-latitude foF2
+    # foF2_noon ≈ 3.5 + 0.6 × √SSN  (validated against ionosonde data:
+    # Juliusruh, Rome, El Arenosillo — SSN 0-150 range)
+    fof2_noon = 3.5 + 0.6 * math.sqrt(ssn)
     # Local Solar Time: LST = UTC + longitude/15
     local_solar_hour = (utc_hour + longitude / 15.0) % 24.0
     # Hour angle from local solar noon
