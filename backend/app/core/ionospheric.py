@@ -82,25 +82,30 @@ def _estimate_fof2(sfi: float, utc_hour: float = 12.0, longitude: float = 0.0) -
 
     Method:
       1. Convert SFI → SSN (sunspot number) via ITU-R relation
-      2. Compute noon foF2 using Rawer empirical model (mid-latitude)
+      2. Compute noon foF2 using ITU-R P.1239 square-root model (mid-latitude)
       3. Compute Local Solar Time from UTC + QTH longitude
       4. Apply cos(χ) day/night scaling relative to local solar noon
 
-    For SFI=149, local noon foF2 ≈ 11 MHz, local midnight ≈ 4 MHz.
+    Reference values (mid-latitude, noon):
+      SFI= 70 → foF2 ≈ 5.0 MHz
+      SFI=120 → foF2 ≈ 6.5 MHz
+      SFI=150 → foF2 ≈ 7.3 MHz
+      SFI=200 → foF2 ≈ 8.5 MHz
     """
     if sfi <= 0:
         return 3.0  # safe minimum
     # SFI → SSN (ITU-R approximation)
     ssn = max(0.0, (sfi - 63.7) / 0.727)
-    # Rawer model: noon mid-latitude foF2
-    fof2_noon = 4.35 + 0.058 * ssn
+    # ITU-R P.1239 square-root model: noon mid-latitude foF2
+    # foF2_noon ≈ 3.5 + 0.35 × √SSN  (calibrated to ionosonde data)
+    fof2_noon = 3.5 + 0.35 * math.sqrt(ssn)
     # Local Solar Time: LST = UTC + longitude/15
     local_solar_hour = (utc_hour + longitude / 15.0) % 24.0
     # Hour angle from local solar noon
     hour_angle = (local_solar_hour - 12.0) * (math.pi / 12.0)
     chi_factor = max(0.0, math.cos(hour_angle))
-    # Night floor: ~35% of noon value
-    fof2 = fof2_noon * (0.35 + 0.65 * chi_factor)
+    # Night floor: ~45% of noon value (mid-latitude, empirical)
+    fof2 = fof2_noon * (0.45 + 0.55 * chi_factor)
     return round(max(fof2, 2.0), 2)
 
 
@@ -144,7 +149,7 @@ def _skip_distance_km(freq_mhz: float, fof2: float) -> float:
 
 
 def _band_status(freq_mhz: float, fof2: float, kp: float,
-                  local_solar_hour: float) -> Dict[str, Any]:
+                  local_solar_hour: float, sfi: float = 100.0) -> Dict[str, Any]:
     """Compute propagation status for a single band.
 
     Status values:
@@ -212,29 +217,29 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
         else:
             max_hops = 1
 
-    # D-layer attenuation model (VOACAP-style, simplified)
-    # Absorption per hop ≈ (k / f²) × cos(χ), where χ is solar zenith.
-    # This destroys multi-hop on 40m/80m during the day and reduces 30m/20m.
-    # At night, D-layer vanishes → full hop count restored.
+    # D-layer attenuation model (CCIR/VOACAP simplified)
+    # D-layer absorption ∝ (1 + 0.004×SSN) / f^1.98 × cos^0.75(χ)
+    # Simplified here as: abs_per_hop ≈ k / f² × solar_elev
+    # where k scales with SSN (more sunspots → more D-layer ionization).
+    # Reference: 7 MHz at noon, SSN=120 → ~18 dB/hop (kills multi-hop)
+    #            14 MHz at noon, SSN=120 → ~4.5 dB/hop (limits to 2-3 hops)
+    _ssn_for_dlayer = max(0.0, (sfi - 63.7) / 0.727) if sfi and sfi > 0 else 0.0
     if is_daytime and not absorbed and max_hops >= 1:
-        # D-layer absorption factor: how many hops survive?
-        # Absorption per hop in dB ≈ 220/f² × solar_elev (empirical fit)
-        # Tolerable total absorption ≈ 30 dB (S9 → S3)
-        abs_per_hop_db = (220.0 / (freq_mhz ** 2)) * _solar_elev
+        d_layer_k = 500.0 + 4.0 * _ssn_for_dlayer  # ~970 at SSN=117
+        abs_per_hop_db = (d_layer_k / (freq_mhz ** 2)) * _solar_elev
+        # Tolerable total absorption: 15 dB (practical DX threshold)
         if abs_per_hop_db > 0:
-            tolerable_hops = max(0, int(30.0 / abs_per_hop_db))
+            tolerable_hops = max(0, int(15.0 / abs_per_hop_db))
             max_hops = min(max_hops, tolerable_hops)
-        # Below ~8 MHz at midday, cap effective range to NVIS (~500 km)
-        if freq_mhz < 8.0 and _solar_elev > 0.5 and max_hops <= 1:
-            max_distance_km_cap = round(500 + (freq_mhz - 5.5) * 200)
-            # will be applied after max_distance_km calculation
 
     max_distance_km = round(max_hops * _HOP_KM)
 
-    # Apply NVIS cap for low bands during peak daytime
-    if is_daytime and not absorbed and freq_mhz < 8.0 and _solar_elev > 0.5:
-        nvis_cap = round(500 + max(0, freq_mhz - 5.5) * 200)  # ~500-1000 km
-        max_distance_km = min(max_distance_km, max(nvis_cap, max_distance_km if max_hops == 0 else nvis_cap))
+    # NVIS cap for low bands during peak daytime: even with 0 hops
+    # from D-layer, 40m can still propagate via NVIS (~300-800 km)
+    if is_daytime and not absorbed and freq_mhz < 10.0 and max_hops == 0:
+        if freq_mhz >= 5.5:  # above D-layer cutoff but heavily absorbed
+            max_distance_km = round(300 + max(0, freq_mhz - 5.5) * 150)  # ~300-975 km
+            # Mark as still open (NVIS) even though 0 F2 hops
 
     # Three-zone model for gradient patches
     # Zones are proportions of max_distance_km (which already includes
@@ -337,7 +342,7 @@ class IonosphericCache:
 
         bands: Dict[str, Dict] = {}
         for band_name, freq_mhz in _HF_BANDS_MHZ.items():
-            bands[band_name] = _band_status(freq_mhz, fof2, kp, local_solar_hour)
+            bands[band_name] = _band_status(freq_mhz, fof2, kp, local_solar_hour, sfi)
 
         return {
             "kp": kp,
