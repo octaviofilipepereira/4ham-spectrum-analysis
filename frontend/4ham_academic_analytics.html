@@ -581,6 +581,102 @@ Last update: 2026-04-03 UTC
       .iono-badge .iono-band-closed   { background: rgba(100,116,139,0.2); color: #94a3b8; }
       .iono-badge .iono-band-absorbed { background: rgba(249,115,22,0.15); color: #fb923c; }
 
+      /* ── Propagation Map ────────────────────────── */
+      .propmap-wrap {
+        position: relative;
+        width: 100%;
+        height: 520px;
+        background: #0d1117;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .propmap-wrap svg { width: 100%; height: 100%; display: block; }
+      .propmap-wrap.fullscreen {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        height: 100vh;
+        border-radius: 0;
+      }
+      .propmap-ctrl {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+      }
+      .propmap-ctrl button {
+        width: 36px;
+        height: 36px;
+        border: 1px solid #2a4a6a;
+        border-radius: 6px;
+        background: rgba(20,30,50,0.92);
+        color: #e2e8f0;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+      .propmap-ctrl button:hover { background: rgba(40,60,90,0.95); }
+      .propmap-legend {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        pointer-events: none;
+      }
+      .propmap-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10px;
+        font-family: monospace;
+        color: #cbd5e1;
+      }
+      .propmap-legend-swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        opacity: 0.85;
+      }
+      .propmap-band-filter {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+      }
+      .propmap-band-btn {
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.15);
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      .propmap-band-btn.off { opacity: 0.25; }
+      .propmap-info {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        z-index: 10;
+        font-size: 11px;
+        font-family: monospace;
+        color: #64748b;
+        pointer-events: none;
+        text-align: right;
+      }
+
       @media (max-width: 1100px) {
         .controls {
           grid-template-columns: 1fr 1fr;
@@ -811,6 +907,15 @@ Last update: 2026-04-03 UTC
             <svg id="propagationBandChart"></svg>
           </article>
 
+          <article class="chart-panel span-12">
+            <div class="chart-header">
+              <h3>QTH-Centric Propagation Map</h3>
+              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Azimuthal equidistant projection centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured rings&lt;/strong&gt; — NOAA-predicted coverage per band (skip distance → max range).&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted ring = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside ring = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom · Double-click to reset.&lt;br&gt;Use band pills to toggle bands. Click ⤢ for fullscreen.">i</button>
+            </div>
+            <p>NOAA prediction rings vs real SDR contacts — drag to rotate, scroll to zoom.</p>
+            <div class="propmap-wrap" id="propMapWrap"></div>
+          </article>
+
           <article class="chart-panel span-6">
             <div class="chart-header">
               <h3>Propagation Time Trend</h3>
@@ -859,6 +964,7 @@ Last update: 2026-04-03 UTC
     </div>
 
     <script src="/lib/d3.min.js"></script>
+    <script src="/lib/topojson.min.js"></script>
     <script src="/lib/xlsx.mini.min.js"></script>
     <script>
       const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
@@ -1310,6 +1416,7 @@ Last update: 2026-04-03 UTC
           }
           renderFromCurrentRange();
           fetchIonosphericBadge();
+          refreshPropMap();
         } finally {
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
@@ -1367,6 +1474,425 @@ Last update: 2026-04-03 UTC
             helpBtn.addEventListener("mouseleave", hideChartHelpLayer);
           }
         } catch (e) { el.style.display = "none"; }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // QTH-Centric Propagation Map
+      // ═══════════════════════════════════════════════════════════════════════
+      const PROPMAP_BAND_COLORS = {
+        "160m": "#ff0000", "80m": "#ff1493", "60m": "#ff6347",
+        "40m": "#ffa500", "30m": "#eab308", "20m": "#00bfff",
+        "17m": "#00ff00", "15m": "#9400ff", "12m": "#00ffff",
+        "10m": "#ff4500", "6m": "#ffff00",
+      };
+      const _pmColor = (b) => PROPMAP_BAND_COLORS[(b || "").toLowerCase()] || "#9ca3af";
+      let _pmBandVis = {};       // {band: true/false} toggle state
+      let _pmWorldData = null;
+      let _pmIonoData = null;
+      let _pmContactData = null;
+      let _pmIsFullscreen = false;
+
+      async function _pmLoadWorld() {
+        if (_pmWorldData) return _pmWorldData;
+        try {
+          const r = await fetch("/lib/countries-110m.json");
+          _pmWorldData = await r.json();
+        } catch { _pmWorldData = null; }
+        return _pmWorldData;
+      }
+
+      function _pmWindowMinutes() {
+        // Derive window from current preset
+        const map = { "1h": 60, "2h": 120, "6h": 360, "12h": 720, "24h": 1440 };
+        if (currentPreset && map[currentPreset]) return map[currentPreset];
+        if (currentPreset === "custom" && lastResolvedRange) {
+          const ms = lastResolvedRange.end - lastResolvedRange.start;
+          return Math.max(1, Math.round(ms / 60000));
+        }
+        return 60;
+      }
+
+      async function refreshPropMap() {
+        const wrap = document.getElementById("propMapWrap");
+        if (!wrap || !window.d3 || !window.topojson) return;
+
+        try {
+          const [ionoResp, contactResp, world] = await Promise.all([
+            fetch("/api/map/ionospheric"),
+            fetch(`/api/map/contacts?window_minutes=${_pmWindowMinutes()}&limit=2000`),
+            _pmLoadWorld(),
+          ]);
+          if (!ionoResp.ok || !contactResp.ok) return;
+          _pmIonoData = await ionoResp.json();
+          _pmContactData = await contactResp.json();
+
+          // Initialize band visibility (all visible by default)
+          if (Object.keys(_pmBandVis).length === 0 && _pmIonoData.bands) {
+            for (const b of Object.keys(_pmIonoData.bands)) _pmBandVis[b] = true;
+          }
+
+          drawPropMap(wrap, world);
+        } catch (e) {
+          console.warn("[propmap] fetch failed", e);
+        }
+      }
+
+      function drawPropMap(wrap, world) {
+        const iono = _pmIonoData;
+        const cdata = _pmContactData;
+        if (!iono || !cdata) return;
+
+        const sLat = (iono.qth && iono.qth.lat) || 39.5;
+        const sLon = (iono.qth && iono.qth.lon) || -8.0;
+        const contacts = cdata.contacts || [];
+        const station = cdata.station || {};
+
+        wrap.innerHTML = "";
+
+        const rect = wrap.getBoundingClientRect();
+        const W = rect.width || 800;
+        const H = rect.height || 520;
+        const baseScale = Math.min(W, H) * 0.40;
+        let kScale = 1;
+
+        // Azimuthal equidistant — QTH at centre, distances preserved radially
+        const proj = d3.geoAzimuthalEquidistant()
+          .rotate([-sLon, -sLat])
+          .scale(baseScale)
+          .translate([W / 2, H / 2])
+          .clipAngle(180);
+
+        const path = d3.geoPath().projection(proj);
+        const graticule = d3.geoGraticule()();
+
+        const svg = d3.select(wrap).append("svg")
+          .attr("width", "100%").attr("height", "100%")
+          .attr("viewBox", `0 0 ${W} ${H}`)
+          .attr("preserveAspectRatio", "xMidYMid meet")
+          .style("cursor", "grab");
+
+        // Ocean background
+        const gradId = "propOcean";
+        const defs = svg.append("defs");
+        const grad = defs.append("radialGradient")
+          .attr("id", gradId)
+          .attr("gradientUnits", "userSpaceOnUse")
+          .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale);
+        grad.append("stop").attr("offset", "0%").attr("stop-color", "#0e3266");
+        grad.append("stop").attr("offset", "70%").attr("stop-color", "#0a1e3d");
+        grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
+
+        const spherePath = svg.append("path").datum({ type: "Sphere" })
+          .attr("fill", `url(#${gradId})`).attr("stroke", "#1e3a5f").attr("stroke-width", 0.6);
+        const gratPath = svg.append("path").datum(graticule)
+          .attr("fill", "none").attr("stroke", "#1a3a5c").attr("stroke-width", 0.3);
+
+        let countryPaths;
+        if (world) {
+          countryPaths = svg.append("g").selectAll("path")
+            .data(topojson.feature(world, world.objects.countries).features)
+            .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
+        }
+
+        // Coverage rings group (behind contacts)
+        const ringG = svg.append("g").attr("class", "rings");
+        // Great-circle arcs
+        const arcG = svg.append("g").attr("class", "arcs");
+        // Contact dots
+        const dotG = svg.append("g").attr("class", "dots");
+        // Home marker
+        const homeG = svg.append("g").attr("class", "home");
+
+        // Tooltip
+        let tip = document.getElementById("propMapTooltip");
+        if (!tip) {
+          tip = document.createElement("div");
+          tip.id = "propMapTooltip";
+          tip.style.cssText =
+            "position:fixed;background:#1e293b;color:#e2e8f0;padding:5px 9px;"
+            + "border-radius:5px;font-size:11px;pointer-events:none;display:none;"
+            + "z-index:10001;white-space:nowrap;border:1px solid #334155;";
+          document.body.appendChild(tip);
+        }
+
+        function kmToProjectedRadius(km) {
+          // In azimuthal equidistant projection, distance is linear from center
+          // Scale factor: proj.scale() corresponds to Earth's radius subtending some angle
+          // For geoAzimuthalEquidistant: scale = R_pixels / (π), so 1 radian = scale pixels
+          // km → radians: km / 6371
+          const radians = km / 6371.0;
+          return radians * proj.scale();
+        }
+
+        function redraw() {
+          spherePath.attr("d", path);
+          gratPath.attr("d", path);
+          if (countryPaths) countryPaths.attr("d", path);
+          grad.attr("r", proj.scale());
+
+          // ── Coverage rings from ionospheric data ──────────────────────
+          ringG.selectAll("*").remove();
+          const bands = iono.bands || {};
+          const center = proj([sLon, sLat]);
+
+          for (const [band, info] of Object.entries(bands)) {
+            if (!_pmBandVis[band]) continue;
+            if (info.status === "Closed" || info.status === "Absorbed") continue;
+            const maxKm = info.max_distance_km || 0;
+            const skipKm = info.skip_km || 0;
+            if (maxKm <= 0) continue;
+
+            const rOuter = kmToProjectedRadius(maxKm);
+            const rInner = kmToProjectedRadius(skipKm);
+            const color = _pmColor(band);
+
+            // Outer ring (max coverage)
+            if (center) {
+              ringG.append("circle")
+                .attr("cx", center[0]).attr("cy", center[1]).attr("r", rOuter)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", 1.5)
+                .attr("stroke-dasharray", "6,3")
+                .attr("opacity", 0.5);
+
+              // Coverage area (donut between skip and max)
+              if (rInner > 0 && rInner < rOuter) {
+                // Inner skip zone boundary
+                ringG.append("circle")
+                  .attr("cx", center[0]).attr("cy", center[1]).attr("r", rInner)
+                  .attr("fill", "none")
+                  .attr("stroke", color)
+                  .attr("stroke-width", 0.8)
+                  .attr("stroke-dasharray", "3,3")
+                  .attr("opacity", 0.3);
+              }
+
+              // Faint fill between skip and max
+              const arc = d3.arc()
+                .innerRadius(rInner)
+                .outerRadius(rOuter)
+                .startAngle(0)
+                .endAngle(2 * Math.PI);
+
+              ringG.append("path")
+                .attr("d", arc)
+                .attr("transform", `translate(${center[0]},${center[1]})`)
+                .attr("fill", color)
+                .attr("opacity", 0.06);
+
+              // Label
+              ringG.append("text")
+                .attr("x", center[0]).attr("y", center[1] - rOuter - 3)
+                .attr("text-anchor", "middle")
+                .attr("fill", color).attr("font-size", "9px")
+                .attr("font-family", "monospace").attr("opacity", 0.7)
+                .text(band);
+            }
+          }
+
+          // ── Contact arcs & dots ──────────────────────────────────────
+          arcG.selectAll("path").remove();
+          dotG.selectAll("*").remove();
+
+          contacts.forEach((c) => {
+            if (c.lat == null || c.lon == null) return;
+            const cBand = (c.band || "").toLowerCase();
+            // Only show contact if its band is visible
+            const matchBand = Object.keys(_pmBandVis).find(b => b.toLowerCase() === cBand);
+            if (matchBand && !_pmBandVis[matchBand]) return;
+
+            const color = _pmColor(c.band);
+            const distKm = c.distance_km || 0;
+
+            // Determine correlation status
+            let corr = "neutral";
+            if (matchBand && iono.bands && iono.bands[matchBand]) {
+              const bInfo = iono.bands[matchBand];
+              const bSt = bInfo.status;
+              if (bSt === "Open" || bSt === "Marginal") {
+                const maxD = bInfo.max_distance_km || 0;
+                corr = distKm <= maxD ? "confirmed" : "anomaly";
+              } else if (bSt === "Closed" || bSt === "Absorbed") {
+                corr = "anomaly"; // contact despite closed/absorbed = anomaly
+              }
+            }
+
+            // Arc
+            arcG.append("path")
+              .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
+              .attr("d", path)
+              .attr("fill", "none")
+              .attr("stroke", color)
+              .attr("stroke-width", corr === "anomaly" ? 2.2 : 1.4)
+              .attr("stroke-opacity", corr === "anomaly" ? 0.95 : 0.65);
+
+            // Dot
+            const pp = proj([c.lon, c.lat]);
+            if (!pp) return;
+
+            const dotR = corr === "anomaly" ? 5.5 : 4;
+            const dotStroke = corr === "anomaly" ? "#f87171" : "#fff";
+            const dotStrokeW = corr === "anomaly" ? 1.8 : 0.7;
+
+            dotG.append("circle")
+              .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", dotR)
+              .attr("fill", color).attr("stroke", dotStroke)
+              .attr("stroke-width", dotStrokeW).attr("opacity", 0.92)
+              .style("cursor", "pointer")
+              .on("mousemove", (evt) => {
+                const snrStr  = c.snr_db != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
+                const distStr = distKm ? `${distKm.toLocaleString()} km` : "—";
+                const corrLabel = corr === "confirmed" ? "✓ Confirmed"
+                  : corr === "anomaly" ? "⚠ Anomaly" : "";
+                tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country || ""}<br>`
+                  + `${c.band || ""} · ${c.mode || ""} · SNR ${snrStr} · ${distStr}`
+                  + (corrLabel ? `<br><span style="color:${corr === "anomaly" ? "#f87171" : "#4ade80"}">${corrLabel}</span>` : "");
+                tip.style.display = "block";
+                tip.style.left = evt.clientX + 14 + "px";
+                tip.style.top  = evt.clientY - 34 + "px";
+              })
+              .on("mouseleave", () => { tip.style.display = "none"; });
+          });
+
+          // ── Home marker ──────────────────────────────────────────────
+          homeG.selectAll("*").remove();
+          if (center) {
+            homeG.append("circle").attr("cx", center[0]).attr("cy", center[1]).attr("r", 7)
+              .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
+            homeG.append("text").attr("x", center[0] + 10).attr("y", center[1] + 5)
+              .attr("fill", "#facc15").attr("font-size", "11px")
+              .attr("font-family", "monospace").attr("pointer-events", "none")
+              .text(station.callsign || "QTH");
+          }
+        }
+
+        redraw();
+
+        // ── Drag to rotate ─────────────────────────────────────────────
+        svg.call(
+          d3.drag()
+            .on("start", () => svg.style("cursor", "grabbing"))
+            .on("drag", (event) => {
+              const [rx, ry, rz] = proj.rotate();
+              proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
+              redraw();
+            })
+            .on("end", () => svg.style("cursor", "grab"))
+        );
+
+        // ── Scroll zoom ────────────────────────────────────────────────
+        wrap.addEventListener("wheel", (event) => {
+          event.preventDefault();
+          const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+          kScale = Math.max(0.25, Math.min(12, kScale * factor));
+          proj.scale(baseScale * kScale);
+          redraw();
+        }, { passive: false });
+
+        // ── Double-click reset ─────────────────────────────────────────
+        svg.on("dblclick", () => {
+          proj.rotate([-sLon, -sLat]).scale(baseScale);
+          kScale = 1;
+          redraw();
+        });
+
+        // ── Controls: + − ↻ ⤢ ──────────────────────────────────────────
+        const ctrl = document.createElement("div");
+        ctrl.className = "propmap-ctrl";
+        const mkBtn = (html, title, fn) => {
+          const b = document.createElement("button");
+          b.title = title; b.innerHTML = html;
+          b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+          return b;
+        };
+        ctrl.appendChild(mkBtn("+", "Zoom in", () => {
+          kScale = Math.min(kScale * 1.6, 12);
+          proj.scale(baseScale * kScale); redraw();
+        }));
+        ctrl.appendChild(mkBtn("−", "Zoom out", () => {
+          kScale = Math.max(kScale / 1.6, 0.25);
+          proj.scale(baseScale * kScale); redraw();
+        }));
+        ctrl.appendChild(mkBtn("↻", "Reset view", () => {
+          proj.rotate([-sLon, -sLat]).scale(baseScale);
+          kScale = 1; redraw();
+        }));
+        ctrl.appendChild(mkBtn("⤢", "Fullscreen", () => {
+          _pmIsFullscreen = !_pmIsFullscreen;
+          wrap.classList.toggle("fullscreen", _pmIsFullscreen);
+          if (_pmIsFullscreen) {
+            wrap.requestFullscreen && wrap.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen && document.exitFullscreen().catch(() => {});
+          }
+          setTimeout(() => {
+            drawPropMap(wrap, world);
+          }, 200);
+        }));
+        wrap.appendChild(ctrl);
+
+        // ── Handle ESC / fullscreen change ──────────────────────────────
+        document.addEventListener("fullscreenchange", () => {
+          if (!document.fullscreenElement && _pmIsFullscreen) {
+            _pmIsFullscreen = false;
+            wrap.classList.remove("fullscreen");
+            setTimeout(() => drawPropMap(wrap, world), 100);
+          }
+        });
+
+        // ── Band filter pills ──────────────────────────────────────────
+        const filterDiv = document.createElement("div");
+        filterDiv.className = "propmap-band-filter";
+        for (const band of Object.keys(iono.bands || {})) {
+          const btn = document.createElement("button");
+          btn.className = "propmap-band-btn" + (_pmBandVis[band] ? "" : " off");
+          btn.style.background = _pmColor(band) + "33";
+          btn.style.color = _pmColor(band);
+          btn.textContent = band;
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            _pmBandVis[band] = !_pmBandVis[band];
+            btn.classList.toggle("off", !_pmBandVis[band]);
+            redraw();
+          });
+          filterDiv.appendChild(btn);
+        }
+        wrap.appendChild(filterDiv);
+
+        // ── Legend (bottom-left) ────────────────────────────────────────
+        const legend = document.createElement("div");
+        legend.className = "propmap-legend";
+        [
+          ["#4ade80", "Confirmed"],
+          ["#f87171", "Anomaly"],
+          ["#facc15", "QTH"],
+        ].forEach(([color, label]) => {
+          const item = document.createElement("div");
+          item.className = "propmap-legend-item";
+          item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color}"></span>${label}`;
+          legend.appendChild(item);
+        });
+        wrap.appendChild(legend);
+
+        // ── Info (bottom-right) ─────────────────────────────────────────
+        const confirmed = contacts.filter(c => {
+          const cBand = (c.band || "").toLowerCase();
+          const mb = Object.keys(_pmBandVis).find(b => b.toLowerCase() === cBand);
+          if (!mb || !iono.bands || !iono.bands[mb]) return false;
+          const st = iono.bands[mb].status;
+          if (st !== "Open" && st !== "Marginal") return false;
+          return (c.distance_km || 0) <= (iono.bands[mb].max_distance_km || 0);
+        }).length;
+        const anomalies = contacts.length - confirmed;
+        const info = document.createElement("div");
+        info.className = "propmap-info";
+        const winMin = _pmWindowMinutes();
+        const winLabel = winMin >= 1440 ? Math.round(winMin / 1440) + "d" : winMin >= 60 ? Math.round(winMin / 60) + "h" : winMin + "min";
+        info.innerHTML = `${contacts.length} contacts · ${winLabel}<br>`
+          + `<span style="color:#4ade80">${confirmed} confirmed</span> · `
+          + `<span style="color:#f87171">${anomalies} anomalies</span>`;
+        wrap.appendChild(info);
       }
 
       let stackedPercentMode = false;
