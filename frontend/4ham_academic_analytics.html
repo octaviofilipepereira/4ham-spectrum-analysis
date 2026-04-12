@@ -1029,9 +1029,17 @@ Last update: 2026-04-03 UTC
       <div class="chart-value-toast-body" id="chartValueToastText"></div>
     </div>
 
-    <script src="/lib/d3.min.js"></script>
-    <script src="/lib/topojson.min.js"></script>
-    <script src="/lib/xlsx.mini.min.js"></script>
+    <script>
+      // Detect base path for proxy-safe resource loading
+      const _BASE = (() => {
+        const p = window.location.pathname;
+        const idx = p.lastIndexOf('/');
+        return idx > 0 ? p.substring(0, idx + 1) : '/';
+      })();
+    </script>
+    <script src="lib/d3.min.js"></script>
+    <script src="lib/topojson.min.js"></script>
+    <script src="lib/xlsx.mini.min.js"></script>
     <script>
       const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
@@ -1049,7 +1057,7 @@ Last update: 2026-04-03 UTC
 
       async function loadI18n() {
         try {
-          const resp = await fetch("/i18n/academic_analytics.json");
+          const resp = await fetch(`${_BASE}i18n/academic_analytics.json`);
           if (resp.ok) _i18nStrings = await resp.json();
         } catch (_) { /* fallback: hardcoded EN strings stay in HTML */ }
       }
@@ -1568,7 +1576,7 @@ Last update: 2026-04-03 UTC
         const el = document.getElementById("ionoBadge");
         if (!el) return;
         try {
-          const resp = await fetch("/api/map/ionospheric");
+          const resp = await fetch(`${_BASE}api/map/ionospheric`);
           if (!resp.ok) { el.style.display = "none"; return; }
           const d = await resp.json();
           if (!d.kp && !d.sfi) { el.style.display = "none"; return; }
@@ -1720,7 +1728,7 @@ Last update: 2026-04-03 UTC
       async function _pmLoadWorld() {
         if (_pmWorldData) return _pmWorldData;
         try {
-          const r = await fetch("/lib/countries-110m.json");
+          const r = await fetch(`${_BASE}lib/countries-110m.json`);
           _pmWorldData = await r.json();
         } catch { _pmWorldData = null; }
         return _pmWorldData;
@@ -1743,8 +1751,8 @@ Last update: 2026-04-03 UTC
 
         try {
           const [ionoResp, contactResp, world] = await Promise.all([
-            fetch("/api/map/ionospheric"),
-            fetch(`/api/map/contacts?window_minutes=${_pmWindowMinutes()}&limit=2000`),
+            fetch(`${_BASE}api/map/ionospheric`),
+            fetch(`${_BASE}api/map/contacts?window_minutes=${_pmWindowMinutes()}&limit=2000`),
             _pmLoadWorld(),
           ]);
           if (!ionoResp.ok || !contactResp.ok) return;
@@ -2307,7 +2315,7 @@ Last update: 2026-04-03 UTC
         }
 
         try {
-          const resp = await fetch(`/api/analytics/academic?${params.toString()}`);
+          const resp = await fetch(`${_BASE}api/analytics/academic?${params.toString()}`);
           updateApiLastFetchInfo(queryAt);
           if (!resp.ok) {
             return false;
