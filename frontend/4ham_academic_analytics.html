@@ -1643,10 +1643,28 @@ Last update: 2026-04-03 UTC
         const baseScale = Math.min(W, H) * 0.44;
         let kScale = 1;
 
+        // Restore saved zoom & rotation from sessionStorage
+        try {
+          const sv = JSON.parse(sessionStorage.getItem("pmMapView"));
+          if (sv && sv.k) kScale = sv.k;
+        } catch {}
+        let savedRot = null;
+        try {
+          const sv = JSON.parse(sessionStorage.getItem("pmMapView"));
+          if (sv && sv.rot) savedRot = sv.rot;
+        } catch {}
+        function _pmSaveView() {
+          try {
+            sessionStorage.setItem("pmMapView", JSON.stringify({
+              k: kScale, rot: proj.rotate()
+            }));
+          } catch {}
+        }
+
         // Orthographic projection — 3D globe, same as main map
         const proj = d3.geoOrthographic()
-          .rotate([-sLon, -sLat])
-          .scale(baseScale)
+          .rotate(savedRot || [-sLon, -sLat])
+          .scale(baseScale * kScale)
           .translate([W / 2, H / 2])
           .clipAngle(90);
 
@@ -1927,7 +1945,7 @@ Last update: 2026-04-03 UTC
               proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
               redraw();
             })
-            .on("end", () => svg.style("cursor", "grab"))
+            .on("end", () => { svg.style("cursor", "grab"); _pmSaveView(); })
         );
 
         // ── Ctrl + Scroll wheel zoom ─────────────────────────────────
@@ -1938,6 +1956,7 @@ Last update: 2026-04-03 UTC
           kScale = Math.max(0.25, Math.min(12, kScale * factor));
           proj.scale(baseScale * kScale);
           redraw();
+          _pmSaveView();
         }, { passive: false });
 
         // ── Double-click reset ─────────────────────────────────────────
@@ -1945,6 +1964,7 @@ Last update: 2026-04-03 UTC
           proj.rotate([-sLon, -sLat]).scale(baseScale);
           kScale = 1;
           redraw();
+          _pmSaveView();
         });
 
         // ── Controls: + − ↻ ⤢ ──────────────────────────────────────────
@@ -1958,15 +1978,15 @@ Last update: 2026-04-03 UTC
         };
         ctrl.appendChild(mkBtn("+", "Zoom in", () => {
           kScale = Math.min(kScale * 1.6, 12);
-          proj.scale(baseScale * kScale); redraw();
+          proj.scale(baseScale * kScale); redraw(); _pmSaveView();
         }));
         ctrl.appendChild(mkBtn("−", "Zoom out", () => {
           kScale = Math.max(kScale / 1.6, 0.25);
-          proj.scale(baseScale * kScale); redraw();
+          proj.scale(baseScale * kScale); redraw(); _pmSaveView();
         }));
         ctrl.appendChild(mkBtn("↻", "Reset view", () => {
           proj.rotate([-sLon, -sLat]).scale(baseScale);
-          kScale = 1; redraw();
+          kScale = 1; redraw(); _pmSaveView();
         }));
         ctrl.appendChild(mkBtn("⤢", "Fullscreen", () => {
           _pmIsFullscreen = !_pmIsFullscreen;
