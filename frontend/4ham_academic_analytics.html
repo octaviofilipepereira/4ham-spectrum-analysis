@@ -1791,10 +1791,11 @@ Last update: 2026-04-03 UTC
             if (d3.geoDistance(bestPt, center) < Math.PI / 2) {
               const lp = proj(bestPt);
               if (lp) {
+                const bandFontSize = Math.round(10 * Math.sqrt(kScale)) + "px";
                 ringG.append("text")
                   .attr("x", lp[0]).attr("y", lp[1] - 5)
                   .attr("text-anchor", "middle")
-                  .attr("fill", color).attr("font-size", "10px")
+                  .attr("fill", color).attr("font-size", bandFontSize)
                   .attr("font-weight", "bold")
                   .attr("font-family", "monospace").attr("opacity", 0.9)
                   .attr("pointer-events", "none")
@@ -1884,13 +1885,14 @@ Last update: 2026-04-03 UTC
           // ── Graticule degree labels ──────────────────────────────────
           gratLabelG.selectAll("*").remove();
           const labelColor = "#4a6a8a";
+          const gratFontSize = Math.round(9 * Math.sqrt(kScale)) + "px";
           // Latitude labels every 30° along the central meridian
           for (let lat = -60; lat <= 60; lat += 30) {
             if (lat === 0) continue;
             const pt = proj([center[0], lat]);
             if (pt) {
               gratLabelG.append("text").attr("x", pt[0] + 3).attr("y", pt[1] - 3)
-                .attr("fill", labelColor).attr("font-size", "9px")
+                .attr("fill", labelColor).attr("font-size", gratFontSize)
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(Math.abs(lat) + "°" + (lat > 0 ? "N" : "S"));
             }
@@ -1903,7 +1905,7 @@ Last update: 2026-04-03 UTC
             const pt = proj([lon, 0]);
             if (pt) {
               gratLabelG.append("text").attr("x", pt[0] + 3).attr("y", pt[1] + 11)
-                .attr("fill", labelColor).attr("font-size", "9px")
+                .attr("fill", labelColor).attr("font-size", gratFontSize)
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(Math.abs(lon) + "°" + (lon > 0 ? "E" : "W"));
             }
@@ -2015,13 +2017,17 @@ Last update: 2026-04-03 UTC
         const legend = document.createElement("div");
         legend.className = "propmap-legend";
         [
-          ["#4ade80", "Confirmed"],
-          ["#f87171", "Anomaly"],
+          ["rgba(255,255,255,0.50)", "Strong zone"],
+          ["rgba(255,255,255,0.30)", "Moderate zone"],
+          ["rgba(255,255,255,0.15)", "Fringe zone"],
+          ["rgba(0,0,20,0.30)", "Night hemisphere"],
           ["#facc15", "QTH"],
+          ["#4ade80", "Confirmed contact"],
+          ["#f87171", "Anomaly contact"],
         ].forEach(([color, label]) => {
           const item = document.createElement("div");
           item.className = "propmap-legend-item";
-          item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color}"></span>${label}`;
+          item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color};border:1px solid rgba(255,255,255,0.25)"></span>${label}`;
           legend.appendChild(item);
         });
         wrap.appendChild(legend);
