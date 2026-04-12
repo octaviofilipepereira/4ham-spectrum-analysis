@@ -174,9 +174,10 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
     absorbed = is_daytime and freq_mhz < d_layer_cutoff_mhz
 
     # Multi-hop distance computation based on MUF margin
-    # Each F2 hop covers ~3000-3500 km; number of viable hops
-    # depends on how far below MUF the frequency is
-    _HOP_KM = 3500.0  # single-hop range
+    # Each F2 hop covers ~2000-3000 km (average ~2500 km).
+    # Signal loses ~3-6 dB per hop, so practical paths rarely exceed 3 hops.
+    # Only the best bands at solar maximum achieve 4 hops (~10000 km).
+    _HOP_KM = 2500.0  # realistic average single-hop range
     if absorbed:
         status = "Absorbed"
         band_open = False
@@ -193,13 +194,11 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
         status = "Open"
         band_open = True
         margin = effective_muf / freq_mhz
-        if margin >= 2.5:
-            max_hops = 5  # very strong — antipodal possible
-        elif margin >= 2.0:
-            max_hops = 4
-        elif margin >= 1.5:
+        if margin >= 3.0:
+            max_hops = 4  # exceptional — DX to antipodal region
+        elif margin >= 2.2:
             max_hops = 3
-        elif margin >= 1.2:
+        elif margin >= 1.5:
             max_hops = 2
         else:
             max_hops = 1
