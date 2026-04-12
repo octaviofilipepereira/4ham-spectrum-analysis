@@ -552,6 +552,28 @@ Last update: 2026-04-03 UTC
       .prop-notice strong { color: var(--fg); }
       .prop-notice .pn-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
 
+      .iono-badge {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        background: rgba(34, 197, 94, 0.07);
+        border: 1px solid rgba(34, 197, 94, 0.25);
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-bottom: 10px;
+      }
+      .iono-badge .iono-item { display: flex; align-items: center; gap: 4px; }
+      .iono-badge .iono-val  { color: var(--fg); font-weight: 600; }
+      .iono-badge .iono-cond { padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+      .iono-badge .iono-quiet      { background: rgba(34,197,94,0.18);  color: #4ade80; }
+      .iono-badge .iono-unsettled   { background: rgba(234,179,8,0.18);  color: #facc15; }
+      .iono-badge .iono-active      { background: rgba(249,115,22,0.18); color: #fb923c; }
+      .iono-badge .iono-storm       { background: rgba(239,68,68,0.18);  color: #f87171; }
+
       @media (max-width: 1100px) {
         .controls {
           grid-template-columns: 1fr 1fr;
@@ -772,6 +794,7 @@ Last update: 2026-04-03 UTC
           </article>
 
           <article class="chart-panel span-6">
+            <div id="ionoBadge" class="iono-badge" style="display:none;"></div>
             <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span>Propagation scores are based on <strong>confirmed decodes only</strong> — events with a <strong>verified callsign</strong>, regardless of mode. Detections without a callsign reflect <strong>band occupancy</strong> and do not contribute to propagation calculation.</span></div>
             <div class="chart-header">
               <h3>Propagation Score by Band</h3>
@@ -1272,10 +1295,48 @@ Last update: 2026-04-03 UTC
             metaSnapshot.textContent = "Simulated dataset (API fallback)";
           }
           renderFromCurrentRange();
+          fetchIonosphericBadge();
         } finally {
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
         }
+      }
+
+      async function fetchIonosphericBadge() {
+        const el = document.getElementById("ionoBadge");
+        if (!el) return;
+        try {
+          const resp = await fetch("/api/map/ionospheric");
+          if (!resp.ok) { el.style.display = "none"; return; }
+          const d = await resp.json();
+          if (!d.kp && !d.sfi) { el.style.display = "none"; return; }
+
+          const kp = d.kp != null ? d.kp : "--";
+          const sfi = d.sfi != null ? d.sfi : "--";
+          const fof2 = d.fof2_estimated_mhz != null ? d.fof2_estimated_mhz : "--";
+          const cond = d.kp_condition || "Unknown";
+
+          let condClass = "iono-quiet";
+          if (kp >= 5) condClass = "iono-storm";
+          else if (kp >= 4) condClass = "iono-active";
+          else if (kp >= 2) condClass = "iono-unsettled";
+
+          // Open bands summary
+          const bands = d.bands || {};
+          const openBands = Object.entries(bands)
+            .filter(([, v]) => v.open)
+            .map(([b]) => b)
+            .join(", ") || "none";
+
+          el.innerHTML = [
+            `<span class="iono-item">☀️ SFI: <span class="iono-val">${sfi}</span></span>`,
+            `<span class="iono-item">Kp: <span class="iono-val">${kp}</span> <span class="iono-cond ${condClass}">${cond}</span></span>`,
+            `<span class="iono-item">foF2≈ <span class="iono-val">${fof2} MHz</span></span>`,
+            `<span class="iono-item">Open: <span class="iono-val">${openBands}</span></span>`,
+            `<span style="margin-left:auto;font-size:10px;color:var(--muted);">Source: NOAA SWPC</span>`,
+          ].join("");
+          el.style.display = "flex";
+        } catch (e) { el.style.display = "none"; }
       }
 
       let stackedPercentMode = false;

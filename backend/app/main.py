@@ -146,6 +146,10 @@ async def lifespan(app_instance: FastAPI):
     from app.websocket.events import _run_occupancy_detection_loop
     asyncio.create_task(_run_occupancy_detection_loop())
 
+    # Start ionospheric data refresh (Kp + SFI from NOAA SWPC, every 15 min)
+    from app.core.ionospheric import ionospheric_refresh_loop
+    asyncio.create_task(ionospheric_refresh_loop())
+
     yield
 
     # Graceful shutdown

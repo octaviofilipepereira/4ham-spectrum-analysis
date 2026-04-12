@@ -19,8 +19,17 @@ from app.dependencies.helpers import (
     maidenhead_to_latlon,
     haversine_km,
 )
+from app.core.ionospheric import ionospheric_cache
 
 router = APIRouter()
+
+
+@router.get("/map/ionospheric")
+def map_ionospheric(
+    _: bool = Depends(optional_verify_basic_auth),
+) -> Dict:
+    """Return current ionospheric conditions with per-band MUF/skip estimates."""
+    return ionospheric_cache.get_summary()
 
 
 @router.get("/map/contacts")
