@@ -14,7 +14,8 @@
 9. [User Interface](#user-interface)
 10. [Spectrogram Interpretation](#spectrogram-interpretation)
 11. [Data Export](#data-export)
-12. [Troubleshooting](#troubleshooting)
+12. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -667,6 +668,107 @@ When the total number of events exceeds the configured limit (default: 500,000),
 2. Keeps only the 50,000 most recent events (configurable)
 
 Retention runs at most once per day and can be triggered manually in the Admin panel.
+
+---
+
+## Embedding the Academic Dashboard on an External Website
+
+The Academic Analytics dashboard (`4ham_academic_analytics.html`) can be embedded on an external website so that visitors can view propagation data without accessing the 4HAM server directly. This is done through a **reverse proxy** that forwards API requests from the public website to your private 4HAM backend.
+
+### Architecture
+
+```
+Visitor browser
+    │
+    ▼
+External web server (e.g. example.com)
+    ├── index.html / index.php    ← serves the dashboard page
+    └── /api/*                    ← reverse-proxied to 4HAM backend
+            │
+            ▼
+    4HAM backend (e.g. 192.168.1.x:8000)
+```
+
+The external server needs:
+1. A page that loads the Academic Analytics dashboard
+2. A reverse proxy rule that forwards `/api/` requests to the 4HAM backend
+
+### Option A — Apache + PHP
+
+**1. Create `config.php`** with your 4HAM backend URL:
+
+```php
+<?php
+$BACKEND_URL = "http://192.168.1.x:8000";  // your 4HAM server IP and port
+```
+
+**2. Create `.htaccess`** for reverse proxy rules:
+
+```apache
+RewriteEngine On
+
+# Proxy API requests to the 4HAM backend
+RewriteRule ^api/(.*)$ http://192.168.1.x:8000/api/$1 [P,L]
+
+# Proxy i18n and lib assets
+RewriteRule ^i18n/(.*)$ http://192.168.1.x:8000/i18n/$1 [P,L]
+RewriteRule ^lib/(.*)$ http://192.168.1.x:8000/lib/$1 [P,L]
+```
+
+Requires Apache modules: `mod_rewrite`, `mod_proxy`, `mod_proxy_http`.
+
+**3. Create `index.php`** that fetches and serves the dashboard:
+
+```php
+<?php
+require_once 'config.php';
+$html = file_get_contents("$BACKEND_URL/4ham_academic_analytics.html");
+if ($html === false) {
+    http_response_code(502);
+    echo "Backend unavailable";
+    exit;
+}
+echo $html;
+```
+
+### Option B — Nginx
+
+```nginx
+location /monitor/ {
+    # Serve the dashboard page
+    location = /monitor/ {
+        proxy_pass http://192.168.1.x:8000/4ham_academic_analytics.html;
+    }
+
+    # Proxy API, i18n and lib requests
+    location /monitor/api/ {
+        proxy_pass http://192.168.1.x:8000/api/;
+    }
+    location /monitor/i18n/ {
+        proxy_pass http://192.168.1.x:8000/i18n/;
+    }
+    location /monitor/lib/ {
+        proxy_pass http://192.168.1.x:8000/lib/;
+    }
+}
+```
+
+### Security considerations
+
+- The reverse proxy exposes only the `/api/analytics/` and static asset endpoints — the 4HAM admin panel, scan controls, and WebSocket streams are **not** proxied.
+- Do **not** proxy `/api/auth/`, `/api/admin/`, `/api/scan/`, or `/ws/` endpoints.
+- Consider adding rate limiting on the external server to prevent abuse.
+- The 4HAM backend should remain on a private network; only the external web server needs access to it.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Dashboard loads but shows no data | API proxy not working | Check that `/api/analytics/academic` returns JSON from the external URL |
+| 502 Bad Gateway | 4HAM backend unreachable | Verify backend is running and the proxy URL/IP is correct |
+| Mixed content warning | External site is HTTPS, backend is HTTP | Ensure the proxy handles the HTTP→HTTPS transition (the browser only sees the external HTTPS URL) |
+| CORS errors in console | Direct browser→backend requests | Verify all API calls go through the proxy, not directly to the backend IP |
+| i18n / translations not loading | Missing proxy rule for `/i18n/` | Add the `i18n` rewrite/proxy rule |
 
 ---
 

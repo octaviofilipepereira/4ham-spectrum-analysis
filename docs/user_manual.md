@@ -14,7 +14,8 @@
 9. [Interface do Utilizador](#interface-do-utilizador)
 10. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
 11. [Exportação de Dados](#exportação-de-dados)
-12. [Resolução de Problemas](#resolução-de-problemas)
+12. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
+13. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -667,6 +668,107 @@ Quando o total de eventos excede o limite configurado (padrão: 500.000), o sist
 2. Mantém apenas os 50.000 eventos mais recentes (configurável)
 
 A retenção corre no máximo uma vez por dia e pode ser acionada manualmente no painel Admin.
+
+---
+
+## Incorporar o Dashboard Académico num Website Externo
+
+O dashboard Academic Analytics (`4ham_academic_analytics.html`) pode ser incorporado num website externo para que os visitantes possam visualizar dados de propagação sem aceder directamente ao servidor 4HAM. Isto é feito através de um **reverse proxy** que encaminha os pedidos API do website público para o backend 4HAM privado.
+
+### Arquitectura
+
+```
+Browser do visitante
+    │
+    ▼
+Servidor web externo (ex. exemplo.pt)
+    ├── index.html / index.php    ← serve a página do dashboard
+    └── /api/*                    ← reverse proxy para o backend 4HAM
+            │
+            ▼
+    Backend 4HAM (ex. 192.168.1.x:8000)
+```
+
+O servidor externo necessita de:
+1. Uma página que carregue o dashboard Academic Analytics
+2. Uma regra de reverse proxy que encaminhe pedidos `/api/` para o backend 4HAM
+
+### Opção A — Apache + PHP
+
+**1. Criar `config.php`** com o URL do backend 4HAM:
+
+```php
+<?php
+$BACKEND_URL = "http://192.168.1.x:8000";  // IP e porta do servidor 4HAM
+```
+
+**2. Criar `.htaccess`** com as regras de reverse proxy:
+
+```apache
+RewriteEngine On
+
+# Proxy dos pedidos API para o backend 4HAM
+RewriteRule ^api/(.*)$ http://192.168.1.x:8000/api/$1 [P,L]
+
+# Proxy dos assets i18n e lib
+RewriteRule ^i18n/(.*)$ http://192.168.1.x:8000/i18n/$1 [P,L]
+RewriteRule ^lib/(.*)$ http://192.168.1.x:8000/lib/$1 [P,L]
+```
+
+Requer módulos Apache: `mod_rewrite`, `mod_proxy`, `mod_proxy_http`.
+
+**3. Criar `index.php`** que obtém e serve o dashboard:
+
+```php
+<?php
+require_once 'config.php';
+$html = file_get_contents("$BACKEND_URL/4ham_academic_analytics.html");
+if ($html === false) {
+    http_response_code(502);
+    echo "Backend indisponível";
+    exit;
+}
+echo $html;
+```
+
+### Opção B — Nginx
+
+```nginx
+location /monitor/ {
+    # Servir a página do dashboard
+    location = /monitor/ {
+        proxy_pass http://192.168.1.x:8000/4ham_academic_analytics.html;
+    }
+
+    # Proxy para API, i18n e lib
+    location /monitor/api/ {
+        proxy_pass http://192.168.1.x:8000/api/;
+    }
+    location /monitor/i18n/ {
+        proxy_pass http://192.168.1.x:8000/i18n/;
+    }
+    location /monitor/lib/ {
+        proxy_pass http://192.168.1.x:8000/lib/;
+    }
+}
+```
+
+### Considerações de segurança
+
+- O reverse proxy expõe apenas os endpoints `/api/analytics/` e assets estáticos — o painel admin, controlos de scan e streams WebSocket **não** são proxied.
+- **Não** fazer proxy de `/api/auth/`, `/api/admin/`, `/api/scan/`, ou `/ws/`.
+- Considere adicionar rate limiting no servidor externo para prevenir abuso.
+- O backend 4HAM deve permanecer numa rede privada; apenas o servidor web externo necessita de acesso.
+
+### Resolução de problemas
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| Dashboard carrega mas não mostra dados | Proxy da API não funciona | Verificar que `/api/analytics/academic` retorna JSON a partir do URL externo |
+| 502 Bad Gateway | Backend 4HAM inacessível | Verificar que o backend está em execução e o URL/IP do proxy está correcto |
+| Aviso de conteúdo misto | Site externo usa HTTPS, backend usa HTTP | Garantir que o proxy trata a transição HTTP→HTTPS (o browser só vê o URL HTTPS externo) |
+| Erros CORS na consola | Pedidos directos browser→backend | Verificar que todos os pedidos API passam pelo proxy, não directamente para o IP do backend |
+| i18n / traduções não carregam | Regra de proxy para `/i18n/` em falta | Adicionar a regra de rewrite/proxy para i18n |
 
 ---
 
