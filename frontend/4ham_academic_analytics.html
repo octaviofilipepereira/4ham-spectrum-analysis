@@ -652,19 +652,22 @@ Last update: 2026-04-03 UTC
         left: 8px;
         z-index: 10;
         display: flex;
-        flex-wrap: wrap;
-        gap: 3px;
+        flex-direction: column;
+        gap: 4px;
       }
       .propmap-band-btn {
-        padding: 2px 7px;
-        border-radius: 4px;
-        font-size: 10px;
-        font-weight: 600;
-        border: 1px solid rgba(255,255,255,0.15);
+        padding: 5px 12px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.2);
         cursor: pointer;
-        transition: opacity 0.15s;
+        transition: opacity 0.15s, filter 0.15s;
+        text-align: left;
+        min-width: 50px;
+        letter-spacing: 0.3px;
       }
-      .propmap-band-btn.off { opacity: 0.25; }
+      .propmap-band-btn.off { opacity: 0.22; filter: saturate(0.3); }
       .propmap-info {
         position: absolute;
         bottom: 8px;
@@ -920,9 +923,9 @@ Last update: 2026-04-03 UTC
           <article class="chart-panel span-12">
             <div class="chart-header">
               <h3>QTH-Centric Propagation Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured rings&lt;/strong&gt; — NOAA-predicted coverage per band (skip distance → max range).&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted ring = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside ring = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom · Double-click to reset.&lt;br&gt;Use band pills to toggle bands. Click ⤢ for fullscreen.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen.">i</button>
             </div>
-            <p>NOAA prediction rings vs real SDR contacts — drag to rotate, scroll to zoom.</p>
+            <p>NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom.</p>
             <div class="propmap-wrap" id="propMapWrap"></div>
           </article>
         </div>
@@ -1488,6 +1491,82 @@ Last update: 2026-04-03 UTC
       };
       const _pmColor = (b) => PROPMAP_BAND_COLORS[(b || "").toLowerCase()] || "#9ca3af";
       let _pmBandVis = {};       // {band: true/false} toggle state
+
+      // ── Solar & patch helpers (DR2W-style propagation zones) ───────
+      const _PM_FREQ_MHZ = {
+        "160m":1.9,"80m":3.6,"60m":5.35,"40m":7.1,"30m":10.125,
+        "20m":14.175,"17m":18.118,"15m":21.225,"12m":24.94,"10m":28.5,"6m":50.15
+      };
+
+      function _pmSubSolar() {
+        const now = new Date();
+        const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+        const decl = -23.44 * Math.cos(2 * Math.PI * (doy + 10) / 365);
+        const utcH = now.getUTCHours() + now.getUTCMinutes() / 60;
+        const subLon = ((12 - utcH) * 15 + 540) % 360 - 180;
+        return { lat: decl, lon: subLon };
+      }
+
+      /**
+       * Generate an irregular, solar-modulated polygon for a propagation zone.
+       *  - HF bands (>=14 MHz) expand toward sunlit hemisphere
+       *  - LF bands (<7 MHz) expand toward dark hemisphere
+       *  - Organic noise gives natural-looking edges
+       */
+      function _pmBandPatch(sLat, sLon, band, radiusKm, subSolar) {
+        const freq = _PM_FREQ_MHZ[band] || 14;
+        const nPts = 72;
+        const pts = [];
+        // Solar preference: >0 = expand sunward (HF), <0 = darkward (LF)
+        let sPref;
+        if (freq >= 14) sPref = 0.5;
+        else if (freq >= 7) sPref = 0.15;
+        else sPref = -0.45;
+        const seed = freq * 7.3;
+        const sLatR = sLat * Math.PI / 180;
+        const sLonR = sLon * Math.PI / 180;
+        for (let i = 0; i < nPts; i++) {
+          const azRad = (i / nPts) * 2 * Math.PI;
+          // Initial test point at base radius to get solar factor
+          const ang0 = radiusKm / 6371.0;
+          const lat2 = Math.asin(
+            Math.sin(sLatR) * Math.cos(ang0) +
+            Math.cos(sLatR) * Math.sin(ang0) * Math.cos(azRad)
+          );
+          const lon2 = sLonR + Math.atan2(
+            Math.sin(azRad) * Math.sin(ang0) * Math.cos(sLatR),
+            Math.cos(ang0) - Math.sin(sLatR) * Math.sin(lat2)
+          );
+          const eLat = lat2 * 180 / Math.PI;
+          const eLon = lon2 * 180 / Math.PI;
+          // Solar factor: 1 = subsolar, 0 = terminator, <0 = dark
+          const gd = d3.geoDistance([eLon, eLat], [subSolar.lon, subSolar.lat]);
+          const sf = Math.cos(gd);
+          // Modulate radius toward preferred hemisphere
+          let mod = 1.0 + sPref * sf * 0.55;
+          // Organic edge noise (deterministic per band)
+          const noise = 1.0
+            + 0.08 * Math.sin(azRad * 5 + seed)
+            + 0.06 * Math.cos(azRad * 7 + seed * 1.3)
+            + 0.04 * Math.sin(azRad * 11 + seed * 0.7)
+            + 0.03 * Math.cos(azRad * 17 + seed * 2.1);
+          const effKm = radiusKm * mod * noise;
+          // Final point at modulated distance
+          const ang2 = effKm / 6371.0;
+          const lat3 = Math.asin(
+            Math.sin(sLatR) * Math.cos(ang2) +
+            Math.cos(sLatR) * Math.sin(ang2) * Math.cos(azRad)
+          );
+          const lon3 = sLonR + Math.atan2(
+            Math.sin(azRad) * Math.sin(ang2) * Math.cos(sLatR),
+            Math.cos(ang2) - Math.sin(sLatR) * Math.sin(lat3)
+          );
+          pts.push([lon3 * 180 / Math.PI, lat3 * 180 / Math.PI]);
+        }
+        pts.push(pts[0].slice());
+        return { type: "Polygon", coordinates: [pts] };
+      }
+
       let _pmWorldData = null;
       let _pmIonoData = null;
       let _pmContactData = null;
@@ -1527,9 +1606,9 @@ Last update: 2026-04-03 UTC
           _pmIonoData = await ionoResp.json();
           _pmContactData = await contactResp.json();
 
-          // Initialize band visibility (all visible by default)
+          // Initialize band visibility (none selected — user picks)
           if (Object.keys(_pmBandVis).length === 0 && _pmIonoData.bands) {
-            for (const b of Object.keys(_pmIonoData.bands)) _pmBandVis[b] = true;
+            for (const b of Object.keys(_pmIonoData.bands)) _pmBandVis[b] = false;
           }
 
           drawPropMap(wrap, world);
@@ -1628,66 +1707,95 @@ Last update: 2026-04-03 UTC
 
           const center = proj.invert([W / 2, H / 2]);
 
-          // ── Coverage patches (solid filled geodesic zones) ────────────
+          // ── DR2W-style propagation patches (multi-zone, solar-shaped) ─
           ringG.selectAll("*").remove();
           const bands = iono.bands || {};
+          const subSolar = _pmSubSolar();
 
-          // Sort bands by max_distance descending so largest patches render behind
+          // Sort by weak_km descending — largest zones render behind
           const sortedBands = Object.entries(bands)
             .filter(([b, info]) => _pmBandVis[b] && info.status !== "Closed" && info.status !== "Absorbed" && (info.max_distance_km || 0) > 0)
-            .sort((a, b) => (b[1].max_distance_km || 0) - (a[1].max_distance_km || 0));
+            .sort((a, b) => (b[1].weak_km || b[1].max_distance_km || 0) - (a[1].weak_km || a[1].max_distance_km || 0));
 
           for (const [band, info] of sortedBands) {
-            const maxKm = info.max_distance_km || 0;
-            const skipKm = info.skip_km || 0;
-            const color = _pmColor(band);
+            const skipKm  = info.skip_km || 0;
+            const strongR = info.strong_km   || Math.round((info.max_distance_km || 0) * 0.4);
+            const modR    = info.moderate_km  || Math.round((info.max_distance_km || 0) * 0.7);
+            const weakR   = info.weak_km      || info.max_distance_km || 0;
+            const color   = _pmColor(band);
 
-            // Outer patch — solid fill for max coverage
-            const outerCircle = d3.geoCircle()
-              .center([sLon, sLat])
-              .radius(kmToDeg(maxKm))
-              .precision(2)();
+            // Three zones: weak (outer) → moderate → strong (inner)
+            // Render outer-first so inner layers paint on top
+            const zones = [
+              { r: weakR,   opacity: 0.08, sw: 0.5 },
+              { r: modR,    opacity: 0.14, sw: 0.7 },
+              { r: strongR, opacity: 0.22, sw: 0   },
+            ];
 
-            ringG.append("path")
-              .datum(outerCircle)
-              .attr("d", path)
-              .attr("fill", color)
-              .attr("fill-opacity", 0.16)
-              .attr("stroke", color)
-              .attr("stroke-width", 1)
-              .attr("stroke-opacity", 0.5);
+            for (const z of zones) {
+              if (z.r <= 0) continue;
+              const patch = _pmBandPatch(sLat, sLon, band, z.r, subSolar);
+              ringG.append("path")
+                .datum(patch)
+                .attr("d", path)
+                .attr("fill", color)
+                .attr("fill-opacity", z.opacity)
+                .attr("stroke", z.sw > 0 ? color : "none")
+                .attr("stroke-width", z.sw)
+                .attr("stroke-opacity", 0.35);
+            }
 
-            // Skip-zone cutout — dark inner zone where no propagation occurs
-            if (skipKm > 0 && skipKm < maxKm) {
+            // Skip-zone cutout — dark halo where signal overshoots
+            if (skipKm > 0 && skipKm < weakR) {
               const innerCircle = d3.geoCircle()
                 .center([sLon, sLat])
                 .radius(kmToDeg(skipKm))
                 .precision(2)();
-
               ringG.append("path")
                 .datum(innerCircle)
                 .attr("d", path)
-                .attr("fill", "#1a1a2e")
-                .attr("fill-opacity", 0.25)
+                .attr("fill", "#0d1117")
+                .attr("fill-opacity", 0.35)
                 .attr("stroke", color)
-                .attr("stroke-width", 0.6)
-                .attr("stroke-opacity", 0.3);
+                .attr("stroke-width", 0.5)
+                .attr("stroke-opacity", 0.2);
             }
 
-            // Band label at north edge of patch
-            const northPt = [sLon, sLat + kmToDeg(maxKm)];
-            const lp = proj(northPt);
-            if (lp && d3.geoDistance(northPt, center) < Math.PI / 2) {
-              ringG.append("text")
-                .attr("x", lp[0]).attr("y", lp[1] - 4)
-                .attr("text-anchor", "middle")
-                .attr("fill", color).attr("font-size", "9px")
-                .attr("font-weight", "bold")
-                .attr("font-family", "monospace").attr("opacity", 0.9)
-                .attr("pointer-events", "none")
-                .text(band);
+            // Band label at point of maximum extent (outermost zone)
+            const weakPatch = _pmBandPatch(sLat, sLon, band, weakR, subSolar);
+            const coords = weakPatch.coordinates[0];
+            let bestPt = coords[0], bestD = 0;
+            for (const c of coords) {
+              const dd = d3.geoDistance([sLon, sLat], c);
+              if (dd > bestD) { bestD = dd; bestPt = c; }
+            }
+            if (d3.geoDistance(bestPt, center) < Math.PI / 2) {
+              const lp = proj(bestPt);
+              if (lp) {
+                ringG.append("text")
+                  .attr("x", lp[0]).attr("y", lp[1] - 5)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", color).attr("font-size", "10px")
+                  .attr("font-weight", "bold")
+                  .attr("font-family", "monospace").attr("opacity", 0.9)
+                  .attr("pointer-events", "none")
+                  .text(band);
+              }
             }
           }
+
+          // ── Day/night terminator ─────────────────────────────────────
+          const terminator = d3.geoCircle()
+            .center([subSolar.lon, subSolar.lat])
+            .radius(90).precision(1)();
+          ringG.append("path")
+            .datum(terminator)
+            .attr("d", path)
+            .attr("fill", "rgba(0,0,0,0.15)")
+            .attr("stroke", "#fbbf24")
+            .attr("stroke-width", 0.8)
+            .attr("stroke-opacity", 0.45)
+            .attr("stroke-dasharray", "5,3");
 
           // ── Contact arcs & dots ──────────────────────────────────────
           arcG.selectAll("path").remove();

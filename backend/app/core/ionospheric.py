@@ -152,6 +152,11 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
       - "Marginal"  — freq between 80-100% of effective MUF
       - "Closed"    — freq above effective MUF
       - "Absorbed"  — daytime D-layer absorption blocks low-band DX
+
+    Returns multi-zone distances for DR2W-style gradient patches:
+      strong_km  — high-confidence coverage (S7-S9+)
+      moderate_km — moderate coverage (S5-S7)
+      weak_km    — fringe coverage (S3-S5)
     """
     muf_3000 = _muf_for_distance(fof2, 3000.0)
 
@@ -168,29 +173,68 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
     d_layer_cutoff_mhz = 5.5 if is_daytime else 0.0
     absorbed = is_daytime and freq_mhz < d_layer_cutoff_mhz
 
-    # Determine status
+    # Multi-hop distance computation based on MUF margin
+    # Each F2 hop covers ~3000-3500 km; number of viable hops
+    # depends on how far below MUF the frequency is
+    _HOP_KM = 3500.0  # single-hop range
     if absorbed:
         status = "Absorbed"
         band_open = False
-        max_distance_km = 0
+        max_hops = 0
     elif freq_mhz > effective_muf:
         status = "Closed"
         band_open = False
-        max_distance_km = 0
+        max_hops = 0
     elif freq_mhz > effective_muf * 0.8:
         status = "Marginal"
         band_open = True
-        max_distance_km = 2000  # reduced range near MUF limit
+        max_hops = 1  # only single hop near MUF limit
     else:
         status = "Open"
         band_open = True
-        max_distance_km = 4000
+        margin = effective_muf / freq_mhz
+        if margin >= 2.5:
+            max_hops = 5  # very strong — antipodal possible
+        elif margin >= 2.0:
+            max_hops = 4
+        elif margin >= 1.5:
+            max_hops = 3
+        elif margin >= 1.2:
+            max_hops = 2
+        else:
+            max_hops = 1
+
+    max_distance_km = round(max_hops * _HOP_KM)
+
+    # Three-zone model for gradient patches
+    # Strong: first 1-2 hops (best SNR)
+    # Moderate: next 1-2 hops (acceptable SNR)
+    # Weak: outermost hops (fringe, barely copyable)
+    if max_hops >= 3:
+        strong_km = round(min(2, max_hops) * _HOP_KM * 0.7)
+        moderate_km = round(min(3, max_hops) * _HOP_KM * 0.85)
+        weak_km = max_distance_km
+    elif max_hops == 2:
+        strong_km = round(_HOP_KM * 0.7)
+        moderate_km = round(_HOP_KM * 1.5)
+        weak_km = max_distance_km
+    elif max_hops == 1:
+        strong_km = round(_HOP_KM * 0.45)
+        moderate_km = round(_HOP_KM * 0.75)
+        weak_km = max_distance_km
+    else:
+        strong_km = 0
+        moderate_km = 0
+        weak_km = 0
 
     return {
         "open": band_open,
         "status": status,
         "skip_km": round(skip_km),
-        "max_distance_km": round(max_distance_km),
+        "max_distance_km": max_distance_km,
+        "strong_km": strong_km,
+        "moderate_km": moderate_km,
+        "weak_km": weak_km,
         "muf_at_3000km": round(effective_muf, 1),
         "geo_factor": round(geo_factor, 2),
     }
