@@ -87,9 +87,9 @@ SNR = signal_level_dB - noise_floor_dB
 #### 🌍 Propagation Score
 
 > **⚠️ Important note on data source:**
-> The Propagation Score is calculated **exclusively from digital modes** (FT8, FT4, WSPR). These modes decode the entire passband in parallel and each successful decode yields a callsign, grid reference, and SNR — the only reliable basis for assessing a real propagation path.
+> The Propagation Score is calculated from **confirmed decodes only** — events with a **verified callsign**, regardless of mode. A successful decode provides a callsign and SNR, the reliable basis for assessing a real propagation path.
 >
-> **CW and SSB** capture **band occupancy**: they confirm that the band is active with traffic, but due to sequential narrowband scanning (short dwell per frequency), a callsign is rarely captured during the listening window. Without a callsign + grid it is not possible to confirm the ionospheric path, so these events **do not contribute to the propagation score**.
+> Events **without a callsign** (in any mode) reflect **band occupancy**: they confirm that the band is active with traffic, but **do not contribute to the propagation score**.
 
 **What it is**: An **aggregated** assessment of propagation conditions based on **multiple recent events**.
 
@@ -120,31 +120,27 @@ These modes decode the entire passband in parallel. The decode rate (ratio of ca
 snr_norm = clamp((SNR - floor) / range, 0, 1)
 ```
 
-##### Category 2 — CW (Morse) — Band Occupancy
+##### Category 2 — CW (Morse) — Confirmed Decodes Only
 
-CW uses sequential narrowband scanning with short dwell times. Not capturing a callsign **does not indicate weak propagation** — the operator may simply not have been transmitting their callsign during the short listening window.
-
-| Component | Weight | Description |
-|---|---|---|
-| `traffic_volume` | **30%** | CW_TRAFFIC detected = band is active |
-| `snr_quality` | **30%** | Normalised SNR (floor −15 dB, ceiling +20 dB) |
-| `signal_strength` | **15%** | RF signal level as propagation indicator |
-| `callsign_bonus` | **15%** | Bonus when callsign IS captured (not penalty when absent) |
-| `recency` | **10%** | More recent events carry more weight |
-
-##### Category 3 — SSB (Voice) — Band Occupancy
-
-SSB shares CW's sequential scanning limitation. Assessment relies on voice detection quality, SNR, and signal strength.
+CW uses sequential narrowband scanning with short dwell times. Only events with a **verified callsign** contribute to propagation scoring. Events without a callsign reflect band occupancy.
 
 | Component | Weight | Description |
 |---|---|---|
-| `traffic_volume` | **20%** | SSB_TRAFFIC / VOICE_DETECTION = band is active |
-| `snr_quality` | **25%** | Normalised SNR (floor +3 dB, ceiling +30 dB) |
-| `signal_strength` | **15%** | RF signal level |
-| `voice_quality` | **20%** | Quality of voice detection (clarity) |
-| `transcript` | **10%** | Successful speech-to-text = intelligible signal |
-| `callsign_bonus` | **5%** | Bonus when callsign IS captured |
-| `recency` | **5%** | More recent events carry more weight |
+| `snr_quality` | **35%** | Normalised SNR (floor −15 dB, ceiling +20 dB) — callsign events only |
+| `callsign_diversity` | **25%** | Unique confirmed callsigns (diversity) |
+| `signal_strength` | **20%** | RF signal level from callsign events |
+| `recency` | **20%** | More recent callsign events carry more weight |
+
+##### Category 3 — SSB (Voice) — Confirmed Decodes Only
+
+SSB shares CW's sequential scanning limitation. Only events with a **verified callsign** contribute to propagation scoring. Events without a callsign reflect band occupancy.
+
+| Component | Weight | Description |
+|---|---|---|
+| `snr_quality` | **35%** | Normalised SNR (floor +3 dB, ceiling +30 dB) — callsign events only |
+| `callsign_diversity` | **25%** | Unique confirmed callsigns (diversity) |
+| `signal_strength` | **20%** | RF signal level from callsign events |
+| `recency` | **20%** | More recent callsign events carry more weight |
 
 **Classification (common to all categories)**:
 - **≥ 70**: Excellent 🟢

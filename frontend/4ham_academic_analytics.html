@@ -715,7 +715,7 @@ Last update: 2026-04-03 UTC
             <span class="label">Overall Propagation score</span>
             <div class="value" id="kpiPropScore">--</div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Digital modes only (FT8/FT4/WSPR).<br>CW &amp; SSB = band occupancy.</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
           </div>
           <div class="card">
             <span class="label">Best band</span>
@@ -772,21 +772,21 @@ Last update: 2026-04-03 UTC
           </article>
 
           <article class="chart-panel span-6">
-            <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span>Propagation scores are based on <strong>digital modes only</strong> (FT8 / FT4 / WSPR). <strong>CW</strong> and <strong>SSB</strong> detections reflect <strong>band occupancy</strong> — they confirm that the band is active but do not contribute to propagation calculation, as no confirmed transmission path (callsign + grid) is available from sequential narrowband scanning.</span></div>
+            <div class="prop-notice"><span class="pn-icon">&#x24D8;</span><span>Propagation scores are based on <strong>confirmed decodes only</strong> — events with a <strong>verified callsign</strong>, regardless of mode. Detections without a callsign reflect <strong>band occupancy</strong> and do not contribute to propagation calculation.</span></div>
             <div class="chart-header">
               <h3>Propagation Score by Band</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows the propagation quality score (0-100) per band, calculated exclusively from digital mode decodes (FT8, FT4, WSPR). A successful decode provides a confirmed callsign, grid, and SNR - the only reliable basis for propagation assessment. CW and SSB events indicate band occupancy only and do not contribute to this score. Higher bars mean better propagation on that band.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Score by Band chart" data-help-title="Propagation Score by Band" data-help-text="Shows the propagation quality score (0-100) per band, based on confirmed decodes only — events with a verified callsign, regardless of mode. Higher bars mean better propagation on that band. Events without a callsign reflect band occupancy and do not contribute to this score.">i</button>
             </div>
-            <p>Digital modes only (FT8/FT4/WSPR) — weighted average by activity in the selected period.</p>
+            <p>Confirmed decodes only (verified callsign) — weighted average by activity in the selected period.</p>
             <svg id="propagationBandChart"></svg>
           </article>
 
           <article class="chart-panel span-6">
             <div class="chart-header">
               <h3>Propagation Time Trend</h3>
-              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots the global propagation score over time at hourly resolution. Score is derived exclusively from digital mode decodes (FT8, FT4, WSPR) - the only modes that provide confirmed transmission paths. CW and SSB contribute band occupancy data only and are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average.">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain Propagation Time Trend chart" data-help-title="Propagation Time Trend" data-help-text="Plots the global propagation score over time at hourly resolution. Score is derived from confirmed decodes only — events with a verified callsign, regardless of mode. Events without a callsign are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average.">i</button>
             </div>
-            <p>Global propagation score per hour — digital modes only (FT8/FT4/WSPR).</p>
+            <p>Global propagation score per hour — confirmed decodes only (verified callsign).</p>
             <svg id="propagationTrendChart"></svg>
           </article>
         </div>

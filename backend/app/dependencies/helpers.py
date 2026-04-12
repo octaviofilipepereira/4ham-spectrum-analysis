@@ -333,10 +333,11 @@ def _score_to_state(score: float) -> str:
 
 def _compute_band_propagation(band_data: Dict) -> Dict:
     """
-    Compute propagation score for a single band using the 3-formula approach.
+    Compute propagation score for a single band — confirmed decodes only.
 
-    band_data contains pre-aggregated metrics per category for one band.
-    Returns dict with score, state, and component breakdown.
+    Only events with a verified callsign contribute to propagation scoring.
+    Events without a callsign reflect band occupancy but do not affect the score.
+    This applies universally across all mode categories.
     """
     cat_scores = []
     cat_weights = []
@@ -359,81 +360,62 @@ def _compute_band_propagation(band_data: Dict) -> Dict:
         cat_scores.append(clamp(score, 0.0, 100.0))
         cat_weights.append(d["total_events"])
 
-    # ── CW ────────────────────────────────────────────────────────────
+    # ── CW — confirmed decodes only ──────────────────────────────────
     c = band_data.get("cw")
-    if c and c["total_events"] > 0:
-        traffic_norm = clamp(math.log1p(c["total_events"]) / math.log1p(100), 0.0, 1.0)
-        snr_list = c["snr_values"]
+    if c and c["callsign_events"] > 0:
+        cs_n = c["callsign_events"]
+        snr_list = c["cs_snr_values"]
         snr_component = _normalise_snr(median(snr_list), "CW") if snr_list else 0.0
-        pwr_list = c["power_values"]
+        pwr_list = c["cs_power_values"]
         signal_component = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
-        callsign_bonus = min(1.0, c["callsign_events"] / max(1, c["total_events"]) * 3.0)
-        recency_component = c["avg_recency"]
+        callsign_norm = clamp(math.log1p(c["unique_callsigns"]) / math.log1p(20), 0.0, 1.0)
+        recency_component = c["cs_avg_recency"]
 
         score = 100.0 * (
-            0.30 * traffic_norm +
-            0.30 * snr_component +
-            0.15 * signal_component +
-            0.15 * callsign_bonus +
-            0.10 * recency_component
+            0.35 * snr_component +
+            0.25 * callsign_norm +
+            0.20 * signal_component +
+            0.20 * recency_component
         )
-        # Verification: occupancy-only events lack callsign confirmation
-        if c["total_events"] > 5:
-            conf_ratio = c["callsign_events"] / c["total_events"]
-            if conf_ratio < 0.03:
-                verification = 0.65 + 0.35 * (conf_ratio / 0.03)
-                score = score * verification
         cat_scores.append(clamp(score, 0.0, 100.0))
-        cat_weights.append(c["total_events"])
+        cat_weights.append(cs_n)
 
-    # ── SSB ───────────────────────────────────────────────────────────
-    s = band_data.get("ssb")
-    if s and s["total_events"] > 0:
-        traffic_norm = clamp(math.log1p(s["total_events"]) / math.log1p(100), 0.0, 1.0)
-        snr_list = s["snr_values"]
+    # ── SSB — confirmed decodes only ─────────────────────────────────
+    sb = band_data.get("ssb")
+    if sb and sb["callsign_events"] > 0:
+        cs_n = sb["callsign_events"]
+        snr_list = sb["cs_snr_values"]
         snr_component = _normalise_snr(median(snr_list), "SSB") if snr_list else 0.0
-        pwr_list = s["power_values"]
+        pwr_list = sb["cs_power_values"]
         signal_component = clamp((median(pwr_list) + 120.0) / 70.0, 0.0, 1.0) if pwr_list else 0.3
-        voice_quality = s["avg_confidence"]
-        transcript_bonus = 1.0 if s["has_transcript"] else 0.0
-        callsign_bonus = min(1.0, s["callsign_events"] / max(1, s["total_events"]) * 3.0)
-        recency_component = s["avg_recency"]
+        callsign_norm = clamp(math.log1p(sb["unique_callsigns"]) / math.log1p(20), 0.0, 1.0)
+        recency_component = sb["cs_avg_recency"]
 
         score = 100.0 * (
-            0.20 * traffic_norm +
-            0.25 * snr_component +
-            0.15 * signal_component +
-            0.20 * voice_quality +
-            0.10 * transcript_bonus +
-            0.05 * callsign_bonus +
-            0.05 * recency_component
+            0.35 * snr_component +
+            0.25 * callsign_norm +
+            0.20 * signal_component +
+            0.20 * recency_component
         )
-        # Verification: occupancy-only events lack callsign confirmation
-        if s["total_events"] > 5:
-            conf_ratio = s["callsign_events"] / s["total_events"]
-            if conf_ratio < 0.03:
-                verification = 0.65 + 0.35 * (conf_ratio / 0.03)
-                score = score * verification
         cat_scores.append(clamp(score, 0.0, 100.0))
-        cat_weights.append(s["total_events"])
+        cat_weights.append(cs_n)
 
     if not cat_scores:
         return {"score": 0.0, "state": "Poor"}
 
     # Weighted average across categories present in this band
     total_w = sum(cat_weights)
-    band_score = sum(s * w for s, w in zip(cat_scores, cat_weights)) / total_w if total_w > 0 else 0.0
+    band_score = sum(sc * w for sc, w in zip(cat_scores, cat_weights)) / total_w if total_w > 0 else 0.0
     return {"score": round(band_score, 1), "state": _score_to_state(band_score)}
 
 
 def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Dict:
     """
-    Build propagation summary using the 3-formula approach.
+    Build propagation summary — confirmed decodes only.
 
-    Three mode-category scoring formulas are applied:
-      * Digital wideband (FT8/FT4/WSPR): decode_rate + SNR + callsigns + recency
-      * CW: traffic_volume + SNR + signal_strength + callsign_bonus + recency
-      * SSB: traffic_volume + SNR + signal_strength + voice_quality + transcript + callsign_bonus + recency
+    Only events with a verified callsign contribute to propagation scoring.
+    Events without a callsign reflect band occupancy but do not affect the score.
+    This applies universally across all mode categories (Digital, CW, SSB).
 
     See docs/propagation_scoring_reference.md for full design rationale.
     """
@@ -467,6 +449,13 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
             "dominant_mode": "",
             "_callsign_set": set(),
             "_mode_counts": {},
+            # Callsign-only metrics (used for CW/SSB confirmed-decode scoring)
+            "cs_snr_values": [],
+            "cs_power_values": [],
+            "cs_recency_sum": 0.0,
+            "cs_avg_recency": 0.0,
+            "cs_confidence_sum": 0.0,
+            "cs_avg_confidence": 0.0,
         }
 
     for event in events:
@@ -492,7 +481,8 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         bucket["_mode_counts"][mode_raw] = bucket["_mode_counts"].get(mode_raw, 0) + 1
 
         # Callsign tracking
-        if event_type == "callsign":
+        is_callsign_event = event_type == "callsign"
+        if is_callsign_event:
             bucket["callsign_events"] += 1
             callsign = str(event.get("callsign") or "").strip().upper()
             if callsign:
@@ -502,6 +492,8 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         raw_snr = safe_float(event.get("snr_db"), default=None)
         if raw_snr is not None:
             bucket["snr_values"].append(raw_snr)
+            if is_callsign_event:
+                bucket["cs_snr_values"].append(raw_snr)
             prev_max = bucket["max_snr_db"]
             bucket["max_snr_db"] = raw_snr if prev_max is None else max(prev_max, raw_snr)
 
@@ -509,6 +501,8 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         raw_power = safe_float(event.get("power_dbm"), default=None)
         if raw_power is not None:
             bucket["power_values"].append(raw_power)
+            if is_callsign_event:
+                bucket["cs_power_values"].append(raw_power)
 
         # Recency
         parsed_ts = parse_event_timestamp(event.get("timestamp"))
@@ -518,11 +512,15 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
         else:
             recency = 0.5
         bucket["recency_sum"] += recency
+        if is_callsign_event:
+            bucket["cs_recency_sum"] += recency
 
         # Confidence
         conf = safe_float(event.get("confidence"), default=None)
         if conf is not None:
             bucket["confidence_sum"] += clamp(conf, 0.0, 1.0)
+            if is_callsign_event:
+                bucket["cs_confidence_sum"] += clamp(conf, 0.0, 1.0)
 
         # Transcript / raw text (SSB)
         if not bucket["has_transcript"]:
@@ -541,6 +539,11 @@ def build_propagation_summary(window_minutes: int = 30, limit: int = 3000) -> Di
                 # Determine dominant mode
                 if bucket["_mode_counts"]:
                     bucket["dominant_mode"] = max(bucket["_mode_counts"], key=bucket["_mode_counts"].get)
+            # Callsign-only averages
+            cs_n = bucket["callsign_events"]
+            if cs_n > 0:
+                bucket["cs_avg_recency"] = bucket["cs_recency_sum"] / cs_n
+                bucket["cs_avg_confidence"] = bucket["cs_confidence_sum"] / cs_n
             # Clean up internal fields
             del bucket["_callsign_set"]
             del bucket["_mode_counts"]

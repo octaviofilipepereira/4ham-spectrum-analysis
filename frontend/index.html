@@ -285,6 +285,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <option value="1440">24 h</option>
                 </select>
               </div>
+              <p style="font-size:0.75rem;color:#9ca3af;margin:0 0 6px;">Score based on confirmed decodes (callsign verified). Events without a callsign = band occupancy.</p>
               <p id="propagationScore" class="mb-1" style="font-size:1.125rem;">Score: --</p>
               <ul class="summary mb-3" id="propagationBands">
                 <li>No propagation data yet.</li>
@@ -966,7 +967,7 @@ Last update: 2026-02-22 16:27:19 UTC
                 <ul class="help mb-0">
                   <li>Switch band live using the quick-band buttons (160m … 10m) without stopping the scan.</li>
                   <li>Use <strong>Logs &amp; Reports → Search &amp; Export Data</strong> to filter events and export CSV / JSON / PNG.</li>
-                  <li>The <strong>Propagation Score</strong> (0–100) reflects band quality over the last 60 min — a single strong signal does not guarantee a high score.</li>
+                  <li>The <strong>Propagation Score</strong> (0–100) reflects band quality from confirmed decodes (verified callsign) over the last 60 min — events without a callsign = band occupancy.</li>
                   <li>FT8/FT4 waterfall markers expire after 3 missed decode cycles — this is normal during low-activity periods.</li>
                   <li>Admin settings (SDR device, gain, retention) require admin login via <strong>Admin Config</strong>.</li>
                 </ul>

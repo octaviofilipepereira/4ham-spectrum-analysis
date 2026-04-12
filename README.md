@@ -17,7 +17,7 @@ It is designed to run on Linux PC and Raspberry Pi (Ubuntu 20.04+, Debian 11+, L
 - Band scanning with occupancy detection (adaptive power/threshold).
 - Real-time waterfall and history.
 - Automatic callsign identification for FT8/FT4, APRS, CW, and SSB (voice).
-- **Propagation scoring from digital modes (FT8/FT4/WSPR):** each successful decode provides a confirmed callsign, grid, and SNR — the only reliable basis for ionospheric path assessment. CW and SSB events are recorded as **band occupancy** (band is active) but do not contribute to propagation scores, as sequential narrowband scanning rarely captures a callsign during the short dwell window.
+- **Propagation scoring from confirmed decodes:** only events with a verified callsign contribute to propagation scoring, regardless of mode. A confirmed decode provides a callsign and SNR — the reliable basis for ionospheric path assessment. Events without a callsign are recorded as **band occupancy** (band is active) but do not contribute to propagation scores.
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
 

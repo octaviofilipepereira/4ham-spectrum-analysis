@@ -87,9 +87,9 @@ SNR = nível_do_sinal_dB - ruído_de_fundo_dB
 #### 🌍 Propagation Score (Score de Propagação)
 
 > **⚠️ Nota importante sobre a origem dos dados:**
-> O Propagation Score é calculado **exclusivamente com base em modos digitais** (FT8, FT4, WSPR). Estes modos descodificam toda a passband em paralelo e, em cada descodificação bem-sucedida, fornecem indicativo + grid + SNR — o único fundamento fiável para avaliar um caminho de propagação real.
+> O Propagation Score é calculado com base em **descodificações confirmadas** — eventos com um **indicativo verificado**, independentemente do modo. Uma descodificação bem-sucedida fornece indicativo + SNR, o fundamento fiável para avaliar um caminho de propagação real.
 >
-> **CW e SSB** capturam **ocupação de banda** (*band occupancy*): confirmam que a banda está activa com tráfego, mas devido ao varrimento sequencial de banda estreita (dwell curto por frequência), raramente captam o indicativo durante a janela de escuta. Sem indicativo + grid não é possível confirmar o caminho ionosférico e, portanto, estes eventos **não contribuem para o cálculo de propagação**.
+> Eventos **sem indicativo** (em qualquer modo) refletem **ocupação de banda** (*band occupancy*): confirmam que a banda está activa com tráfego, mas **não contribuem para o cálculo de propagação**.
 
 **O que é**: Avaliação **agregada** das condições de propagação baseada em **múltiplos eventos recentes**.
 
@@ -120,31 +120,27 @@ Estes modos descodificam toda a passband em paralelo. A taxa de descodificação
 snr_norm = clamp((SNR - floor) / faixa, 0, 1)
 ```
 
-##### Categoria 2 — CW (Morse) — Ocupação de Banda
+##### Categoria 2 — CW (Morse) — Apenas Descodificações Confirmadas
 
-CW usa varrimento sequencial por frequência com dwell curto. Não captar um indicativo **não indica propagação fraca** — o operador pode simplesmente não ter transmitido o indicativo durante a janela de escuta.
-
-| Componente | Peso | Descrição |
-|---|---|---|
-| `traffic_volume` | **30 %** | CW_TRAFFIC detetado = banda ativa |
-| `snr_quality` | **30 %** | SNR normalizado (floor −15 dB, ceiling +20 dB) |
-| `signal_strength` | **15 %** | Nível de sinal RF como indicador de propagação |
-| `callsign_bonus` | **15 %** | Bónus quando indicativo É captado (não penalização quando ausente) |
-| `recency` | **10 %** | Eventos mais recentes pesam mais |
-
-##### Categoria 3 — SSB (Voz) — Ocupação de Banda
-
-SSB partilha a limitação de varrimento sequencial do CW. A avaliação depende da deteção de voz, qualidade do SNR e nível de sinal.
+CW usa varrimento sequencial por frequência com dwell curto. Apenas eventos com um **indicativo verificado** contribuem para o score de propagação. Eventos sem indicativo refletem ocupação de banda.
 
 | Componente | Peso | Descrição |
 |---|---|---|
-| `traffic_volume` | **20 %** | SSB_TRAFFIC / VOICE_DETECTION = banda ativa |
-| `snr_quality` | **25 %** | SNR normalizado (floor +3 dB, ceiling +30 dB) |
-| `signal_strength` | **15 %** | Nível de sinal RF |
-| `voice_quality` | **20 %** | Qualidade da deteção de voz (clareza) |
-| `transcript` | **10 %** | Transcrição speech-to-text bem-sucedida = sinal inteligível |
-| `callsign_bonus` | **5 %** | Bónus quando indicativo É captado |
-| `recency` | **5 %** | Eventos mais recentes pesam mais |
+| `snr_quality` | **35 %** | SNR normalizado (floor −15 dB, ceiling +20 dB) — apenas dos eventos com indicativo |
+| `callsign_diversity` | **25 %** | Indicativos únicos confirmados (diversidade) |
+| `signal_strength` | **20 %** | Nível de sinal RF dos eventos com indicativo |
+| `recency` | **20 %** | Eventos com indicativo mais recentes pesam mais |
+
+##### Categoria 3 — SSB (Voz) — Apenas Descodificações Confirmadas
+
+SSB partilha a limitação de varrimento sequencial do CW. Apenas eventos com um **indicativo verificado** contribuem para o score de propagação. Eventos sem indicativo refletem ocupação de banda.
+
+| Componente | Peso | Descrição |
+|---|---|---|
+| `snr_quality` | **35 %** | SNR normalizado (floor +3 dB, ceiling +30 dB) — apenas dos eventos com indicativo |
+| `callsign_diversity` | **25 %** | Indicativos únicos confirmados (diversidade) |
+| `signal_strength` | **20 %** | Nível de sinal RF dos eventos com indicativo |
+| `recency` | **20 %** | Eventos com indicativo mais recentes pesam mais |
 
 **Classificação (comum a todas as categorias)**:
 - **≥ 70**: Excellent 🟢 (Excelente)
@@ -314,7 +310,7 @@ Seis cartões no topo sumarizam o estado geral do período selecionado:
 | **Unique callsigns** | Número de indicativos distintos descodificados | Quanto mais indicativos únicos, melhor a propagação — indica que sinais de múltiplas estações estão a chegar. Um valor alto com Total events alto indica propagação diversificada |
 | **Average SNR** | SNR médio ponderado em dB | Valores acima de 0 dB indicam sinais geralmente fortes. Valores negativos (ex.: -8 dB) indicam sinais fracos mas descodificáveis. Compare com o threshold do modo: FT8 descodifica até -20 dB, SSB precisa de pelo menos +3 dB |
 | **Time coverage** | Percentagem de horas UTC que tiveram atividade | 100% = atividade em todas as horas da janela. Valores baixos (ex.: 30%) indicam propagação esporádica — a banda só esteve aberta em algumas horas |
-| **Overall Propagation** | Score composto (0–100) | Avaliação global usando as 3 fórmulas (Digital/CW/SSB). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). O badge colorido dá uma leitura rápida. Referência: [propagation_scoring_reference_pt.md](propagation_scoring_reference_pt.md) |
+| **Overall Propagation** | Score composto (0–100) | Avaliação global baseada em descodificações confirmadas (indicativo verificado). **≥ 70** Excellent (🟢), **≥ 50** Good (🟡), **≥ 30** Fair (🟠), **< 30** Poor (🔴). O badge colorido dá uma leitura rápida. Referência: [propagation_scoring_reference_pt.md](propagation_scoring_reference_pt.md) |
 | **Best band** | Banda com melhor score de propagação | Indica qual banda ofereceu as melhores condições no período. O sub-texto mostra o score e a estabilidade (%) — estabilidade alta significa propagação consistente, não apenas picos isolados |
 
 ### Gráficos — como interpretar
