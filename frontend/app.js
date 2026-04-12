@@ -3822,16 +3822,25 @@ if (checkForUpdatesBtn) {
         return;
       }
 
+      // Report dependency installation results
+      const deps = applyData.deps_installed || {};
+      const depMsgs = [];
+      if (deps.pip === true) depMsgs.push("Python deps instaladas");
+      else if (deps.pip === false) depMsgs.push("⚠ Falha ao instalar deps Python");
+      if (deps.npm === true) depMsgs.push("npm deps instaladas");
+      else if (deps.npm === false) depMsgs.push("⚠ Falha ao instalar deps npm");
+      const depInfo = depMsgs.length ? ` (${depMsgs.join("; ")})` : "";
+
       if (applyData.restart_required) {
         showStatus(
           "warning",
-          `Actualização aplicada (${applyData.head_after}). Serviço a reiniciar — aguarde ~10 segundos e faça refresh à página.`
+          `Actualização aplicada (${applyData.head_after})${depInfo}. Serviço a reiniciar — aguarde ~10 segundos e faça refresh à página.`
         );
         showToast("Actualização instalada. Serviço a reiniciar...");
       } else {
         showStatus(
           "success",
-          `Actualização aplicada (${applyData.head_after}). Faça refresh à página para carregar o frontend actualizado.`
+          `Actualização aplicada (${applyData.head_after})${depInfo}. Faça refresh à página para carregar o frontend actualizado.`
         );
         showToast("Actualização instalada. Faça refresh.");
       }

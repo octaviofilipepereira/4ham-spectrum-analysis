@@ -382,6 +382,7 @@ async def admin_update_apply(
     updated = head_before != head_after
     files_changed: List[str] = []
     restart_required = False
+    deps_installed: Dict = {"pip": None, "npm": None}
 
     if updated and head_before:
         diff_result = run_command(
@@ -393,6 +394,27 @@ async def admin_update_apply(
         ]
         restart_required = any(f.startswith("backend/") for f in files_changed)
 
+        # Install new Python dependencies if requirements.txt changed
+        if any(f == "backend/requirements.txt" for f in files_changed):
+            venv_pip = _REPO_ROOT / ".venv" / "bin" / "pip"
+            req_file = _REPO_ROOT / "backend" / "requirements.txt"
+            if venv_pip.is_file() and req_file.is_file():
+                pip_result = run_command(
+                    [str(venv_pip), "install", "--quiet", "-r", str(req_file)],
+                    timeout=120,
+                )
+                deps_installed["pip"] = pip_result.get("returncode") == 0
+
+        # Install new frontend dependencies if package.json changed
+        if any(f == "frontend/package.json" for f in files_changed):
+            frontend_dir = _REPO_ROOT / "frontend"
+            if (frontend_dir / "package.json").is_file() and command_exists("npm"):
+                npm_result = run_command(
+                    ["npm", "--prefix", str(frontend_dir), "install", "--no-fund", "--no-audit"],
+                    timeout=120,
+                )
+                deps_installed["npm"] = npm_result.get("returncode") == 0
+
     if restart_required:
         background_tasks.add_task(_schedule_restart)
 
@@ -403,6 +425,7 @@ async def admin_update_apply(
         "head_after": head_after[:12] if head_after else None,
         "files_changed": files_changed,
         "restart_required": restart_required,
+        "deps_installed": deps_installed,
         "pull_output": (pull_result.get("stdout") or "").strip(),
     }
 
