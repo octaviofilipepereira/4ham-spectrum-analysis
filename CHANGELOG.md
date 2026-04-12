@@ -2,10 +2,41 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-10 UTC
+Last update: 2026-04-12 UTC
 -->
 
 # Changelog
+
+## v0.12.0 - 2026-04-12
+
+### Added
+- **QTH-Centric Propagation Map — complete redesign**: DR2W-style irregular solar-shaped propagation zones per band with 3 intensity layers (Strong / Moderate / Fringe), shaped by solar elevation angle. Zone boundaries computed from real-time NOAA SWPC indices via a calibrated ionospheric model.
+- **NOAA SWPC Ionospheric Space Weather sidebar**: 1/4-width panel to the right of the globe showing real-time SFI (Solar Flux Index), Kp (geomagnetic index), and foF2 (estimated F2 critical frequency). Per-band status pills: **Open** (green) / **Marginal** (amber) / **Closed** (crimson) / **Absorbed** (grey). Auto-refresh every 15 minutes.
+- **Backend ionospheric model** (`/api/map/ionospheric`):
+  - foF2 calibrated against ionosonde data: `foF2 = 3.5 + 0.6 × √SSN` MHz, with 45 % night floor.
+  - SSN-dependent D-layer absorption: `k = (500 + 4×SSN) / f² × sin(solar_elevation)`, ±15 dB tolerance.
+  - Multi-hop skip model: 2 500 km per ionospheric hop, maximum 4 hops.
+  - NVIS cap: bands < 8 MHz in daylight limited to near-vertical-incidence skip when D-layer prevents long-distance propagation.
+  - Band status re-evaluated after D-layer absorption: NVIS-only propagation → Marginal; full absorption → Absorbed.
+- **Map layout**: 3/4-width globe (CSS span-9) + 1/4-width ionospheric sidebar (span-3).
+- **Map controls**: Ctrl+Mouse Wheel zoom, drag to rotate, double-click to reset; zoom level and globe rotation persisted via `sessionStorage`.
+- **Split map legend**: contacts + count (left panel), zone intensity swatches (right panel).
+- **Band buttons**: vertical layout, toggle-per-band, persisted via `sessionStorage`, none selected by default; active band shown in its unique colour, inactive in white.
+- **Graticule degree labels and band labels** scale proportionally with zoom level.
+- **Day/night terminator**: dashed yellow line from subsolar point; dark-hemisphere overlay; antipodal calculation corrected.
+
+### Changed
+- **Map**: band buttons resized to taller, wider vertical style for usability.
+- **ionoBadge legend footer**: includes Open / Marginal / Closed / Absorbed colour key and "⟳ Auto-refresh every 15 min" note.
+- **Propagation zones**: opacities calibrated — weak 0.08, moderate 0.14, strong 0.22.
+
+### Documentation
+- **help.html** updated to v0.12.0 — new sections: *QTH-Centric Propagation Map* and *Ionospheric Space Weather panel*.
+- **User manuals** (EN/PT) updated — new chapters on propagation map, ionospheric model, and band status interpretation.
+- **README** changelog updated to v0.12.0.
+- **ROADMAP** (EN/PT) updated — v0.12.0 milestone added.
+
+---
 
 ## v0.11.1 - 2026-04-10
 

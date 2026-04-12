@@ -1,15 +1,15 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-04-10
+Last update: 2026-04-12
 -->
 
 # 🗺️ ROADMAP — 4ham-spectrum-analysis
 
 > **Also available in:** [Português](ROADMAP_PT.md)
 
-**Current Version**: v0.11.1  
-**Last Update**: 2026-04-10  
+**Current Version**: v0.12.0  
+**Last Update**: 2026-04-12  
 **Status**: 🟢 Production-Ready (main branch)
 
 ---
@@ -23,6 +23,7 @@ Last update: 2026-04-10
 - ✅ Interactive TUI installer (whiptail) — Ubuntu/Debian/Mint/RPi OS
 - ✅ SSB Voice Signature Detection with hold-validation pipeline
 - ✅ Whisper ASR pipeline (FT-991A / IC-7300 USB)
+- ✅ QTH-Centric Propagation Map: DR2W-style 3-layer solar-shaped zones, NOAA SWPC ionospheric model (foF2, D-layer, band status), ionospheric sidebar, Ctrl+scroll zoom, sessionStorage persistence
 - ✅ Propagation Map with 3D globe & 3-formula scoring (Digital/CW/SSB)
 - ✅ Academic Analytics dashboard with multi-format export (CSV/XLSX/JSON)
 - ✅ Scan Rotation scheduler (multi-band/mode cycling with dwell time, loop, presets)
@@ -59,6 +60,7 @@ Last update: 2026-04-10
 | v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
 | v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
 | v0.11.1 | 2026-04-10 | SQLite concurrency fix, SSB signal quality hardening, production stabilisation |
+| v0.12.0 | 2026-04-12 | QTH-Centric Propagation Map redesign, NOAA SWPC ionospheric model, ionospheric sidebar |
 
 ---
 

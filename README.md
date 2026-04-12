@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-10 UTC
+Last update: 2026-04-12 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -97,6 +97,16 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.12.0
+- **QTH-Centric Propagation Map redesign**: DR2W-style irregular solar-shaped propagation zones per band — 3 intensity layers (Strong / Moderate / Fringe) shaped by solar elevation, with day/night terminator and dark-hemisphere overlay.
+- **NOAA SWPC Ionospheric Space Weather sidebar**: real-time SFI, Kp, foF2, and per-band status pills (Open / Marginal / Closed / Absorbed). Auto-refresh every 15 minutes.
+- **Backend ionospheric model** (`/api/map/ionospheric`): foF2 = 3.5 + 0.6 × √SSN (ionosonde-calibrated, 45 % night floor); SSN-dependent D-layer absorption; multi-hop skip model (2 500 km/hop, max 4 hops); NVIS cap for bands < 8 MHz; band status re-evaluated after absorption.
+- **Map layout**: 3/4-width globe + 1/4-width ionospheric sidebar.
+- **Map controls**: Ctrl+Mouse Wheel zoom, drag to rotate, double-click reset; zoom + rotation persisted via `sessionStorage`.
+- **Band buttons**: vertical, toggle per-band, persisted via `sessionStorage`, none selected by default.
+- **Split legend**: contacts + counts (left), zone intensity swatches (right).
+- **Documentation**: new propagation map and ionospheric sidebar chapters in `help.html`, user manuals (EN/PT), and README.
 
 ### v0.11.1
 - **SQLite concurrency fix**: eliminated ~705 `sqlite3.InterfaceError`/day in auth/session methods. CPU 243%→37%, memory 1.63 GB→580 MB.

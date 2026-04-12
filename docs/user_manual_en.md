@@ -8,11 +8,13 @@
 3. [Academic Analytics Dashboard](#academic-analytics-dashboard)
 4. [Scan Rotation](#scan-rotation)
 5. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
-6. [Initial Setup](#initial-setup)
-7. [User Interface](#user-interface)
-8. [Spectrogram Interpretation](#spectrogram-interpretation)
-9. [Data Export](#data-export)
-10. [Troubleshooting](#troubleshooting)
+6. [QTH-Centric Propagation Map](#qth-centric-propagation-map)
+7. [Ionospheric Space Weather Panel](#ionospheric-space-weather-panel)
+8. [Initial Setup](#initial-setup)
+9. [User Interface](#user-interface)
+10. [Spectrogram Interpretation](#spectrogram-interpretation)
+11. [Data Export](#data-export)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -464,6 +466,86 @@ The propagation map includes a time window selector controlling which events app
 | **24h** | Last 24 hours (default) |
 
 Events outside the selected window are not shown on the map. This allows focusing on recent activity or expanding to a full-day view.
+
+---
+
+## QTH-Centric Propagation Map
+
+### Overview
+
+The propagation map is an orthographic 3D globe centred on your QTH, rendered with D3.js inside the Academic Analytics dashboard. It combines two data layers:
+
+1. **Ionospheric zone predictions** — band-by-band predicted propagation coverage, derived in real time from NOAA SWPC solar/geomagnetic indices via a calibrated ionospheric model.
+2. **Confirmed SDR contacts** — callsign-confirmed decodes from your SDR sessions, plotted as dots and great-circle arcs to the decoded station's grid locator position.
+
+### Map elements
+
+| Element | Description |
+|---------|-------------|
+| **Coloured zones** | Predicted propagation coverage per band. Three intensity layers: **Strong** (opaque fill), **Moderate** (semi-transparent), **Fringe** (faint). Zones expand toward the subsolar point and contract on the night side, shaped by D-layer absorption and the ionospheric model. |
+| **Day/night terminator** | Dashed yellow line separating the sunlit and dark hemispheres, computed from the current subsolar point. The dark hemisphere is dimmed to indicate reduced skip propagation. |
+| **Dots & arcs** | Confirmed SDR contacts in the selected time window: dot = decoded station's geographic position, arc = great-circle path from your QTH. |
+| **Graticule** | Latitude/longitude grid with degree labels; labels scale proportionally with zoom level. |
+
+### Band buttons
+
+Vertical band buttons on the left edge of the map toggle individual bands on or off. An active band is shown in its unique colour; an inactive band appears white. Selection is persisted in `sessionStorage` and restored on the next page load. No bands are selected by default — click any band to reveal its propagation zones.
+
+### Map controls
+
+| Action | Effect |
+|--------|--------|
+| **Drag** | Rotate the globe to any orientation |
+| **Ctrl + Mouse Wheel** | Zoom in or out; zoom level persisted via `sessionStorage` |
+| **Double-click** | Reset globe to default orientation and zoom level |
+
+### Legend
+
+Two legend panels sit below the globe:
+
+- **Left**: QTH coordinates, total confirmed contact count in the selected period, anomaly count.
+- **Right**: Zone intensity swatches (Strong / Moderate / Fringe), Night hemisphere swatch, note that each band uses a unique colour.
+
+### Ionospheric model
+
+Zone boundaries are computed by `/api/map/ionospheric` from real-time NOAA SWPC data:
+
+| Parameter | Formula / Model |
+|-----------|----------------|
+| **foF2** | `3.5 + 0.6 × √SSN` MHz — calibrated to ionosonde data; 45 % night floor outside the sunlit hemisphere |
+| **D-layer absorption** | `k = (500 + 4×SSN) / f² × sin(solar_elevation)` — SSN-dependent, per VOACAP absorption tables; ±15 dB tolerance |
+| **Multi-hop skip** | 2 500 km per ionospheric reflection, maximum 4 hops |
+| **NVIS cap** | Bands < 8 MHz in daylight limited to near-vertical-incidence skip when D-layer prevents long-distance propagation |
+| **Band status re-evaluation** | NVIS-only propagation → **Marginal**; full absorption → **Absorbed** |
+
+> **Note**: The model uses SFI and Kp from NOAA SWPC (refreshed every 15 min) and is tuned to near-average mid-latitude conditions. Sporadic-E, sudden ionospheric disturbances, and local variability are not captured.
+
+---
+
+## Ionospheric Space Weather Panel
+
+The narrow sidebar to the right of the globe (1/4 page width) shows real-time NOAA SWPC space weather data translated into practical HF band status predictions for your QTH.
+
+### Space weather indicators
+
+| Indicator | Description | Interpretation |
+|-----------|-------------|----------------|
+| **SFI** (Solar Flux Index, 10.7 cm) | Proxy for solar UV/X-ray ionising radiation | < 80: poor HF; 80–120: moderate; > 120: good, esp. 10–15 m; > 200: excellent for 10–15 m |
+| **Kp** (Planetary geomagnetic index, 0–9) | Degree of geomagnetic disturbance | 0–2: quiet (ideal); 3–4: unsettled; 5–6: active storm; ≥ 7: severe / HF blackout risk |
+| **foF2** (Critical F2 frequency, MHz) | Highest frequency reflected vertically by the F2 layer | Bands below foF2 cannot skip. Higher foF2 = more bands open for long-distance propagation. |
+
+### Band status pills
+
+| Status | Colour | Meaning |
+|--------|--------|---------|
+| **Open** | 🟢 Green | F-layer skip predicted — multi-hop distances achievable |
+| **Marginal** | 🟠 Amber | Borderline — NVIS or short skip only; unreliable for DX |
+| **Closed** | 🔴 Crimson | Band frequency below foF2 — no skip propagation |
+| **Absorbed** | ⚫ Grey | D-layer absorption too high — typically 40 m / 80 m at mid-day under high solar activity |
+
+Data auto-refreshes every **15 minutes** from NOAA SWPC.
+
+> Band status is a model-based planning guide. Confirm against actual on-air conditions and DX Cluster / WSPRnet for real-time evidence.
 
 ---
 

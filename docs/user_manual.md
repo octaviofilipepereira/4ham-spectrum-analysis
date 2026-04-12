@@ -8,11 +8,13 @@
 3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
 4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
 5. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
-6. [Configuração Inicial](#configuração-inicial)
-7. [Interface do Utilizador](#interface-do-utilizador)
-8. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
-9. [Exportação de Dados](#exportação-de-dados)
-10. [Resolução de Problemas](#resolução-de-problemas)
+6. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
+7. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
+8. [Configuração Inicial](#configuração-inicial)
+9. [Interface do Utilizador](#interface-do-utilizador)
+10. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+11. [Exportação de Dados](#exportação-de-dados)
+12. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -464,6 +466,86 @@ O mapa de propagação inclui um seletor de janela temporal que controla o perí
 | **24h** | Últimas 24 horas (padrão) |
 
 Eventos fora da janela selecionada não aparecem no mapa. Isto permite focar na atividade recente ou alargar para uma visão diária.
+
+---
+
+## Mapa de Propagação QTH-Cêntrico
+
+### Visão geral
+
+O mapa de propagação é um globo ortográfico 3D centrado no QTH do utilizador, renderizado com D3.js no dashboard Academic Analytics. Combina duas camadas de dados:
+
+1. **Previsão de zonas ionosféricas** — cobertura de propagação prevista por banda, calculada em tempo real a partir dos índices solares/geomagnéticos do NOAA SWPC através de um modelo ionosférico calibrado.
+2. **Contactos SDR confirmados** — descodificações com indicativo confirmado das sessões SDR, representadas como pontos e arcos de ortodrómia até à posição do locator da estação remota.
+
+### Elementos do mapa
+
+| Elemento | Descrição |
+|----------|-----------|
+| **Zonas coloridas** | Cobertura de propagação prevista por banda. Três camadas de intensidade: **Forte** (opaco), **Moderada** (semi-transparente), **Franja** (ténue). As zonas expandem-se para o lado iluminado e contraem-se no lado noturno, modeladas pela absorção da camada D e pelo modelo ionosférico. |
+| **Terminador dia/noite** | Linha amarela tracejada a separar os hemisférios iluminado e escuro, calculada a partir do ponto subsolar atual. O hemisfério noturno fica escurecido para indicar propagação por salto reduzida. |
+| **Pontos e arcos** | Contactos SDR confirmados na janela temporal selecionada: ponto = posição geográfica da estação remota, arco = trajeto de ortodrómia desde o QTH. |
+| **Gratícu­lo** | Grade de latitude/longitude com etiquetas de graus; as etiquetas escalam proporcionalmente com o nível de zoom. |
+
+### Botões de banda
+
+Os botões de banda verticais no lado esquerdo do mapa ativam ou desativam bandas individualmente. Uma banda ativa é mostrada na sua cor exclusiva; uma banda inativa aparece a branco. A seleção é guardada em `sessionStorage` e restaurada na próxima visita. Por defeito, nenhuma banda está selecionada — clique numa banda para visualizar as suas zonas de propagação.
+
+### Controlos do mapa
+
+| Ação | Efeito |
+|------|--------|
+| **Arrastar** | Rodar o globo para qualquer orientação |
+| **Ctrl + Roda do rato** | Aproximar ou afastar; nível guardado via `sessionStorage` |
+| **Duplo clique** | Repor orientação e zoom predefinidos |
+
+### Legenda
+
+Dois painéis de legenda abaixo do globo:
+
+- **Esquerda**: coordenadas do QTH, total de contactos confirmados no período selecionado, contagem de anomalias.
+- **Direita**: amostras de intensidade das zonas (Forte / Moderada / Franja), amostra do hemisfério noturno, nota de que cada banda usa uma cor exclusiva.
+
+### Modelo ionosférico
+
+Os limites das zonas são calculados pelo endpoint `/api/map/ionospheric` a partir dos dados do NOAA SWPC em tempo real:
+
+| Parâmetro | Fórmula / Modelo |
+|-----------|-----------------|
+| **foF2** | `3,5 + 0,6 × √SSN` MHz — calibrado contra dados de ionossonda; piso noturno de 45 % fora do hemisfério iluminado |
+| **Absorção camada D** | `k = (500 + 4×SSN) / f² × sin(elevação_solar)` — dependente do SSN, tabelas de absorção VOACAP; tolerância ±15 dB |
+| **Salto multi-hop** | 2 500 km por reflexão ionosférica, máximo 4 saltos |
+| **Limite NVIS** | Bandas < 8 MHz durante o dia limitadas a incidência quasi-vertical quando a camada D impede propagação a longa distância |
+| **Reavaliação do estado** | Propagação apenas NVIS → **Marginal**; absorção total → **Absorbed** |
+
+> **Nota**: O modelo usa SFI e Kp do NOAA SWPC (atualização a cada 15 min) e foi calibrado para condições médias de média latitude. Eventos de Sporadic-E, distúrbios ionosféricos súbitos e variabilidade local não são capturados.
+
+---
+
+## Painel de Clima Espacial Ionosférico
+
+A barra lateral estreita à direita do globo (1/4 da largura da página) mostra dados de clima espacial em tempo real do **NOAA Space Weather Prediction Center (SWPC)**, traduzidos em estado de propagação HF por banda para o seu QTH.
+
+### Indicadores de clima espacial
+
+| Indicador | Descrição | Interpretação |
+|-----------|-----------|---------------|
+| **SFI** (Índice de Fluxo Solar, 10,7 cm) | Indicador da radiação ionizante solar UV/raios-X | < 80: pobre; 80–120: moderado; > 120: bom, esp. 10–15 m; > 200: excelente para 10–15 m |
+| **Kp** (Índice geomagnético planetário, 0–9) | Grau de perturbação geomagnética | 0–2: calmo (ideal); 3–4: instável; 5–6: tempestade ativa; ≥ 7: tempestade severa / risco de apagão HF |
+| **foF2** (Frequência crítica F2, MHz) | Frequência máxima refletida verticalmente pela camada F2 | Bandas abaixo do foF2 não conseguem propagar por salto. foF2 mais alto = mais bandas abertas para longa distância. |
+
+### Indicadores de estado de banda
+
+| Estado | Cor | Significado |
+|--------|-----|-------------|
+| **Open** | 🟢 Verde | Salto F2 previsto — distâncias multi-hop alcançáveis |
+| **Marginal** | 🟠 Âmbar | Condições limite — apenas NVIS ou salto curto; pouco fiável para DX |
+| **Closed** | 🔴 Carmesim | Frequência da banda abaixo do foF2 — sem propagação por salto |
+| **Absorbed** | ⚫ Cinzento | Absorção da camada D demasiado elevada — normalmente 40 m / 80 m em pleno dia sob alta atividade solar |
+
+Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC.
+
+> O estado de banda é um guia baseado em modelo. Confirme sempre com as condições reais de operação e com o DX Cluster / WSPRnet para evidência em tempo real.
 
 ---
 

@@ -52,7 +52,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.11.1 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.12.0 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -70,6 +70,8 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#admin">Admin &amp; configuration</a></li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
       <li><a href="#analytics">Academic Analytics dashboard</a></li>
+      <li><a href="#propmap">QTH-Centric Propagation Map</a></li>
+      <li><a href="#ionobadge">Ionospheric Space Weather panel</a></li>
       <li><a href="#launcher">Desktop launcher</a></li>
       <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
     </ol>
@@ -719,9 +721,153 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </table>
   </section>
 
-  <!-- 13. DESKTOP LAUNCHER -->
+  <!-- 13. QTH-CENTRIC PROPAGATION MAP -->
+  <section id="propmap">
+    <h2 class="section-title">13 · QTH-Centric Propagation Map</h2>
+    <p>
+      The propagation map is an orthographic 3D globe centred on your QTH, embedded in the
+      <strong>Academic Analytics</strong> dashboard. It combines two data layers: band-by-band
+      ionospheric zone predictions from NOAA SWPC, and your actual confirmed SDR contacts.
+    </p>
+
+    <h3 class="sub-title">Map elements</h3>
+    <table class="manual-table">
+      <thead><tr><th>Element</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Coloured zones</strong></td>
+          <td>NOAA-predicted propagation coverage per band. Three intensity layers — <strong>Strong</strong> (opaque), <strong>Moderate</strong> (semi-transparent), <strong>Fringe</strong> (faint) — expand toward the subsolar point and shrink on the night side, controlled by D-layer absorption and the ionospheric model.</td>
+        </tr>
+        <tr>
+          <td><strong>Day/night terminator</strong></td>
+          <td>Dashed yellow line separating the sunlit and dark hemispheres, computed from the current subsolar point. The dark hemisphere receives an overlay indicating reduced skip propagation.</td>
+        </tr>
+        <tr>
+          <td><strong>Dots &amp; arcs</strong></td>
+          <td>Confirmed SDR contacts from the selected time window: a dot at the decoded station's geographic position, and a great-circle arc from your QTH when a grid locator is available.</td>
+        </tr>
+        <tr>
+          <td><strong>Graticule</strong></td>
+          <td>Latitude/longitude grid lines with degree labels. Both the grid labels and band distance labels scale with zoom level.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Band buttons</h3>
+    <p>
+      Vertical band buttons on the left of the map toggle individual bands on or off.
+      An active band is shown in its unique colour; an inactive band appears white.
+      Selection is persisted in <code>sessionStorage</code> and restored on the next visit.
+      No bands are selected by default — click any band to reveal its propagation zones.
+    </p>
+
+    <h3 class="sub-title">Map controls</h3>
+    <table class="manual-table">
+      <thead><tr><th>Action</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Drag</strong></td><td>Rotate the globe to any orientation.</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + Mouse Wheel</td><td>Zoom in or out. Zoom level is persisted via <code>sessionStorage</code>.</td></tr>
+        <tr><td><strong>Double-click</strong></td><td>Reset the globe to the default orientation and zoom level.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Legend</h3>
+    <p>Two panels sit below the globe:</p>
+    <ul>
+      <li><strong>Left</strong>: QTH position, total confirmed contacts in the selected period, anomaly count.</li>
+      <li><strong>Right</strong>: Zone intensity swatches (Strong / Moderate / Fringe), Night hemisphere swatch, note that each band uses its own unique colour.</li>
+    </ul>
+
+    <h3 class="sub-title">Ionospheric model (zone boundaries)</h3>
+    <p>Zone extent and intensity are computed by the backend from NOAA SWPC data:</p>
+    <table class="manual-table">
+      <thead><tr><th>Parameter</th><th>Formula / Model</th></tr></thead>
+      <tbody>
+        <tr><td><strong>foF2</strong></td><td><code>3.5 + 0.6 × √SSN</code> MHz — calibrated to ionosonde data; 45 % night floor outside the sunlit hemisphere.</td></tr>
+        <tr><td><strong>D-layer absorption</strong></td><td><code>k = (500 + 4×SSN) / f² × sin(solar_elevation)</code> — SSN-dependent, per VOACAP absorption tables; ±15 dB tolerance.</td></tr>
+        <tr><td><strong>Multi-hop skip</strong></td><td>2 500 km per ionospheric reflection, maximum 4 hops. Strong zone = short-skip distance, Fringe zone = maximum multi-hop range.</td></tr>
+        <tr><td><strong>NVIS cap</strong></td><td>Bands &lt; 8 MHz in daylight limited to near-vertical-incidence skip when D-layer prevents long-distance propagation.</td></tr>
+      </tbody>
+    </table>
+    <div class="info-box">
+      💡 Zone predictions are based on NOAA SWPC indices and a physics-calibrated open model. They serve as a directional planning guide — actual conditions depend on local ionospheric variability, QRM, and geomagnetic events not yet reflected in Kp.
+    </div>
+  </section>
+
+  <!-- 14. IONOSPHERIC SPACE WEATHER PANEL -->
+  <section id="ionobadge">
+    <h2 class="section-title">14 · Ionospheric Space Weather panel</h2>
+    <p>
+      The narrow sidebar to the right of the globe (1/4 page width) shows real-time space weather data
+      from the <strong>NOAA Space Weather Prediction Center (SWPC)</strong>, translated into practical
+      per-band HF propagation status for your QTH.
+    </p>
+
+    <h3 class="sub-title">Space weather indicators</h3>
+    <table class="manual-table">
+      <thead><tr><th>Indicator</th><th>Description</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>SFI</strong></td>
+          <td>Solar Flux Index (10.7 cm radio flux)</td>
+          <td>
+            &lt; 80: low solar activity — poor HF propagation on higher bands<br>
+            80–120: moderate — reasonable conditions<br>
+            &gt; 120: high — good propagation, esp. 10–15 m<br>
+            &gt; 200: very high — excellent conditions for 10 m / 12 m / 15 m
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Kp</strong></td>
+          <td>Planetary geomagnetic index (0–9)</td>
+          <td>
+            0–2: quiet — ideal propagation<br>
+            3–4: unsettled — minor degradation at high latitudes<br>
+            5–6: active storm — noticeable degradation<br>
+            ≥ 7: severe storm — HF blackout possible
+          </td>
+        </tr>
+        <tr>
+          <td><strong>foF2</strong></td>
+          <td>Estimated critical frequency of the F2 layer (MHz)</td>
+          <td>
+            Bands whose frequency is <em>below</em> foF2 cannot skip — signals are absorbed or returned
+            at near-vertical angles (NVIS only). Bands above foF2 can propagate via F2-skip.
+            Higher foF2 = more bands open.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Band status pills</h3>
+    <p>A coloured pill for each HF band shows the predicted propagation status at your QTH:</p>
+    <table class="manual-table">
+      <thead><tr><th>Status</th><th>Colour</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Open</strong></td><td style="color:#4caf50">■ Green</td><td>F-layer skip is predicted — multi-hop distances achievable on this band.</td></tr>
+        <tr><td><strong>Marginal</strong></td><td style="color:#ff9800">■ Amber</td><td>Borderline conditions — NVIS or short skip only (typical for 40 m at mid-day, or higher bands under low SFI).</td></tr>
+        <tr><td><strong>Closed</strong></td><td style="color:#e53935">■ Crimson</td><td>Band frequency is below foF2 — no skip propagation. Signals are absorbed by the ionosphere.</td></tr>
+        <tr><td><strong>Absorbed</strong></td><td style="color:#9e9e9e">■ Grey</td><td>D-layer absorption is too high for useful propagation — typically 40 m and below during peak daylight under high solar activity.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Auto-refresh</h3>
+    <p>
+      NOAA SWPC data is fetched via the backend endpoint <code>/api/map/ionospheric</code> and
+      refreshes automatically every <strong>15 minutes</strong>. The sidebar footer shows
+      "⟳ Auto-refresh every 15 min" as a reminder. The backend caches NOAA data and
+      applies the ionospheric model before serving the response.
+    </p>
+    <div class="warn-box">
+      ⚠ Band status predictions are model-based estimates using NOAA SWPC indices. They are a planning aid,
+      not a real-time ionosonde measurement. Always verify against actual on-air conditions and the
+      DX Cluster / WSPRnet for live propagation evidence.
+    </div>
+  </section>
+
+  <!-- 15. DESKTOP LAUNCHER -->
   <section id="launcher">
-    <h2 class="section-title">13 · Desktop launcher</h2>
+    <h2 class="section-title">15 · Desktop launcher</h2>
     <p>
       On systems with a graphical desktop (GNOME, Cinnamon, XFCE, KDE, MATE, LXQt), the installer offers to create a
       <strong>desktop shortcut</strong>. Double-clicking it opens an interactive terminal menu:
@@ -740,9 +886,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </p>
   </section>
 
-  <!-- 14. FAQ -->
+  <!-- 16. FAQ -->
   <section id="faq">
-    <h2 class="section-title">14 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">16 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>
