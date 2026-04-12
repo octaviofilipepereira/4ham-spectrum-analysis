@@ -204,6 +204,14 @@ def _band_status(freq_mhz: float, fof2: float, kp: float,
         else:
             max_hops = 1
 
+    # D-layer attenuation: during daytime, lower frequencies suffer
+    # progressive absorption proportional to ~1/f².  This reduces the
+    # effective number of hops for bands below ~15 MHz (40m, 30m …)
+    # without fully blocking them (which only happens below 5.5 MHz).
+    if is_daytime and not absorbed and freq_mhz < 15.0 and max_hops > 1:
+        d_atten = (freq_mhz / 15.0) ** 2   # 0.22 @7MHz, 0.45 @10MHz, 0.90 @14MHz
+        max_hops = max(1, round(max_hops * d_atten))
+
     max_distance_km = round(max_hops * _HOP_KM)
 
     # Three-zone model for gradient patches
