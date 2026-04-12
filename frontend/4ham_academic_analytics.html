@@ -2093,16 +2093,35 @@ Last update: 2026-04-03 UTC
         // ── Legend — Contacts (bottom-left) ──────────────────────────
         const legendL = document.createElement("div");
         legendL.className = "propmap-legend propmap-legend-left";
+
+        // Contact counts
+        const confirmed = contacts.filter(c => {
+          const cBand = (c.band || "").toLowerCase();
+          const mb = Object.keys(_pmBandVis).find(b => b.toLowerCase() === cBand);
+          if (!mb || !iono.bands || !iono.bands[mb]) return false;
+          const st = iono.bands[mb].status;
+          if (st !== "Open" && st !== "Marginal") return false;
+          return (c.distance_km || 0) <= (iono.bands[mb].max_distance_km || 0);
+        }).length;
+        const anomalies = contacts.length - confirmed;
+        const winMin = _pmWindowMinutes();
+        const winLabel = winMin >= 1440 ? Math.round(winMin / 1440) + "d" : winMin >= 60 ? Math.round(winMin / 60) + "h" : winMin + "min";
+
         [
           ["#facc15", "QTH"],
-          ["#4ade80", "Confirmed contact"],
-          ["#f87171", "Anomaly contact"],
+          ["#4ade80", `Confirmed: ${confirmed}`],
+          ["#f87171", `Anomalies: ${anomalies}`],
         ].forEach(([color, label]) => {
           const item = document.createElement("div");
           item.className = "propmap-legend-item";
           item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color};border:1px solid rgba(255,255,255,0.12)"></span>${label}`;
           legendL.appendChild(item);
         });
+        const countNote = document.createElement("div");
+        countNote.className = "propmap-legend-item";
+        countNote.style.cssText = "font-size:10px;opacity:0.55;margin-top:3px";
+        countNote.textContent = `${contacts.length} contacts · ${winLabel}`;
+        legendL.appendChild(countNote);
         wrap.appendChild(legendL);
 
         // ── Legend — Zones (bottom-right) ────────────────────────────
@@ -2126,25 +2145,6 @@ Last update: 2026-04-03 UTC
         note.textContent = "Each band has its own colour";
         legendR.appendChild(note);
         wrap.appendChild(legendR);
-
-        // ── Info (bottom-right) ─────────────────────────────────────────
-        const confirmed = contacts.filter(c => {
-          const cBand = (c.band || "").toLowerCase();
-          const mb = Object.keys(_pmBandVis).find(b => b.toLowerCase() === cBand);
-          if (!mb || !iono.bands || !iono.bands[mb]) return false;
-          const st = iono.bands[mb].status;
-          if (st !== "Open" && st !== "Marginal") return false;
-          return (c.distance_km || 0) <= (iono.bands[mb].max_distance_km || 0);
-        }).length;
-        const anomalies = contacts.length - confirmed;
-        const info = document.createElement("div");
-        info.className = "propmap-info";
-        const winMin = _pmWindowMinutes();
-        const winLabel = winMin >= 1440 ? Math.round(winMin / 1440) + "d" : winMin >= 60 ? Math.round(winMin / 60) + "h" : winMin + "min";
-        info.innerHTML = `${contacts.length} contacts · ${winLabel}<br>`
-          + `<span style="color:#4ade80">${confirmed} confirmed</span> · `
-          + `<span style="color:#f87171">${anomalies} anomalies</span>`;
-        wrap.appendChild(info);
       }
 
       let stackedPercentMode = false;
