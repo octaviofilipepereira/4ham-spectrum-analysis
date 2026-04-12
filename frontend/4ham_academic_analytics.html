@@ -663,7 +663,6 @@ Last update: 2026-04-03 UTC
       .propmap-legend {
         position: absolute;
         bottom: 10px;
-        left: 10px;
         z-index: 10;
         display: flex;
         flex-direction: column;
@@ -673,6 +672,12 @@ Last update: 2026-04-03 UTC
         padding: 8px 10px;
         border-radius: 6px;
         border: 1px solid rgba(255,255,255,0.1);
+      }
+      .propmap-legend-left {
+        left: 10px;
+      }
+      .propmap-legend-right {
+        right: 10px;
       }
       .propmap-legend-item {
         display: flex;
@@ -2085,19 +2090,10 @@ Last update: 2026-04-03 UTC
         }
         wrap.appendChild(filterDiv);
 
-        // ── Legend (bottom-left) ────────────────────────────────────────
-        const legend = document.createElement("div");
-        legend.className = "propmap-legend";
-        // Use a representative band colour (20m turquoise) over dark bg
-        // to simulate the actual map patch appearance at each opacity.
-        // Map renders: strong=0.22, moderate=0.14, fringe=0.08 of band color.
-        // Legend boosts opacity ×3 so swatches are visible at small size.
-        const repR = 64, repG = 224, repB = 208;  // #40e0d0 (20m)
+        // ── Legend — Contacts (bottom-left) ──────────────────────────
+        const legendL = document.createElement("div");
+        legendL.className = "propmap-legend propmap-legend-left";
         [
-          [`rgba(${repR},${repG},${repB},0.65)`, "Strong (inner)"],
-          [`rgba(${repR},${repG},${repB},0.42)`, "Moderate"],
-          [`rgba(${repR},${repG},${repB},0.22)`, "Fringe (outer)"],
-          ["rgba(0,0,20,0.35)", "Night hemisphere"],
           ["#facc15", "QTH"],
           ["#4ade80", "Confirmed contact"],
           ["#f87171", "Anomaly contact"],
@@ -2105,15 +2101,31 @@ Last update: 2026-04-03 UTC
           const item = document.createElement("div");
           item.className = "propmap-legend-item";
           item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color};border:1px solid rgba(255,255,255,0.12)"></span>${label}`;
-          legend.appendChild(item);
+          legendL.appendChild(item);
         });
-        // Note explaining band colors
+        wrap.appendChild(legendL);
+
+        // ── Legend — Zones (bottom-right) ────────────────────────────
+        const legendR = document.createElement("div");
+        legendR.className = "propmap-legend propmap-legend-right";
+        const repR = 64, repG = 224, repB = 208;  // #40e0d0 (20m)
+        [
+          [`rgba(${repR},${repG},${repB},0.65)`, "Strong (inner)"],
+          [`rgba(${repR},${repG},${repB},0.42)`, "Moderate"],
+          [`rgba(${repR},${repG},${repB},0.22)`, "Fringe (outer)"],
+          ["rgba(0,0,20,0.35)", "Night hemisphere"],
+        ].forEach(([color, label]) => {
+          const item = document.createElement("div");
+          item.className = "propmap-legend-item";
+          item.innerHTML = `<span class="propmap-legend-swatch" style="background:${color};border:1px solid rgba(255,255,255,0.12)"></span>${label}`;
+          legendR.appendChild(item);
+        });
         const note = document.createElement("div");
         note.className = "propmap-legend-item";
         note.style.cssText = "font-size:10px;opacity:0.55;margin-top:3px;font-style:italic";
         note.textContent = "Each band has its own colour";
-        legend.appendChild(note);
-        wrap.appendChild(legend);
+        legendR.appendChild(note);
+        wrap.appendChild(legendR);
 
         // ── Info (bottom-right) ─────────────────────────────────────────
         const confirmed = contacts.filter(c => {
