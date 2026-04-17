@@ -2409,7 +2409,7 @@ const _utcClockEl = document.getElementById("schedulerUtcClock");
 function _updateUtcClock() {
   if (!_utcClockEl) return;
   const now = new Date();
-  _utcClockEl.textContent = String(now.getUTCHours()).padStart(2, "0") + ":" + String(now.getUTCMinutes()).padStart(2, "0");
+  _utcClockEl.textContent = "UTC " + String(now.getUTCHours()).padStart(2, "0") + ":" + String(now.getUTCMinutes()).padStart(2, "0");
 }
 _updateUtcClock();
 setInterval(_updateUtcClock, 10000);
