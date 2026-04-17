@@ -2386,8 +2386,8 @@ rotationPresetLoadBtn?.addEventListener("click", loadRotationPreset);
 rotationPresetDeleteBtn?.addEventListener("click", deleteRotationPreset);
 rotationPresetSelect?.addEventListener("change", _showRotationPresetPreview);
 
-document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", () => {
-  loadRotationPresetsList();
+document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", async () => {
+  await loadRotationPresetsList();
   loadSchedulesList();
 });
 
