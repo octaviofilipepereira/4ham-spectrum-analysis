@@ -64,10 +64,12 @@ class PresetScheduler:
         get_schedules: Callable[[], List[Dict]],
         apply_preset_cb: ApplyPresetCb,
         stop_rotation_cb: Callable[[], Coroutine[Any, Any, Any]],
+        is_rotation_running: Callable[[], bool] = lambda: True,
     ) -> None:
         self._get_schedules = get_schedules
         self._apply_preset = apply_preset_cb
         self._stop_rotation = stop_rotation_cb
+        self._is_rotation_running = is_rotation_running
         self._running = False
         self._task: Optional[asyncio.Task] = None
         self._active_preset_id: Optional[int] = None
@@ -145,7 +147,13 @@ class PresetScheduler:
                 break  # first matching window wins
 
         if target_preset_id == self._active_preset_id:
-            return  # no change needed
+            if self._is_rotation_running():
+                return  # no change needed
+            # Rotation died — re-apply the same preset
+            logger.info(
+                "preset_scheduler: rotation not running, re-applying preset_id=%s",
+                target_preset_id,
+            )
 
         if target_preset_id is None:
             # Outside any window — leave rotation unchanged

@@ -160,6 +160,7 @@ async def lifespan(app_instance: FastAPI):
                 get_schedules=_state.db.get_preset_schedules,
                 apply_preset_cb=_apply_preset_by_id,
                 stop_rotation_cb=_stop_active_rotation,
+                is_rotation_running=lambda: bool(_state.scan_rotation and _state.scan_rotation.running),
             )
             _state.preset_scheduler = scheduler
             await scheduler.start()

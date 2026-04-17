@@ -1250,6 +1250,7 @@ async def scheduler_start(
         get_schedules=state.db.get_preset_schedules,
         apply_preset_cb=_apply_preset_by_id,
         stop_rotation_cb=_stop_active_rotation,
+        is_rotation_running=lambda: bool(state.scan_rotation and state.scan_rotation.running),
     )
     state.preset_scheduler = scheduler
     await scheduler.start()
