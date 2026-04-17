@@ -150,9 +150,31 @@ async def lifespan(app_instance: FastAPI):
     from app.core.ionospheric import ionospheric_refresh_loop
     asyncio.create_task(ionospheric_refresh_loop())
 
+    # Auto-start preset scheduler if there are enabled schedules
+    try:
+        enabled = [s for s in _state.db.get_preset_schedules() if s.get("enabled")]
+        if enabled:
+            from app.scan.preset_scheduler import PresetScheduler
+            from app.api.scan import _apply_preset_by_id, _stop_active_rotation
+            scheduler = PresetScheduler(
+                get_schedules=_state.db.get_preset_schedules,
+                apply_preset_cb=_apply_preset_by_id,
+                stop_rotation_cb=_stop_active_rotation,
+            )
+            _state.preset_scheduler = scheduler
+            await scheduler.start()
+            _log.info("Preset scheduler auto-started (%d enabled schedules)", len(enabled))
+    except Exception as exc:
+        _log.warning("Preset scheduler auto-start failed: %s", exc)
+
     yield
 
     # Graceful shutdown
+    if _state.preset_scheduler and _state.preset_scheduler.running:
+        try:
+            await _state.preset_scheduler.stop()
+        except Exception:
+            pass
     from app.api.decoders import _stop_ft_external_decoder, _stop_ft_internal_decoder
     if _state.ft_external_decoder:
         try:
