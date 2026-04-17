@@ -27,7 +27,7 @@ from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
 from app.scan.rotation import RotationConfig, RotationSlot, ScanRotation
-from app.scan.preset_scheduler import PresetScheduler
+from app.scan.preset_scheduler import PresetScheduler, _hhmm_to_minutes, _time_in_window
 from app.api.decoders import (
     _start_cw_decoder,
     _stop_cw_decoder,
@@ -1030,6 +1030,27 @@ import re
 _HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
+def _windows_overlap(s1: int, e1: int, s2: int, e2: int) -> bool:
+    """Check if two circular time windows (in minutes 0–1439) overlap.
+
+    Each window runs from start (inclusive) to end (exclusive) and may
+    wrap around midnight.
+    """
+    # Expand each window to a set of minute-ranges on a 0–2879 number line
+    # (doubling the day avoids modular arithmetic edge cases).
+    def _ranges(s: int, e: int) -> list[tuple[int, int]]:
+        if s < e:
+            return [(s, e)]
+        # cross-midnight: split into [s, 1440) + [0, e)
+        return [(s, 1440), (0, e)]
+
+    for a_start, a_end in _ranges(s1, e1):
+        for b_start, b_end in _ranges(s2, e2):
+            if a_start < b_end and b_start < a_end:
+                return True
+    return False
+
+
 async def _apply_preset_by_id(preset_id: int) -> bool:
     """Load a rotation preset from DB and (re)start scan rotation with it.
 
@@ -1169,6 +1190,24 @@ def create_preset_schedule(
     presets = state.db.get_rotation_presets()
     if not any(p["id"] == preset_id for p in presets):
         raise HTTPException(status_code=404, detail="Preset not found")
+
+    # Check for overlap with existing enabled schedules
+    new_s = _hhmm_to_minutes(start_hhmm)
+    new_e = _hhmm_to_minutes(end_hhmm)
+    for existing in state.db.get_preset_schedules():
+        if not existing.get("enabled"):
+            continue
+        ex_s = _hhmm_to_minutes(existing["start_hhmm"])
+        ex_e = _hhmm_to_minutes(existing["end_hhmm"])
+        if _windows_overlap(new_s, new_e, ex_s, ex_e):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Time window {start_hhmm}–{end_hhmm} overlaps with "
+                    f"existing schedule \"{existing['preset_name']}\" "
+                    f"({existing['start_hhmm']}–{existing['end_hhmm']})"
+                ),
+            )
 
     return state.db.save_preset_schedule(preset_id, start_hhmm, end_hhmm)
 
