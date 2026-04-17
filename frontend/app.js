@@ -2386,7 +2386,182 @@ rotationPresetLoadBtn?.addEventListener("click", loadRotationPreset);
 rotationPresetDeleteBtn?.addEventListener("click", deleteRotationPreset);
 rotationPresetSelect?.addEventListener("change", _showRotationPresetPreview);
 
-document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", loadRotationPresetsList);
+document.getElementById("rotationPresetsModal")?.addEventListener("show.bs.modal", () => {
+  loadRotationPresetsList();
+  loadSchedulesList();
+});
+
+// ── Preset Scheduler (time-of-day preset rotation) ─────────────
+const schedulerStartBtn = document.getElementById("schedulerStartBtn");
+const schedulerStopBtn = document.getElementById("schedulerStopBtn");
+const schedulerStatusBadge = document.getElementById("schedulerStatusBadge");
+const schedulePresetSelect = document.getElementById("schedulePresetSelect");
+const scheduleStartTime = document.getElementById("scheduleStartTime");
+const scheduleEndTime = document.getElementById("scheduleEndTime");
+const scheduleAddBtn = document.getElementById("scheduleAddBtn");
+const scheduleTableBody = document.getElementById("scheduleTableBody");
+
+let _schedulesCache = [];
+let _schedulerRunning = false;
+
+async function loadSchedulesList() {
+  try {
+    const resp = await fetch("/api/scan/rotation/schedules", { headers: { ...getAuthHeader() } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    _schedulesCache = data.schedules || [];
+    _schedulerRunning = data.scheduler?.running || false;
+    _renderScheduleTable();
+    _updateSchedulerUI();
+    _populateSchedulePresetSelect();
+  } catch { /* best effort */ }
+}
+
+function _populateSchedulePresetSelect() {
+  if (!schedulePresetSelect) return;
+  schedulePresetSelect.innerHTML = "";
+  if (!_rotationPresetsCache.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No presets available";
+    schedulePresetSelect.appendChild(opt);
+    return;
+  }
+  _rotationPresetsCache.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = String(p.id);
+    opt.textContent = p.name;
+    schedulePresetSelect.appendChild(opt);
+  });
+}
+
+function _renderScheduleTable() {
+  if (!scheduleTableBody) return;
+  if (!_schedulesCache.length) {
+    scheduleTableBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">No schedules configured</td></tr>';
+    return;
+  }
+  scheduleTableBody.innerHTML = _schedulesCache.map(s => `
+    <tr>
+      <td>${_escHtml(s.preset_name)}</td>
+      <td>${s.start_hhmm}</td>
+      <td>${s.end_hhmm}</td>
+      <td>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" ${s.enabled ? "checked" : ""} data-schedule-toggle="${s.id}" />
+        </div>
+      </td>
+      <td><button class="btn btn-outline-danger btn-sm py-0 px-1" data-schedule-delete="${s.id}" title="Delete">×</button></td>
+    </tr>
+  `).join("");
+
+  // Bind toggle events
+  scheduleTableBody.querySelectorAll("[data-schedule-toggle]").forEach(el => {
+    el.addEventListener("change", async () => {
+      const id = Number(el.dataset.scheduleToggle);
+      try {
+        await fetch(`/api/scan/rotation/schedules/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getAuthHeader() },
+          body: JSON.stringify({ enabled: el.checked }),
+        });
+      } catch { showToastError("Failed to update schedule"); }
+    });
+  });
+
+  // Bind delete events
+  scheduleTableBody.querySelectorAll("[data-schedule-delete]").forEach(el => {
+    el.addEventListener("click", async () => {
+      const id = Number(el.dataset.scheduleDelete);
+      if (!window.confirm("Delete this schedule?")) return;
+      try {
+        const resp = await fetch(`/api/scan/rotation/schedules/${id}`, {
+          method: "DELETE",
+          headers: { ...getAuthHeader() },
+        });
+        if (resp.ok) {
+          await loadSchedulesList();
+          showToast("Schedule deleted");
+        } else { showToastError("Failed to delete schedule"); }
+      } catch { showToastError("Failed to delete schedule"); }
+    });
+  });
+}
+
+function _escHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str || "";
+  return d.innerHTML;
+}
+
+function _updateSchedulerUI() {
+  if (schedulerStartBtn) schedulerStartBtn.classList.toggle("d-none", _schedulerRunning);
+  if (schedulerStopBtn) schedulerStopBtn.classList.toggle("d-none", !_schedulerRunning);
+  if (schedulerStatusBadge) {
+    schedulerStatusBadge.textContent = _schedulerRunning ? "Running" : "Off";
+    schedulerStatusBadge.className = _schedulerRunning
+      ? "badge bg-success ms-2"
+      : "badge bg-secondary ms-2";
+  }
+}
+
+scheduleAddBtn?.addEventListener("click", async () => {
+  const presetId = Number(schedulePresetSelect?.value);
+  const start = scheduleStartTime?.value || "";
+  const end = scheduleEndTime?.value || "";
+  if (!presetId || !start || !end) { showToast("Fill in all fields"); return; }
+  if (start === end) { showToast("Start and end cannot be the same"); return; }
+  try {
+    const resp = await fetch("/api/scan/rotation/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeader() },
+      body: JSON.stringify({ preset_id: presetId, start_hhmm: start, end_hhmm: end }),
+    });
+    if (!resp.ok) {
+      const msg = await parseApiError(resp, "Failed to add schedule");
+      showToastError(msg);
+      return;
+    }
+    await loadSchedulesList();
+    showToast("Schedule added");
+  } catch { showToastError("Failed to add schedule"); }
+});
+
+schedulerStartBtn?.addEventListener("click", async () => {
+  try {
+    const resp = await fetch("/api/scan/rotation/scheduler/start", {
+      method: "POST",
+      headers: { ...getAuthHeader() },
+    });
+    if (!resp.ok) {
+      const msg = await parseApiError(resp, "Failed to start scheduler");
+      showToastError(msg);
+      return;
+    }
+    _schedulerRunning = true;
+    _updateSchedulerUI();
+    showToast("Preset scheduler started");
+    logLine("Preset scheduler started");
+  } catch { showToastError("Failed to start scheduler"); }
+});
+
+schedulerStopBtn?.addEventListener("click", async () => {
+  try {
+    const resp = await fetch("/api/scan/rotation/scheduler/stop", {
+      method: "POST",
+      headers: { ...getAuthHeader() },
+    });
+    if (!resp.ok) {
+      const msg = await parseApiError(resp, "Failed to stop scheduler");
+      showToastError(msg);
+      return;
+    }
+    _schedulerRunning = false;
+    _updateSchedulerUI();
+    showToast("Preset scheduler stopped");
+    logLine("Preset scheduler stopped");
+  } catch { showToastError("Failed to stop scheduler"); }
+});
 
 rotationStartBtn?.addEventListener("click", () => startRotation());
 rotationStopBtn?.addEventListener("click", () => stopRotation());

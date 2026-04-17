@@ -106,6 +106,9 @@ scan_state = {
 # Scan rotation scheduler instance (set by rotation API on start)
 scan_rotation: Any = None
 
+# Preset scheduler instance (set by schedule API on start/stop)
+preset_scheduler: Any = None
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Default Configuration

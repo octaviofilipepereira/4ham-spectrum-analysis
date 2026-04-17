@@ -27,6 +27,7 @@ from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth, optional_verify_basic_auth
 from app.dependencies.helpers import log, fallback_sample_rate_for_device
 from app.scan.rotation import RotationConfig, RotationSlot, ScanRotation
+from app.scan.preset_scheduler import PresetScheduler
 from app.api.decoders import (
     _start_cw_decoder,
     _stop_cw_decoder,
@@ -1020,3 +1021,210 @@ def delete_rotation_preset(
     if not state.db.delete_rotation_preset(preset_id):
         raise HTTPException(status_code=404, detail="Preset not found")
     return {"ok": True}
+
+
+# ── Preset Schedule (time-of-day rotation of presets) ──────────
+
+import re
+
+_HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+async def _apply_preset_by_id(preset_id: int) -> bool:
+    """Load a rotation preset from DB and (re)start scan rotation with it.
+
+    Called by the PresetScheduler background task when a time-window
+    boundary is reached.
+    """
+    presets = state.db.get_rotation_presets()
+    preset = next((p for p in presets if p["id"] == preset_id), None)
+    if not preset:
+        log(f"preset_scheduler:preset_not_found id={preset_id}")
+        return False
+
+    cfg = preset["config"]
+
+    # Build the payload that RotationConfig.from_dict expects
+    rotation_mode = cfg.get("rotationMode", "bands")
+    dwell_s = int(cfg.get("dwell", 60) or 60)
+    do_loop = cfg.get("loop", True)
+
+    if rotation_mode == "modes":
+        payload = {
+            "rotation_mode": "modes",
+            "band": cfg.get("band", "20m"),
+            "dwell_s": dwell_s,
+            "loop": do_loop,
+            "modes": [s.get("mode", "ft8").lower() for s in cfg.get("slots", [])],
+        }
+    else:
+        payload = {
+            "rotation_mode": "bands",
+            "dwell_s": dwell_s,
+            "loop": do_loop,
+            "slots": [
+                {
+                    "band": s.get("band", "20m"),
+                    "mode": s.get("mode", "ft8").lower(),
+                    **({"dwell_s": int(s["dwell_s"])} if s.get("dwell_s") else {}),
+                }
+                for s in cfg.get("slots", [])
+            ],
+        }
+
+    # Stop current rotation if any
+    if state.scan_rotation and state.scan_rotation.running:
+        await state.scan_rotation.stop()
+        state.scan_rotation = None
+
+    # Parse rotation config
+    try:
+        config = RotationConfig.from_dict(payload)
+    except (ValueError, KeyError, TypeError) as exc:
+        log(f"preset_scheduler:config_parse_error preset={preset_id} err={exc}")
+        return False
+
+    # If no scan running, bootstrap one from the first slot
+    if state.scan_state.get("state") != "running":
+        first = config.slots[0]
+        band_start, band_end = _lookup_band_bounds(first.band)
+        if band_start is None or band_end is None:
+            return False
+        prev_device = (
+            state.scan_state.get("device")
+            or (state.scan_state.get("scan") or {}).get("device_id")
+        )
+        # Stop preview if active
+        if state.scan_engine.preview:
+            await state.scan_engine.stop_async()
+        scan_cfg = {
+            "band": first.band,
+            "start_hz": band_start,
+            "end_hz": band_end,
+            "center_hz": (band_start + band_end) // 2,
+            "step_hz": 2000,
+            "dwell_ms": 250,
+            "sample_rate": 2048000,
+            "mode": "auto",
+        }
+        if prev_device:
+            scan_cfg["device_id"] = prev_device
+        try:
+            await state.scan_engine.start_async(scan_cfg)
+            state.scan_state["state"] = "running"
+            state.scan_state["scan"] = scan_cfg
+            state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
+            state.scan_state["scan_id"] = state.db.start_scan(
+                scan_cfg, state.scan_state["started_at"],
+            )
+        except Exception as exc:
+            log(f"preset_scheduler:scan_start_error err={exc}")
+            return False
+
+    rotation = ScanRotation(config, _rotation_switch_slot)
+    state.scan_rotation = rotation
+    started = await rotation.start()
+    log(f"preset_scheduler:rotation_started preset={preset_id} ok={started}")
+    return started
+
+
+async def _stop_active_rotation() -> None:
+    """Stop the current rotation (if any)."""
+    if state.scan_rotation and state.scan_rotation.running:
+        await state.scan_rotation.stop()
+
+
+@router.get("/rotation/schedules")
+def list_preset_schedules(
+    _: bool = Depends(optional_verify_basic_auth),
+) -> Dict:
+    """List all preset schedules and scheduler status."""
+    schedules = state.db.get_preset_schedules()
+    sched_status = (
+        state.preset_scheduler.status()
+        if state.preset_scheduler
+        else {"running": False, "active_preset_id": None}
+    )
+    return {"schedules": schedules, "scheduler": sched_status}
+
+
+@router.post("/rotation/schedules")
+def create_preset_schedule(
+    body: Dict,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Create a new time-of-day schedule for a rotation preset."""
+    preset_id = body.get("preset_id")
+    start_hhmm = str(body.get("start_hhmm", "")).strip()
+    end_hhmm = str(body.get("end_hhmm", "")).strip()
+
+    if not preset_id or not isinstance(preset_id, int):
+        raise HTTPException(status_code=400, detail="preset_id (int) is required")
+    if not _HHMM_RE.match(start_hhmm) or not _HHMM_RE.match(end_hhmm):
+        raise HTTPException(status_code=400, detail="start_hhmm and end_hhmm must be HH:MM (00:00–23:59)")
+    if start_hhmm == end_hhmm:
+        raise HTTPException(status_code=400, detail="start and end cannot be the same")
+
+    # Verify preset exists
+    presets = state.db.get_rotation_presets()
+    if not any(p["id"] == preset_id for p in presets):
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    return state.db.save_preset_schedule(preset_id, start_hhmm, end_hhmm)
+
+
+@router.patch("/rotation/schedules/{schedule_id}")
+def toggle_preset_schedule(
+    schedule_id: int,
+    body: Dict,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Enable or disable a preset schedule."""
+    enabled = body.get("enabled")
+    if enabled is None or not isinstance(enabled, bool):
+        raise HTTPException(status_code=400, detail="'enabled' (bool) is required")
+    if not state.db.toggle_preset_schedule(schedule_id, enabled):
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"ok": True}
+
+
+@router.delete("/rotation/schedules/{schedule_id}")
+def delete_preset_schedule(
+    schedule_id: int,
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Delete a preset schedule."""
+    if not state.db.delete_preset_schedule(schedule_id):
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"ok": True}
+
+
+@router.post("/rotation/scheduler/start")
+async def scheduler_start(
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Start the preset scheduler (time-of-day auto-switching)."""
+    if state.preset_scheduler and state.preset_scheduler.running:
+        return {"status": "already_running", **state.preset_scheduler.status()}
+
+    scheduler = PresetScheduler(
+        get_schedules=state.db.get_preset_schedules,
+        apply_preset_cb=_apply_preset_by_id,
+        stop_rotation_cb=_stop_active_rotation,
+    )
+    state.preset_scheduler = scheduler
+    await scheduler.start()
+    log("preset_scheduler_started")
+    return scheduler.status()
+
+
+@router.post("/rotation/scheduler/stop")
+async def scheduler_stop(
+    _: None = Depends(verify_basic_auth),
+) -> Dict:
+    """Stop the preset scheduler. Current rotation continues running."""
+    if not state.preset_scheduler or not state.preset_scheduler.running:
+        raise HTTPException(status_code=400, detail="Scheduler is not running")
+    await state.preset_scheduler.stop()
+    log("preset_scheduler_stopped")
+    return state.preset_scheduler.status()

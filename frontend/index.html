@@ -712,6 +712,57 @@ Last update: 2026-02-22 16:27:19 UTC
                 <div id="rotationPresetPreview" class="rotation-preset-preview text-muted small"></div>
               </div>
             </div>
+
+            <!-- Preset Scheduler (time-of-day preset rotation) -->
+            <div class="card panel mt-3">
+              <div class="card-body">
+                <h3 class="h6 mb-3">
+                  Preset Scheduler
+                  <span class="badge bg-secondary ms-2" id="schedulerStatusBadge">Off</span>
+                </h3>
+                <p class="text-muted small mb-3">Automatically switch between presets based on time of day (UTC).</p>
+
+                <!-- Scheduler controls -->
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <button class="btn btn-success btn-sm" type="button" id="schedulerStartBtn">Start Scheduler</button>
+                  <button class="btn btn-outline-danger btn-sm d-none" type="button" id="schedulerStopBtn">Stop Scheduler</button>
+                </div>
+
+                <!-- Add new schedule -->
+                <div class="d-flex align-items-end gap-2 mb-3 flex-wrap">
+                  <div>
+                    <label class="form-label small mb-1">Preset</label>
+                    <select class="form-select form-select-sm" id="schedulePresetSelect" style="min-width: 180px;"></select>
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">Start (UTC)</label>
+                    <input type="time" class="form-control form-control-sm" id="scheduleStartTime" value="23:00" />
+                  </div>
+                  <div>
+                    <label class="form-label small mb-1">End (UTC)</label>
+                    <input type="time" class="form-control form-control-sm" id="scheduleEndTime" value="09:00" />
+                  </div>
+                  <button class="btn btn-outline-info btn-sm" type="button" id="scheduleAddBtn">Add</button>
+                </div>
+
+                <!-- Schedule list -->
+                <table class="table table-sm table-hover small mb-0" id="scheduleTable">
+                  <thead>
+                    <tr>
+                      <th>Preset</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Enabled</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="scheduleTableBody">
+                    <tr><td colspan="5" class="text-muted text-center">No schedules configured</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

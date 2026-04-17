@@ -109,6 +109,15 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
   user TEXT NOT NULL,
   expires_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS preset_schedules (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  preset_id  INTEGER NOT NULL REFERENCES rotation_presets(id) ON DELETE CASCADE,
+  start_hhmm TEXT NOT NULL,
+  end_hhmm   TEXT NOT NULL,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
 """
 
 
@@ -256,6 +265,60 @@ class Database:
     def delete_rotation_preset(self, preset_id: int) -> bool:
         with self._lock:
             cur = self.conn.execute("DELETE FROM rotation_presets WHERE id = ?", (preset_id,))
+            # CASCADE: remove schedules referencing this preset
+            self.conn.execute("DELETE FROM preset_schedules WHERE preset_id = ?", (preset_id,))
+            self.conn.commit()
+        return cur.rowcount > 0
+
+    # ── Preset Schedules CRUD ──────────────────────────────────────
+
+    def get_preset_schedules(self) -> list:
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT s.id, s.preset_id, s.start_hhmm, s.end_hhmm, s.enabled, "
+                "s.created_at, p.name AS preset_name "
+                "FROM preset_schedules s "
+                "LEFT JOIN rotation_presets p ON p.id = s.preset_id "
+                "ORDER BY s.start_hhmm"
+            ).fetchall()
+        return [
+            {
+                "id": r[0], "preset_id": r[1], "start_hhmm": r[2],
+                "end_hhmm": r[3], "enabled": bool(r[4]),
+                "created_at": r[5], "preset_name": r[6] or "(deleted)",
+            }
+            for r in rows
+        ]
+
+    def save_preset_schedule(self, preset_id: int, start_hhmm: str, end_hhmm: str) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO preset_schedules(preset_id, start_hhmm, end_hhmm, enabled, created_at) "
+                "VALUES (?, ?, ?, 1, ?)",
+                (preset_id, start_hhmm, end_hhmm, now),
+            )
+            self.conn.commit()
+        return {
+            "id": cur.lastrowid, "preset_id": preset_id,
+            "start_hhmm": start_hhmm, "end_hhmm": end_hhmm,
+            "enabled": True, "created_at": now,
+        }
+
+    def toggle_preset_schedule(self, schedule_id: int, enabled: bool) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "UPDATE preset_schedules SET enabled = ? WHERE id = ?",
+                (int(enabled), schedule_id),
+            )
+            self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_preset_schedule(self, schedule_id: int) -> bool:
+        with self._lock:
+            cur = self.conn.execute(
+                "DELETE FROM preset_schedules WHERE id = ?", (schedule_id,)
+            )
             self.conn.commit()
         return cur.rowcount > 0
 
