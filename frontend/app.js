@@ -2482,7 +2482,8 @@ function _renderScheduleTable() {
     scheduleTableBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center">No schedules configured</td></tr>';
     return;
   }
-  scheduleTableBody.innerHTML = _schedulesCache.map(s => `
+  const sorted = [..._schedulesCache].sort((a, b) => a.start_hhmm.localeCompare(b.start_hhmm));
+  scheduleTableBody.innerHTML = sorted.map(s => `
     <tr>
       <td>${_escHtml(s.preset_name)}</td>
       <td>${_displayTime(s.start_hhmm)}</td>
