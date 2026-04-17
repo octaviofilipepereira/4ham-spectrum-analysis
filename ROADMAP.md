@@ -1,15 +1,15 @@
 <!--
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
-Last update: 2026-04-12
+Last update: 2026-04-17
 -->
 
 # 🗺️ ROADMAP — 4ham-spectrum-analysis
 
 > **Also available in:** [Português](ROADMAP_PT.md)
 
-**Current Version**: v0.12.2  
-**Last Update**: 2026-04-12  
+**Current Version**: v0.12.3  
+**Last Update**: 2026-04-17  
 **Status**: 🟢 Production-Ready (main branch)
 
 ---
@@ -60,6 +60,7 @@ Last update: 2026-04-12
 | v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
 | v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
 | v0.11.1 | 2026-04-10 | SQLite concurrency fix, SSB signal quality hardening, production stabilisation |
+| v0.12.3 | 2026-04-17 | Preset Scheduler (time-of-day auto-rotation), overlap validation, auto-start on boot |
 | v0.12.2 | 2026-04-12 | SNR KPI split (Digital vs CW/SSB), dashboard cleanup, external embedding docs |
 | v0.12.1 | 2026-04-12 | QTH-Centric Propagation Map redesign, NOAA SWPC ionospheric model, ionospheric sidebar |
 

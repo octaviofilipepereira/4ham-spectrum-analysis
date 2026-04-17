@@ -2,10 +2,26 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-12 UTC
+Last update: 2026-04-17 UTC
 -->
 
 # Changelog
+
+## v0.12.3 - 2026-04-17
+
+### Added
+- **Preset Scheduler**: time-of-day automatic rotation of scan presets. New `preset_schedules` DB table, `PresetScheduler` background task (30 s tick), 6 new API endpoints (`GET/POST /rotation/schedules`, `PATCH/DELETE /rotation/schedules/{id}`, `POST /rotation/scheduler/start|stop`).
+- **Scheduler auto-start on boot**: if enabled schedules exist in the DB, the scheduler starts automatically during app lifespan — no manual start required after server restart.
+- **Scheduler rotation recovery**: if the rotation dies unexpectedly (preview mode, error, user action), the scheduler detects it within 30 s and re-applies the active preset.
+- **Schedule overlap validation**: `POST /rotation/schedules` returns HTTP 409 with descriptive message when a new schedule collides with an existing enabled schedule. Handles same-day and cross-midnight windows.
+- **UTC clock in scheduler UI**: live UTC clock displayed next to the Preset Scheduler title for unambiguous time reference.
+- **Frontend Preset Scheduler section**: inside Rotation Presets modal — Add/Delete/Enable-Disable schedules, Start/Stop Scheduler, status badge, schedule table sorted by start time.
+
+### Fixed
+- **Schedule preset dropdown empty on modal open**: race condition where schedules loaded before presets — now presets load first (`await`).
+- **Graceful scheduler shutdown**: scheduler is stopped cleanly on app exit.
+
+---
 
 ## v0.12.2 - 2026-04-12
 

@@ -98,6 +98,13 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.12.3
+- **Preset Scheduler**: time-of-day automatic rotation of scan presets. 6 new API endpoints, `preset_schedules` DB table, background scheduler task (30 s tick).
+- **Scheduler auto-start on boot**: resumes automatically after server restart if enabled schedules exist.
+- **Rotation recovery**: scheduler re-applies preset within 30 s if rotation stops unexpectedly.
+- **Schedule overlap validation**: HTTP 409 on colliding time windows (same-day and cross-midnight).
+- **Frontend**: Preset Scheduler section in Rotation Presets modal — CRUD schedules, start/stop, UTC clock, sorted table.
+
 ### v0.12.2
 - **SNR KPI split**: separate "Avg SNR FT4/FT8/WSPR" and "Avg SNR CW/SSB" cards (incompatible measurement scales).
 - **Removed Time Coverage KPI card**, renamed "Overall Propagation score" → "Global Propagation".
