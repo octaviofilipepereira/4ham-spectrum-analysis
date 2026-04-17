@@ -7,15 +7,16 @@
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
 3. [Academic Analytics Dashboard](#academic-analytics-dashboard)
 4. [Scan Rotation](#scan-rotation)
-5. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
-6. [QTH-Centric Propagation Map](#qth-centric-propagation-map)
-7. [Ionospheric Space Weather Panel](#ionospheric-space-weather-panel)
-8. [Initial Setup](#initial-setup)
-9. [User Interface](#user-interface)
-10. [Spectrogram Interpretation](#spectrogram-interpretation)
-11. [Data Export](#data-export)
-12. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
-13. [Troubleshooting](#troubleshooting)
+5. [Rotation Presets & Scheduler](#rotation-presets--scheduler)
+6. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
+7. [QTH-Centric Propagation Map](#qth-centric-propagation-map)
+8. [Ionospheric Space Weather Panel](#ionospheric-space-weather-panel)
+9. [Initial Setup](#initial-setup)
+10. [User Interface](#user-interface)
+11. [Spectrogram Interpretation](#spectrogram-interpretation)
+12. [Data Export](#data-export)
+13. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -451,6 +452,45 @@ Scan Rotation lets you define a **sequence of slots (band + mode)** that the sys
 - A red pulsing dot confirms that rotation is active.
 - The **Stop scanning** button stops the rotation (and the current scan).
 - Data from all scanned bands/modes accumulates in the database and appears in the analytics dashboards.
+
+---
+
+## Rotation Presets & Scheduler
+
+### Rotation Presets
+
+Rotation Presets let you **save named rotation configurations** (slot list, dwell time, loop mode) so you can quickly switch between different monitoring strategies without re-creating the slot sequence each time.
+
+#### Managing presets
+
+1. Click **Rotation Presets** in the scan toolbar to open the Presets modal.
+2. The **Available Presets** section lists all saved presets with their slots summary.
+3. Click **Load** to apply a preset to the current rotation configuration.
+4. Click **Delete** to remove a preset you no longer need.
+5. To create a new preset, configure your rotation slots and dwell time in the Scan Rotation panel, then enter a name and click **Save current config as preset**.
+
+### Preset Scheduler
+
+The Scheduler automatically activates presets based on the **time of day (UTC)**, allowing the system to adapt to propagation changes between daytime and nighttime bands without manual intervention.
+
+#### Configuring schedules
+
+1. In the Presets modal, scroll to the **Preset Scheduler** section.
+2. Select a preset from the dropdown, enter a **Start** and **End** time (HH:MM, UTC), then click **Add Schedule**.
+3. The schedule table shows all configured time windows, sorted by start time.
+4. Use the **On/Off** toggle to enable or disable individual schedules.
+5. Click **Start Scheduler** to begin automatic preset switching.
+
+#### Behaviour
+
+- The scheduler checks every **30 seconds** which time window is active and applies the corresponding preset.
+- If rotation stops unexpectedly (e.g. SDR error), the scheduler detects and **re-applies** the preset automatically.
+- **Cross-midnight windows** are supported (e.g. 22:00 → 06:00).
+- **Overlapping windows** are rejected — the API returns an error if a new schedule conflicts with an existing one.
+- The scheduler **auto-starts on boot** if there are enabled schedules in the database.
+- The current UTC time is displayed above the schedule table for reference.
+
+> 💡 **Tip:** Create presets for daytime (e.g. 10m, 15m, 20m) and nighttime (e.g. 40m, 80m, 160m) bands, then schedule them to switch automatically — the system runs fully unattended 24/7.
 
 ---
 

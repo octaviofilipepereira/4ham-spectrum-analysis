@@ -52,7 +52,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.12.2 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.12.3 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -62,6 +62,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#interface">Interface tour</a></li>
       <li><a href="#scan-modes">Scan modes</a></li>
       <li><a href="#rotation">Scan Rotation</a></li>
+      <li><a href="#presets-scheduler">Rotation Presets &amp; Scheduler</a></li>
       <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
       <li><a href="#events">Events log</a></li>
       <li><a href="#voice-sig">SSB Voice Signature &amp; Whisper ASR</a></li>
@@ -233,6 +234,55 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 
     <div class="info-box">
       💡 <strong>Tip:</strong> Combine rotation with the Academic Analytics dashboard to see propagation patterns across bands over time — the Heatmap Pro and activity timeline charts are particularly useful with multi-band rotation data.
+    </div>
+  </section>
+
+  <!-- 4b. ROTATION PRESETS & SCHEDULER -->
+  <section id="presets-scheduler">
+    <h2 class="section-title">4b · Rotation Presets &amp; Scheduler</h2>
+    <p>
+      <strong>Rotation Presets</strong> let you save named rotation configurations (slot list, dwell time, loop mode)
+      so you can quickly switch between different monitoring strategies. The <strong>Preset Scheduler</strong> takes this
+      further by automatically activating presets based on the time of day (UTC).
+    </p>
+
+    <h3 class="sub-title">Managing Presets</h3>
+    <ol>
+      <li>Click <strong>Rotation Presets</strong> in the scan toolbar to open the Presets modal.</li>
+      <li>The <strong>Available Presets</strong> section lists all saved presets with their slots summary.</li>
+      <li>Click <strong>Load</strong> to apply a preset to the current rotation configuration.</li>
+      <li>Click <strong>Delete</strong> to remove a preset you no longer need.</li>
+      <li>To create a new preset, configure your rotation slots and dwell time in the Scan Rotation panel,
+         then enter a name and click <strong>Save current config as preset</strong>.</li>
+    </ol>
+
+    <h3 class="sub-title">Preset Scheduler</h3>
+    <p>
+      The Scheduler allows you to assign presets to specific <strong>time windows</strong> (UTC) so the system
+      automatically switches rotation presets throughout the day — ideal for adapting to propagation changes
+      between daytime and nighttime bands.
+    </p>
+    <ol>
+      <li>In the Presets modal, scroll to the <strong>Preset Scheduler</strong> section.</li>
+      <li>Select a preset from the dropdown, enter a <strong>Start</strong> and <strong>End</strong> time (HH:MM, UTC), then click <strong>Add Schedule</strong>.</li>
+      <li>The schedule table shows all configured time windows, sorted by start time.</li>
+      <li>Use the <strong>On/Off</strong> toggle to enable or disable individual schedules without deleting them.</li>
+      <li>Click <strong>Start Scheduler</strong> to activate automatic preset switching.</li>
+    </ol>
+    <p>The scheduler checks every 30 seconds which time window is active and applies the corresponding preset.
+       If rotation stops unexpectedly, the scheduler detects and re-applies it automatically.</p>
+
+    <h3 class="sub-title">Schedule rules</h3>
+    <ul>
+      <li><strong>Cross-midnight windows</strong> are supported (e.g. 22:00 → 06:00).</li>
+      <li><strong>Overlapping windows</strong> are rejected — the system returns an error if a new schedule conflicts with an existing one.</li>
+      <li>The scheduler <strong>auto-starts on boot</strong> if there are enabled schedules in the database.</li>
+      <li>The current UTC time is displayed above the schedule table for reference.</li>
+    </ul>
+
+    <div class="info-box">
+      💡 <strong>Tip:</strong> Create presets for daytime (e.g. 10m, 15m, 20m) and nighttime (e.g. 40m, 80m, 160m)
+      bands, then schedule them to switch automatically — the system runs fully unattended 24/7.
     </div>
   </section>
 

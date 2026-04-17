@@ -7,15 +7,16 @@
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
 3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
 4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
-5. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
-6. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
-7. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
-8. [Configuração Inicial](#configuração-inicial)
-9. [Interface do Utilizador](#interface-do-utilizador)
-10. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
-11. [Exportação de Dados](#exportação-de-dados)
-12. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
-13. [Resolução de Problemas](#resolução-de-problemas)
+5. [Presets de Rotação & Scheduler](#presets-de-rotação--scheduler)
+6. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
+7. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
+8. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
+9. [Configuração Inicial](#configuração-inicial)
+10. [Interface do Utilizador](#interface-do-utilizador)
+11. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+12. [Exportação de Dados](#exportação-de-dados)
+13. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
+14. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -451,6 +452,45 @@ O Scan Rotation permite definir uma **sequência de slots (banda + modo)** que o
 - O indicador de pulsação vermelho confirma que a rotação está ativa.
 - O botão **Stop scanning** para a rotação (e o scan atual).
 - Os dados de todas as bandas/modos varridos acumulam-se na base de dados e aparecem nos dashboards analíticos.
+
+---
+
+## Presets de Rotação & Scheduler
+
+### Presets de Rotação
+
+Os Presets de Rotação permitem **guardar configurações de rotação com nome** (lista de slots, tempo de permanência, modo loop) para alternar rapidamente entre diferentes estratégias de monitorização sem recriar a sequência de slots de cada vez.
+
+#### Gerir presets
+
+1. Clicar em **Rotation Presets** na barra de scan para abrir o modal de Presets.
+2. A secção **Available Presets** lista todos os presets guardados com o resumo dos slots.
+3. Clicar **Load** para aplicar um preset à configuração de rotação atual.
+4. Clicar **Delete** para remover um preset que já não é necessário.
+5. Para criar um novo preset, configurar os slots de rotação e dwell no painel de Scan Rotation, inserir um nome e clicar **Save current config as preset**.
+
+### Preset Scheduler
+
+O Scheduler ativa automaticamente presets com base na **hora do dia (UTC)**, permitindo que o sistema se adapte às mudanças de propagação entre bandas diurnas e noturnas sem intervenção manual.
+
+#### Configurar schedules
+
+1. No modal de Presets, descer até à secção **Preset Scheduler**.
+2. Selecionar um preset no dropdown, inserir hora de **Início** e **Fim** (HH:MM, UTC), e clicar **Add Schedule**.
+3. A tabela de schedules mostra todas as janelas temporais configuradas, ordenadas por hora de início.
+4. Usar o toggle **On/Off** para ativar ou desativar schedules individuais.
+5. Clicar **Start Scheduler** para iniciar a comutação automática de presets.
+
+#### Comportamento
+
+- O scheduler verifica a cada **30 segundos** qual janela temporal está ativa e aplica o preset correspondente.
+- Se a rotação parar inesperadamente (ex: erro do SDR), o scheduler deteta e **re-aplica** o preset automaticamente.
+- **Janelas que cruzam a meia-noite** são suportadas (ex: 22:00 → 06:00).
+- **Janelas sobrepostas** são rejeitadas — a API retorna erro se um novo schedule conflituar com um existente.
+- O scheduler **inicia automaticamente no arranque** se existirem schedules ativos na base de dados.
+- A hora UTC atual é mostrada acima da tabela de schedules para referência.
+
+> 💡 **Dica:** Crie presets para bandas diurnas (ex: 10m, 15m, 20m) e noturnas (ex: 40m, 80m, 160m) e programe-os para comutar automaticamente — o sistema funciona 24/7 sem supervisão.
 
 ---
 
