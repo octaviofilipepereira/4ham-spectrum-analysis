@@ -2400,9 +2400,50 @@ const scheduleStartTime = document.getElementById("scheduleStartTime");
 const scheduleEndTime = document.getElementById("scheduleEndTime");
 const scheduleAddBtn = document.getElementById("scheduleAddBtn");
 const scheduleTableBody = document.getElementById("scheduleTableBody");
+const scheduleLocalTzCheckbox = document.getElementById("scheduleLocalTz");
+const scheduleTzLabel = document.getElementById("scheduleTzLabel");
 
 let _schedulesCache = [];
 let _schedulerRunning = false;
+let _scheduleUseLocal = false;   // false = UTC (default), true = browser local
+
+// ── Timezone helpers ──
+function _getLocalTzAbbr() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch { return "Local"; }
+}
+
+/** Convert "HH:MM" from UTC to the browser's local timezone. */
+function _utcToLocal(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date(Date.UTC(2026, 0, 1, h, m));
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+
+/** Convert "HH:MM" from browser local timezone to UTC. */
+function _localToUtc(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date(2026, 0, 1, h, m);
+  return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
+}
+
+/** Display an HH:MM value respecting the current tz toggle. */
+function _displayTime(utcHhmm) {
+  return _scheduleUseLocal ? _utcToLocal(utcHhmm) : utcHhmm;
+}
+
+function _updateTzLabels() {
+  const label = _scheduleUseLocal ? _getLocalTzAbbr() : "UTC";
+  if (scheduleTzLabel) scheduleTzLabel.textContent = label;
+  document.querySelectorAll(".schedule-tz-hint").forEach(el => { el.textContent = label; });
+}
+
+scheduleLocalTzCheckbox?.addEventListener("change", () => {
+  _scheduleUseLocal = scheduleLocalTzCheckbox.checked;
+  _updateTzLabels();
+  _renderScheduleTable();
+});
 
 async function loadSchedulesList() {
   try {
@@ -2444,8 +2485,8 @@ function _renderScheduleTable() {
   scheduleTableBody.innerHTML = _schedulesCache.map(s => `
     <tr>
       <td>${_escHtml(s.preset_name)}</td>
-      <td>${s.start_hhmm}</td>
-      <td>${s.end_hhmm}</td>
+      <td>${_displayTime(s.start_hhmm)}</td>
+      <td>${_displayTime(s.end_hhmm)}</td>
       <td>
         <div class="form-check form-switch mb-0">
           <input class="form-check-input" type="checkbox" ${s.enabled ? "checked" : ""} data-schedule-toggle="${s.id}" />
@@ -2507,10 +2548,13 @@ function _updateSchedulerUI() {
 
 scheduleAddBtn?.addEventListener("click", async () => {
   const presetId = Number(schedulePresetSelect?.value);
-  const start = scheduleStartTime?.value || "";
-  const end = scheduleEndTime?.value || "";
-  if (!presetId || !start || !end) { showToast("Fill in all fields"); return; }
-  if (start === end) { showToast("Start and end cannot be the same"); return; }
+  const startRaw = scheduleStartTime?.value || "";
+  const endRaw = scheduleEndTime?.value || "";
+  if (!presetId || !startRaw || !endRaw) { showToast("Fill in all fields"); return; }
+  if (startRaw === endRaw) { showToast("Start and end cannot be the same"); return; }
+  // Convert to UTC if user is entering local times
+  const start = _scheduleUseLocal ? _localToUtc(startRaw) : startRaw;
+  const end = _scheduleUseLocal ? _localToUtc(endRaw) : endRaw;
   try {
     const resp = await fetch("/api/scan/rotation/schedules", {
       method: "POST",
