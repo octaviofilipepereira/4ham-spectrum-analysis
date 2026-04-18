@@ -321,6 +321,7 @@ decoder_stop = asyncio.Event()
 kiss_stop = asyncio.Event()
 kiss_task = None
 direwolf_process = None
+aprs_demod = None
 ft_internal_decoder = None
 ft_external_decoder = None
 cw_decoder = None

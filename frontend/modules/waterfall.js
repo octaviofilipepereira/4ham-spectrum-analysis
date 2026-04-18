@@ -826,8 +826,9 @@ export class WaterfallController {
       seenAtMs,
       mode: normalizedMode,
     });
-    if (normalizedMode !== "FT8" && normalizedMode !== "FT4") return;
-    const dialHz = findDialFrequency(numericFrequency, normalizedMode);
+    if (normalizedMode !== "FT8" && normalizedMode !== "FT4" && normalizedMode !== "APRS") return;
+    // APRS dial frequency is fixed at 144.800 MHz — no audio offset
+    const dialHz = normalizedMode === "APRS" ? 144_800_000 : findDialFrequency(numericFrequency, normalizedMode);
     if (!dialHz) return;
     const markerKey = `${dialHz}_${normalizedMode}`;
     const existing  = this.#decodedMarkerCache.get(markerKey);
