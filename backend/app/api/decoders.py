@@ -13,6 +13,7 @@ Mode decoder control and event ingestion endpoints.
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import asyncio
+import os
 import re
 
 import numpy as np
@@ -505,6 +506,30 @@ def _kiss_status_cb(status: str, detail: str):
         kiss_st["last_error"] = detail
 
 
+def _sync_direwolf_mycall(cmd: list):
+    """Update MYCALL in direwolf.conf with the station callsign from settings."""
+    try:
+        settings = state.db.get_settings()
+        callsign = str((settings.get("station") or {}).get("callsign") or "").strip().upper()
+        if not callsign:
+            return
+        # Find the config file path from -c flag in the command
+        conf_path = None
+        for i, arg in enumerate(cmd):
+            if arg == "-c" and i + 1 < len(cmd):
+                conf_path = cmd[i + 1]
+                break
+        if not conf_path or not os.path.isfile(conf_path):
+            return
+        text = open(conf_path, "r").read()
+        updated = re.sub(r"^MYCALL\s+.*$", f"MYCALL {callsign}", text, flags=re.MULTILINE)
+        if updated != text:
+            open(conf_path, "w").write(updated)
+            log(f"direwolf_mycall_synced:{callsign}")
+    except Exception as exc:
+        log(f"direwolf_mycall_sync_failed:{exc}")
+
+
 async def _start_kiss_loop(force: bool = False) -> Dict:
     """Start the KISS TCP loop that connects to Direwolf."""
     config = get_kiss_config()
@@ -521,6 +546,8 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
     if kiss_st["autostart"] and state.direwolf_process is None:
         cmd = resolve_command("DIREWOLF_CMD", "direwolf -t 0 -p")
         if cmd:
+            # Sync MYCALL in direwolf.conf with the station callsign from Admin Config
+            _sync_direwolf_mycall(cmd)
             try:
                 state.direwolf_process = await start_process(cmd)
                 kiss_st["process_running"] = True
