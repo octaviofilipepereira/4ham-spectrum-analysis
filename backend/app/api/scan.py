@@ -255,7 +255,23 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 
-    if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
+    # APRS mode: park the SDR on a single center frequency that covers
+    # 144.800 MHz instead of sweeping.  With sr=2048000 the 2 MHz
+    # instantaneous bandwidth captures the entire 2m band from a single
+    # tuning position, giving Direwolf continuous reception of APRS packets.
+    if decoder_mode == "aprs":
+        from app.decoders.aprs_demod import APRS_FREQ_HZ
+        aprs_center = APRS_FREQ_HZ           # 144 800 000
+        scan["start_hz"] = aprs_center
+        scan["end_hz"] = aprs_center
+        scan["step_hz"] = 0                   # single step = parked
+        # Keep the full 2m band display range for the waterfall
+        scan.setdefault("band_display_start_hz", 144000000)
+        scan.setdefault("band_display_end_hz", 146000000)
+        start_hz = aprs_center
+        end_hz = aprs_center
+
+    if start_hz <= 0 or end_hz <= 0 or end_hz < start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
     # Store selected decoder mode in scan state and start appropriate decoder
