@@ -104,6 +104,8 @@ Default frontend routes:
 - **Rotation recovery**: scheduler re-applies preset within 30 s if rotation stops unexpectedly.
 - **Schedule overlap validation**: HTTP 409 on colliding time windows (same-day and cross-midnight).
 - **Frontend**: Preset Scheduler section in Rotation Presets modal — CRUD schedules, start/stop, UTC clock, sorted table.
+- **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
+- **Human-readable export column headers**: all export column headers now use descriptive names with measurement units (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal snake_case identifiers.
 
 ### v0.12.2
 - **SNR KPI split**: separate "Avg SNR FT4/FT8/WSPR" and "Avg SNR CW/SSB" cards (incompatible measurement scales).

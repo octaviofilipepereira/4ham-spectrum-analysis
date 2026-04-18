@@ -86,6 +86,8 @@ Last update: 2026-04-17
 - 3-formula propagation scoring (Digital/CW/SSB with tailored SNR normalisation)
 - Multi-format export (CSV/XLSX/JSON), 1 h / 12 h presets
 - Callsign ITU validation + DXCC prefix lookup
+- Enriched "All Events" export with 13 additional fields per event (DXCC entity, continent, code, lat/lon, power, confidence, crest, Doppler shift, source, grid locator, derived band, normalised mode)
+- Human-readable column headers with measurement units across all export formats
 
 ### Phantom Mode Fix ✅ (v0.10.0)
 - Occupancy events forced to match active decoder mode

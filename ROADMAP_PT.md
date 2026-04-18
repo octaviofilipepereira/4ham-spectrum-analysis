@@ -86,6 +86,8 @@ Indicativo: CT7BFV
 - Scoring a 3 fórmulas (Digital/CW/SSB com normalização SNR específica)
 - Exportação multi-formato (CSV/XLSX/JSON), presets 1 h / 12 h
 - Validação ITU de indicativos + lookup DXCC
+- Exportação "All Events" enriquecida com 13 campos adicionais por evento (entidade DXCC, continente, código, lat/lon, potência, confiança, crest, desvio Doppler, fonte, grid locator, banda derivada, modo normalizado)
+- Cabeçalhos de coluna legíveis com unidades de medida em todos os formatos de exportação
 
 ### Correção de Modos Fantasma ✅ (v0.10.0)
 - Eventos de ocupação forçados a corresponder ao modo do decoder activo
