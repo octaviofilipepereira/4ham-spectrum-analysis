@@ -315,16 +315,6 @@ para receber pacotes APRS em tempo real.
   18 70; then
   _install_direwolf=1
   _direwolf_label="Sim (Direwolf + KISS TCP na porta 8001)"
-
-  _direwolf_callsign=$(whiptail --backtitle "$BT" \
-    --title "APRS — Indicativo de Estação" \
-    --inputbox "\
-Indique o indicativo de estação (callsign) para Direwolf.
-
-Este indicativo é usado na configuração do Direwolf.
-Se não tiver ou só quiser receber, deixe N0CALL." \
-    12 66 "N0CALL" 3>&1 1>&2 2>&3) || _direwolf_callsign="N0CALL"
-  _direwolf_callsign="${_direwolf_callsign:-N0CALL}"
 fi
 
 # ── installation mode ──────────────────────────────────────────────────────────
