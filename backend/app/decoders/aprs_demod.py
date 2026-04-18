@@ -204,6 +204,15 @@ class AprsDemodulator:
         phase = 0.0
         phase_inc = -2.0 * np.pi * offset_hz / sample_rate  # shift channel to baseband
 
+        # Telemetry counters
+        import time as _time
+        _tel_start = _time.monotonic()
+        _tel_chunks = 0
+        _tel_samples = 0
+        _tel_rms_acc = 0.0
+        _tel_peak = 0.0
+        _TEL_INTERVAL = 10.0  # log every 10 s
+
         while self._running:
             try:
                 # Non-blocking get with short sleep to allow cancel
@@ -255,6 +264,29 @@ class AprsDemodulator:
                         _log.warning("APRS demod: Direwolf pipe broken — stopping")
                         self._running = False
                         return
+
+                # Telemetry
+                _tel_chunks += 1
+                _tel_samples += len(pcm)
+                chunk_rms = float(np.sqrt(np.mean(pcm.astype(np.float64) ** 2)))
+                _tel_rms_acc += chunk_rms
+                chunk_peak = float(np.max(np.abs(pcm)))
+                if chunk_peak > _tel_peak:
+                    _tel_peak = chunk_peak
+                elapsed = _time.monotonic() - _tel_start
+                if elapsed >= _TEL_INTERVAL:
+                    avg_rms = _tel_rms_acc / max(_tel_chunks, 1)
+                    _log.info(
+                        "APRS demod tel: %.0fs  chunks=%d  samples=%d  "
+                        "rms=%.0f  peak=%.0f  (of 32767)",
+                        elapsed, _tel_chunks, _tel_samples,
+                        avg_rms, _tel_peak,
+                    )
+                    _tel_start = _time.monotonic()
+                    _tel_chunks = 0
+                    _tel_samples = 0
+                    _tel_rms_acc = 0.0
+                    _tel_peak = 0.0
 
                 await asyncio.sleep(0)
 
