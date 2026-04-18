@@ -3168,12 +3168,22 @@ async function fetchDecoderStatus() {
       }
     }
 
-    // Direwolf KISS
-    const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
-    const kissDisabledReason = kiss.last_error
-      ? ` (${kiss.last_error})`
-      : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
-    if (kissStatusModalEl) kissStatusModalEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
+    // Direwolf KISS / APRS
+    if (kissStatusModalEl) {
+      if (kiss.enabled) {
+        const connLabel = kiss.connected ? "Connected" : "Reconnecting…";
+        const addrLabel = kiss.address ? ` (${kiss.address})` : "";
+        const lastPkt = kiss.last_packet_at
+          ? ` · last pkt ${new Date(kiss.last_packet_at).toLocaleTimeString()}`
+          : "";
+        kissStatusModalEl.textContent = `${connLabel}${addrLabel}${lastPkt}`;
+      } else {
+        const reason = kiss.last_error
+          ? ` (${kiss.last_error})`
+          : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
+        kissStatusModalEl.textContent = `Disabled${reason}`;
+      }
+    }
 
     if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = lastEvent;
     if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";

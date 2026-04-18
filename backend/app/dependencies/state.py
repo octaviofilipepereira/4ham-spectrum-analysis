@@ -318,6 +318,7 @@ decoder_status = {
 # Decoder tasks and processes
 decoder_tasks = []
 decoder_stop = asyncio.Event()
+kiss_stop = asyncio.Event()
 kiss_task = None
 direwolf_process = None
 ft_internal_decoder = None

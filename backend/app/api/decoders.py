@@ -31,6 +31,12 @@ from app.dependencies.helpers import (
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
+from app.decoders.direwolf_kiss import (
+    kiss_loop,
+    get_kiss_config,
+    describe_kiss,
+    parse_kiss_frame,
+)
 from app.decoders.ssb_asr import (
     feed_iq_ssb,
     is_ssb_asr_available,
@@ -461,6 +467,91 @@ async def _run_ssb_detector_loop() -> None:
         except Exception as exc:
             log(f"ssb_detector_loop_error:{exc}")
             await asyncio.sleep(0.5)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# KISS / APRS Loop — Direwolf TCP KISS interface
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _kiss_on_event(event: Dict):
+    """Callback invoked by kiss_loop for each decoded APRS frame."""
+    if not event or not isinstance(event, dict):
+        return
+    # Update last-packet timestamp
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+    state.decoder_status["direwolf_kiss"]["last_packet_at"] = now_iso
+    # Enrich with scan frequency if available
+    center_hz = state.scan_engine.center_hz or state.spectrum_cache.get("center_hz") if state.scan_engine else None
+    if center_hz and not event.get("frequency_hz"):
+        event["frequency_hz"] = int(center_hz)
+    # Ingest through the standard pipeline
+    _ingest_callsign_payloads([event], {})
+
+
+def _kiss_status_cb(status: str, detail: str):
+    """Callback invoked by kiss_loop for connection state changes."""
+    kiss_st = state.decoder_status["direwolf_kiss"]
+    if status == "connected":
+        kiss_st["connected"] = True
+        kiss_st["address"] = detail
+        kiss_st["last_error"] = None
+    elif status == "disconnected":
+        kiss_st["connected"] = False
+    elif status == "error":
+        kiss_st["connected"] = False
+        kiss_st["last_error"] = detail
+
+
+async def _start_kiss_loop(force: bool = False) -> Dict:
+    """Start the KISS TCP loop that connects to Direwolf."""
+    config = get_kiss_config()
+    if not config:
+        if not force:
+            return {"started": False, "reason": "kiss_not_configured"}
+        return {"started": False, "reason": "kiss_not_configured"}
+
+    if state.kiss_task is not None and not state.kiss_task.done():
+        return {"started": False, "reason": "kiss_already_running"}
+
+    # Reset the dedicated KISS stop event so the loop starts fresh
+    state.kiss_stop.clear()
+
+    state.kiss_task = asyncio.create_task(
+        kiss_loop(
+            on_event=_kiss_on_event,
+            stop_event=state.kiss_stop,
+            logger=lambda msg: log(msg),
+            reconnect_delay=3.0,
+            status_cb=_kiss_status_cb,
+        )
+    )
+    state.decoder_status["direwolf_kiss"]["enabled"] = True
+    state.decoder_status["direwolf_kiss"]["address"] = describe_kiss()
+    log(f"kiss_loop_started:{describe_kiss()}")
+    return {"started": True, "reason": None}
+
+
+async def _stop_kiss_loop() -> Dict:
+    """Stop the KISS TCP loop."""
+    if state.kiss_task is None:
+        return {"stopped": False, "reason": "kiss_not_running"}
+
+    # Signal the KISS loop to stop (dedicated event, won't affect other decoders)
+    state.kiss_stop.set()
+
+    if not state.kiss_task.done():
+        state.kiss_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(state.kiss_task), timeout=3.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    state.kiss_task = None
+    state.decoder_status["direwolf_kiss"]["connected"] = False
+    log("kiss_loop_stopped")
+    return {"stopped": True, "reason": None}
 
 
 async def _start_ssb_detector(force: bool = False) -> Dict:
