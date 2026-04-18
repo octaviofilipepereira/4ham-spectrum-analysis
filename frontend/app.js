@@ -2033,7 +2033,7 @@ let rotationRunning = false;
 let _rotationPollTimer = null;
 
 const ROTATION_BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m"];
-const ROTATION_MODES = ["CW", "WSPR", "FT4", "FT8", "SSB"];
+const ROTATION_MODES = ["CW", "WSPR", "FT4", "FT8", "SSB", "APRS"];
 
 function renderRotationSlots() {
   const mode = rotationModeSelect.value;
@@ -4170,6 +4170,12 @@ if (quickModeButtons.length) {
           selectedDecoderMode = mode;
           wfc.selectedDecoderMode = mode;
           eventsSearchModeInput.value = mode;
+          // APRS operates on 2m — auto-switch band before restarting
+          if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
+            bandSelect.value = "2m";
+            localStorage.setItem("4ham_active_band", "2m");
+            refreshQuickBandButtons();
+          }
           // Clear old markers from previous mode to prevent pollution
           wfc.clearDecodedMarkerCache();
           refreshModeButtons();
@@ -4198,6 +4204,10 @@ if (quickModeButtons.length) {
         fetchTotal();
       } else {
         selectedDecoderMode = mode;
+        // APRS operates on 2m (144.800 MHz) — auto-switch band
+        if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
+          await switchBandLive("2m");
+        }
         wfc.recenterForMode(mode);
         eventsSearchModeInput.value = mode;
         refreshModeButtons();
