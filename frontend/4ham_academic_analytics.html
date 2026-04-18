@@ -1263,17 +1263,17 @@ Last update: 2026-04-03 UTC
             return bi !== 0 ? bi : a.mode.localeCompare(b.mode);
           })
           .map((r) => ({
-            band: r.band,
-            mode: r.mode,
-            total_events: r.total_events,
-            peak_snr_db: Number(r.peak_snr_db.toFixed(1)),
-            avg_snr_db: Number((r._snrSum / r._snrN).toFixed(1)),
+            "Band": r.band,
+            "Mode": r.mode,
+            "Total Events": r.total_events,
+            "Peak SNR (dB)": Number(r.peak_snr_db.toFixed(1)),
+            "Avg SNR (dB)": Number((r._snrSum / r._snrN).toFixed(1)),
           }));
 
         const propRows = (propagation.byBand || []).map((r) => ({
-          band: r.band,
-          propagation_score: Number(r.score.toFixed(1)),
-          events: r.events,
+          "Band": r.band,
+          "Propagation Score (0-100)": Number(r.score.toFixed(1)),
+          "Total Events": r.events,
         }));
 
         /* Aggregated events per time bucket, sorted by band then timestamp */
@@ -1283,11 +1283,11 @@ Last update: 2026-04-03 UTC
             return bi !== 0 ? bi : a.ts - b.ts;
           })
           .map((r) => ({
-            timestamp_utc: r.ts.toISOString(),
-            band: r.band,
-            mode: r.mode,
-            events: r.count,
-            snr_db: Number(r.snr.toFixed(1)),
+            "Timestamp (UTC)": r.ts.toISOString(),
+            "Band": r.band,
+            "Mode": r.mode,
+            "Events": r.count,
+            "SNR (dB)": Number(r.snr.toFixed(1)),
           }));
 
         /* All individual events from the database, sorted by band then timestamp */
@@ -1302,26 +1302,26 @@ Last update: 2026-04-03 UTC
             return bi !== 0 ? bi : (a.timestamp || "").localeCompare(b.timestamp || "");
           })
           .map((r) => ({
-            timestamp_utc: r.timestamp,
-            type: r.type,
-            band: r.band,
-            mode: r.mode,
-            callsign: r.callsign || "",
-            country: r.country || "",
-            continent: r.continent || "",
-            cq_zone: r.cq_zone != null ? r.cq_zone : "",
-            itu_zone: r.itu_zone != null ? r.itu_zone : "",
-            grid: r.grid || "",
-            lat: r.lat != null ? r.lat : "",
-            lon: r.lon != null ? r.lon : "",
-            coord_source: r.coord_source || "",
-            snr_db: r.snr_db != null ? Number(r.snr_db) : "",
-            power_dbm: r.power_dbm != null ? Number(r.power_dbm) : "",
-            confidence: r.confidence != null ? Number(r.confidence) : "",
-            crest_db: r.crest_db != null ? Number(r.crest_db) : "",
-            df_hz: r.df_hz != null ? r.df_hz : "",
-            frequency_hz: r.frequency_hz || "",
-            source: r.source || "",
+            "Timestamp (UTC)": r.timestamp,
+            "Type": r.type,
+            "Band": r.band,
+            "Mode": r.mode,
+            "Callsign": r.callsign || "",
+            "Country": r.country || "",
+            "Continent": r.continent || "",
+            "CQ Zone": r.cq_zone != null ? r.cq_zone : "",
+            "ITU Zone": r.itu_zone != null ? r.itu_zone : "",
+            "Grid Locator": r.grid || "",
+            "Latitude": r.lat != null ? r.lat : "",
+            "Longitude": r.lon != null ? r.lon : "",
+            "Coord Source": r.coord_source || "",
+            "SNR (dB)": r.snr_db != null ? Number(r.snr_db) : "",
+            "Power (dBm)": r.power_dbm != null ? Number(r.power_dbm) : "",
+            "Confidence": r.confidence != null ? Number(r.confidence) : "",
+            "Crest Factor (dB)": r.crest_db != null ? Number(r.crest_db) : "",
+            "Freq Offset (Hz)": r.df_hz != null ? r.df_hz : "",
+            "Frequency (Hz)": r.frequency_hz || "",
+            "Decoder Source": r.source || "",
           }));
 
         return { series: rows, agg_events: aggEvents, all_events: allEvents, propagation_by_band: propRows, period: { start: start.toISOString(), end: end.toISOString() } };
@@ -1354,7 +1354,7 @@ Last update: 2026-04-03 UTC
         }
 
         if (fmt === "csv") {
-          const headers = ["band", "mode", "total_events", "peak_snr_db", "avg_snr_db"];
+          const headers = ["Band", "Mode", "Total Events", "Peak SNR (dB)", "Avg SNR (dB)"];
           const lines = [
             headers.join(","),
             ...data.series.map((r) => headers.map((h) => r[h] ?? "").join(",")),
