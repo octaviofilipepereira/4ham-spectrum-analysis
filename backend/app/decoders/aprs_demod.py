@@ -272,13 +272,11 @@ class AprsDemodulator:
                 phase_diff = baseband * np.conj(delayed)
                 fm_audio = np.angle(phase_diff)
 
-                # Normalize FM output to audio range.
-                # np.angle gives radians in [-π, π].  The max phase step for
-                # a signal at ±FM_DEVIATION_HZ is ±2π·FM_DEVIATION_HZ/intermediate_rate.
-                # Scale so that ±FM_DEVIATION_HZ maps to roughly ±0.5 of PCM range,
-                # leaving headroom.
-                max_phase_step = 2.0 * np.pi * FM_DEVIATION_HZ / intermediate_rate
-                fm_audio = fm_audio / max_phase_step * 0.5
+                # Normalize to [-1, 1] range for PCM conversion.
+                # np.angle gives ±π; dividing by π maps to ±1.0.
+                # The channel FIR has already removed out-of-band noise,
+                # so the effective signal energy is much lower than full-scale.
+                fm_audio = fm_audio / np.pi
 
                 # 4. Decimate stage 2 to final audio rate
                 if decim2 > 1:
