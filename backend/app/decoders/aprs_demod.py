@@ -37,6 +37,7 @@ class AprsDemodulator:
         self._iq_queue: Optional[asyncio.Queue] = None
         self._task: Optional[asyncio.Task] = None
         self._process: Optional[asyncio.subprocess.Process] = None
+        self._dw_log_fp = None
         self._running = False
         # Demod state
         self._prev_sample: complex = 0 + 0j
@@ -104,12 +105,19 @@ class AprsDemodulator:
         env["FOURHAM_MANAGED"] = "1"
         env["FOURHAM_MANAGED_BY"] = "4ham-spectrum-analysis"
 
+        # Log Direwolf stderr for diagnostics
+        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "logs")
+        log_dir = os.path.normpath(log_dir)
+        os.makedirs(log_dir, exist_ok=True)
+        dw_log_path = os.path.join(log_dir, "direwolf_pipe.log")
+        self._dw_log_fp = open(dw_log_path, "w")
+
         try:
             self._process = await asyncio.create_subprocess_exec(
                 *pipe_cmd,
                 stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stdout=self._dw_log_fp,
+                stderr=asyncio.subprocess.STDOUT,
                 env=env,
             )
         except Exception as exc:
@@ -168,6 +176,13 @@ class AprsDemodulator:
             pid = self._process.pid
             self._process = None
             _log.info("APRS demod: Direwolf stopped (PID %s)", pid)
+
+        if self._dw_log_fp is not None:
+            try:
+                self._dw_log_fp.close()
+            except Exception:
+                pass
+            self._dw_log_fp = None
 
     @property
     def pid(self) -> Optional[int]:
