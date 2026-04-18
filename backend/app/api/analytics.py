@@ -21,6 +21,7 @@ from app.dependencies.auth import optional_verify_basic_auth
 from app.dependencies.helpers import (
     clamp, parse_event_timestamp, safe_float, sanitize_events_for_api,
     _mode_category, _normalise_snr,
+    callsign_to_dxcc, maidenhead_to_latlon,
 )
 from app.decoders.ingest import is_valid_callsign
 
@@ -272,6 +273,8 @@ def academic_analytics(
                 snr_analog_count += 1
 
         # Collect individual event for raw export
+        power_dbm = safe_float(event.get("power_dbm"), default=None)
+        confidence_val = safe_float(event.get("confidence"), default=None)
         raw_ev = {
             "timestamp": ts.isoformat(),
             "type": event_type,
@@ -279,10 +282,39 @@ def academic_analytics(
             "mode": mode_name,
             "snr_db": round(snr_db, 1) if snr_db is not None else None,
             "frequency_hz": int(event.get("frequency_hz") or 0) or None,
+            "power_dbm": round(power_dbm, 1) if power_dbm is not None else None,
+            "confidence": round(confidence_val, 3) if confidence_val is not None else None,
         }
         if event_type == "callsign":
-            raw_ev["callsign"] = str(event.get("callsign") or "").strip().upper() or None
-            raw_ev["grid"] = str(event.get("grid") or "").strip().upper() or None
+            cs_val = str(event.get("callsign") or "").strip().upper() or None
+            grid_val = str(event.get("grid") or "").strip().upper() or None
+            raw_ev["callsign"] = cs_val
+            raw_ev["grid"] = grid_val
+            crest = safe_float(event.get("crest_db"), default=None)
+            raw_ev["crest_db"] = round(crest, 1) if crest is not None else None
+            df = event.get("df_hz")
+            raw_ev["df_hz"] = int(df) if df is not None else None
+            raw_ev["source"] = str(event.get("source") or "").strip() or None
+            # DXCC enrichment
+            dxcc = callsign_to_dxcc(cs_val) if cs_val else None
+            raw_ev["country"] = dxcc.get("country") if dxcc else None
+            raw_ev["continent"] = dxcc.get("continent") if dxcc else None
+            raw_ev["cq_zone"] = dxcc.get("cq_zone") if dxcc else None
+            raw_ev["itu_zone"] = dxcc.get("itu_zone") if dxcc else None
+            # Coordinates: grid locator > DXCC centroid
+            coords = maidenhead_to_latlon(grid_val) if grid_val else None
+            if coords:
+                raw_ev["lat"] = coords[0]
+                raw_ev["lon"] = coords[1]
+                raw_ev["coord_source"] = "grid"
+            elif dxcc and dxcc.get("lat") is not None:
+                raw_ev["lat"] = dxcc["lat"]
+                raw_ev["lon"] = dxcc["lon"]
+                raw_ev["coord_source"] = "dxcc"
+            else:
+                raw_ev["lat"] = None
+                raw_ev["lon"] = None
+                raw_ev["coord_source"] = None
         raw_events.append(raw_ev)
 
         series_key = (bucket_iso, band_name, mode_name)

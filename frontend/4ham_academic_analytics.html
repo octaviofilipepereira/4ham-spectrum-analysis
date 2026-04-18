@@ -1307,9 +1307,21 @@ Last update: 2026-04-03 UTC
             band: r.band,
             mode: r.mode,
             callsign: r.callsign || "",
+            country: r.country || "",
+            continent: r.continent || "",
+            cq_zone: r.cq_zone != null ? r.cq_zone : "",
+            itu_zone: r.itu_zone != null ? r.itu_zone : "",
             grid: r.grid || "",
+            lat: r.lat != null ? r.lat : "",
+            lon: r.lon != null ? r.lon : "",
+            coord_source: r.coord_source || "",
             snr_db: r.snr_db != null ? Number(r.snr_db) : "",
+            power_dbm: r.power_dbm != null ? Number(r.power_dbm) : "",
+            confidence: r.confidence != null ? Number(r.confidence) : "",
+            crest_db: r.crest_db != null ? Number(r.crest_db) : "",
+            df_hz: r.df_hz != null ? r.df_hz : "",
             frequency_hz: r.frequency_hz || "",
+            source: r.source || "",
           }));
 
         return { series: rows, agg_events: aggEvents, all_events: allEvents, propagation_by_band: propRows, period: { start: start.toISOString(), end: end.toISOString() } };
