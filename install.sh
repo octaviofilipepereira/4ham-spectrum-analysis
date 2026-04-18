@@ -458,9 +458,12 @@ BLACKLIST
   run_sudo apt-get install -y soapysdr-module-rtlsdr >> "$LOG_FILE" 2>&1 || true
 fi
 
-gauge_step 65 "Configuring USB device access (plugdev group)..."
+gauge_step 65 "Configuring USB and audio device access (plugdev + audio groups)..."
 if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
   run_sudo usermod -aG plugdev "$(id -un)" >> "$LOG_FILE" 2>&1
+fi
+if ! id -nG "$(id -un)" 2>/dev/null | grep -qw audio; then
+  run_sudo usermod -aG audio "$(id -un)" >> "$LOG_FILE" 2>&1
 fi
 
 gauge_step 67 "Installing SDR udev rules..."
@@ -567,6 +570,61 @@ if [[ $_install_direwolf -eq 1 ]]; then
     _install_direwolf=0; }
 
   if [[ $_install_direwolf -eq 1 ]]; then
+    # ── Detect ALSA capture devices for Direwolf ─────────────────────────
+    close_gauge
+    _dw_adevice="null null"
+    _dw_adevice_label="null (sem áudio — configurar depois)"
+    _alsa_menu_items=()
+    _alsa_menu_items+=("null" "Sem áudio — configurar depois manualmente")
+    _alsa_menu_items+=("default" "Dispositivo ALSA/PulseAudio por omissão")
+
+    # Parse arecord -l to build hw:CARD,DEV entries
+    while IFS= read -r _aline; do
+      if [[ "$_aline" =~ ^card\ ([0-9]+):\ ([^\[]+)\[([^\]]+)\].*device\ ([0-9]+):\ (.+)\[(.*)\] ]]; then
+        _acard="${BASH_REMATCH[1]}"
+        _adev="${BASH_REMATCH[4]}"
+        _aname="${BASH_REMATCH[3]}"
+        _adesc="${BASH_REMATCH[6]}"
+        _alsa_hw="plughw:${_acard},${_adev}"
+        _alsa_menu_items+=("${_alsa_hw}" "${_aname} — ${_adesc}")
+      fi
+    done < <(arecord -l 2>/dev/null || true)
+
+    _item_count=$(( ${#_alsa_menu_items[@]} / 2 ))
+    _menu_height=$(( _item_count + 8 ))
+    [[ $_menu_height -gt 22 ]] && _menu_height=22
+
+    _dw_choice=$(whiptail --backtitle "$BT" \
+      --title "APRS — Dispositivo de Áudio para Direwolf" \
+      --menu "\
+Selecione o dispositivo de captura de áudio (entrada) para
+o Direwolf usar na descodificação APRS.
+
+Ligue o rádio (144.800 MHz) à entrada de áudio (line-in)
+da placa de som antes de iniciar o Direwolf.
+
+Se não souber qual escolher, selecione 'null' e
+configure depois em config/direwolf.conf." \
+      "$_menu_height" 78 "$_item_count" \
+      "${_alsa_menu_items[@]}" \
+      3>&1 1>&2 2>&3) || _dw_choice="null"
+
+    case "$_dw_choice" in
+      null)
+        _dw_adevice="null null"
+        _dw_adevice_label="null (sem áudio — configurar depois)"
+        ;;
+      default)
+        _dw_adevice="default"
+        _dw_adevice_label="default (ALSA/PulseAudio)"
+        ;;
+      *)
+        _dw_adevice="${_dw_choice} null"
+        _dw_adevice_label="${_dw_choice} (só receção)"
+        ;;
+    esac
+
+    start_gauge "Installing 4ham-spectrum-analysis - please wait..."
     gauge_step 94 "Creating Direwolf configuration for KISS TCP..."
     mkdir -p "$ROOT_DIR/config"
     if [[ ! -f "$ROOT_DIR/config/direwolf.conf" ]]; then
@@ -580,19 +638,17 @@ if [[ $_install_direwolf -eq 1 ]]; then
 MYCALL ${_direwolf_callsign}
 
 # ── Audio device ──────────────────────────────────────────────
-# Option A: Pipe from rtl_fm (receive only, no soundcard needed):
+# Detected and selected during installation.
+# To change later, edit this file or re-run the installer.
+#
+# Options:
+#   plughw:CARD,DEV  — ALSA hardware device (soundcard line-in)
+#   default          — system default audio device
+#   null null        — no audio (test mode only)
+#
+# For rtl_fm pipe mode (receive via RTL-SDR on 144.800 MHz):
 #   rtl_fm -f 144.800e6 -s 22050 -g 40 - | direwolf -c config/direwolf.conf -r 22050 -
-#   Set ADEVICE to stdin when using pipe mode.
-#
-# Option B: USB soundcard connected to a radio on 144.800 MHz:
-#   Use "arecord -l" to find the device name.
-#   Example: ADEVICE plughw:1,0
-#
-# Option C: PulseAudio / default ALSA device:
-#   ADEVICE default
-#
-# Default: null (no audio — for testing connectivity only)
-ADEVICE null null
+ADEVICE ${_dw_adevice}
 
 # Channel 0 — 1200 baud AFSK modem (APRS standard)
 CHANNEL 0
