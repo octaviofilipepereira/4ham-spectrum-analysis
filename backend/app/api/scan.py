@@ -360,6 +360,10 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 log(f"scan_ssb_detector_started:{result}")
             elif decoder_mode == "aprs":
                 await _stop_ssb_detector()
+                # Restart KISS loop so it picks up the IQ→FM demodulator
+                # (it may have started at boot without scan engine active)
+                if state.aprs_demod is None and state.kiss_task is not None:
+                    await _stop_kiss_loop()
                 result = await _start_kiss_loop(force=True)
                 log(f"scan_kiss_loop_started:{result}")
             else:
