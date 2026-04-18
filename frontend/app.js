@@ -138,7 +138,7 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 
 // Immediately show/hide APRS-related buttons from cached state (avoids flash)
 {
-  const cachedAprs = localStorage.getItem("4ham_aprs_available") === "1";
+  const cachedAprs = localStorage.getItem("4ham_aprs_active") === "1";
   const btn2m = document.querySelector('[data-quick-band="2m"]');
   const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
   if (btn2m) btn2m.classList.toggle('d-none', !cachedAprs);
@@ -3574,13 +3574,13 @@ async function loadSettings() {
           if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
         }
       }
-      // Show/hide 2m band + APRS mode buttons based on Direwolf availability
-      const aprsAvail = Boolean(data.aprs.available);
-      localStorage.setItem("4ham_aprs_available", aprsAvail ? "1" : "0");
+      // Show/hide 2m band + APRS mode buttons: available AND enabled
+      const aprsActive = Boolean(data.aprs.available) && Boolean(data.aprs.enabled);
+      localStorage.setItem("4ham_aprs_active", aprsActive ? "1" : "0");
       const btn2m = document.querySelector('[data-quick-band="2m"]');
       const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
-      if (btn2m) btn2m.classList.toggle('d-none', !aprsAvail);
-      if (btnAprs) btnAprs.classList.toggle('d-none', !aprsAvail);
+      if (btn2m) btn2m.classList.toggle('d-none', !aprsActive);
+      if (btnAprs) btnAprs.classList.toggle('d-none', !aprsActive);
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
@@ -4126,6 +4126,12 @@ if (saveAprsSettingsBtn) {
         return;
       }
       showToast(enabled ? "APRS packet decoding enabled" : "APRS packet decoding disabled");
+      // Immediately show/hide 2m & APRS buttons
+      const btn2m = document.querySelector('[data-quick-band="2m"]');
+      const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+      if (btn2m) btn2m.classList.toggle('d-none', !enabled);
+      if (btnAprs) btnAprs.classList.toggle('d-none', !enabled);
+      localStorage.setItem("4ham_aprs_active", enabled ? "1" : "0");
     } catch (err) {
       showToastError("Failed to save APRS setting");
     }
