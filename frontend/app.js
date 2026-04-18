@@ -3565,6 +3565,12 @@ async function loadSettings() {
           if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
         }
       }
+      // Show/hide 2m band + APRS mode buttons based on Direwolf availability
+      const aprsAvail = Boolean(data.aprs.available);
+      const btn2m = document.querySelector('[data-quick-band="2m"]');
+      const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+      if (btn2m) btn2m.classList.toggle('d-none', !aprsAvail);
+      if (btnAprs) btnAprs.classList.toggle('d-none', !aprsAvail);
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
