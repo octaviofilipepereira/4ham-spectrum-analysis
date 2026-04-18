@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-12 UTC
+Last update: 2026-04-18 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -98,14 +98,16 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.12.4
+- **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
+- **Human-readable export column headers**: all export column headers now use descriptive names with measurement units (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal snake_case identifiers.
+
 ### v0.12.3
 - **Preset Scheduler**: time-of-day automatic rotation of scan presets. 6 new API endpoints, `preset_schedules` DB table, background scheduler task (30 s tick).
 - **Scheduler auto-start on boot**: resumes automatically after server restart if enabled schedules exist.
 - **Rotation recovery**: scheduler re-applies preset within 30 s if rotation stops unexpectedly.
 - **Schedule overlap validation**: HTTP 409 on colliding time windows (same-day and cross-midnight).
 - **Frontend**: Preset Scheduler section in Rotation Presets modal — CRUD schedules, start/stop, UTC clock, sorted table.
-- **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
-- **Human-readable export column headers**: all export column headers now use descriptive names with measurement units (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal snake_case identifiers.
 
 ### v0.12.2
 - **SNR KPI split**: separate "Avg SNR FT4/FT8/WSPR" and "Avg SNR CW/SSB" cards (incompatible measurement scales).

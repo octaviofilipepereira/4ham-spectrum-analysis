@@ -3,4 +3,4 @@
 # License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 # Application version source of truth
 
-APP_VERSION = "0.12.3"
+APP_VERSION = "0.12.4"
