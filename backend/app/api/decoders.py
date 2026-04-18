@@ -37,6 +37,7 @@ from app.decoders.direwolf_kiss import (
     describe_kiss,
     parse_kiss_frame,
 )
+from app.decoders.launchers import resolve_command, start_process, stop_process
 from app.decoders.ssb_asr import (
     feed_iq_ssb,
     is_ssb_asr_available,
@@ -515,6 +516,22 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
     if state.kiss_task is not None and not state.kiss_task.done():
         return {"started": False, "reason": "kiss_already_running"}
 
+    # Auto-start Direwolf process if configured
+    kiss_st = state.decoder_status["direwolf_kiss"]
+    if kiss_st["autostart"] and state.direwolf_process is None:
+        cmd = resolve_command("DIREWOLF_CMD", "direwolf -t 0 -p")
+        if cmd:
+            try:
+                state.direwolf_process = await start_process(cmd)
+                kiss_st["process_running"] = True
+                kiss_st["process_pid"] = state.direwolf_process.pid
+                log(f"direwolf_process_started:pid={state.direwolf_process.pid}")
+                # Give Direwolf time to open the KISS TCP port
+                await asyncio.sleep(2.0)
+            except Exception as exc:
+                log(f"direwolf_process_start_failed:{exc}")
+                kiss_st["last_error"] = str(exc)
+
     # Reset the dedicated KISS stop event so the loop starts fresh
     state.kiss_stop.clear()
 
@@ -527,8 +544,8 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
             status_cb=_kiss_status_cb,
         )
     )
-    state.decoder_status["direwolf_kiss"]["enabled"] = True
-    state.decoder_status["direwolf_kiss"]["address"] = describe_kiss()
+    kiss_st["enabled"] = True
+    kiss_st["address"] = describe_kiss()
     log(f"kiss_loop_started:{describe_kiss()}")
     return {"started": True, "reason": None}
 
@@ -550,6 +567,18 @@ async def _stop_kiss_loop() -> Dict:
 
     state.kiss_task = None
     state.decoder_status["direwolf_kiss"]["connected"] = False
+
+    # Stop managed Direwolf process if we started it
+    if state.direwolf_process is not None:
+        try:
+            await stop_process(state.direwolf_process)
+            log(f"direwolf_process_stopped:pid={state.direwolf_process.pid}")
+        except Exception as exc:
+            log(f"direwolf_process_stop_failed:{exc}")
+        state.direwolf_process = None
+        state.decoder_status["direwolf_kiss"]["process_running"] = False
+        state.decoder_status["direwolf_kiss"]["process_pid"] = None
+
     log("kiss_loop_stopped")
     return {"stopped": True, "reason": None}
 
