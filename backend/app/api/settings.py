@@ -225,6 +225,7 @@ async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> 
             asyncio.create_task(_start_kiss_loop(force=True))
         elif not aprs_enabled and currently_enabled:
             asyncio.create_task(_stop_kiss_loop())
+            state.decoder_status["direwolf_kiss"]["enabled"] = False
         existing["aprs"] = {"enabled": aprs_enabled}
 
     state.db.save_settings(existing)
