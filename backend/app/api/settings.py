@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
+from app.dependencies.utils import command_exists
 from app.decoders.ssb_asr import is_ssb_asr_available, set_asr_enabled
 
 
@@ -48,6 +49,15 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "enabled": bool(asr_cfg.get("enabled", True)),
         "available": is_ssb_asr_available(),
     }
+    aprs_cfg = settings.get("aprs") or {}
+    kiss_st = state.decoder_status.get("direwolf_kiss") or {}
+    settings["aprs"] = {
+        "enabled": bool(kiss_st.get("enabled", False)),
+        "available": command_exists("direwolf"),
+        "connected": bool(kiss_st.get("connected", False)),
+        "autostart": bool(kiss_st.get("autostart", False)),
+        "address": kiss_st.get("address"),
+    }
     settings["auth"] = {
         "enabled": bool(state.auth_required),
         "user": state.auth_user if state.auth_required else "",
@@ -57,7 +67,7 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
 
 
 @router.post("")
-def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
+async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
     """
     Save application settings.
     
@@ -116,6 +126,19 @@ def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
         enabled = bool(asr.get("enabled", True))
         existing["asr"] = {"enabled": enabled}
         set_asr_enabled(enabled)
+
+    if "aprs" in payload:
+        from app.api.decoders import _start_kiss_loop, _stop_kiss_loop
+        import asyncio
+        aprs = payload.get("aprs") or {}
+        aprs_enabled = bool(aprs.get("enabled", False))
+        kiss_st = state.decoder_status.get("direwolf_kiss") or {}
+        currently_enabled = bool(kiss_st.get("enabled", False))
+        if aprs_enabled and not currently_enabled:
+            asyncio.create_task(_start_kiss_loop(force=True))
+        elif not aprs_enabled and currently_enabled:
+            asyncio.create_task(_stop_kiss_loop())
+        existing["aprs"] = {"enabled": aprs_enabled}
 
     state.db.save_settings(existing)
     return {"status": "ok"}

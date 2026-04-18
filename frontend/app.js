@@ -114,6 +114,9 @@ const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
 const ssbAsrEnabledCheck = document.getElementById("ssbAsrEnabled");
 const ssbAsrAvailableBadge = document.getElementById("ssbAsrAvailableBadge");
 const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
+const aprsEnabledCheck = document.getElementById("aprsEnabled");
+const aprsAvailableBadge = document.getElementById("aprsAvailableBadge");
+const saveAprsSettingsBtn = document.getElementById("saveAprsSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
@@ -3549,6 +3552,20 @@ async function loadSettings() {
         }
       }
     }
+    if (data.aprs) {
+      if (aprsEnabledCheck) aprsEnabledCheck.checked = data.aprs.enabled === true;
+      if (aprsAvailableBadge) {
+        if (data.aprs.available) {
+          aprsAvailableBadge.textContent = "Direwolf installed";
+          aprsAvailableBadge.className = "badge bg-success ms-2";
+          if (aprsEnabledCheck) aprsEnabledCheck.disabled = false;
+        } else {
+          aprsAvailableBadge.textContent = "Direwolf not installed";
+          aprsAvailableBadge.className = "badge bg-warning text-dark ms-2";
+          if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
+        }
+      }
+    }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
       audioOutputDeviceInput.value = data.audio_config.output_device || "";
@@ -4074,6 +4091,27 @@ if (saveAsrSettingsBtn) {
       showToast(enabled ? "ASR voice transcription enabled" : "ASR voice transcription disabled");
     } catch (err) {
       showToastError("Failed to save ASR setting");
+    }
+  });
+}
+
+if (saveAprsSettingsBtn) {
+  saveAprsSettingsBtn.addEventListener("click", async () => {
+    const enabled = aprsEnabledCheck ? aprsEnabledCheck.checked : false;
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ aprs: { enabled } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save APRS setting");
+        showToastError(message);
+        return;
+      }
+      showToast(enabled ? "APRS packet decoding enabled" : "APRS packet decoding disabled");
+    } catch (err) {
+      showToastError("Failed to save APRS setting");
     }
   });
 }

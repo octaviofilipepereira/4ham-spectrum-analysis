@@ -559,6 +559,25 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="btn btn-outline-info btn-sm" id="saveAsrSettings">Save ASR setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12">
+                <h3 class="h6 mb-1">APRS Packet Decoding (Direwolf) <span id="aprsAvailableBadge" class="badge bg-secondary ms-2">checking…</span></h3>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="aprsEnabled" />
+                  <label class="form-check-label" for="aprsEnabled">Enable APRS packet decoding via Direwolf KISS TCP</label>
+                </div>
+                <small class="d-block mt-1">
+                  When active, the backend starts Direwolf and connects to its KISS TCP port to decode APRS packets on
+                  144.800 MHz (VHF). Decoded packets appear in the live event stream and are stored in the event log.
+                  Requires <code>direwolf</code> — install it via the installer or manually:
+                  <code>sudo apt install direwolf</code>. You can enable/disable this at any time without restarting.
+                </small>
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveAprsSettings">Save APRS setting</button>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
               <div class="col-6">
                 <label class="form-label">Callsign</label>
