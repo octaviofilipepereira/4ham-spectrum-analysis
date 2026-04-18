@@ -14,6 +14,7 @@ import struct
 from typing import Optional
 
 import numpy as np
+from scipy.signal import firwin, lfilter, lfilter_zi
 
 _log = logging.getLogger(__name__)
 
@@ -204,6 +205,28 @@ class AprsDemodulator:
         phase = 0.0
         phase_inc = -2.0 * np.pi * offset_hz / sample_rate  # shift channel to baseband
 
+        # Design FIR low-pass channel filter at the intermediate rate.
+        # This isolates the ±7.5 kHz APRS NBFM channel and rejects
+        # wideband noise that would otherwise overwhelm FM demod.
+        intermediate_rate = sample_rate / decim1
+        chan_cutoff_hz = 7500.0  # ±7.5 kHz keeps APRS AFSK with margin
+        num_taps = 101
+        fir_coeffs = firwin(
+            num_taps,
+            chan_cutoff_hz,
+            fs=intermediate_rate,
+            window="hamming",
+        ).astype(np.float64)
+        # Initial filter state (for complex IQ — separate real/imag)
+        zi_proto = lfilter_zi(fir_coeffs, 1.0)
+        fir_zi_re = zi_proto * 0.0
+        fir_zi_im = zi_proto * 0.0
+
+        _log.info(
+            "APRS demod: channel FIR %d taps, cutoff %.0f Hz at %.0f Hz rate",
+            num_taps, chan_cutoff_hz, intermediate_rate,
+        )
+
         # Telemetry counters
         import time as _time
         _tel_start = _time.monotonic()
@@ -237,15 +260,25 @@ class AprsDemodulator:
                     trim = (n // decim1) * decim1
                     baseband = baseband[:trim].reshape(-1, decim1).mean(axis=1)
 
+                # 2b. Channel isolation FIR low-pass filter (at intermediate rate)
+                # Applied to complex IQ — filter real and imaginary independently
+                bb_re, fir_zi_re = lfilter(fir_coeffs, 1.0, baseband.real, zi=fir_zi_re)
+                bb_im, fir_zi_im = lfilter(fir_coeffs, 1.0, baseband.imag, zi=fir_zi_im)
+                baseband = bb_re + 1j * bb_im
+
                 # 3. FM demodulate: instantaneous frequency via arg(z[n] * conj(z[n-1]))
                 delayed = np.concatenate(([self._prev_sample], baseband[:-1]))
                 self._prev_sample = baseband[-1]
                 phase_diff = baseband * np.conj(delayed)
                 fm_audio = np.angle(phase_diff)
 
-                # Normalize: NBFM deviation maps ±π to ±FM_DEVIATION_HZ
-                # Scale to ±1.0 range for 16-bit PCM
-                fm_audio = fm_audio / np.pi
+                # Normalize FM output to audio range.
+                # np.angle gives radians in [-π, π].  The max phase step for
+                # a signal at ±FM_DEVIATION_HZ is ±2π·FM_DEVIATION_HZ/intermediate_rate.
+                # Scale so that ±FM_DEVIATION_HZ maps to roughly ±0.5 of PCM range,
+                # leaving headroom.
+                max_phase_step = 2.0 * np.pi * FM_DEVIATION_HZ / intermediate_rate
+                fm_audio = fm_audio / max_phase_step * 0.5
 
                 # 4. Decimate stage 2 to final audio rate
                 if decim2 > 1:
