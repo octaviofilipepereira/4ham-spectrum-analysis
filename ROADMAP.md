@@ -8,8 +8,8 @@ Last update: 2026-04-17
 
 > **Also available in:** [Português](ROADMAP_PT.md)
 
-**Current Version**: v0.12.3  
-**Last Update**: 2026-04-17  
+**Current Version**: v0.12.4  
+**Last Update**: 2026-04-18  
 **Status**: 🟢 Production-Ready (main branch)
 
 ---
@@ -60,6 +60,7 @@ Last update: 2026-04-17
 | v0.9.0 | 2026-04-06 | 3-formula propagation scoring, multi-format export, callsign ITU validation |
 | v0.10.0 | 2026-04-08 | Scan Rotation scheduler, phantom mode fix |
 | v0.11.1 | 2026-04-10 | SQLite concurrency fix, SSB signal quality hardening, production stabilisation |
+| v0.12.4 | 2026-04-18 | Academic Analytics enriched export (13 new fields), human-readable column headers |
 | v0.12.3 | 2026-04-17 | Preset Scheduler (time-of-day auto-rotation), overlap validation, auto-start on boot |
 | v0.12.2 | 2026-04-12 | SNR KPI split (Digital vs CW/SSB), dashboard cleanup, external embedding docs |
 | v0.12.1 | 2026-04-12 | QTH-Centric Propagation Map redesign, NOAA SWPC ionospheric model, ionospheric sidebar |
@@ -86,6 +87,8 @@ Last update: 2026-04-17
 - 3-formula propagation scoring (Digital/CW/SSB with tailored SNR normalisation)
 - Multi-format export (CSV/XLSX/JSON), 1 h / 12 h presets
 - Callsign ITU validation + DXCC prefix lookup
+- Enriched "All Events" export with 13 additional fields per event (DXCC entity, continent, code, lat/lon, power, confidence, crest, Doppler shift, source, grid locator, derived band, normalised mode)
+- Human-readable column headers with measurement units across all export formats
 
 ### Phantom Mode Fix ✅ (v0.10.0)
 - Occupancy events forced to match active decoder mode

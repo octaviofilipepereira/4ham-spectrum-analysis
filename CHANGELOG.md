@@ -2,10 +2,21 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-17 UTC
+Last update: 2026-04-18 UTC
 -->
 
 # Changelog
+
+## v0.12.4 - 2026-04-18
+
+### Added
+- **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
+- **Human-readable export column headers**: all export column headers now use descriptive names with measurement units (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal snake_case identifiers.
+
+### Documentation
+- Updated README changelog, help.html, user manuals (EN/PT), and ROADMAP (EN/PT) with enriched export details.
+
+---
 
 ## v0.12.3 - 2026-04-17
 

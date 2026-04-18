@@ -400,8 +400,8 @@ O dashboard permite exportar os dados analisados em três formatos. Para exporta
 
 | Formato | Melhor para | Conteúdo |
 |---|---|---|
-| **CSV** | Abrir em Excel/LibreOffice, importar noutra ferramenta | Tabela simples com colunas: banda, modo, total de eventos, SNR pico, SNR médio |
-| **JSON** | Processamento programático (Python, JavaScript, etc.) | Objeto completo com: séries agregadas por banda+modo, eventos por bucket temporal, todos os eventos individuais (com indicativo, grid, SNR, frequência), scores de propagação por banda, e intervalo temporal |
+| **CSV** | Abrir em Excel/LibreOffice, importar noutra ferramenta | Todos os eventos individuais com campos enriquecidos (ver abaixo). Cabeçalhos de coluna legíveis com unidades de medida. |
+| **JSON** | Processamento programático (Python, JavaScript, etc.) | Objeto completo com: séries agregadas por banda+modo, eventos por bucket temporal, todos os eventos individuais (enriquecidos, com indicativo, grid, SNR, frequência, DXCC, geolocalização), scores de propagação por banda, e intervalo temporal |
 | **XLSX** | Relatórios profissionais, análise detalhada em Excel | Workbook com **4 folhas separadas**: |
 
 **Folhas do ficheiro XLSX:**
@@ -410,10 +410,12 @@ O dashboard permite exportar os dados analisados em três formatos. Para exporta
 |---|---|---|
 | **Events by Band-Mode** | Dados agregados por combinação banda+modo | Visão geral: quantos eventos em cada banda e modo |
 | **Aggregated Events** | Eventos agrupados por bucket temporal (hora/dia) | Análise de tendências temporais |
-| **All Events** | Todos os eventos individuais com: timestamp, indicativo, banda, modo, frequência, SNR, grid locator | Análise detalhada evento a evento, log completo |
+| **All Events** | Todos os eventos individuais com campos enriquecidos: timestamp, indicativo, banda, modo, frequência, SNR, grid locator, nome da entidade DXCC, continente, código DXCC, latitude, longitude, potência (dBm), confiança, crest (dB), desvio Doppler (Hz), fonte, banda derivada, modo normalizado | Análise detalhada evento a evento com dados de geolocalização e qualidade de sinal |
 | **Propagation by Band** | Score de propagação e contagem de eventos por banda | Resumo da qualidade de propagação |
 
 O ficheiro é gerado no browser e descarregado automaticamente com o nome `4ham-analytics_{início}_{fim}.{ext}` (ex.: `4ham-analytics_2026-04-07-14-00_2026-04-08-14-00.xlsx`).
+
+> **Colunas de exportação enriquecidas:** Todos os formatos de exportação usam agora cabeçalhos de coluna legíveis com unidades de medida (ex.: "Frequency (Hz)", "SNR (dB)", "Power (dBm)") em vez de identificadores internos. A folha "All Events" inclui 13 campos adicionais por evento: nome da entidade DXCC, continente, código DXCC, latitude/longitude GPS, potência (dBm), confiança, crest (dB), desvio Doppler (Hz), fonte, grid locator, banda derivada e modo normalizado — permitindo análise geográfica e estudos de qualidade de sinal diretamente a partir da exportação.
 
 ### Metadados (rodapé)
 

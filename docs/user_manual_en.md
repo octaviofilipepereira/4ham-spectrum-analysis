@@ -400,8 +400,8 @@ The dashboard allows exporting the analysed data in three formats. To export:
 
 | Format | Best for | Content |
 |---|---|---|
-| **CSV** | Opening in Excel/LibreOffice, importing into other tools | Simple table with columns: band, mode, total events, peak SNR, average SNR |
-| **JSON** | Programmatic processing (Python, JavaScript, etc.) | Complete object with: aggregated series by band+mode, events per time bucket, all individual events (with callsign, grid, SNR, frequency), propagation scores per band, and time range |
+| **CSV** | Opening in Excel/LibreOffice, importing into other tools | All individual events with enriched fields (see below). Human-readable column headers with units. |
+| **JSON** | Programmatic processing (Python, JavaScript, etc.) | Complete object with: aggregated series by band+mode, events per time bucket, all individual events (enriched, with callsign, grid, SNR, frequency, DXCC, geolocation), propagation scores per band, and time range |
 | **XLSX** | Professional reports, detailed analysis in Excel | Workbook with **4 separate sheets**: |
 
 **XLSX file sheets:**
@@ -410,10 +410,12 @@ The dashboard allows exporting the analysed data in three formats. To export:
 |---|---|---|
 | **Events by Band-Mode** | Data aggregated by band+mode combination | Overview: how many events in each band and mode |
 | **Aggregated Events** | Events grouped by time bucket (hour/day) | Temporal trend analysis |
-| **All Events** | Every individual event with: timestamp, callsign, band, mode, frequency, SNR, grid locator | Detailed event-by-event analysis, complete log |
+| **All Events** | Every individual event with enriched fields: timestamp, callsign, band, mode, frequency, SNR, grid locator, DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, derived band, normalised mode | Detailed event-by-event analysis with geolocation and signal quality data |
 | **Propagation by Band** | Propagation score and event count per band | Propagation quality summary |
 
 The file is generated in the browser and downloaded automatically with the name `4ham-analytics_{start}_{end}.{ext}` (e.g. `4ham-analytics_2026-04-07-14-00_2026-04-08-14-00.xlsx`).
+
+> **Enriched export columns:** All export formats now use human-readable column headers with measurement units (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal identifiers. The "All Events" sheet includes 13 additional fields per event: DXCC entity name, continent, DXCC code, GPS latitude/longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode — enabling geographic analysis and signal quality studies directly from the export.
 
 ### Metadata (footer)
 

@@ -52,7 +52,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.12.3 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; v0.12.4 &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -741,9 +741,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <table class="manual-table">
       <thead><tr><th>Format</th><th>Best for</th><th>Content</th></tr></thead>
       <tbody>
-        <tr><td><strong>CSV</strong></td><td>Spreadsheets (Excel, LibreOffice), importing into other tools</td><td>Band, mode, total events, peak SNR, average SNR</td></tr>
-        <tr><td><strong>JSON</strong></td><td>Programmatic processing (Python, JS)</td><td>Full object: aggregated series, time-bucketed events, all individual events, propagation by band, period</td></tr>
-        <tr><td><strong>XLSX</strong></td><td>Professional reports, detailed Excel analysis</td><td>Workbook with 4 sheets (see below)</td></tr>
+        <tr><td><strong>CSV</strong></td><td>Spreadsheets (Excel, LibreOffice), importing into other tools</td><td>All individual events with enriched fields (see below). Human-readable column headers with units.</td></tr>
+        <tr><td><strong>JSON</strong></td><td>Programmatic processing (Python, JS)</td><td>Full object: aggregated series, time-bucketed events, all individual events (enriched), propagation by band, period</td></tr>
+        <tr><td><strong>XLSX</strong></td><td>Professional reports, detailed Excel analysis</td><td>Workbook with 4 sheets (see below). Human-readable column headers with units.</td></tr>
       </tbody>
     </table>
 
@@ -753,11 +753,19 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <tbody>
         <tr><td><strong>Events by Band-Mode</strong></td><td>Data aggregated by band+mode</td><td>Overview: events per band and mode</td></tr>
         <tr><td><strong>Aggregated Events</strong></td><td>Events grouped by time bucket (hour/day)</td><td>Temporal trend analysis</td></tr>
-        <tr><td><strong>All Events</strong></td><td>Every individual event: timestamp, callsign, band, mode, frequency, SNR, grid</td><td>Detailed event-by-event analysis, complete log</td></tr>
+        <tr><td><strong>All Events</strong></td><td>Every individual event with enriched fields: timestamp, callsign, band, mode, frequency, SNR, grid locator, DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, derived band, normalised mode</td><td>Detailed event-by-event analysis, complete log with geolocation and signal quality data</td></tr>
         <tr><td><strong>Propagation by Band</strong></td><td>Score and event count per band</td><td>Propagation quality summary</td></tr>
       </tbody>
     </table>
     <p>The file is generated in the browser and downloaded automatically as <code>4ham-analytics_{start}_{end}.{ext}</code>.</p>
+
+    <div class="info-box">
+      💡 <strong>Enriched export columns</strong> — all export formats now use human-readable column headers with measurement units
+      (e.g. "Frequency (Hz)", "SNR (dB)", "Power (dBm)") instead of internal identifiers.
+      The "All Events" sheet includes 13 additional fields per event: DXCC entity name, continent, DXCC code,
+      GPS latitude/longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator,
+      derived band, and normalised mode — enabling geographic analysis and signal quality studies directly from the export.
+    </div>
 
     <h3 class="sub-title">Metadata footer</h3>
     <table class="manual-table">
