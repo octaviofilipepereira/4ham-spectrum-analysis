@@ -136,6 +136,15 @@ const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]
 const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
 
+// Immediately show/hide APRS-related buttons from cached state (avoids flash)
+{
+  const cachedAprs = localStorage.getItem("4ham_aprs_available") === "1";
+  const btn2m = document.querySelector('[data-quick-band="2m"]');
+  const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+  if (btn2m) btn2m.classList.toggle('d-none', !cachedAprs);
+  if (btnAprs) btnAprs.classList.toggle('d-none', !cachedAprs);
+}
+
 // Selected decoder mode for scan
 let selectedDecoderMode = null;
 let latestScanState = null;
@@ -3567,6 +3576,7 @@ async function loadSettings() {
       }
       // Show/hide 2m band + APRS mode buttons based on Direwolf availability
       const aprsAvail = Boolean(data.aprs.available);
+      localStorage.setItem("4ham_aprs_available", aprsAvail ? "1" : "0");
       const btn2m = document.querySelector('[data-quick-band="2m"]');
       const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
       if (btn2m) btn2m.classList.toggle('d-none', !aprsAvail);
