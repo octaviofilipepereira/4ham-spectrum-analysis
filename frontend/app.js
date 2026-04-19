@@ -3081,6 +3081,9 @@ exportPngBtn.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  // Ignore shortcuts when typing in an input, textarea, or contenteditable
+  const tag = event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || event.target.isContentEditable) return;
   if (event.key === "s") {
     if (!isScanRunning) {
       toggleScan();
