@@ -91,7 +91,16 @@ export class APRSMapController {
         zoom: 11,
         zoomControl: true,
         attributionControl: true,
+        scrollWheelZoom: false,
       });
+      // Ctrl+scroll to zoom (prevents accidental zoom while scrolling the page)
+      this.#container.addEventListener("wheel", (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 1 : -1;
+          this.#map.zoomIn(delta);
+        }
+      }, { passive: false });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
