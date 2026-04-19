@@ -29,6 +29,7 @@ from app.dependencies.helpers import (
     record_decoder_event_saved,
     record_decoder_event_invalid,
     is_plausible_occupancy_event,
+    maidenhead_to_latlon,
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
@@ -37,6 +38,11 @@ from app.decoders.direwolf_kiss import (
     get_kiss_config,
     describe_kiss,
     parse_kiss_frame,
+)
+from app.decoders.aprs_is import (
+    aprs_is_loop,
+    check_internet,
+    parse_aprs_is_line,
 )
 from app.decoders.launchers import resolve_command, start_process, stop_process
 from app.decoders.ssb_asr import (
@@ -703,6 +709,113 @@ async def _stop_kiss_loop() -> Dict:
     return {"stopped": True, "reason": None}
 
 
+# ── APRS-IS (Internet feed) ─────────────────────────────────────────
+
+def _aprs_is_on_event(event: Dict):
+    """Callback invoked by aprs_is_loop for each decoded APRS-IS packet."""
+    if not event or not isinstance(event, dict):
+        return
+    now_iso = datetime.now(timezone.utc).isoformat()
+    state.decoder_status["aprs_is"]["last_packet_at"] = now_iso
+    # Enrich with APRS frequency
+    if not event.get("frequency_hz"):
+        event["frequency_hz"] = 144800000
+    result = _ingest_callsign_payloads([event], {})
+    if result and result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(event)
+        except Exception:
+            pass
+
+
+def _aprs_is_status_cb(status: str, detail: str):
+    """Callback invoked by aprs_is_loop for connection state changes."""
+    is_st = state.decoder_status["aprs_is"]
+    if status == "connected":
+        is_st["connected"] = True
+        is_st["address"] = detail
+        is_st["last_error"] = None
+    elif status == "disconnected":
+        is_st["connected"] = False
+    elif status in ("error", "connecting"):
+        if status == "error":
+            is_st["connected"] = False
+            is_st["last_error"] = detail
+
+
+def _get_station_coords() -> tuple:
+    """Return (callsign, lat, lon) from settings, or (None, None, None)."""
+    try:
+        settings = state.db.get_settings()
+        station = settings.get("station") or {}
+        callsign = str(station.get("callsign") or "").strip().upper()
+        locator = str(station.get("locator") or "").strip().upper()
+        if not callsign or not locator:
+            return None, None, None
+        pos = maidenhead_to_latlon(locator)
+        if not pos:
+            return callsign, None, None
+        return callsign, pos[0], pos[1]
+    except Exception:
+        return None, None, None
+
+
+async def _start_aprs_is_loop() -> Dict:
+    """Start the APRS-IS Internet feed loop."""
+    if state.aprs_is_task is not None and not state.aprs_is_task.done():
+        return {"started": False, "reason": "aprs_is_already_running"}
+
+    # Check internet connectivity
+    has_internet = await asyncio.to_thread(check_internet)
+    state.decoder_status["aprs_is"]["internet_available"] = has_internet
+    if not has_internet:
+        log("aprs_is_no_internet:skipping APRS-IS (no internet connectivity)")
+        return {"started": False, "reason": "no_internet"}
+
+    callsign, lat, lon = _get_station_coords()
+    if not callsign or lat is None or lon is None:
+        log("aprs_is_no_station_config:station callsign/locator not configured")
+        return {"started": False, "reason": "no_station_config"}
+
+    state.aprs_is_stop.clear()
+    state.aprs_is_task = asyncio.create_task(
+        aprs_is_loop(
+            callsign=callsign,
+            lat=lat,
+            lon=lon,
+            on_event=_aprs_is_on_event,
+            stop_event=state.aprs_is_stop,
+            logger=lambda msg: log(msg),
+            reconnect_delay=10.0,
+            status_cb=_aprs_is_status_cb,
+        )
+    )
+    state.decoder_status["aprs_is"]["enabled"] = True
+    log(f"aprs_is_loop_started:callsign={callsign} lat={lat:.4f} lon={lon:.4f}")
+    return {"started": True, "reason": None}
+
+
+async def _stop_aprs_is_loop() -> Dict:
+    """Stop the APRS-IS Internet feed loop."""
+    if state.aprs_is_task is None:
+        return {"stopped": False, "reason": "aprs_is_not_running"}
+
+    state.aprs_is_stop.set()
+    if not state.aprs_is_task.done():
+        state.aprs_is_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(state.aprs_is_task), timeout=3.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    state.aprs_is_task = None
+    state.decoder_status["aprs_is"]["connected"] = False
+    state.decoder_status["aprs_is"]["enabled"] = False
+    log("aprs_is_loop_stopped")
+    return {"stopped": True, "reason": None}
+
+
 async def _start_ssb_detector(force: bool = False) -> Dict:
     global _ssb_iq_queue, _ssb_detector_task
 
@@ -1334,8 +1447,32 @@ def decoder_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
             "batch": True
         },
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
-        "sources": ["direwolf", "cw", "asr", "dsp", "internal_ft", "external_ft", "internal_cw", "internal_ssb", "internal_psk"],
+        "sources": ["direwolf", "aprs_is", "cw", "asr", "dsp", "internal_ft", "external_ft", "internal_cw", "internal_ssb", "internal_psk"],
         "status": state.decoder_status
+    }
+
+
+@router.get("/aprs-connectivity")
+async def aprs_connectivity(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
+    """
+    Check APRS connectivity: internet availability and APRS-IS status.
+    Used by frontend to show RF-only warning when no internet.
+    """
+    has_internet = await asyncio.to_thread(check_internet, 3.0)
+    state.decoder_status["aprs_is"]["internet_available"] = has_internet
+    return {
+        "internet": has_internet,
+        "aprs_is": {
+            "connected": state.decoder_status["aprs_is"]["connected"],
+            "enabled": state.decoder_status["aprs_is"]["enabled"],
+            "address": state.decoder_status["aprs_is"].get("address"),
+            "last_packet_at": state.decoder_status["aprs_is"].get("last_packet_at"),
+        },
+        "rf": {
+            "connected": state.decoder_status["direwolf_kiss"]["connected"],
+            "enabled": state.decoder_status["direwolf_kiss"]["enabled"],
+            "process_running": state.decoder_status["direwolf_kiss"]["process_running"],
+        },
     }
 
 

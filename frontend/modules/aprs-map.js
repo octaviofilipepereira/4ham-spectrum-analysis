@@ -193,9 +193,11 @@ export class APRSMapController {
     if (!hasPosition) return;
 
     const emoji = aprsSymbolEmoji(evt.symbol_table, evt.symbol_code);
+    const isRF = String(evt.source || "").toLowerCase() !== "aprs_is";
+    const sourceClass = isRF ? "aprs-marker-rf" : "aprs-marker-is";
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({
-        className: "aprs-station-icon",
+        className: `aprs-station-icon ${sourceClass}`,
         html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
         iconSize: [120, 28],
         iconAnchor: [60, 14],
@@ -238,6 +240,12 @@ export class APRSMapController {
     const firstSeen = data.firstSeenMs ? new Date(data.firstSeenMs).toLocaleTimeString() : "—";
     const lastSeen = data.lastSeenMs ? new Date(data.lastSeenMs).toLocaleTimeString() : "—";
 
+    // Source badge
+    const isRF = String(data.source || "").toLowerCase() !== "aprs_is";
+    const sourceBadge = isRF
+      ? '<span class="aprs-source-badge aprs-source-rf">RF 144.800</span>'
+      : '<span class="aprs-source-badge aprs-source-is">APRS-IS</span>';
+
     // Distance from QTH
     let distText = "";
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -247,7 +255,7 @@ export class APRSMapController {
 
     return `
       <div class="aprs-popup">
-        <div class="aprs-popup__header">${emoji} <strong>${callsign}</strong></div>
+        <div class="aprs-popup__header">${emoji} <strong>${callsign}</strong> ${sourceBadge}</div>
         <table class="aprs-popup__table">
           <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
           ${distText}

@@ -50,7 +50,9 @@ def _infer_source(mode):
 def normalize_callsign(value):
     if not value:
         return None
-    cleaned = re.sub(r"[^A-Za-z0-9/]", "", str(value).upper())
+    raw = str(value).strip().upper()
+    # Preserve SSID (e.g. CT4TX-16) — strip only truly invalid chars
+    cleaned = re.sub(r"[^A-Za-z0-9/\-]", "", raw)
     return cleaned or None
 
 
@@ -69,10 +71,13 @@ _VALID_CALLSIGN_RE = re.compile(
 
 
 def is_valid_callsign(value):
-    """Return True if *value* looks like a plausible amateur-radio callsign."""
+    """Return True if *value* looks like a plausible amateur-radio callsign.
+    Accepts optional SSID suffix (e.g. CT4TX-16)."""
     if not value:
         return False
-    return bool(_VALID_CALLSIGN_RE.match(str(value).upper()))
+    # Strip SSID before validation (e.g. CT4TX-16 → CT4TX)
+    base = str(value).upper().split("-")[0]
+    return bool(_VALID_CALLSIGN_RE.match(base))
 
 
 def _infer_band_from_frequency(frequency_hz):

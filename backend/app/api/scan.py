@@ -37,6 +37,8 @@ from app.api.decoders import (
     _stop_ssb_detector,
     _start_kiss_loop,
     _stop_kiss_loop,
+    _start_aprs_is_loop,
+    _stop_aprs_is_loop,
 )
 
 
@@ -371,6 +373,7 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 await _stop_ft_external_decoder()
             if decoder_mode == "ssb":
                 await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
                 result = await _start_ssb_detector(force=True)
                 log(f"scan_ssb_detector_started:{result}")
             elif decoder_mode == "aprs":
@@ -379,9 +382,11 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                 # IQ→FM demodulator after the scan engine is running.
                 if state.kiss_task is not None:
                     await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
             else:
                 await _stop_ssb_detector()
                 await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
 
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()
@@ -393,6 +398,10 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         try:
             result = await _start_kiss_loop(force=True)
             log(f"scan_kiss_loop_started:{result}")
+
+            # Start APRS-IS Internet feed alongside the RF pipeline
+            aprs_is_result = await _start_aprs_is_loop()
+            log(f"scan_aprs_is_started:{aprs_is_result}")
 
             state.scan_state["state"] = "running"
             state.scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
@@ -473,6 +482,7 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     await state.scan_engine.stop_async()
     await _stop_ssb_detector()
     await _stop_kiss_loop()
+    await _stop_aprs_is_loop()
     # Stop rotation if active
     if state.scan_rotation and state.scan_rotation.running:
         await state.scan_rotation.stop()
@@ -635,6 +645,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             await _stop_kiss_loop()
         except Exception as exc:
             log(f"scan_kiss_loop_stop_failed:{exc}")
+        try:
+            await _stop_aprs_is_loop()
+        except Exception as exc:
+            log(f"scan_aprs_is_stop_failed:{exc}")
         
         # Start FT external decoder if not already running
         if state.ft_external_decoder is None:
@@ -669,6 +683,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             await _stop_kiss_loop()
         except Exception as exc:
             log(f"scan_kiss_loop_stop_failed:{exc}")
+        try:
+            await _stop_aprs_is_loop()
+        except Exception as exc:
+            log(f"scan_aprs_is_stop_failed:{exc}")
 
         current_scan = dict(state.scan_state.get("scan") or {})
         cw_start_hz, cw_end_hz = _resolve_cw_sweep_bounds(
@@ -714,6 +732,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 await _stop_kiss_loop()
             except Exception as exc:
                 log(f"scan_kiss_loop_stop_failed:{exc}")
+            try:
+                await _stop_aprs_is_loop()
+            except Exception as exc:
+                log(f"scan_aprs_is_stop_failed:{exc}")
 
             current_scan = dict(state.scan_state.get("scan") or {})
             scan_start_hz = int(current_scan.get("start_hz", 0) or 0)
@@ -759,6 +781,11 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_kiss_loop_started:{result}")
             except Exception as exc:
                 log(f"scan_kiss_loop_start_failed:{exc}")
+            try:
+                aprs_is_result = await _start_aprs_is_loop()
+                log(f"scan_aprs_is_started:{aprs_is_result}")
+            except Exception as exc:
+                log(f"scan_aprs_is_start_failed:{exc}")
 
         else:
             try:
@@ -769,6 +796,10 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 await _stop_kiss_loop()
             except Exception as exc:
                 log(f"scan_kiss_loop_stop_failed:{exc}")
+            try:
+                await _stop_aprs_is_loop()
+            except Exception as exc:
+                log(f"scan_aprs_is_stop_failed:{exc}")
 
     return {"status": "ok", "decoder_mode": decoder_mode}
 

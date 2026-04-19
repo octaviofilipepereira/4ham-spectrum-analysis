@@ -601,9 +601,23 @@ function setAprsMapVisible(showMap) {
     } else {
       aprsMapCtrl.show();
     }
+    // Non-blocking connectivity check — warn if no internet (RF-only)
+    _checkAprsConnectivity();
   } else {
     aprsMapCtrl.hide();
   }
+}
+
+/** Best-effort APRS-IS connectivity check — shows toast if offline. */
+async function _checkAprsConnectivity() {
+  try {
+    const resp = await fetch("/api/decoders/aprs-connectivity", { headers: getAuthHeader() });
+    if (!resp.ok) return;
+    const info = await resp.json();
+    if (!info.internet) {
+      showToast("⚠️ No internet — APRS limited to RF reception only (144.800 MHz)");
+    }
+  } catch { /* best-effort */ }
 }
 
 /** Fetch recent APRS events from the API and populate the map. */
