@@ -76,13 +76,20 @@ export class APRSMapController {
    * Initialise (or re‐centre) the map.
    * @param {string} locator  - Maidenhead grid square (e.g. "IN51mu")
    * @param {string} callsign - Station callsign (e.g. "CT7BFV")
+   * @param {number|null} exactLat - Optional exact latitude (overrides locator)
+   * @param {number|null} exactLon - Optional exact longitude (overrides locator)
    */
-  init(locator, callsign) {
+  init(locator, callsign, exactLat = null, exactLon = null) {
     this.#stationCall = callsign || "";
-    const qth = maidenheadToLatLon(locator);
-    if (qth) {
-      this.#qthLat = qth.lat;
-      this.#qthLon = qth.lon;
+    if (Number.isFinite(exactLat) && Number.isFinite(exactLon)) {
+      this.#qthLat = exactLat;
+      this.#qthLon = exactLon;
+    } else {
+      const qth = maidenheadToLatLon(locator);
+      if (qth) {
+        this.#qthLat = qth.lat;
+        this.#qthLon = qth.lon;
+      }
     }
 
     if (!this.#map) {

@@ -121,6 +121,8 @@ const saveAprsSettingsBtn = document.getElementById("saveAprsSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
+const stationLatInput = document.getElementById("stationLat");
+const stationLonInput = document.getElementById("stationLon");
 const stationQthInput = document.getElementById("stationQth");
 const deviceClassSelect = document.getElementById("deviceClass");
 const devicePpmInput = document.getElementById("devicePpm");
@@ -606,8 +608,10 @@ function setAprsMapVisible(showMap) {
 
     const locator = stationLocatorInput?.value || localStorage.getItem("4ham_station_locator") || "";
     const callsign = stationCallsignInput?.value || localStorage.getItem("4ham_station_callsign") || "";
+    const exactLat = stationLatInput?.value ? parseFloat(stationLatInput.value) : null;
+    const exactLon = stationLonInput?.value ? parseFloat(stationLonInput.value) : null;
     if (!aprsMapCtrl.isReady) {
-      aprsMapCtrl.init(locator, callsign);
+      aprsMapCtrl.init(locator, callsign, exactLat, exactLon);
       // Load recent APRS events from the DB
       _loadRecentAprsEvents();
     } else {
@@ -3629,6 +3633,8 @@ async function loadSettings() {
       stationOperatorInput.value = data.station.operator || "";
       stationLocatorInput.value = data.station.locator || "";
       stationQthInput.value = data.station.qth || "";
+      if (stationLatInput) stationLatInput.value = data.station.lat ?? "";
+      if (stationLonInput) stationLonInput.value = data.station.lon ?? "";
     }
     if (data.auth) {
       setAuthFields(data.auth || {});
@@ -3856,6 +3862,8 @@ saveSettingsBtn.addEventListener("click", async () => {
       operator: stationOperatorInput.value.trim(),
       locator: stationLocatorInput.value.trim(),
       qth: stationQthInput.value.trim(),
+      lat: stationLatInput?.value ? parseFloat(stationLatInput.value) : null,
+      lon: stationLonInput?.value ? parseFloat(stationLonInput.value) : null,
     },
     device_config: buildDeviceConfigPayload(),
     audio_config: buildAudioConfigPayload(),
