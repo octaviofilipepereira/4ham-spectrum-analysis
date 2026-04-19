@@ -214,14 +214,6 @@ Last update: 2026-02-22 16:27:19 UTC
                   <span id="cwSegmentSummary">--</span>
                 </span>
               </div>
-              <!-- APRS map (hidden by default, shown when decoder mode is APRS) -->
-              <div class="aprs-map-area" id="aprsMapArea" hidden>
-                <div class="aprs-map-header">
-                  <span class="aprs-map-header__title">📡 APRS Map — 144.800 MHz</span>
-                  <span class="aprs-map-header__count" id="aprsMapCount">0 stations</span>
-                </div>
-                <div id="aprsMap" class="aprs-map"></div>
-              </div>
               <!-- Spectrum graph + Waterfall — wrapped together so the transition overlay covers both -->
               <div class="waterfall-area" id="waterfallArea">
                 <canvas id="spectrumCanvas" width="640" height="80" aria-hidden="true"></canvas>
@@ -284,7 +276,15 @@ Last update: 2026-02-22 16:27:19 UTC
           </div>
         </div>
         <div class="col-12 col-propmap-custom">
-          <div class="card panel h-100">
+          <!-- APRS map (hidden by default, shown when decoder mode is APRS) -->
+          <div class="aprs-map-area aprs-map-area--propslot h-100" id="aprsMapArea" hidden>
+            <div class="aprs-map-header">
+              <span class="aprs-map-header__title">📡 APRS Map — 144.800 MHz</span>
+              <span class="aprs-map-header__count" id="aprsMapCount">0 stations</span>
+            </div>
+            <div id="aprsMap" class="aprs-map"></div>
+          </div>
+          <div class="card panel h-100" id="propagationCard">
             <div class="card-body d-flex flex-column">
               <div class="d-flex align-items-center gap-2 mb-1">
                 <h2 class="h5 mb-0">Propagation Map</h2>

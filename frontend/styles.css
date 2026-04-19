@@ -1537,6 +1537,16 @@ h1,
   overflow: hidden;
   border: 1px solid #334155;
 }
+/* When placed in the propagation card slot, fill the full column height */
+.aprs-map-area--propslot {
+  display: flex;
+  flex-direction: column;
+}
+.aprs-map-area--propslot .aprs-map {
+  flex: 1 1 0;
+  min-height: 420px;
+  height: auto;
+}
 .aprs-map-header {
   display: flex;
   justify-content: space-between;

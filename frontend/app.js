@@ -518,8 +518,13 @@ function resolveCwDecoderSegment(scanState) {
 
 function renderScanContextSummary(scanState) {
   if (scanRangeSummaryEl) {
-    const scanRange = resolveDisplayedScanRange(scanState);
-    scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
+    const isAprs = String(selectedDecoderMode || "").trim().toUpperCase() === "APRS";
+    if (isAprs) {
+      scanRangeSummaryEl.textContent = "144.800 MHz (APRS)";
+    } else {
+      const scanRange = resolveDisplayedScanRange(scanState);
+      scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
+    }
   }
 
   if (!cwSegmentSummaryWrapEl || !cwSegmentSummaryEl) {
@@ -583,15 +588,22 @@ const aprsMapCtrl = new APRSMapController("aprsMap");
 const aprsMapArea = document.getElementById("aprsMapArea");
 const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
+const propagationCard = document.getElementById("propagationCard");
 
 /**
  * Toggle between waterfall and APRS map views.
+ * When APRS mode is active the propagation card is replaced by the APRS map
+ * (side-by-side with the Events card) and the VFO shows 144.800 MHz.
  * @param {boolean} showMap - true → show map, false → show waterfall
  */
 function setAprsMapVisible(showMap) {
   if (aprsMapArea) aprsMapArea.hidden = !showMap;
   if (waterfallArea) waterfallArea.hidden = showMap;
+  if (propagationCard) propagationCard.hidden = showMap;
   if (showMap) {
+    // VFO → fixed APRS frequency
+    wfc.updateVFODisplay(144800000, 144800000);
+
     const locator = stationLocatorInput?.value || localStorage.getItem("4ham_station_locator") || "";
     const callsign = stationCallsignInput?.value || localStorage.getItem("4ham_station_callsign") || "";
     if (!aprsMapCtrl.isReady) {
