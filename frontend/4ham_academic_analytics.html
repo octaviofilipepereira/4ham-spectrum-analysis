@@ -1212,7 +1212,7 @@ Last update: 2026-04-03 UTC
               <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
             </div>
           </div>
-          <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters">Apply Filters</button>
+          <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="display:none">Apply Filters</button>
           <div class="aprs-filter-row" style="margin:0;align-self:end;">
             <button class="aprs-filter-btn active" data-filter="all" data-i18n="all">All</button>
             <button class="aprs-filter-btn" data-filter="rf">📻 RF</button>
@@ -3697,6 +3697,7 @@ Last update: 2026-04-03 UTC
           aprsCurrentPreset = btn.dataset.preset;
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
+          if (aprsApplyBtn) aprsApplyBtn.style.display = aprsCurrentPreset === "custom" ? "" : "none";
           // Auto-apply on non-custom presets — no need to click "Apply Filters"
           if (aprsCurrentPreset !== "custom") aprsLoadAndRender();
         });
