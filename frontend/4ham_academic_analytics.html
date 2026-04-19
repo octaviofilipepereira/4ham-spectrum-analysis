@@ -2537,7 +2537,10 @@ Last update: 2026-04-03 UTC
 
         updateKpis(filteredSeries, filteredCallsigns, start, end);
         // Prefer server-computed propagation (accurate); fall back to JS computation for simulated data
-        const propagation = serverPropagation || computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end);
+        // Always recompute locally from filtered data (APRS already excluded from series)
+        const propagation = (filteredSeries.length > 0)
+          ? computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end)
+          : { overallScore: 0, stability: 0, bestBand: null, byBand: [], trend: [] };
         updatePropagationKpis(propagation);
         drawTimeline(filteredSeries, start, end);
         drawStackedByBandMode(filteredSeries);
