@@ -1561,6 +1561,31 @@ h1,
   font-weight: 600;
   font-size: 15px;
 }
+.aprs-map-header__filter {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+}
+.aprs-filter-btn {
+  background: #334155;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.aprs-filter-btn:hover {
+  background: #475569;
+  color: #fff;
+}
+.aprs-filter-btn--active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+}
 .aprs-map-header__count {
   color: #e2e8f0;
   font-size: 14px;

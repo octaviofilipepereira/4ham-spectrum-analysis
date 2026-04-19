@@ -280,6 +280,11 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="aprs-map-area aprs-map-area--propslot h-100" id="aprsMapArea" hidden>
             <div class="aprs-map-header">
               <span class="aprs-map-header__title">📡 APRS Map — 144.800 MHz</span>
+              <div class="aprs-map-header__filter" id="aprsMapFilter">
+                <button class="aprs-filter-btn aprs-filter-btn--active" data-filter="all" title="Show all stations">All</button>
+                <button class="aprs-filter-btn" data-filter="rf" title="RF only (144.800 MHz)">📻 RF</button>
+                <button class="aprs-filter-btn" data-filter="tcp" title="APRS-IS (TCP)">🌐 TCP</button>
+              </div>
               <span class="aprs-map-header__hint">Ctrl + Scroll = Zoom</span>
               <span class="aprs-map-header__count" id="aprsMapCount">0 stations</span>
               <button class="aprs-map-header__fullscreen" id="aprsMapFullscreenBtn" title="Fullscreen (ESC to exit)">

@@ -618,6 +618,21 @@ if (aprsMapFullscreenBtn && aprsMapArea) {
   });
 }
 
+// ── APRS Map source filter (All / RF / TCP) ────────────────────────────
+const aprsMapFilterEl = document.getElementById("aprsMapFilter");
+if (aprsMapFilterEl) {
+  aprsMapFilterEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".aprs-filter-btn");
+    if (!btn) return;
+    const filter = btn.dataset.filter;
+    aprsMapFilterEl.querySelectorAll(".aprs-filter-btn").forEach((b) =>
+      b.classList.toggle("aprs-filter-btn--active", b === btn)
+    );
+    aprsMapCtrl.applyFilter(filter);
+    _updateAprsMapCount();
+  });
+}
+
 /**
  * Toggle between waterfall and APRS map views.
  * When APRS mode is active the propagation card is replaced by the APRS map
@@ -682,7 +697,7 @@ async function _loadRecentAprsEvents() {
 
 function _updateAprsMapCount() {
   if (aprsMapCountEl) {
-    const n = aprsMapCtrl.markerCount;
+    const n = aprsMapCtrl.filteredMarkerCount;
     aprsMapCountEl.textContent = `${n} station${n !== 1 ? "s" : ""}`;
   }
 }

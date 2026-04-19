@@ -47,6 +47,7 @@ export class APRSMapController {
   #qthLat = 39.5;
   #qthLon = -8.0;
   #stationCall = "";
+  #activeFilter = "all"; // "all" | "rf" | "tcp"
 
   constructor(containerId) {
     this.#container = document.getElementById(containerId);
@@ -203,11 +204,15 @@ export class APRSMapController {
         iconSize: [120, 28],
         iconAnchor: [60, 14],
       }),
-    }).addTo(this.#map);
+    });
 
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
     marker.bindPopup(this.#buildPopup(data));
     this.#markers.set(callsign, { marker, data, lastSeenMs: now });
+    // Only add to map if it passes the active filter
+    if (this.#matchesFilter(data)) {
+      marker.addTo(this.#map);
+    }
   }
 
   /** Load a batch of historical events (e.g. from DB on APRS mode entry). */
@@ -225,6 +230,39 @@ export class APRSMapController {
   }
 
   get markerCount() { return this.#markers.size; }
+
+  /** Return the count of currently visible markers (respects active filter). */
+  get filteredMarkerCount() {
+    if (this.#activeFilter === "all") return this.#markers.size;
+    let count = 0;
+    for (const [, entry] of this.#markers) {
+      if (this.#matchesFilter(entry.data)) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Filter markers by source: "all", "rf", or "tcp".
+   * @param {string} filter
+   */
+  applyFilter(filter) {
+    this.#activeFilter = filter;
+    for (const [, entry] of this.#markers) {
+      const visible = this.#matchesFilter(entry.data);
+      if (visible && !this.#map.hasLayer(entry.marker)) {
+        entry.marker.addTo(this.#map);
+      } else if (!visible && this.#map.hasLayer(entry.marker)) {
+        this.#map.removeLayer(entry.marker);
+      }
+    }
+  }
+
+  /** Check if an event's source matches the active filter. */
+  #matchesFilter(data) {
+    if (this.#activeFilter === "all") return true;
+    const isRF = String(data.source || "").toLowerCase() !== "aprs_is";
+    return this.#activeFilter === "rf" ? isRF : !isRF;
+  }
 
   // ── Private ───────────────────────────────────────────────────────────
 
