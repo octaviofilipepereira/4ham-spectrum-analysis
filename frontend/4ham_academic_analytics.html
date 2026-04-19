@@ -4163,7 +4163,7 @@ Last update: 2026-04-03 UTC
           .attr("text-anchor", "middle")
           .attr("dy", "-0.3em")
           .text(d => d.data.label)
-          .style("fill", "#fff").style("font-size", "26px").style("font-weight", "600");
+          .style("fill", "#fff").style("font-size", "20px").style("font-weight", "600");
 
         g.selectAll("text.pct").data(pie(data)).join("text")
           .attr("class", "pct")
@@ -4171,12 +4171,12 @@ Last update: 2026-04-03 UTC
           .attr("text-anchor", "middle")
           .attr("dy", "1em")
           .text(d => `${Math.round(d.data.value / total * 100)}%`)
-          .style("fill", "#fff").style("font-size", "22px");
+          .style("fill", "#fff").style("font-size", "17px");
 
         // Total in centre
         g.append("text").attr("text-anchor", "middle").attr("dy", "0.35em")
           .text(formatInt(total))
-          .style("fill", "var(--text)").style("font-size", "40px").style("font-weight", "700");
+          .style("fill", "var(--text)").style("font-size", "30px").style("font-weight", "700");
       }
 
     </script>
