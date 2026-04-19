@@ -18,25 +18,7 @@ const APRS_RANGE_KM = 50;
 const APRS_CLEANUP_INTERVAL_MS = 60 * 1000; // check every minute
 const APRS_RECENT_WINDOW_MIN = 30; // load events from last 30 min on init
 
-// ── Maidenhead grid → lat/lon ────────────────────────────────────────────
-function maidenheadToLatLon(locator) {
-  const loc = String(locator || "").trim().toUpperCase();
-  if (loc.length < 4) return null;
-  const A = "A".charCodeAt(0);
-  const lon = (loc.charCodeAt(0) - A) * 20 - 180;
-  const lat = (loc.charCodeAt(1) - A) * 10 - 90;
-  const lonSub = Number(loc[2]) * 2;
-  const latSub = Number(loc[3]) * 1;
-  let finalLon = lon + lonSub + 1;   // centre of subsquare
-  let finalLat = lat + latSub + 0.5;
-  if (loc.length >= 6) {
-    const lonSS = (loc.charCodeAt(4) - A) * (2 / 24);
-    const latSS = (loc.charCodeAt(5) - A) * (1 / 24);
-    finalLon = lon + lonSub + lonSS + (1 / 24);
-    finalLat = lat + latSub + latSS + (0.5 / 24);
-  }
-  return { lat: finalLat, lon: finalLon };
-}
+import { maidenheadToLatLon } from "./utils.js";
 
 // ── APRS symbol → emoji (best-effort) ───────────────────────────────────
 function aprsSymbolEmoji(table, code) {

@@ -24,6 +24,7 @@ import {
   isValidCallsign,
   extractCallsignFromRaw,
   isValidLocator,
+  maidenheadToLatLon,
   _isSsbSpectralProof,
   extractDecodedText,
   getAuthHeader,
@@ -118,6 +119,7 @@ const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
 const aprsEnabledCheck = document.getElementById("aprsEnabled");
 const aprsAvailableBadge = document.getElementById("aprsAvailableBadge");
 const saveAprsSettingsBtn = document.getElementById("saveAprsSettings");
+const saveStationSettingsBtn = document.getElementById("saveStationSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
@@ -3635,6 +3637,17 @@ async function loadSettings() {
       stationQthInput.value = data.station.qth || "";
       if (stationLatInput) stationLatInput.value = data.station.lat ?? "";
       if (stationLonInput) stationLonInput.value = data.station.lon ?? "";
+      // Auto-fill lat/lon from locator if not yet set
+      if (stationLatInput && stationLonInput && !stationLatInput.value && !stationLonInput.value) {
+        const loc = data.station.locator || "";
+        if (isValidLocator(loc) && loc.trim().length >= 4) {
+          const pos = maidenheadToLatLon(loc);
+          if (pos) {
+            stationLatInput.value = pos.lat.toFixed(6);
+            stationLonInput.value = pos.lon.toFixed(6);
+          }
+        }
+      }
     }
     if (data.auth) {
       setAuthFields(data.auth || {});
@@ -4231,6 +4244,68 @@ if (saveAprsSettingsBtn) {
       localStorage.setItem("4ham_aprs_active", enabled ? "1" : "0");
     } catch (err) {
       showToastError("Failed to save APRS setting");
+    }
+  });
+}
+
+// ── Locator → Lat/Lon auto-fill ─────────────────────────────────────────
+if (stationLocatorInput) {
+  stationLocatorInput.addEventListener("input", () => {
+    const val = stationLocatorInput.value.trim();
+    if (isValidLocator(val) && val.length >= 4) {
+      const pos = maidenheadToLatLon(val);
+      if (pos && stationLatInput && stationLonInput) {
+        stationLatInput.value = pos.lat.toFixed(6);
+        stationLonInput.value = pos.lon.toFixed(6);
+      }
+    }
+  });
+}
+
+// ── Save User & Station ─────────────────────────────────────────────────
+if (saveStationSettingsBtn) {
+  saveStationSettingsBtn.addEventListener("click", async () => {
+    if (!isValidCallsign(stationCallsignInput.value)) {
+      showToastError("Invalid callsign format");
+      return;
+    }
+    if (!stationLocatorInput.value.trim()) {
+      showToastError("Locator/Grid is required (e.g. IN51 or IN51ab)");
+      stationLocatorInput.focus();
+      return;
+    }
+    if (!isValidLocator(stationLocatorInput.value)) {
+      showToastError("Invalid locator format (use IN51 or IN51ab)");
+      return;
+    }
+    if (!stationQthInput.value.trim()) {
+      showToastError("QTH is required (e.g. Lisboa)");
+      stationQthInput.focus();
+      return;
+    }
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({
+          station: {
+            callsign: stationCallsignInput.value.trim(),
+            operator: stationOperatorInput.value.trim(),
+            locator: stationLocatorInput.value.trim(),
+            qth: stationQthInput.value.trim(),
+            lat: stationLatInput?.value ? parseFloat(stationLatInput.value) : null,
+            lon: stationLonInput?.value ? parseFloat(stationLonInput.value) : null,
+          },
+        }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save station settings");
+        showToastError(message);
+        return;
+      }
+      showToast("User & Station saved");
+    } catch (err) {
+      showToastError("Failed to save station settings");
     }
   });
 }
