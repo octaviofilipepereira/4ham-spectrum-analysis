@@ -3794,6 +3794,11 @@ Last update: 2026-04-03 UTC
       async function aprsEnsureStationQth() {
         if (aprsQthLoaded) return;
         try {
+          const lsCallsign = localStorage.getItem("4ham_station_callsign") || "";
+          const lsLocator = localStorage.getItem("4ham_station_locator") || "";
+          if (lsCallsign) aprsStationCallsign = lsCallsign;
+          if (lsLocator) aprsStationLocator = lsLocator;
+
           const resp = await fetch(`${_BASE}api/settings`);
           if (!resp.ok) {
             aprsQthLoaded = true;
