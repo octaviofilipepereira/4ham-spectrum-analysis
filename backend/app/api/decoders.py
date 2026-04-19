@@ -564,7 +564,7 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
             )
             if rtl_fm_cmd:
                 try:
-                    import shutil
+                    import subprocess
                     log_dir = os.path.join(
                         os.path.dirname(os.path.abspath(__file__)),
                         "..", "..", "logs",
@@ -578,24 +578,29 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
                     env["FOURHAM_MANAGED"] = "1"
                     env["FOURHAM_MANAGED_BY"] = "4ham-spectrum-analysis"
 
-                    # Start rtl_fm: stdout is piped to Direwolf
-                    rtl_fm_proc = await asyncio.create_subprocess_exec(
-                        *rtl_fm_cmd,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.DEVNULL,
+                    # Use subprocess.Popen for real OS-level pipe between
+                    # rtl_fm stdout → Direwolf stdin (asyncio subprocess
+                    # doesn't support piping between two child processes).
+                    rtl_fm_proc = subprocess.Popen(
+                        rtl_fm_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
                         env=env,
                     )
                     state.rtl_fm_process = rtl_fm_proc
 
                     # Start Direwolf in stdin-pipe mode, reading audio from rtl_fm
                     dw_pipe_cmd = list(cmd) + ["-r", "22050", "-n", "1", "-b", "16", "-"]
-                    state.direwolf_process = await asyncio.create_subprocess_exec(
-                        *dw_pipe_cmd,
+                    dw_proc = subprocess.Popen(
+                        dw_pipe_cmd,
                         stdin=rtl_fm_proc.stdout,
                         stdout=dw_log_fp,
-                        stderr=asyncio.subprocess.STDOUT,
+                        stderr=subprocess.STDOUT,
                         env=env,
                     )
+                    state.direwolf_process = dw_proc
+                    # Allow rtl_fm to receive SIGPIPE if Direwolf exits
+                    rtl_fm_proc.stdout.close()
 
                     kiss_st["process_running"] = True
                     kiss_st["process_pid"] = state.direwolf_process.pid
@@ -665,22 +670,27 @@ async def _stop_kiss_loop() -> Dict:
     state.decoder_status["direwolf_kiss"]["connected"] = False
 
     # Stop rtl_fm process if it was used (rtl_fm → Direwolf pipeline)
-    if state.rtl_fm_process is not None:
+    # These are subprocess.Popen objects (sync), not asyncio subprocesses,
+    # so we use asyncio.to_thread for the blocking .wait() call.
+    import subprocess as _sp
+    for label, attr in [("rtl_fm", "rtl_fm_process"), ("direwolf", "direwolf_process")]:
+        proc = getattr(state, attr, None)
+        if proc is None:
+            continue
         try:
-            await stop_process(state.rtl_fm_process)
-            log(f"rtl_fm_process_stopped:pid={state.rtl_fm_process.pid}")
+            if isinstance(proc, _sp.Popen):
+                proc.terminate()
+                try:
+                    await asyncio.to_thread(proc.wait, timeout=3)
+                except _sp.TimeoutExpired:
+                    proc.kill()
+                    await asyncio.to_thread(proc.wait, timeout=3)
+            else:
+                await stop_process(proc)
+            log(f"{label}_process_stopped:pid={proc.pid}")
         except Exception as exc:
-            log(f"rtl_fm_process_stop_failed:{exc}")
-        state.rtl_fm_process = None
-
-    # Stop Direwolf process
-    if state.direwolf_process is not None:
-        try:
-            await stop_process(state.direwolf_process)
-            log(f"direwolf_process_stopped:pid={state.direwolf_process.pid}")
-        except Exception as exc:
-            log(f"direwolf_process_stop_failed:{exc}")
-        state.direwolf_process = None
+            log(f"{label}_process_stop_failed:{exc}")
+        setattr(state, attr, None)
         state.decoder_status["direwolf_kiss"]["process_running"] = False
         state.decoder_status["direwolf_kiss"]["process_pid"] = None
 
