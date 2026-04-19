@@ -1366,6 +1366,10 @@ Last update: 2026-04-03 UTC
               <span class="v" id="aprsMetaPeriod">--</span>
             </div>
             <div class="meta-item">
+              <span class="k">Próxima atualização</span>
+              <span class="v" id="aprsNextRefreshInfo">--</span>
+            </div>
+            <div class="meta-item">
               <span class="k" data-i18n="aprs_meta_source">Data source</span>
               <span class="v" id="aprsMetaSource">APRS-IS + Direwolf</span>
             </div>
@@ -3744,6 +3748,10 @@ Last update: 2026-04-03 UTC
       let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
       let aprsCurrentPreset = "24h";
       let aprsDataLoaded = false;
+      const APRS_REFRESH_INTERVAL_MS = 30 * 1000;
+      let aprsRefreshTimer = null;
+      let aprsNextRefreshMs = null;
+      let aprsCountdownTimer = null;
 
       // ── Haversine ──────────────────────────────────────────────────────
       function haversineKm(lat1, lon1, lat2, lon2) {
@@ -3774,12 +3782,14 @@ Last update: 2026-04-03 UTC
             aprsView.style.display = "block";
             if (!aprsDataLoaded) {
               aprsLoadAndRender();
-            } else if (aprsMap) {
-              setTimeout(() => aprsMap.invalidateSize(), 200);
+            } else {
+              if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
+              aprsStartAutoRefresh();
             }
           } else {
             hfView.style.display = "block";
             aprsView.style.display = "none";
+            aprsStopAutoRefresh();
           }
           localStorage.setItem("academic_active_view", view);
         });
@@ -3811,8 +3821,11 @@ Last update: 2026-04-03 UTC
           aprsCurrentPreset = btn.dataset.preset;
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
-          // Auto-apply on non-custom presets — no need to click "Apply Filters"
-          if (aprsCurrentPreset !== "custom") aprsLoadAndRender();
+          if (aprsCurrentPreset === "custom") {
+            aprsStopAutoRefresh();
+          } else {
+            aprsLoadAndRender();
+          }
         });
       }
       if (aprsApplyBtn) {
@@ -3892,6 +3905,38 @@ Last update: 2026-04-03 UTC
         if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
 
         aprsRenderAll();
+        aprsStartAutoRefresh();
+      }
+
+      // ── APRS auto-refresh (30 s) ─────────────────────────────────────
+      function aprsStartAutoRefresh() {
+        aprsStopAutoRefresh();
+        if (aprsCurrentPreset === "custom") return;
+        aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
+        aprsRefreshTimer = window.setInterval(async () => {
+          aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
+          await aprsLoadAndRender();
+        }, APRS_REFRESH_INTERVAL_MS);
+        if (!aprsCountdownTimer) {
+          aprsCountdownTimer = window.setInterval(aprsUpdateCountdown, 250);
+        }
+        aprsUpdateCountdown();
+      }
+
+      function aprsStopAutoRefresh() {
+        if (aprsRefreshTimer) { clearInterval(aprsRefreshTimer); aprsRefreshTimer = null; }
+        if (aprsCountdownTimer) { clearInterval(aprsCountdownTimer); aprsCountdownTimer = null; }
+        aprsNextRefreshMs = null;
+        const el = document.getElementById("aprsNextRefreshInfo");
+        if (el) el.textContent = "--";
+      }
+
+      function aprsUpdateCountdown() {
+        const el = document.getElementById("aprsNextRefreshInfo");
+        if (!el || !aprsNextRefreshMs) return;
+        const rem = Math.max(0, aprsNextRefreshMs - Date.now());
+        const s = Math.ceil(rem / 1000);
+        el.textContent = s > 0 ? `${s}s` : "a atualizar…";
       }
 
       function aprsRenderAll() {
