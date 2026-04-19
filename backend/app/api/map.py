@@ -119,6 +119,10 @@ def map_contacts(
         if not cs:
             continue
 
+        # Exclude APRS — this is a HF propagation map
+        if str(row.get("mode") or "").upper() == "APRS":
+            continue
+
         dxcc = callsign_to_dxcc(cs)
         if not dxcc:
             continue
