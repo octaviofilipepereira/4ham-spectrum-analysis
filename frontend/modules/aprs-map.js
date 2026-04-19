@@ -182,12 +182,20 @@ export class APRSMapController {
     if (existing) {
       // Update existing marker data
       existing.lastSeenMs = now;
+      // Track all sources this station was received from (RF + TCP)
+      const src = String(evt.source || "").toLowerCase();
+      if (src) existing.sources.add(src);
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
         existing.marker.setLatLng([lat, lon]);
       }
-      existing.marker.setPopupContent(this.#buildPopup(existing.data));
+      existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.sources));
+      // Re-evaluate filter visibility (source may have changed)
+      const visible = this.#matchesFilter(existing);
+      if (visible && !this.#map.hasLayer(existing.marker)) {
+        existing.marker.addTo(this.#map);
+      }
       return;
     }
 
@@ -206,11 +214,14 @@ export class APRSMapController {
       }),
     });
 
+    const sources = new Set();
+    const src = String(evt.source || "").toLowerCase();
+    if (src) sources.add(src);
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
-    marker.bindPopup(this.#buildPopup(data));
-    this.#markers.set(callsign, { marker, data, lastSeenMs: now });
+    marker.bindPopup(this.#buildPopup(data, sources));
+    this.#markers.set(callsign, { marker, data, sources, lastSeenMs: now });
     // Only add to map if it passes the active filter
-    if (this.#matchesFilter(data)) {
+    if (this.#matchesFilter(this.#markers.get(callsign))) {
       marker.addTo(this.#map);
     }
   }
@@ -236,7 +247,7 @@ export class APRSMapController {
     if (this.#activeFilter === "all") return this.#markers.size;
     let count = 0;
     for (const [, entry] of this.#markers) {
-      if (this.#matchesFilter(entry.data)) count++;
+      if (this.#matchesFilter(entry)) count++;
     }
     return count;
   }
@@ -248,7 +259,7 @@ export class APRSMapController {
   applyFilter(filter) {
     this.#activeFilter = filter;
     for (const [, entry] of this.#markers) {
-      const visible = this.#matchesFilter(entry.data);
+      const visible = this.#matchesFilter(entry);
       if (visible && !this.#map.hasLayer(entry.marker)) {
         entry.marker.addTo(this.#map);
       } else if (!visible && this.#map.hasLayer(entry.marker)) {
@@ -257,16 +268,24 @@ export class APRSMapController {
     }
   }
 
-  /** Check if an event's source matches the active filter. */
-  #matchesFilter(data) {
+  /** Check if a marker entry matches the active filter (uses sources Set). */
+  #matchesFilter(entry) {
     if (this.#activeFilter === "all") return true;
-    const isRF = String(data.source || "").toLowerCase() !== "aprs_is";
-    return this.#activeFilter === "rf" ? isRF : !isRF;
+    const sources = entry.sources || new Set();
+    if (this.#activeFilter === "rf") {
+      // Any non-aprs_is source counts as RF
+      for (const s of sources) {
+        if (s !== "aprs_is") return true;
+      }
+      return false;
+    }
+    // tcp filter
+    return sources.has("aprs_is");
   }
 
   // ── Private ───────────────────────────────────────────────────────────
 
-  #buildPopup(data) {
+  #buildPopup(data, sources) {
     const callsign = data.callsign || "—";
     const lat = Number(data.lat);
     const lon = Number(data.lon);
@@ -279,11 +298,13 @@ export class APRSMapController {
     const firstSeen = data.firstSeenMs ? new Date(data.firstSeenMs).toLocaleTimeString() : "—";
     const lastSeen = data.lastSeenMs ? new Date(data.lastSeenMs).toLocaleTimeString() : "—";
 
-    // Source badge
-    const isRF = String(data.source || "").toLowerCase() !== "aprs_is";
-    const sourceBadge = isRF
-      ? '<span class="aprs-source-badge aprs-source-rf">RF 144.800</span>'
-      : '<span class="aprs-source-badge aprs-source-is">APRS-IS</span>';
+    // Source badges — show all sources this station was received from
+    const srcSet = sources || new Set();
+    const hasRF = [...srcSet].some((s) => s !== "aprs_is");
+    const hasTCP = srcSet.has("aprs_is");
+    let sourceBadge = "";
+    if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+    if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
     // Distance from QTH
     let distText = "";
