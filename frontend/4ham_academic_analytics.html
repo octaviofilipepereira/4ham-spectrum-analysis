@@ -854,6 +854,37 @@ Last update: 2026-04-03 UTC
       .hf-view { display: block; }
       .hf-view.hidden { display: none; }
 
+      #hfStaleBanner {
+        display: none;
+        align-items: flex-start;
+        gap: 10px;
+        background: rgba(251,191,36,0.12);
+        border: 1px solid rgba(251,191,36,0.45);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 0 0 14px 0;
+        font-size: 0.88rem;
+        color: var(--text);
+        line-height: 1.5;
+      }
+      #hfStaleBanner.visible { display: flex; }
+      #hfStaleBanner .stale-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+      #hfStaleBanner .stale-body { flex: 1; }
+      #hfStaleBanner .stale-link {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 4px 12px;
+        border-radius: 6px;
+        background: rgba(251,191,36,0.2);
+        border: 1px solid rgba(251,191,36,0.5);
+        color: #fbbf24;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+      #hfStaleBanner .stale-link:hover { background: rgba(251,191,36,0.35); }
+
       .aprs-cards {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -995,6 +1026,14 @@ Last update: 2026-04-03 UTC
       </section>
 
       <div id="hfView" class="hf-view">
+      <div id="hfStaleBanner" role="alert">
+        <span class="stale-icon">⚠️</span>
+        <div class="stale-body">
+          <span id="hfStaleBannerText"></span>
+          <br>
+          <button class="stale-link" id="hfStaleGoBtn"></button>
+        </div>
+      </div>
       <section class="panel">
         <div class="controls">
           <div class="field">
@@ -1901,9 +1940,71 @@ Last update: 2026-04-03 UTC
           renderFromCurrentRange();
           fetchIonosphericBadge();
           refreshPropMap();
+          _checkHfStaleBanner(start, end);
         } finally {
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
+        }
+      }
+
+      async function _checkHfStaleBanner(start, end) {
+        const banner = document.getElementById("hfStaleBanner");
+        const bannerText = document.getElementById("hfStaleBannerText");
+        const goBtn = document.getElementById("hfStaleGoBtn");
+        if (!banner || !bannerText || !goBtn) return;
+
+        // Hide if data exists in the requested period
+        const hasHfData = synthetic && synthetic.series && synthetic.series.length > 0;
+        if (hasHfData) {
+          banner.classList.remove("visible");
+          return;
+        }
+
+        // Fetch the timestamp of the last non-APRS event
+        // No mode filter: fetch most recent events (DESC order) and find the first non-APRS one
+        try {
+          const params = new URLSearchParams({ limit: 20 });
+          const resp = await fetch(`${_BASE}api/events?${params.toString()}`);
+          if (!resp.ok) { banner.classList.remove("visible"); return; }
+          const events = await resp.json();
+          // Find last non-APRS event among the most recent 20
+          const lastHf = Array.isArray(events) ? events.find(e => e.mode && e.mode.toUpperCase() !== "APRS") : null;
+
+          if (!lastHf) {
+            bannerText.textContent = "Não existem dados HF na base de dados.";
+            goBtn.style.display = "none";
+            banner.classList.add("visible");
+            return;
+          }
+
+          const lastTs = new Date(lastHf.timestamp);
+          const lastTsStr = lastTs.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }) + " UTC";
+          const periodStr = currentPreset === "custom" ? "período selecionado" : `últimas ${currentPreset}`;
+
+          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF nas ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
+          goBtn.textContent = "→ Ver últimos dados HF";
+          goBtn.style.display = "inline-block";
+          goBtn.onclick = () => {
+            // Switch to custom preset and set range around last HF data
+            const windowMs = 6 * 3600 * 1000; // 6h window centred on last HF event
+            const newEnd = new Date(lastTs.getTime() + 30 * 60 * 1000);
+            const newStart = new Date(newEnd.getTime() - windowMs);
+            // Activate custom preset
+            currentPreset = "custom";
+            sessionStorage.setItem("4ham_preset", "custom");
+            for (const b of presetRow.querySelectorAll("button[data-preset]")) {
+              b.classList.toggle("active", b.dataset.preset === "custom");
+            }
+            const customRange = document.getElementById("customRange");
+            if (customRange) customRange.style.display = "grid";
+            // Fill in the date inputs
+            if (startInput) startInput.value = toLocalDateTimeValue(newStart);
+            if (endInput) endInput.value = toLocalDateTimeValue(newEnd);
+            loadAndRender();
+          };
+          banner.classList.add("visible");
+        } catch (_) {
+          banner.classList.remove("visible");
         }
       }
 
