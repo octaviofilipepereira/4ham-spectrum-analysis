@@ -3661,11 +3661,22 @@ Last update: 2026-04-03 UTC
             hfView.style.display = "block";
             aprsView.style.display = "none";
           }
+          localStorage.setItem("academic_active_view", view);
         });
       }
 
-      // Hide APRS view initially
-      if (aprsView) aprsView.style.display = "none";
+      // Restore last active view (default: hf)
+      const savedView = localStorage.getItem("academic_active_view") || "hf";
+      if (savedView === "aprs" && aprsView) {
+        hfView.style.display = "none";
+        aprsView.style.display = "block";
+        viewSelector?.querySelectorAll(".view-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.view === "aprs");
+        });
+        if (!aprsDataLoaded) aprsLoadAndRender();
+      } else {
+        if (aprsView) aprsView.style.display = "none";
+      }
 
       // ── APRS period presets ───────────────────────────────────────────
       const aprsPresetRow = document.getElementById("aprsPresetRow");
