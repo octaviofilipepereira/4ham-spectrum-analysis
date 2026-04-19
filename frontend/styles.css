@@ -1551,37 +1551,39 @@ h1,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 8px 14px;
   background: #1e293b;
   color: #e2e8f0;
-  font-size: 13px;
+  font-size: 15px;
   border-bottom: 1px solid #334155;
 }
 .aprs-map-header__title {
   font-weight: 600;
+  font-size: 15px;
 }
 .aprs-map-header__count {
-  color: #94a3b8;
-  font-size: 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
 }
 .aprs-map-header__hint {
-  color: #64748b;
-  font-size: 11px;
+  color: #e2e8f0;
+  font-size: 13px;
   font-style: italic;
   margin-left: auto;
-  margin-right: 8px;
+  margin-right: 10px;
 }
 .aprs-map-header__fullscreen {
   background: #1e40af;
   border: none;
   color: #fff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  padding: 5px 12px;
+  padding: 7px 16px;
   border-radius: 4px;
   cursor: pointer;
-  margin-left: 8px;
+  margin-left: 10px;
   transition: background 0.15s;
 }
 .aprs-map-header__fullscreen:hover {
