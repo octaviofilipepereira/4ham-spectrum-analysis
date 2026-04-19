@@ -1205,14 +1205,18 @@ Last update: 2026-04-03 UTC
               <button class="preset-btn active" data-preset="24h">24h</button>
               <button class="preset-btn" data-preset="custom">Custom Period</button>
             </div>
-            <div id="aprsCustomRange" style="display:none;margin-top:8px;gap:8px;align-items:center;flex-wrap:nowrap;width:100%;">
-              <label style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap">From</label>
-              <input type="datetime-local" id="aprsCustomStart" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
-              <label style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap">To</label>
-              <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
+            <div id="aprsCustomRange" style="display:none;margin-top:8px;flex-direction:column;gap:6px;width:100%;">
+              <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">From</label>
+                <input type="datetime-local" id="aprsCustomStart" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">To</label>
+                <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+              </div>
+              <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="align-self:flex-start;margin-top:2px">Apply Filters</button>
             </div>
           </div>
-          <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="display:none">Apply Filters</button>
           <div class="aprs-filter-row" style="margin:0;align-self:end;">
             <button class="aprs-filter-btn active" data-filter="all" data-i18n="all">All</button>
             <button class="aprs-filter-btn" data-filter="rf">📻 RF</button>
@@ -3697,7 +3701,6 @@ Last update: 2026-04-03 UTC
           aprsCurrentPreset = btn.dataset.preset;
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
-          if (aprsApplyBtn) aprsApplyBtn.style.display = aprsCurrentPreset === "custom" ? "" : "none";
           // Auto-apply on non-custom presets — no need to click "Apply Filters"
           if (aprsCurrentPreset !== "custom") aprsLoadAndRender();
         });
