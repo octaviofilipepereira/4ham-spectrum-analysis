@@ -3739,9 +3739,15 @@ Last update: 2026-04-03 UTC
       //  APRS View — logic, map, charts
       // ══════════════════════════════════════════════════════════════════════
 
-      const APRS_QTH_LAT = 39.5;
-      const APRS_QTH_LON = -8.0;
+      const APRS_QTH_DEFAULT_LAT = 39.5;
+      const APRS_QTH_DEFAULT_LON = -8.0;
       const APRS_RANGE_KM = 50;
+
+      let aprsQthLat = APRS_QTH_DEFAULT_LAT;
+      let aprsQthLon = APRS_QTH_DEFAULT_LON;
+      let aprsStationCallsign = "CT7BFV";
+      let aprsStationLocator = "";
+      let aprsQthLoaded = false;
 
       let aprsMap = null;
       let aprsEvents = [];
@@ -3762,6 +3768,59 @@ Last update: 2026-04-03 UTC
                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                   Math.sin(dLon / 2) ** 2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function aprsMaidenheadToLatLon(locator) {
+        const loc = String(locator || "").trim().toUpperCase();
+        if (!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(loc)) {
+          return null;
+        }
+        const A = "A".charCodeAt(0);
+        const lon = (loc.charCodeAt(0) - A) * 20 - 180;
+        const lat = (loc.charCodeAt(1) - A) * 10 - 90;
+        const lonSub = Number(loc[2]) * 2;
+        const latSub = Number(loc[3]);
+        let finalLon = lon + lonSub + 1;
+        let finalLat = lat + latSub + 0.5;
+        if (loc.length >= 6) {
+          const lonSS = (loc.charCodeAt(4) - A) * (2 / 24);
+          const latSS = (loc.charCodeAt(5) - A) * (1 / 24);
+          finalLon = lon + lonSub + lonSS + (1 / 24);
+          finalLat = lat + latSub + latSS + (0.5 / 24);
+        }
+        return { lat: finalLat, lon: finalLon };
+      }
+
+      async function aprsEnsureStationQth() {
+        if (aprsQthLoaded) return;
+        try {
+          const resp = await fetch(`${_BASE}api/settings`);
+          if (!resp.ok) {
+            aprsQthLoaded = true;
+            return;
+          }
+          const data = await resp.json();
+          const station = data.station || {};
+          aprsStationCallsign = station.callsign || aprsStationCallsign;
+          aprsStationLocator = station.locator || "";
+
+          const lat = Number.parseFloat(station.lat);
+          const lon = Number.parseFloat(station.lon);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            aprsQthLat = lat;
+            aprsQthLon = lon;
+          } else {
+            const pos = aprsMaidenheadToLatLon(aprsStationLocator);
+            if (pos) {
+              aprsQthLat = pos.lat;
+              aprsQthLon = pos.lon;
+            }
+          }
+        } catch (_err) {
+          // Keep defaults when station settings are unavailable.
+        } finally {
+          aprsQthLoaded = true;
+        }
       }
 
       // ── View toggle ───────────────────────────────────────────────────
@@ -3894,6 +3953,7 @@ Last update: 2026-04-03 UTC
 
       // ── Main load ─────────────────────────────────────────────────────
       async function aprsLoadAndRender() {
+        await aprsEnsureStationQth();
         const { start, end } = aprsResolvePeriod();
         aprsEvents = await aprsFetchEvents(start, end);
         aprsDataLoaded = true;
@@ -3962,7 +4022,7 @@ Last update: 2026-04-03 UTC
         const digipeaters = new Set();
         events.forEach(e => {
           if (Number.isFinite(e.lat) && Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0)) {
-            const d = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon);
+            const d = haversineKm(aprsQthLat, aprsQthLon, e.lat, e.lon);
             if (d > maxDist) maxDist = d;
           }
           // Extract digipeaters from path
@@ -4022,7 +4082,7 @@ Last update: 2026-04-03 UTC
         if (hasTcp) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
         let distText = "";
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
-          const d = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, lat, lon);
+          const d = haversineKm(aprsQthLat, aprsQthLon, lat, lon);
           distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
         }
         const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
@@ -4044,7 +4104,7 @@ Last update: 2026-04-03 UTC
         const mapEl = document.getElementById("aprsLeafletMap");
         if (!aprsMap) {
           aprsMap = L.map("aprsLeafletMap", {
-            center: [APRS_QTH_LAT, APRS_QTH_LON],
+            center: [aprsQthLat, aprsQthLon],
             zoom: 9,
             zoomControl: true,
             attributionControl: true,
@@ -4063,20 +4123,22 @@ Last update: 2026-04-03 UTC
           }).addTo(aprsMap);
 
           // QTH marker (divIcon with label — same as main interface)
-          L.marker([APRS_QTH_LAT, APRS_QTH_LON], {
+          L.marker([aprsQthLat, aprsQthLon], {
             icon: L.divIcon({
               className: "aprs-qth-icon",
-              html: '<span class="aprs-qth-label">📻 CT7BFV</span>',
+              html: `<span class="aprs-qth-label">📻 ${aprsStationCallsign || "QTH"}</span>`,
               iconSize: [80, 28],
               iconAnchor: [40, 14]
             }),
             zIndexOffset: 1000
           }).addTo(aprsMap).bindPopup(
-            `<strong>CT7BFV</strong><br>${APRS_QTH_LAT.toFixed(4)}°N  ${APRS_QTH_LON.toFixed(4)}°E`
+            `<strong>${aprsStationCallsign || "QTH"}</strong><br>` +
+            `Grid: ${aprsStationLocator || "-"}<br>` +
+            `${aprsQthLat.toFixed(4)}°N  ${aprsQthLon.toFixed(4)}°E`
           );
 
           // Range circle
-          L.circle([APRS_QTH_LAT, APRS_QTH_LON], {
+          L.circle([aprsQthLat, aprsQthLon], {
             radius: APRS_RANGE_KM * 1000,
             color: "#00bfff", fillColor: "#00bfff", fillOpacity: 0.05,
             weight: 1, dashArray: "6 4"
@@ -4164,7 +4226,7 @@ Last update: 2026-04-03 UTC
           if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign || seen.has(e.callsign)) return;
           seen.add(e.callsign);
-          distances.push(haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon));
+          distances.push(haversineKm(aprsQthLat, aprsQthLon, e.lat, e.lon));
         });
 
         if (!distances.length) return;
@@ -4374,7 +4436,10 @@ Last update: 2026-04-03 UTC
           if (vr.ok) { const vj = await vr.json(); softwareVersion = vj.version || vj.app_version || "unknown"; }
         } catch (_) {}
 
-        let stationCallsign = "CT7BFV", stationLocator = "", stationLat = APRS_QTH_LAT, stationLon = APRS_QTH_LON;
+        let stationCallsign = aprsStationCallsign || "CT7BFV";
+        let stationLocator = aprsStationLocator || "";
+        let stationLat = aprsQthLat;
+        let stationLon = aprsQthLon;
         try {
           const sr = await fetch(`${_BASE}api/settings`);
           if (sr.ok) {
