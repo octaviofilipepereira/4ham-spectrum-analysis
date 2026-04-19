@@ -1261,6 +1261,14 @@ Last update: 2026-04-03 UTC
             <button class="aprs-filter-btn" data-filter="rf">📻 RF</button>
             <button class="aprs-filter-btn" data-filter="tcp">🌐 TCP</button>
           </div>
+          <div class="export-wrap" id="aprsExportWrap" style="align-self:end;">
+            <button class="apply-btn export-btn" id="aprsExportBtn" type="button">Export ▾</button>
+            <ul class="export-menu" id="aprsExportMenu" role="menu">
+              <li><button data-aprsfmt="csv">CSV</button></li>
+              <li><button data-aprsfmt="xlsx">XLSX</button></li>
+              <li><button data-aprsfmt="json">JSON</button></li>
+            </ul>
+          </div>
         </div>
 
         <!-- APRS KPIs -->
@@ -4279,6 +4287,275 @@ Last update: 2026-04-03 UTC
         g.append("text").attr("text-anchor", "middle").attr("dy", "0.35em")
           .text(formatInt(total))
           .style("fill", "var(--text)").style("font-size", "30px").style("font-weight", "700");
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      //  APRS Academic Export
+      // ══════════════════════════════════════════════════════════════════════
+
+      (function () {
+        const exportBtn  = document.getElementById("aprsExportBtn");
+        const exportMenu = document.getElementById("aprsExportMenu");
+        if (!exportBtn || !exportMenu) return;
+
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          exportMenu.classList.toggle("open");
+        });
+        document.addEventListener("click", () => exportMenu.classList.remove("open"));
+        exportMenu.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-aprsfmt]");
+          if (!btn) return;
+          exportMenu.classList.remove("open");
+          aprsRunExport(btn.dataset.aprsfmt);
+        });
+      })();
+
+      function _aprsSourceLabel(src) {
+        const s = (src || "").toLowerCase();
+        if (s === "direwolf" || s === "rf") return "RF (Direwolf)";
+        if (s === "aprs_is" || s === "aprs-is" || s === "tcp" || s === "aprsis") return "APRS-IS (TCP)";
+        return src || "unknown";
+      }
+
+      async function buildAprsExportData() {
+        const filtered = aprsFilteredEvents();
+        const { start, end } = aprsResolvePeriod();
+
+        // ── Metadata ──────────────────────────────────────────────────────
+        let softwareVersion = "unknown";
+        try {
+          const vr = await fetch(`${_BASE}api/version`);
+          if (vr.ok) { const vj = await vr.json(); softwareVersion = vj.version || vj.app_version || "unknown"; }
+        } catch (_) {}
+
+        let stationCallsign = "CT7BFV", stationLocator = "", stationLat = APRS_QTH_LAT, stationLon = APRS_QTH_LON;
+        try {
+          const sr = await fetch(`${_BASE}api/settings`);
+          if (sr.ok) {
+            const sj = await sr.json();
+            const st = sj.station || {};
+            stationCallsign = st.callsign || stationCallsign;
+            stationLocator  = st.locator  || stationLocator;
+            stationLat = parseFloat(st.lat) || stationLat;
+            stationLon = parseFloat(st.lon) || stationLon;
+          }
+        } catch (_) {}
+
+        const rfCount  = filtered.filter(e => { const s = (e.source||"").toLowerCase(); return s==="direwolf"||s==="rf"; }).length;
+        const tcpCount = filtered.length - rfCount;
+        const uniqueStations = new Set(filtered.map(e => e.callsign).filter(Boolean)).size;
+        const sourceFilterLabel = aprsSourceFilter === "all" ? "all" : aprsSourceFilter === "rf" ? "rf_only" : "aprs_is_only";
+
+        const metadata = {
+          "Station_Callsign":         stationCallsign,
+          "Station_Locator":          stationLocator,
+          "Station_Lat_deg":          stationLat,
+          "Station_Lon_deg":          stationLon,
+          "Export_Timestamp_UTC":     new Date().toISOString(),
+          "Period_Start_UTC":         start.toISOString(),
+          "Period_End_UTC":           end.toISOString(),
+          "Source_Filter":            sourceFilterLabel,
+          "Total_Packets_Exported":   filtered.length,
+          "Unique_Stations":          uniqueStations,
+          "RF_Packets":               rfCount,
+          "APRS_IS_Packets":          tcpCount,
+          "Observation_Frequency_Hz": 144800000,
+          "Observation_Band":         "2m (144 MHz)",
+          "QTH_Reference_Range_km":   APRS_RANGE_KM,
+          "Software":                 "4ham-spectrum-analysis",
+          "Software_Version":         softwareVersion,
+          "Data_Source":              "APRS-IS (TCP) + Direwolf (RF)",
+          "Reproducibility_Note":     "Raw_Frame field contains the original APRS frame for independent verification."
+        };
+
+        // ── Packets (raw, 1 row per packet) ───────────────────────────────
+        const packets = filtered
+          .slice()
+          .sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""))
+          .map(e => {
+            const lat = Number.isFinite(e.lat) && (e.lat !== 0 || e.lon !== 0) ? e.lat : null;
+            const lon = Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0) ? e.lon : null;
+            const dist = (lat !== null && lon !== null)
+              ? Number(haversineKm(stationLat, stationLon, lat, lon).toFixed(3))
+              : null;
+            return {
+              "Packet_ID":       e.id ?? "",
+              "Timestamp_UTC":   e.timestamp || "",
+              "Callsign":        e.callsign  || "",
+              "Source":          _aprsSourceLabel(e.source),
+              "Frequency_Hz":    e.frequency_hz ?? 144800000,
+              "Latitude_deg":    lat ?? "",
+              "Longitude_deg":   lon ?? "",
+              "Distance_km":     dist ?? "",
+              "SNR_dB":          (e.snr_db != null) ? Number(e.snr_db) : "",
+              "Path":            e.path || e.via || "",
+              "Comment":         e.msg  || e.comment || "",
+              "Raw_Frame":       e.raw  || "",
+            };
+          });
+
+        // ── Stations (deduplicated, 1 row per callsign) ───────────────────
+        const stationMap = new Map(); // callsign → aggregated
+        filtered.forEach(e => {
+          if (!e.callsign) return;
+          const src = (e.source || "").toLowerCase();
+          const isRf = src === "direwolf" || src === "rf";
+          let st = stationMap.get(e.callsign);
+          if (!st) {
+            st = {
+              callsign: e.callsign, total: 0, rf: 0, tcp: 0,
+              firstSeen: e.timestamp, lastSeen: e.timestamp,
+              lat: null, lon: null, pathLast: "", snrMax: null,
+              _rfSeen: false
+            };
+            stationMap.set(e.callsign, st);
+          }
+          st.total++;
+          if (isRf) st.rf++; else st.tcp++;
+          if (e.timestamp < st.firstSeen) st.firstSeen = e.timestamp;
+          if (e.timestamp > st.lastSeen) {
+            st.lastSeen = e.timestamp;
+            st.pathLast = e.path || e.via || "";
+            // Prefer RF position; otherwise take latest
+            if (isRf || !st._rfSeen) {
+              if (Number.isFinite(e.lat) && Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0)) {
+                st.lat = e.lat; st.lon = e.lon;
+              }
+              if (isRf) st._rfSeen = true;
+            }
+          }
+          if (isRf && e.snr_db != null) {
+            if (st.snrMax === null || e.snr_db > st.snrMax) st.snrMax = e.snr_db;
+          }
+        });
+
+        const stations = [...stationMap.values()]
+          .sort((a, b) => b.total - a.total)
+          .map(st => {
+            const dist = (st.lat !== null && st.lon !== null)
+              ? Number(haversineKm(stationLat, stationLon, st.lat, st.lon).toFixed(3))
+              : null;
+            const srcType = (st.rf > 0 && st.tcp > 0) ? "RF + APRS-IS"
+                          : (st.rf > 0)                ? "RF only"
+                          :                              "APRS-IS only";
+            return {
+              "Callsign":           st.callsign,
+              "Total_Packets":      st.total,
+              "RF_Packets":         st.rf,
+              "APRS_IS_Packets":    st.tcp,
+              "Source_Type":        srcType,
+              "First_Seen_UTC":     st.firstSeen || "",
+              "Last_Seen_UTC":      st.lastSeen  || "",
+              "Latitude_deg":       st.lat  ?? "",
+              "Longitude_deg":      st.lon  ?? "",
+              "Distance_km":        dist    ?? "",
+              "Path_Last":          st.pathLast  || "",
+              "Max_SNR_dB_RF":      st.snrMax !== null ? Number(st.snrMax.toFixed(1)) : "",
+            };
+          });
+
+        // ── Timeline (hourly buckets) ──────────────────────────────────────
+        const buckets = new Map();
+        const bucketKey = (ts) => {
+          const d = new Date(ts);
+          d.setMinutes(0, 0, 0);
+          return d.toISOString();
+        };
+        filtered.forEach(e => {
+          if (!e.timestamp) return;
+          const k = bucketKey(e.timestamp);
+          let b = buckets.get(k);
+          if (!b) { b = { bucket: k, total: 0, rf: 0, tcp: 0, stations: new Set(), rfStations: new Set(), isStations: new Set() }; buckets.set(k, b); }
+          const src = (e.source || "").toLowerCase();
+          const isRf = src === "direwolf" || src === "rf";
+          b.total++;
+          if (isRf) { b.rf++; b.rfStations.add(e.callsign); }
+          else       { b.tcp++; b.isStations.add(e.callsign); }
+          b.stations.add(e.callsign);
+        });
+        // Fill empty buckets between start and end
+        const bucketStart = new Date(start); bucketStart.setMinutes(0, 0, 0);
+        for (let t = new Date(bucketStart); t <= end; t = new Date(t.getTime() + 3600000)) {
+          const k = t.toISOString().slice(0, 14) + "00:00.000Z";
+          if (!buckets.has(k)) buckets.set(k, { bucket: k, total: 0, rf: 0, tcp: 0, stations: new Set(), rfStations: new Set(), isStations: new Set() });
+        }
+        const timeline = [...buckets.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, b]) => ({
+            "Bucket_UTC":         b.bucket,
+            "Total_Packets":      b.total,
+            "RF_Packets":         b.rf,
+            "APRS_IS_Packets":    b.tcp,
+            "Unique_Stations":    b.stations.size,
+            "RF_Only_Stations":   [...b.rfStations].filter(c => !b.isStations.has(c)).length,
+            "IS_Only_Stations":   [...b.isStations].filter(c => !b.rfStations.has(c)).length,
+          }));
+
+        return { metadata, packets, stations, timeline };
+      }
+
+      function _aprsExportFilename(fmt) {
+        const { start, end } = aprsResolvePeriod();
+        const ts = (d) => d.toISOString().slice(0, 16).replace(/[:T]/g, "-");
+        return `4ham-aprs_${ts(start)}_${ts(end)}.${fmt}`;
+      }
+
+      async function aprsRunExport(fmt) {
+        const data = await buildAprsExportData();
+
+        if (fmt === "json") {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          triggerDownload(blob, _aprsExportFilename("json"));
+          return;
+        }
+
+        if (fmt === "csv") {
+          // Export packets sheet as CSV (most useful for external tools)
+          const cols = Object.keys(data.packets[0] || {
+            Packet_ID: "", Timestamp_UTC: "", Callsign: "", Source: "",
+            Frequency_Hz: "", Latitude_deg: "", Longitude_deg: "", Distance_km: "",
+            SNR_dB: "", Path: "", Comment: "", Raw_Frame: ""
+          });
+          const escCsv = (v) => {
+            const s = String(v ?? "");
+            return (s.includes(",") || s.includes('"') || s.includes("\n"))
+              ? `"${s.replace(/"/g, '""')}"` : s;
+          };
+          const lines = [
+            `# 4ham-spectrum-analysis APRS Export`,
+            `# Generated: ${data.metadata.Export_Timestamp_UTC}`,
+            `# Station: ${data.metadata.Station_Callsign}  Locator: ${data.metadata.Station_Locator}`,
+            `# Period: ${data.metadata.Period_Start_UTC} → ${data.metadata.Period_End_UTC}`,
+            `# Source filter: ${data.metadata.Source_Filter}`,
+            `# Packets: ${data.metadata.Total_Packets_Exported}  RF: ${data.metadata.RF_Packets}  APRS-IS: ${data.metadata.APRS_IS_Packets}`,
+            cols.join(","),
+            ...data.packets.map(r => cols.map(c => escCsv(r[c])).join(","))
+          ];
+          const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+          triggerDownload(blob, _aprsExportFilename("csv"));
+          return;
+        }
+
+        if (fmt === "xlsx") {
+          if (!window.XLSX) { alert("SheetJS not loaded — cannot export XLSX"); return; }
+          const wb = XLSX.utils.book_new();
+
+          // Sheet 1: Metadata (key-value)
+          const metaRows = Object.entries(data.metadata).map(([k, v]) => ({ "Field": k, "Value": String(v) }));
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(metaRows), "Metadata");
+
+          // Sheet 2: Packets
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.packets), "Packets");
+
+          // Sheet 3: Stations
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.stations), "Stations");
+
+          // Sheet 4: Timeline
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.timeline), "Timeline");
+
+          XLSX.writeFile(wb, _aprsExportFilename("xlsx"));
+        }
       }
 
     </script>
