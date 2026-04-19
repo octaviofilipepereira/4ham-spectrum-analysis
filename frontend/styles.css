@@ -1564,19 +1564,28 @@ h1,
   color: #94a3b8;
   font-size: 12px;
 }
+.aprs-map-header__hint {
+  color: #64748b;
+  font-size: 11px;
+  font-style: italic;
+  margin-left: auto;
+  margin-right: 8px;
+}
 .aprs-map-header__fullscreen {
-  background: none;
-  border: 1px solid #475569;
-  color: #e2e8f0;
-  font-size: 16px;
+  background: #1e40af;
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1;
-  padding: 2px 8px;
+  padding: 5px 12px;
   border-radius: 4px;
   cursor: pointer;
   margin-left: 8px;
+  transition: background 0.15s;
 }
 .aprs-map-header__fullscreen:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #2563eb;
 }
 /* Fullscreen mode */
 .aprs-map-area--fullscreen {
