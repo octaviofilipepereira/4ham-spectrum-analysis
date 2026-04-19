@@ -867,6 +867,42 @@ Last update: 2026-04-03 UTC
         border-radius: 10px;
         background: #0d1117;
       }
+      /* ── APRS marker styles (matches main interface) ── */
+      .aprs-qth-icon { background: none !important; border: none !important; }
+      .aprs-qth-label {
+        display: inline-block;
+        background: #1e40af;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      }
+      .aprs-station-icon { background: none !important; border: none !important; }
+      .aprs-station-label {
+        display: inline-block;
+        background: #0f172a;
+        color: #38bdf8;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        border: 1px solid #334155;
+        box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      }
+      .aprs-popup { font-size: 12px; line-height: 1.5; min-width: 200px; }
+      .aprs-popup__header { font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+      .aprs-popup__table { width: 100%; border-collapse: collapse; }
+      .aprs-popup__table td { padding: 1px 6px 1px 0; vertical-align: top; }
+      .aprs-popup__table td:first-child { white-space: nowrap; color: #475569; width: 85px; }
+      .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
+      .aprs-source-rf { background: #dcfce7; color: #166534; }
+      .aprs-source-is { background: #dbeafe; color: #1e40af; }
+      .aprs-marker-rf { filter: hue-rotate(90deg) saturate(1.3); }
+      .aprs-marker-is { filter: hue-rotate(200deg) saturate(1.1); }
 
       .aprs-source-legend {
         display: flex;
@@ -3740,29 +3776,102 @@ Last update: 2026-04-03 UTC
         el("aprsKpiDigipeaters").textContent = formatInt(digipeaters.size);
       }
 
-      // ── Leaflet map ───────────────────────────────────────────────────
+      // ── HTML escape helper ────────────────────────────────────────────
+      function aprsEscapeHtml(str) {
+        const d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+      }
+
+      // ── APRS symbol → emoji (matches main interface) ──────────────────
+      function aprsSymbolEmoji(table, code) {
+        if (!code) return "📡";
+        const c = code.charCodeAt ? code : String.fromCharCode(code);
+        const map = {
+          ">": "🚗", k: "🚚", b: "🚲", R: "🚐", Y: "⛵",
+          f: "🚒", a: "🚑", U: "🚌", v: "🚐", j: "🏍️",
+          "[": "🏃", O: "🎈", "^": "✈️", X: "🚁", "'": "✈️",
+          "-": "🏠", "#": "📡", "&": "⛽", n: "📶", r: "📻",
+          I: "📻", "/": "⚡", "\\": "⚡", _: "🌤️", W: "🌊",
+        };
+        return map[c] || "📍";
+      }
+
+      // ── Build rich popup (matches main interface) ─────────────────────
+      function aprsBuildPopup(e) {
+        const call = e.callsign || "—";
+        const lat = Number(e.lat);
+        const lon = Number(e.lon);
+        const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
+        const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
+        const path = e.path || e.via || "—";
+        const msg = e.msg || e.comment || "";
+        const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+        const src = (e.source || "").toLowerCase();
+        const isRf = src === "direwolf" || src === "rf";
+        let sourceBadge = isRf
+          ? '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>'
+          : '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+        let distText = "";
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          const d = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, lat, lon);
+          distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
+        }
+        const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+        return `
+          <div class="aprs-popup">
+            <div class="aprs-popup__header">${emoji} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
+            <table class="aprs-popup__table">
+              <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
+              ${distText}
+              <tr><td><strong>Path</strong></td><td>${aprsEscapeHtml(path)}</td></tr>
+              ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
+              <tr><td><strong>Last seen</strong></td><td>${ts}</td></tr>
+            </table>
+          </div>`;
+      }
+
+      // ── Leaflet map (matches main interface) ──────────────────────────
       function aprsRenderMap(events) {
+        const mapEl = document.getElementById("aprsLeafletMap");
         if (!aprsMap) {
           aprsMap = L.map("aprsLeafletMap", {
             center: [APRS_QTH_LAT, APRS_QTH_LON],
             zoom: 9,
             zoomControl: true,
-            attributionControl: true
+            attributionControl: true,
+            scrollWheelZoom: false
           });
+          // Ctrl+scroll to zoom
+          mapEl.addEventListener("wheel", (ev) => {
+            if (ev.ctrlKey) {
+              ev.preventDefault();
+              aprsMap.zoomIn(ev.deltaY < 0 ? 1 : -1);
+            }
+          }, { passive: false });
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; OpenStreetMap contributors',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
             maxZoom: 18
           }).addTo(aprsMap);
 
-          // QTH marker
-          L.circleMarker([APRS_QTH_LAT, APRS_QTH_LON], {
-            radius: 8, fillColor: "#facc15", color: "#000", weight: 2, fillOpacity: 1
-          }).addTo(aprsMap).bindPopup("<strong>QTH — CT7BFV</strong>");
+          // QTH marker (divIcon with label — same as main interface)
+          L.marker([APRS_QTH_LAT, APRS_QTH_LON], {
+            icon: L.divIcon({
+              className: "aprs-qth-icon",
+              html: '<span class="aprs-qth-label">📻 CT7BFV</span>',
+              iconSize: [80, 28],
+              iconAnchor: [40, 14]
+            }),
+            zIndexOffset: 1000
+          }).addTo(aprsMap).bindPopup(
+            `<strong>CT7BFV</strong><br>${APRS_QTH_LAT.toFixed(4)}°N  ${APRS_QTH_LON.toFixed(4)}°E`
+          );
 
           // Range circle
           L.circle([APRS_QTH_LAT, APRS_QTH_LON], {
             radius: APRS_RANGE_KM * 1000,
-            color: "#facc15", fillColor: "#facc15", fillOpacity: 0.05, weight: 1, dashArray: "6 4"
+            color: "#00bfff", fillColor: "#00bfff", fillOpacity: 0.05,
+            weight: 1, dashArray: "6 4"
           }).addTo(aprsMap);
         }
 
@@ -3785,20 +3894,19 @@ Last update: 2026-04-03 UTC
         byCall.forEach((e, call) => {
           const src = (e.source || "").toLowerCase();
           const isRf = src === "direwolf" || src === "rf";
-          const color = isRf ? "#3b82f6" : "#22c55e";
-          const dist = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon);
+          const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+          const sourceClass = isRf ? "aprs-marker-rf" : "aprs-marker-is";
 
-          const marker = L.circleMarker([e.lat, e.lon], {
-            radius: 6, fillColor: color, color: "#000", weight: 1, fillOpacity: 0.85
+          const marker = L.marker([e.lat, e.lon], {
+            icon: L.divIcon({
+              className: `aprs-station-icon ${sourceClass}`,
+              html: `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>`,
+              iconSize: [120, 28],
+              iconAnchor: [60, 14]
+            })
           });
           marker._isAprsStation = true;
-          marker.addTo(aprsMap).bindPopup(
-            `<strong>${call}</strong><br>` +
-            `Source: ${isRf ? "📻 RF" : "🌐 TCP"}<br>` +
-            `Distance: ${Math.round(dist)} km<br>` +
-            `Path: ${e.path || e.via || "--"}<br>` +
-            `Last seen: ${e.timestamp || "--"}`
-          );
+          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e));
         });
 
         // Invalidate size (in case tab was hidden)
