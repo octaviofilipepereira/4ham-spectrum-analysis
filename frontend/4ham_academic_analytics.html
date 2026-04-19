@@ -3697,6 +3697,8 @@ Last update: 2026-04-03 UTC
           aprsCurrentPreset = btn.dataset.preset;
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
+          // Auto-apply on non-custom presets — no need to click "Apply Filters"
+          if (aprsCurrentPreset !== "custom") aprsLoadAndRender();
         });
       }
       if (aprsApplyBtn) {
