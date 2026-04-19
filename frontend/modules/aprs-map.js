@@ -184,11 +184,23 @@ export class APRSMapController {
       existing.lastSeenMs = now;
       // Track all sources this station was received from (RF + TCP)
       const src = String(evt.source || "").toLowerCase();
+      const hadRF = [...existing.sources].some((s) => s !== "aprs_is");
       if (src) existing.sources.add(src);
+      const hasRF = [...existing.sources].some((s) => s !== "aprs_is");
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
         existing.marker.setLatLng([lat, lon]);
+      }
+      // If station gained RF source, rebuild icon so RF style prevails
+      if (hasRF && !hadRF) {
+        const emoji = aprsSymbolEmoji(existing.data.symbol_table, existing.data.symbol_code);
+        existing.marker.setIcon(L.divIcon({
+          className: "aprs-station-icon aprs-marker-rf",
+          html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
+          iconSize: [120, 28],
+          iconAnchor: [60, 14],
+        }));
       }
       existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.sources));
       // Re-evaluate filter visibility (source may have changed)
