@@ -34,6 +34,7 @@ import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 
 const statusEl = document.getElementById("status");
+const vfoGotoGroup = document.querySelector(".vfo-goto-group");
 const eventsEl = document.getElementById("events");
 const eventsSearchCallsignInput = document.getElementById("eventsSearchCallsign");
 const eventsSearchModeInput = document.getElementById("eventsSearchMode");
@@ -627,6 +628,8 @@ function setAprsMapVisible(showMap) {
   if (aprsMapArea) aprsMapArea.hidden = !showMap;
   if (waterfallArea) waterfallArea.hidden = showMap;
   if (propagationCard) propagationCard.hidden = showMap;
+  // Hide Go-to-MHz / SNR / DSP status — irrelevant in APRS mode
+  if (vfoGotoGroup) vfoGotoGroup.hidden = showMap;
   if (showMap) {
     // VFO → fixed APRS frequency
     wfc.updateVFODisplay(144800000, 144800000);
