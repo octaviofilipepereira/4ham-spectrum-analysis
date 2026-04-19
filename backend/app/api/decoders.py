@@ -548,20 +548,24 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
     if state.kiss_task is not None and not state.kiss_task.done():
         return {"started": False, "reason": "kiss_already_running"}
 
-    # Auto-start rtl_fm → Direwolf pipeline if configured
+    # Launch Direwolf / rtl_fm pipeline when needed
     kiss_st = state.decoder_status["direwolf_kiss"]
-    if kiss_st["autostart"] and state.direwolf_process is None:
+    should_launch = (force or kiss_st["autostart"]) and state.direwolf_process is None
+    if should_launch:
         cmd = resolve_command("DIREWOLF_CMD", "direwolf -t 0 -p")
         if cmd:
             # Sync MYCALL in direwolf.conf with the station callsign from Admin Config
             _sync_direwolf_mycall(cmd)
 
-            # Launch rtl_fm → Direwolf pipeline:
-            # rtl_fm demodulates NFM on 144.800 MHz, pipes PCM audio to Direwolf
+            # Only launch rtl_fm → Direwolf pipeline when the user explicitly
+            # selects APRS mode (force=True).  rtl_fm grabs the RTL-SDR device
+            # exclusively, which would block the waterfall/SoapySDR scan.
+            # On autostart we only start the KISS TCP listener (no rtl_fm).
             rtl_fm_cmd = resolve_command(
                 "RTL_FM_CMD",
                 "rtl_fm -f 144800000 -s 22050 -g 42",
-            )
+            ) if force else None
+
             if rtl_fm_cmd:
                 try:
                     import subprocess
@@ -622,7 +626,8 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
                             pass
                         state.rtl_fm_process = None
             else:
-                # rtl_fm not available: fall back to Direwolf soundcard mode
+                # Autostart or rtl_fm not available: Direwolf soundcard mode
+                # (does NOT grab the RTL-SDR, safe for concurrent waterfall)
                 try:
                     state.direwolf_process = await start_process(cmd)
                     kiss_st["process_running"] = True
