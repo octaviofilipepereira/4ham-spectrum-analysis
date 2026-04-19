@@ -1205,11 +1205,11 @@ Last update: 2026-04-03 UTC
               <button class="preset-btn" data-preset="24h">24h</button>
               <button class="preset-btn" data-preset="custom">Custom Period</button>
             </div>
-            <div id="aprsCustomRange" style="display:none;margin-top:8px;display:none;gap:8px;align-items:center;flex-wrap:wrap;">
-              <label style="font-size:0.78rem;color:var(--text-muted)">From</label>
-              <input type="datetime-local" id="aprsCustomStart" style="padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
-              <label style="font-size:0.78rem;color:var(--text-muted)">To</label>
-              <input type="datetime-local" id="aprsCustomEnd" style="padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
+            <div id="aprsCustomRange" style="display:none;margin-top:8px;gap:8px;align-items:center;flex-wrap:nowrap;width:100%;">
+              <label style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap">From</label>
+              <input type="datetime-local" id="aprsCustomStart" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
+              <label style="font-size:0.78rem;color:var(--text-muted);white-space:nowrap">To</label>
+              <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.82rem;">
             </div>
           </div>
           <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters">Apply Filters</button>
