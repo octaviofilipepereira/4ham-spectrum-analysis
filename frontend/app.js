@@ -4304,6 +4304,16 @@ if (saveStationSettingsBtn) {
         return;
       }
       showToast("User & Station saved");
+      // Refresh APRS map with updated coordinates
+      if (aprsMapCtrl.isReady) {
+        const lat = stationLatInput?.value ? parseFloat(stationLatInput.value) : null;
+        const lon = stationLonInput?.value ? parseFloat(stationLonInput.value) : null;
+        aprsMapCtrl.init(
+          stationLocatorInput.value.trim(),
+          stationCallsignInput.value.trim(),
+          lat, lon
+        );
+      }
     } catch (err) {
       showToastError("Failed to save station settings");
     }
