@@ -16,6 +16,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <meta http-equiv="Expires" content="0" />
     <title>4ham Spectrum Analysis</title>
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css?v=20260301000400" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
   </head>
@@ -212,6 +213,14 @@ Last update: 2026-02-22 16:27:19 UTC
                   <span class="scan-context__label">CW decoder:</span>
                   <span id="cwSegmentSummary">--</span>
                 </span>
+              </div>
+              <!-- APRS map (hidden by default, shown when decoder mode is APRS) -->
+              <div class="aprs-map-area" id="aprsMapArea" hidden>
+                <div class="aprs-map-header">
+                  <span class="aprs-map-header__title">📡 APRS Map — 144.800 MHz</span>
+                  <span class="aprs-map-header__count" id="aprsMapCount">0 stations</span>
+                </div>
+                <div id="aprsMap" class="aprs-map"></div>
               </div>
               <!-- Spectrum graph + Waterfall — wrapped together so the transition overlay covers both -->
               <div class="waterfall-area" id="waterfallArea">
@@ -1059,6 +1068,7 @@ Last update: 2026-02-22 16:27:19 UTC
     </footer>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
     <script src="map.js?v=20260408120000"></script>

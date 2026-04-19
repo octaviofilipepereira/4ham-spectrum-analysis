@@ -171,7 +171,9 @@ def parse_kiss_frame(frame):
         "payload": payload,
         "lat": extras.get("lat"),
         "lon": extras.get("lon"),
-        "msg": extras.get("msg")
+        "msg": extras.get("msg"),
+        "symbol_table": extras.get("symbol_table"),
+        "symbol_code": extras.get("symbol_code"),
     }
 
 

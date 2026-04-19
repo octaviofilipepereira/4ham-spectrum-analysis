@@ -30,6 +30,7 @@ import {
   wsUrl,
 } from "./modules/utils.js";
 import { WaterfallController } from "./modules/waterfall.js";
+import { APRSMapController } from "./modules/aprs-map.js";
 
 const statusEl = document.getElementById("status");
 const eventsEl = document.getElementById("events");
@@ -577,6 +578,57 @@ const wfc = new WaterfallController(
   }
 );
 
+// ── APRS Map controller ────────────────────────────────────────────────
+const aprsMapCtrl = new APRSMapController("aprsMap");
+const aprsMapArea = document.getElementById("aprsMapArea");
+const waterfallArea = document.getElementById("waterfallArea");
+const aprsMapCountEl = document.getElementById("aprsMapCount");
+
+/**
+ * Toggle between waterfall and APRS map views.
+ * @param {boolean} showMap - true → show map, false → show waterfall
+ */
+function setAprsMapVisible(showMap) {
+  if (aprsMapArea) aprsMapArea.hidden = !showMap;
+  if (waterfallArea) waterfallArea.hidden = showMap;
+  if (showMap) {
+    const locator = stationLocatorInput?.value || localStorage.getItem("4ham_station_locator") || "";
+    const callsign = stationCallsignInput?.value || localStorage.getItem("4ham_station_callsign") || "";
+    if (!aprsMapCtrl.isReady) {
+      aprsMapCtrl.init(locator, callsign);
+      // Load recent APRS events from the DB
+      _loadRecentAprsEvents();
+    } else {
+      aprsMapCtrl.show();
+    }
+  } else {
+    aprsMapCtrl.hide();
+  }
+}
+
+/** Fetch recent APRS events from the API and populate the map. */
+async function _loadRecentAprsEvents() {
+  try {
+    const now = new Date();
+    const start = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+    const url = `/api/events?limit=200&start=${encodeURIComponent(start)}&end=${encodeURIComponent(now.toISOString())}`;
+    const resp = await fetch(url, { headers: getAuthHeader() });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const events = Array.isArray(data) ? data : (data.events || []);
+    const aprsEvents = events.filter((e) => String(e.mode || "").toUpperCase() === "APRS");
+    aprsMapCtrl.loadHistory(aprsEvents);
+    _updateAprsMapCount();
+  } catch { /* best-effort */ }
+}
+
+function _updateAprsMapCount() {
+  if (aprsMapCountEl) {
+    const n = aprsMapCtrl.markerCount;
+    aprsMapCountEl.textContent = `${n} station${n !== 1 ? "s" : ""}`;
+  }
+}
+
 function updateFullscreenButtonState() {
   if (!waterfallFullscreenBtn) {
     return;
@@ -952,6 +1004,12 @@ function pushLiveEventToPanel(eventPayload) {
   wfc.updateCallsignCacheFromEvent(eventPayload);
   latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
+
+  // Feed APRS events to the map (if in APRS mode)
+  if (String(eventPayload.mode || "").toUpperCase() === "APRS" && aprsMapCtrl.isReady) {
+    aprsMapCtrl.addEvent(eventPayload);
+    _updateAprsMapCount();
+  }
   
   // Update fullscreen modal if it's open
   if (eventsFullscreenModal && eventsFullscreenModal.classList.contains('show')) {
@@ -1864,6 +1922,9 @@ async function stopScan() {
   isScanRunning = false;
   localStorage.removeItem("4ham_active_band");
 
+  // Hide APRS map when scan stops
+  setAprsMapVisible(false);
+
   // Clear waterfall marker caches when scan stops
   wfc.clearMarkerCaches();
   latestEvents = []; // Clear events list
@@ -1893,6 +1954,7 @@ async function syncScanState() {
       }
       // Deselect mode button when scan transitions running → stopped
       if (wasRunning && !nextRunning && selectedDecoderMode) {
+        setAprsMapVisible(false);
         selectedDecoderMode = null;
         refreshModeButtons();
       }
@@ -1904,6 +1966,7 @@ async function syncScanState() {
     if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
       selectedDecoderMode = backendMode;
       wfc.recenterForMode(backendMode);
+      setAprsMapVisible(backendMode === "APRS");
       refreshModeButtons();
       // Sync the events panel filter with the restored mode
       if (eventsSearchModeInput.value !== backendMode) {
@@ -4243,6 +4306,7 @@ if (quickModeButtons.length) {
           // Immediately reload events for the new mode
           fetchEvents();
           fetchTotal();
+          setAprsMapVisible(mode === "APRS");
           showToast(`Mode switched to ${mode}`);
         } catch (err) {
           showToastError(`Failed to switch mode: ${err.message}`);
@@ -4258,6 +4322,7 @@ if (quickModeButtons.length) {
       if (selectedDecoderMode === mode) {
         selectedDecoderMode = null;
         eventsSearchModeInput.value = "";
+        setAprsMapVisible(false);
         refreshModeButtons();
         logLine(`Modo desseleccionado: ${mode}`);
         fetchEvents();
@@ -4270,6 +4335,7 @@ if (quickModeButtons.length) {
         }
         wfc.recenterForMode(mode);
         eventsSearchModeInput.value = mode;
+        setAprsMapVisible(mode === "APRS");
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
         fetchEvents();
