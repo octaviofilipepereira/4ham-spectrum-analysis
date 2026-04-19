@@ -3764,7 +3764,7 @@ Last update: 2026-04-03 UTC
         return aprsEvents.filter(e => {
           const src = (e.source || "").toLowerCase();
           if (aprsSourceFilter === "rf") return src === "direwolf" || src === "rf";
-          if (aprsSourceFilter === "tcp") return src === "aprs-is" || src === "tcp" || src === "aprsis";
+          if (aprsSourceFilter === "tcp") return src === "aprs_is" || src === "aprs-is" || src === "tcp" || src === "aprsis";
           return true;
         });
       }
