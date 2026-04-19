@@ -2590,9 +2590,13 @@ Last update: 2026-04-03 UTC
             dashboardTitle.textContent = t("dashboard_title_tpl", { version: appVersion });
           }
 
-          const series = Array.isArray(payload.data.series) ? payload.data.series : [];
-          const callsigns = Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [];
-          const rawEvts = Array.isArray(payload.data.raw_events) ? payload.data.raw_events : [];
+          // Filter out APRS from HF academic dataset (APRS has its own dedicated view)
+          const series = (Array.isArray(payload.data.series) ? payload.data.series : [])
+            .filter(r => r.mode !== "APRS");
+          const callsigns = (Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [])
+            .filter(r => r.mode !== "APRS");
+          const rawEvts = (Array.isArray(payload.data.raw_events) ? payload.data.raw_events : [])
+            .filter(r => r.mode !== "APRS");
 
           synthetic = {
             series: series
@@ -2617,8 +2621,11 @@ Last update: 2026-04-03 UTC
           };
 
           // Use server-computed propagation data (accurate, uses real per-event data)
+          // Exclude APRS-dominated bands (2m, 70cm) from HF propagation analysis
+          const APRS_BANDS = new Set(["2m", "70cm"]);
           const kpis = payload.kpis || {};
-          const propBands = Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [];
+          const propBands = (Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [])
+            .filter(r => !APRS_BANDS.has(r.band));
           const propTrend = Array.isArray(payload.data.propagation_trend) ? payload.data.propagation_trend : [];
           if (propBands.length > 0 || kpis.propagation_score != null) {
             const byBandArray = BANDS.map((b) => {
@@ -2630,6 +2637,7 @@ Last update: 2026-04-03 UTC
               .filter((r) => !Number.isNaN(r.ts.getTime()))
               .sort((a, b) => a.ts - b.ts);
             const overallScore = Number(kpis.propagation_score || 0);
+            // Skip APRS bands for best_band calculation
             const bestBandData = propBands.length > 0 ? propBands[0] : null;
             const bestBand = bestBandData
               ? { band: bestBandData.band, score: Number(bestBandData.score), events: Number(bestBandData.events) }
@@ -3574,12 +3582,14 @@ Last update: 2026-04-03 UTC
 
           if (view === "aprs") {
             hfView.style.display = "none";
-            aprsView.style.display = "";
+            aprsView.style.display = "block";
             if (!aprsDataLoaded) {
               aprsLoadAndRender();
+            } else if (aprsMap) {
+              setTimeout(() => aprsMap.invalidateSize(), 200);
             }
           } else {
-            hfView.style.display = "";
+            hfView.style.display = "block";
             aprsView.style.display = "none";
           }
         });
