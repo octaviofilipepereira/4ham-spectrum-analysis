@@ -11,6 +11,7 @@ Last update: 2026-04-03 UTC
     <meta name="google" content="notranslate" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>4ham Academic Analytics</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <style>
       :root {
         --bg: #0b1118;
@@ -804,6 +805,107 @@ Last update: 2026-04-03 UTC
         color: #fff !important;
         font-weight: 700;
       }
+
+      /* ── View selector toggle ──────────────────────────────────── */
+      .view-selector {
+        display: inline-flex;
+        gap: 4px;
+        background: rgba(15,28,40,0.6);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 3px;
+        margin-top: 10px;
+      }
+      .view-btn {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        padding: 6px 16px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+      }
+      .view-btn:hover {
+        color: var(--text);
+        background: rgba(255,255,255,0.05);
+      }
+      .view-btn.active {
+        background: #1b4a44;
+        border-color: #2e7b72;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* ── APRS view ────────────────────────────────────────────── */
+      .aprs-view { display: none; }
+      .aprs-view.active { display: block; }
+      .hf-view { display: block; }
+      .hf-view.hidden { display: none; }
+
+      .aprs-cards {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      #aprsLeafletMap {
+        width: 100%;
+        height: 480px;
+        border-radius: 10px;
+        background: #0d1117;
+      }
+
+      .aprs-source-legend {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin: 6px 4px 8px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .aprs-source-legend .swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+
+      .aprs-filter-row {
+        display: flex;
+        gap: 6px;
+        margin: 8px 4px 10px;
+      }
+      .aprs-filter-btn {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0f1c28;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        padding: 4px 12px;
+        cursor: pointer;
+      }
+      .aprs-filter-btn.active {
+        background: #1b4a44;
+        border-color: #2e7b72;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      @media (max-width: 1100px) {
+        .aprs-cards {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 640px) {
+        .aprs-cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
@@ -823,8 +925,13 @@ Last update: 2026-04-03 UTC
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
         <p id="apiLastFetchInfo">Last API data query: --</p>
         <p id="nextRefreshInfo">Time until next data refresh: --</p>
+        <div class="view-selector" id="viewSelector">
+          <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
+          <button type="button" class="view-btn" data-view="aprs" data-i18n="view_aprs">APRS Network Topology &amp; Coverage</button>
+        </div>
       </section>
 
+      <div id="hfView" class="hf-view">
       <section class="panel">
         <div class="controls">
           <div class="field">
@@ -1016,6 +1123,140 @@ Last update: 2026-04-03 UTC
           </div>
         </section>
       </section>
+      </div><!-- /hfView -->
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- APRS Network Topology & Coverage view                      -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <div id="aprsView" class="aprs-view">
+      <section class="panel">
+        <!-- APRS period controls -->
+        <div class="controls" style="grid-template-columns: 2fr auto auto;">
+          <div class="field">
+            <label data-i18n="period">Period</label>
+            <div class="preset-row" id="aprsPresetRow">
+              <button class="preset-btn" data-preset="1h">1h</button>
+              <button class="preset-btn" data-preset="6h">6h</button>
+              <button class="preset-btn" data-preset="24h">24h</button>
+              <button class="preset-btn" data-preset="7d">7d</button>
+              <button class="preset-btn active" data-preset="30d">30d</button>
+              <button class="preset-btn" data-preset="all" data-i18n="aprs_all_time">All time</button>
+            </div>
+          </div>
+          <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters">Apply Filters</button>
+          <div class="aprs-filter-row" style="margin:0;align-self:end;">
+            <button class="aprs-filter-btn active" data-filter="all" data-i18n="all">All</button>
+            <button class="aprs-filter-btn" data-filter="rf">📻 RF</button>
+            <button class="aprs-filter-btn" data-filter="tcp">🌐 TCP</button>
+          </div>
+        </div>
+
+        <!-- APRS KPIs -->
+        <div class="aprs-cards">
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_stations">Total stations</span>
+            <div class="value" id="aprsKpiStations">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_events">Total packets</span>
+            <div class="value" id="aprsKpiEvents">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_rf_tcp">RF / TCP</span>
+            <div class="value" id="aprsKpiRfTcp">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_max_dist">Max distance</span>
+            <div class="value" id="aprsKpiMaxDist">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_digipeaters">Unique digipeaters</span>
+            <div class="value" id="aprsKpiDigipeaters">--</div>
+          </div>
+        </div>
+
+        <!-- APRS Map -->
+        <div class="grid">
+          <article class="chart-panel span-12">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_map">APRS Station Map</h3>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: blue for RF (direwolf), green for TCP (APRS-IS). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
+            </div>
+            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (blue) and APRS-IS (green).</p>
+            <div class="aprs-source-legend">
+              <span><span class="swatch" style="background:#3b82f6;"></span> RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#22c55e;"></span> APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
+            </div>
+            <div id="aprsLeafletMap"></div>
+          </article>
+
+          <!-- Distance distribution -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_distance">Distance Distribution</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Distance Distribution chart" data-help-title="Distance Distribution" data-help-text="Histogram showing the distribution of station distances from your QTH. Each bar represents a distance bin. Use it to understand your station's coverage profile and identify gaps." data-i18n-help-text="help_aprs_distance" data-i18n-help-title="aprs_chart_distance">i</button>
+            </div>
+            <p data-i18n="aprs_chart_distance_desc">Distribution of station distances from QTH (km).</p>
+            <svg id="aprsDistChart"></svg>
+          </article>
+
+          <!-- Temporal activity -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_timeline">Temporal Activity</h3>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Temporal Activity chart" data-help-title="Temporal Activity" data-help-text="Shows APRS packet count aggregated by hour for the selected period. Use peaks and troughs to identify active and quiet windows on the APRS network." data-i18n-help-text="help_aprs_timeline" data-i18n-help-title="aprs_chart_timeline">i</button>
+            </div>
+            <p data-i18n="aprs_chart_timeline_desc">Hourly APRS packet volume for the selected period.</p>
+            <svg id="aprsTimelineChart"></svg>
+          </article>
+
+          <!-- Top stations -->
+          <article class="chart-panel chart-panel-fill span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_top_stations">Top Active Stations</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Top Active Stations chart" data-help-title="Top Active Stations" data-help-text="Ranks the top 20 APRS callsigns by total packet count after applying period and source filters. Longer bars indicate more active stations." data-i18n-help-text="help_aprs_top_stations" data-i18n-help-title="aprs_chart_top_stations">i</button>
+            </div>
+            <p data-i18n="aprs_chart_top_stations_desc">Top 20 APRS callsigns by number of packets.</p>
+            <svg id="aprsTopStationsChart"></svg>
+          </article>
+
+          <!-- Source breakdown (RF vs TCP pie/bar) -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_source">Source Breakdown</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Source Breakdown chart" data-help-title="Source Breakdown" data-help-text="Shows the proportion of APRS packets received via RF (local radio) versus TCP (APRS-IS internet). A high RF ratio indicates good local radio coverage." data-i18n-help-text="help_aprs_source" data-i18n-help-title="aprs_chart_source">i</button>
+            </div>
+            <p data-i18n="aprs_chart_source_desc">RF vs APRS-IS packet ratio.</p>
+            <svg id="aprsSourceChart"></svg>
+          </article>
+        </div>
+
+        <section class="meta">
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="k" data-i18n="meta_snapshot">Data snapshot</span>
+              <span class="v" id="aprsMetaSnapshot">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="meta_period">Analyzed period</span>
+              <span class="v" id="aprsMetaPeriod">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="aprs_meta_source">Data source</span>
+              <span class="v" id="aprsMetaSource">APRS-IS + Direwolf</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="aprs_meta_coverage">Coverage radius</span>
+              <span class="v">50 km</span>
+            </div>
+          </div>
+          <div class="footnote">
+            Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; &copy; 2026 Octávio Filipe Gonçalves | License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>
+          </div>
+        </section>
+      </section>
+      </div><!-- /aprsView -->
     </div>
 
     <div class="chart-help-layer" id="chartHelpLayer" role="status" aria-live="polite">
@@ -1040,6 +1281,7 @@ Last update: 2026-04-03 UTC
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
     <script src="lib/xlsx.mini.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
       const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
@@ -1115,6 +1357,7 @@ Last update: 2026-04-03 UTC
         if (typeof fetchIonosphericBadge === "function") fetchIonosphericBadge();
         if (typeof refreshPropMap === "function") refreshPropMap();
         if (lastResolvedRange) renderFromCurrentRange();
+        if (aprsDataLoaded && aprsView && aprsView.style.display !== "none") aprsRenderAll();
         const queryAt = new Date();
         if (apiLastFetchInfo) apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
       }
@@ -3290,6 +3533,433 @@ Last update: 2026-04-03 UTC
       function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
       }
+
+      // ══════════════════════════════════════════════════════════════════════
+      //  APRS View — logic, map, charts
+      // ══════════════════════════════════════════════════════════════════════
+
+      const APRS_QTH_LAT = 39.5;
+      const APRS_QTH_LON = -8.0;
+      const APRS_RANGE_KM = 50;
+
+      let aprsMap = null;
+      let aprsEvents = [];
+      let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
+      let aprsCurrentPreset = "30d";
+      let aprsDataLoaded = false;
+
+      // ── Haversine ──────────────────────────────────────────────────────
+      function haversineKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      // ── View toggle ───────────────────────────────────────────────────
+      const viewSelector = document.getElementById("viewSelector");
+      const hfView = document.getElementById("hfView");
+      const aprsView = document.getElementById("aprsView");
+
+      if (viewSelector) {
+        viewSelector.addEventListener("click", (e) => {
+          const btn = e.target.closest(".view-btn");
+          if (!btn) return;
+          const view = btn.dataset.view;
+          viewSelector.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          if (view === "aprs") {
+            hfView.style.display = "none";
+            aprsView.style.display = "";
+            if (!aprsDataLoaded) {
+              aprsLoadAndRender();
+            }
+          } else {
+            hfView.style.display = "";
+            aprsView.style.display = "none";
+          }
+        });
+      }
+
+      // Hide APRS view initially
+      if (aprsView) aprsView.style.display = "none";
+
+      // ── APRS period presets ───────────────────────────────────────────
+      const aprsPresetRow = document.getElementById("aprsPresetRow");
+      const aprsApplyBtn = document.getElementById("aprsApplyBtn");
+
+      if (aprsPresetRow) {
+        aprsPresetRow.addEventListener("click", (e) => {
+          const btn = e.target.closest(".preset-btn");
+          if (!btn) return;
+          aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          aprsCurrentPreset = btn.dataset.preset;
+        });
+      }
+      if (aprsApplyBtn) {
+        aprsApplyBtn.addEventListener("click", () => aprsLoadAndRender());
+      }
+
+      // ── APRS source filter ────────────────────────────────────────────
+      document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          aprsSourceFilter = btn.dataset.filter;
+          aprsRenderAll();
+        });
+      });
+
+      // ── Period resolution ─────────────────────────────────────────────
+      function aprsResolvePeriod() {
+        const now = new Date();
+        let start;
+        switch (aprsCurrentPreset) {
+          case "1h":  start = new Date(now - 3600e3); break;
+          case "6h":  start = new Date(now - 6 * 3600e3); break;
+          case "24h": start = new Date(now - 24 * 3600e3); break;
+          case "7d":  start = new Date(now - 7 * 86400e3); break;
+          case "30d": start = new Date(now - 30 * 86400e3); break;
+          case "all": start = new Date("2020-01-01T00:00:00Z"); break;
+          default:    start = new Date(now - 30 * 86400e3);
+        }
+        return { start, end: now };
+      }
+
+      // ── Fetch APRS events from API ────────────────────────────────────
+      async function aprsFetchEvents(start, end) {
+        const params = new URLSearchParams({
+          mode: "APRS",
+          start: start.toISOString(),
+          end: end.toISOString()
+        });
+        try {
+          const resp = await fetch(`${_BASE}api/events?${params.toString()}`);
+          if (!resp.ok) return [];
+          return await resp.json();
+        } catch (_) {
+          return [];
+        }
+      }
+
+      // ── Filter by source ──────────────────────────────────────────────
+      function aprsFilteredEvents() {
+        if (aprsSourceFilter === "all") return aprsEvents;
+        return aprsEvents.filter(e => {
+          const src = (e.source || "").toLowerCase();
+          if (aprsSourceFilter === "rf") return src === "direwolf" || src === "rf";
+          if (aprsSourceFilter === "tcp") return src === "aprs-is" || src === "tcp" || src === "aprsis";
+          return true;
+        });
+      }
+
+      // ── Main load ─────────────────────────────────────────────────────
+      async function aprsLoadAndRender() {
+        const { start, end } = aprsResolvePeriod();
+        aprsEvents = await aprsFetchEvents(start, end);
+        aprsDataLoaded = true;
+
+        // Update meta
+        const snap = document.getElementById("aprsMetaSnapshot");
+        const period = document.getElementById("aprsMetaPeriod");
+        if (snap) snap.textContent = fmtDateUtc(new Date());
+        if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
+
+        aprsRenderAll();
+      }
+
+      function aprsRenderAll() {
+        const filtered = aprsFilteredEvents();
+        aprsUpdateKpis(filtered);
+        aprsRenderMap(filtered);
+        aprsDrawDistanceChart(filtered);
+        aprsDrawTimelineChart(filtered);
+        aprsDrawTopStationsChart(filtered);
+        aprsDrawSourceChart();
+      }
+
+      // ── KPIs ──────────────────────────────────────────────────────────
+      function aprsUpdateKpis(events) {
+        const callsigns = new Set(events.map(e => e.callsign).filter(Boolean));
+        const rfCount = events.filter(e => {
+          const s = (e.source || "").toLowerCase();
+          return s === "direwolf" || s === "rf";
+        }).length;
+        const tcpCount = events.length - rfCount;
+
+        let maxDist = 0;
+        const digipeaters = new Set();
+        events.forEach(e => {
+          if (Number.isFinite(e.lat) && Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0)) {
+            const d = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon);
+            if (d > maxDist) maxDist = d;
+          }
+          // Extract digipeaters from path
+          const path = e.path || e.via || "";
+          if (path) {
+            path.split(",").forEach(p => {
+              const call = p.replace(/\*$/, "").trim();
+              if (call && call !== e.callsign) digipeaters.add(call);
+            });
+          }
+        });
+
+        const el = (id) => document.getElementById(id);
+        el("aprsKpiStations").textContent = formatInt(callsigns.size);
+        el("aprsKpiEvents").textContent = formatInt(events.length);
+        el("aprsKpiRfTcp").textContent = `${formatInt(rfCount)} / ${formatInt(tcpCount)}`;
+        el("aprsKpiMaxDist").textContent = maxDist > 0 ? `${Math.round(maxDist)} km` : "--";
+        el("aprsKpiDigipeaters").textContent = formatInt(digipeaters.size);
+      }
+
+      // ── Leaflet map ───────────────────────────────────────────────────
+      function aprsRenderMap(events) {
+        if (!aprsMap) {
+          aprsMap = L.map("aprsLeafletMap", {
+            center: [APRS_QTH_LAT, APRS_QTH_LON],
+            zoom: 9,
+            zoomControl: true,
+            attributionControl: true
+          });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 18
+          }).addTo(aprsMap);
+
+          // QTH marker
+          L.circleMarker([APRS_QTH_LAT, APRS_QTH_LON], {
+            radius: 8, fillColor: "#facc15", color: "#000", weight: 2, fillOpacity: 1
+          }).addTo(aprsMap).bindPopup("<strong>QTH — CT7BFV</strong>");
+
+          // Range circle
+          L.circle([APRS_QTH_LAT, APRS_QTH_LON], {
+            radius: APRS_RANGE_KM * 1000,
+            color: "#facc15", fillColor: "#facc15", fillOpacity: 0.05, weight: 1, dashArray: "6 4"
+          }).addTo(aprsMap);
+        }
+
+        // Clear previous station markers (keep base layers)
+        aprsMap.eachLayer(layer => {
+          if (layer._isAprsStation) aprsMap.removeLayer(layer);
+        });
+
+        // De-duplicate by callsign (keep latest)
+        const byCall = new Map();
+        events.forEach(e => {
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
+          if (!e.callsign) return;
+          const existing = byCall.get(e.callsign);
+          if (!existing || new Date(e.timestamp) > new Date(existing.timestamp)) {
+            byCall.set(e.callsign, e);
+          }
+        });
+
+        byCall.forEach((e, call) => {
+          const src = (e.source || "").toLowerCase();
+          const isRf = src === "direwolf" || src === "rf";
+          const color = isRf ? "#3b82f6" : "#22c55e";
+          const dist = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon);
+
+          const marker = L.circleMarker([e.lat, e.lon], {
+            radius: 6, fillColor: color, color: "#000", weight: 1, fillOpacity: 0.85
+          });
+          marker._isAprsStation = true;
+          marker.addTo(aprsMap).bindPopup(
+            `<strong>${call}</strong><br>` +
+            `Source: ${isRf ? "📻 RF" : "🌐 TCP"}<br>` +
+            `Distance: ${Math.round(dist)} km<br>` +
+            `Path: ${e.path || e.via || "--"}<br>` +
+            `Last seen: ${e.timestamp || "--"}`
+          );
+        });
+
+        // Invalidate size (in case tab was hidden)
+        setTimeout(() => aprsMap.invalidateSize(), 200);
+      }
+
+      // ── Distance histogram ────────────────────────────────────────────
+      function aprsDrawDistanceChart(events) {
+        const svg = d3.select("#aprsDistChart");
+        svg.selectAll("*").remove();
+
+        const distances = [];
+        const seen = new Set();
+        events.forEach(e => {
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
+          if (!e.callsign || seen.has(e.callsign)) return;
+          seen.add(e.callsign);
+          distances.push(haversineKm(APRS_QTH_LAT, APRS_QTH_LON, e.lat, e.lon));
+        });
+
+        if (!distances.length) return;
+
+        const W = 560, H = 300, M = { top: 20, right: 20, bottom: 40, left: 50 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const maxD = d3.max(distances);
+        const binCount = Math.min(20, Math.ceil(maxD / 10));
+        const binGen = d3.bin().domain([0, maxD]).thresholds(binCount);
+        const bins = binGen(distances);
+
+        const x = d3.scaleLinear().domain([0, maxD]).range([M.left, W - M.right]);
+        const y = d3.scaleLinear().domain([0, d3.max(bins, b => b.length)]).nice().range([H - M.bottom, M.top]);
+
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(8).tickFormat(d => `${Math.round(d)} km`))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+
+        svg.selectAll("rect.bar").data(bins).join("rect")
+          .attr("class", "bar")
+          .attr("x", d => x(d.x0) + 1)
+          .attr("y", d => y(d.length))
+          .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 2))
+          .attr("height", d => y(0) - y(d.length))
+          .attr("fill", "#3b82f6").attr("rx", 2);
+      }
+
+      // ── Timeline chart ────────────────────────────────────────────────
+      function aprsDrawTimelineChart(events) {
+        const svg = d3.select("#aprsTimelineChart");
+        svg.selectAll("*").remove();
+        if (!events.length) return;
+
+        const W = 560, H = 300, M = { top: 20, right: 20, bottom: 40, left: 50 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        // Aggregate by hour
+        const hourMap = new Map();
+        events.forEach(e => {
+          const ts = new Date(e.timestamp);
+          if (isNaN(ts)) return;
+          const key = d3.utcFormat("%Y-%m-%dT%H:00Z")(ts);
+          hourMap.set(key, (hourMap.get(key) || 0) + 1);
+        });
+        const data = Array.from(hourMap, ([k, v]) => ({ time: new Date(k), count: v }))
+          .sort((a, b) => a.time - b.time);
+        if (!data.length) return;
+
+        const x = d3.scaleUtc().domain(d3.extent(data, d => d.time)).range([M.left, W - M.right]);
+        const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([H - M.bottom, M.top]);
+
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(6).tickFormat(d3.utcFormat("%b %d")))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+
+        const area = d3.area()
+          .x(d => x(d.time)).y0(y(0)).y1(d => y(d.count)).curve(d3.curveMonotoneX);
+        svg.append("path").datum(data).attr("d", area)
+          .attr("fill", "rgba(59,130,246,0.25)").attr("stroke", "#3b82f6").attr("stroke-width", 1.5);
+      }
+
+      // ── Top stations bar chart ────────────────────────────────────────
+      function aprsDrawTopStationsChart(events) {
+        const svg = d3.select("#aprsTopStationsChart");
+        svg.selectAll("*").remove();
+        if (!events.length) return;
+
+        const countMap = new Map();
+        events.forEach(e => {
+          if (!e.callsign) return;
+          countMap.set(e.callsign, (countMap.get(e.callsign) || 0) + 1);
+        });
+        const data = Array.from(countMap, ([k, v]) => ({ callsign: k, count: v }))
+          .sort((a, b) => b.count - a.count).slice(0, 20);
+        if (!data.length) return;
+
+        const W = 560, H = Math.max(300, data.length * 22 + 40);
+        const M = { top: 10, right: 30, bottom: 20, left: 90 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const x = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([M.left, W - M.right]);
+        const y = d3.scaleBand().domain(data.map(d => d.callsign)).range([M.top, H - M.bottom]).padding(0.2);
+
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "10px");
+
+        svg.selectAll("rect.bar").data(data).join("rect")
+          .attr("class", "bar")
+          .attr("x", M.left)
+          .attr("y", d => y(d.callsign))
+          .attr("width", d => x(d.count) - M.left)
+          .attr("height", y.bandwidth())
+          .attr("fill", "#22c55e").attr("rx", 2);
+
+        svg.selectAll("text.val").data(data).join("text")
+          .attr("class", "val")
+          .attr("x", d => x(d.count) + 4)
+          .attr("y", d => y(d.callsign) + y.bandwidth() / 2)
+          .attr("dy", "0.35em")
+          .text(d => d.count)
+          .style("fill", "var(--text-muted)").style("font-size", "10px");
+      }
+
+      // ── Source breakdown (donut) ──────────────────────────────────────
+      function aprsDrawSourceChart() {
+        const svg = d3.select("#aprsSourceChart");
+        svg.selectAll("*").remove();
+
+        const all = aprsEvents; // always use unfiltered for this chart
+        if (!all.length) return;
+
+        let rf = 0, tcp = 0;
+        all.forEach(e => {
+          const s = (e.source || "").toLowerCase();
+          if (s === "direwolf" || s === "rf") rf++; else tcp++;
+        });
+
+        const W = 300, H = 300;
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const pie = d3.pie().sort(null).value(d => d.value);
+        const arc = d3.arc().innerRadius(60).outerRadius(120);
+        const data = [
+          { label: "RF", value: rf, color: "#3b82f6" },
+          { label: "TCP", value: tcp, color: "#22c55e" }
+        ];
+
+        const g = svg.append("g").attr("transform", `translate(${W / 2},${H / 2})`);
+        g.selectAll("path").data(pie(data)).join("path")
+          .attr("d", arc)
+          .attr("fill", d => d.data.color)
+          .attr("stroke", "var(--panel)").attr("stroke-width", 2);
+
+        g.selectAll("text.lbl").data(pie(data)).join("text")
+          .attr("class", "lbl")
+          .attr("transform", d => `translate(${arc.centroid(d)})`)
+          .attr("text-anchor", "middle")
+          .attr("dy", "-0.3em")
+          .text(d => d.data.label)
+          .style("fill", "#fff").style("font-size", "13px").style("font-weight", "600");
+
+        g.selectAll("text.pct").data(pie(data)).join("text")
+          .attr("class", "pct")
+          .attr("transform", d => `translate(${arc.centroid(d)})`)
+          .attr("text-anchor", "middle")
+          .attr("dy", "1em")
+          .text(d => `${Math.round(d.data.value / all.length * 100)}%`)
+          .style("fill", "#fff").style("font-size", "11px");
+
+        // Total in centre
+        g.append("text").attr("text-anchor", "middle").attr("dy", "0.35em")
+          .text(formatInt(all.length))
+          .style("fill", "var(--text)").style("font-size", "18px").style("font-weight", "700");
+      }
+
     </script>
   </body>
 </html>
