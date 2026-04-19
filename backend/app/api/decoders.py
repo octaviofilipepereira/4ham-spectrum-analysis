@@ -39,7 +39,6 @@ from app.decoders.direwolf_kiss import (
     parse_kiss_frame,
 )
 from app.decoders.launchers import resolve_command, start_process, stop_process
-from app.decoders.aprs_demod import AprsDemodulator
 from app.decoders.ssb_asr import (
     feed_iq_ssb,
     is_ssb_asr_available,
@@ -549,7 +548,7 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
     if state.kiss_task is not None and not state.kiss_task.done():
         return {"started": False, "reason": "kiss_already_running"}
 
-    # Auto-start Direwolf process if configured
+    # Auto-start rtl_fm → Direwolf pipeline if configured
     kiss_st = state.decoder_status["direwolf_kiss"]
     if kiss_st["autostart"] and state.direwolf_process is None:
         cmd = resolve_command("DIREWOLF_CMD", "direwolf -t 0 -p")
@@ -557,42 +556,73 @@ async def _start_kiss_loop(force: bool = False) -> Dict:
             # Sync MYCALL in direwolf.conf with the station callsign from Admin Config
             _sync_direwolf_mycall(cmd)
 
-            # Try IQ→FM demod pipe mode when scan engine is active
-            demod_started = False
-            if state.scan_engine is not None and state.scan_engine.running:
-                center_hz = getattr(state.scan_engine, "center_hz", None)
-                sample_rate = getattr(state.scan_engine, "sample_rate", None)
-                if center_hz and sample_rate:
-                    try:
-                        demod = AprsDemodulator()
-                        ok = await demod.start(
-                            scan_engine=state.scan_engine,
-                            direwolf_cmd=cmd,
-                            center_hz=int(center_hz),
-                            sample_rate=int(sample_rate),
-                        )
-                        if ok:
-                            state.aprs_demod = demod
-                            state.direwolf_process = demod._process
-                            kiss_st["process_running"] = True
-                            kiss_st["process_pid"] = demod.pid
-                            log(f"aprs_demod_started:pid={demod.pid}")
-                            demod_started = True
-                            await asyncio.sleep(2.0)
-                        else:
-                            log("aprs_demod_start_returned_false")
-                    except Exception as exc:
-                        log(f"aprs_demod_start_failed:{exc}")
-                        kiss_st["last_error"] = str(exc)
+            # Launch rtl_fm → Direwolf pipeline:
+            # rtl_fm demodulates NFM on 144.800 MHz, pipes PCM audio to Direwolf
+            rtl_fm_cmd = resolve_command(
+                "RTL_FM_CMD",
+                "rtl_fm -f 144800000 -s 22050 -g 42",
+            )
+            if rtl_fm_cmd:
+                try:
+                    import shutil
+                    log_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..", "..", "logs",
+                    )
+                    log_dir = os.path.normpath(log_dir)
+                    os.makedirs(log_dir, exist_ok=True)
+                    dw_log_path = os.path.join(log_dir, "direwolf_pipe.log")
+                    dw_log_fp = open(dw_log_path, "w")
 
-            # Fallback: launch Direwolf normally (soundcard mode)
-            if not demod_started:
+                    env = dict(os.environ)
+                    env["FOURHAM_MANAGED"] = "1"
+                    env["FOURHAM_MANAGED_BY"] = "4ham-spectrum-analysis"
+
+                    # Start rtl_fm: stdout is piped to Direwolf
+                    rtl_fm_proc = await asyncio.create_subprocess_exec(
+                        *rtl_fm_cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.DEVNULL,
+                        env=env,
+                    )
+                    state.rtl_fm_process = rtl_fm_proc
+
+                    # Start Direwolf in stdin-pipe mode, reading audio from rtl_fm
+                    dw_pipe_cmd = list(cmd) + ["-r", "22050", "-n", "1", "-b", "16", "-"]
+                    state.direwolf_process = await asyncio.create_subprocess_exec(
+                        *dw_pipe_cmd,
+                        stdin=rtl_fm_proc.stdout,
+                        stdout=dw_log_fp,
+                        stderr=asyncio.subprocess.STDOUT,
+                        env=env,
+                    )
+
+                    kiss_st["process_running"] = True
+                    kiss_st["process_pid"] = state.direwolf_process.pid
+                    log(
+                        f"rtl_fm_direwolf_pipeline_started:"
+                        f"rtl_fm_pid={rtl_fm_proc.pid} "
+                        f"direwolf_pid={state.direwolf_process.pid}"
+                    )
+                    # Give Direwolf time to open the KISS TCP port
+                    await asyncio.sleep(2.0)
+                except Exception as exc:
+                    log(f"rtl_fm_direwolf_pipeline_start_failed:{exc}")
+                    kiss_st["last_error"] = str(exc)
+                    # Clean up partial start
+                    if state.rtl_fm_process is not None:
+                        try:
+                            state.rtl_fm_process.kill()
+                        except Exception:
+                            pass
+                        state.rtl_fm_process = None
+            else:
+                # rtl_fm not available: fall back to Direwolf soundcard mode
                 try:
                     state.direwolf_process = await start_process(cmd)
                     kiss_st["process_running"] = True
                     kiss_st["process_pid"] = state.direwolf_process.pid
                     log(f"direwolf_process_started:pid={state.direwolf_process.pid}")
-                    # Give Direwolf time to open the KISS TCP port
                     await asyncio.sleep(2.0)
                 except Exception as exc:
                     log(f"direwolf_process_start_failed:{exc}")
@@ -634,19 +664,17 @@ async def _stop_kiss_loop() -> Dict:
     state.kiss_task = None
     state.decoder_status["direwolf_kiss"]["connected"] = False
 
-    # Stop the APRS FM demodulator if it was used (pipe mode)
-    if state.aprs_demod is not None:
+    # Stop rtl_fm process if it was used (rtl_fm → Direwolf pipeline)
+    if state.rtl_fm_process is not None:
         try:
-            await state.aprs_demod.stop(state.scan_engine)
-            log(f"aprs_demod_stopped")
+            await stop_process(state.rtl_fm_process)
+            log(f"rtl_fm_process_stopped:pid={state.rtl_fm_process.pid}")
         except Exception as exc:
-            log(f"aprs_demod_stop_failed:{exc}")
-        state.aprs_demod = None
-        state.direwolf_process = None
-        state.decoder_status["direwolf_kiss"]["process_running"] = False
-        state.decoder_status["direwolf_kiss"]["process_pid"] = None
-    # Stop managed Direwolf process if we started it (soundcard fallback)
-    elif state.direwolf_process is not None:
+            log(f"rtl_fm_process_stop_failed:{exc}")
+        state.rtl_fm_process = None
+
+    # Stop Direwolf process
+    if state.direwolf_process is not None:
         try:
             await stop_process(state.direwolf_process)
             log(f"direwolf_process_stopped:pid={state.direwolf_process.pid}")

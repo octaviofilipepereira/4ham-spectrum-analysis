@@ -255,12 +255,11 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 
-    # APRS mode: park the SDR on a single center frequency that covers
-    # 144.800 MHz instead of sweeping.  With sr=2048000 the 2 MHz
-    # instantaneous bandwidth captures the entire 2m band from a single
-    # tuning position, giving Direwolf continuous reception of APRS packets.
+    # APRS mode: rtl_fm takes exclusive control of the SDR dongle.
+    # The ScanEngine must NOT open the device — rtl_fm will open it directly.
+    # We store the APRS frequency for display purposes only.
+    APRS_FREQ_HZ = 144_800_000
     if decoder_mode == "aprs":
-        from app.decoders.aprs_demod import APRS_FREQ_HZ
         aprs_center = APRS_FREQ_HZ           # 144 800 000
         scan["start_hz"] = aprs_center
         scan["end_hz"] = aprs_center
@@ -387,6 +386,25 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()
 
+    # APRS mode: rtl_fm takes exclusive control of the SDR — do NOT start
+    # the ScanEngine.  Launch the rtl_fm → Direwolf → KISS pipeline directly.
+    if decoder_mode == "aprs":
+
+        try:
+            result = await _start_kiss_loop(force=True)
+            log(f"scan_kiss_loop_started:{result}")
+
+            state.scan_state["state"] = "running"
+            state.scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
+            state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
+            state.scan_state["scan"] = scan
+            state.scan_state["scan_id"] = state.db.start_scan(scan, state.scan_state["started_at"])
+
+            log("scan_start:aprs")
+            return state.scan_state
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to start APRS: {exc}") from exc
+
     # Pre-check: ensure at least one real SDR device is connected.
     # Audio devices (SoapySDR audio plugin) are excluded — they are
     # host sound cards, not SDR receivers.
@@ -432,12 +450,6 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
         state.scan_state["scan"] = scan
         state.scan_state["scan_id"] = state.db.start_scan(scan, state.scan_state["started_at"])
-        
-        # Start APRS KISS loop now that the scan engine is running,
-        # so the IQ→FM demodulator can register as an IQ listener.
-        if decoder_mode == "aprs":
-            result = await _start_kiss_loop(force=True)
-            log(f"scan_kiss_loop_started:{result}")
 
         log("scan_start")
         return state.scan_state
@@ -460,6 +472,7 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     """
     await state.scan_engine.stop_async()
     await _stop_ssb_detector()
+    await _stop_kiss_loop()
     # Stop rotation if active
     if state.scan_rotation and state.scan_rotation.running:
         await state.scan_rotation.stop()
