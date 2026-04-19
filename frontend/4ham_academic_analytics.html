@@ -1979,10 +1979,11 @@ Last update: 2026-04-03 UTC
 
           const lastTs = new Date(lastHf.timestamp);
           const lastTsStr = lastTs.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }) + " UTC";
-          const periodStr = currentPreset === "custom" ? "período selecionado" : `últimas ${currentPreset}`;
+          const _presetLabels = { "1h": "na última hora", "6h": "nas últimas 6 horas", "24h": "nas últimas 24 horas", "7d": "nos últimos 7 dias", "30d": "nos últimos 30 dias" };
+          const periodStr = currentPreset === "custom" ? "no período selecionado" : (_presetLabels[currentPreset] || `nas últimas ${currentPreset}`);
 
-          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF nas ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
-          goBtn.textContent = "→ Ver últimos dados HF";
+          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
+          goBtn.textContent = "→ Ver os últimos dados de propagação HF";
           goBtn.style.display = "inline-block";
           goBtn.onclick = () => {
             // Switch to custom preset and set range around last HF data
