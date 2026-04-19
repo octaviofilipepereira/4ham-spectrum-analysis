@@ -113,16 +113,59 @@ def _parse_ax25(frame):
     }
 
 
+def _decode_compressed_lat(chars):
+    """Decode 4 base-91 characters into latitude (decimal degrees)."""
+    val = 0
+    for ch in chars:
+        val = val * 91 + (ord(ch) - 33)
+    return 90.0 - val / 380926.0
+
+
+def _decode_compressed_lon(chars):
+    """Decode 4 base-91 characters into longitude (decimal degrees)."""
+    val = 0
+    for ch in chars:
+        val = val * 91 + (ord(ch) - 33)
+    return -180.0 + val / 190463.0
+
+
+def _is_compressed_position(payload, offset):
+    """Check if payload[offset:] looks like a compressed APRS position.
+    Compressed format: <sym_table><4 lat chars><4 lon chars><sym_code>..."""
+    if len(payload) < offset + 10:
+        return False
+    sym_table = payload[offset]
+    if sym_table not in ("/", "\\") and not sym_table.isupper():
+        return False
+    # All 8 base-91 position chars must be in printable range 33–124
+    for ch in payload[offset + 1:offset + 9]:
+        if not (33 <= ord(ch) <= 124):
+            return False
+    return True
+
+
 def _parse_aprs_payload(text):
     if not text:
         return {}, None
     payload = str(text)
-    if len(payload) >= 20 and payload[0] in ("!", "="):
-        lat_raw = payload[1:9]
-        symbol_table = payload[9]
-        lon_raw = payload[10:19]
-        symbol_code = payload[19]
-        comment = payload[20:]
+    if len(payload) < 2 or payload[0] not in ("!", "=", "/", "@"):
+        return {}, payload
+
+    # Determine offset after data-type indicator
+    dtype = payload[0]
+    if dtype in ("/", "@"):
+        # Timestamped position: 7 chars timestamp after dtype
+        offset = 8
+    else:
+        offset = 1
+
+    # Try uncompressed position first: !DDMM.MMN/DDDMM.MMW...
+    if len(payload) >= offset + 19:
+        lat_raw = payload[offset:offset + 8]
+        symbol_table = payload[offset + 8]
+        lon_raw = payload[offset + 9:offset + 18]
+        symbol_code = payload[offset + 18]
+        comment = payload[offset + 19:]
         try:
             lat_deg = int(lat_raw[0:2])
             lat_min = float(lat_raw[2:7])
@@ -130,21 +173,44 @@ def _parse_aprs_payload(text):
             lon_deg = int(lon_raw[0:3])
             lon_min = float(lon_raw[3:8])
             lon_hem = lon_raw[8]
-            lat = lat_deg + (lat_min / 60.0)
-            lon = lon_deg + (lon_min / 60.0)
-            if lat_hem == "S":
-                lat = -lat
-            if lon_hem == "W":
-                lon = -lon
-            return {
-                "lat": lat,
-                "lon": lon,
-                "msg": comment.strip() if comment else None,
-                "symbol_table": symbol_table,
-                "symbol_code": symbol_code
-            }, payload
+            if lat_hem in ("N", "S") and lon_hem in ("E", "W"):
+                lat = lat_deg + (lat_min / 60.0)
+                lon = lon_deg + (lon_min / 60.0)
+                if lat_hem == "S":
+                    lat = -lat
+                if lon_hem == "W":
+                    lon = -lon
+                return {
+                    "lat": lat,
+                    "lon": lon,
+                    "msg": comment.strip() if comment else None,
+                    "symbol_table": symbol_table,
+                    "symbol_code": symbol_code,
+                }, payload
         except (ValueError, IndexError):
-            return {}, payload
+            pass
+
+    # Try compressed format: <sym_table><4 lat b91><4 lon b91><sym_code>...
+    if _is_compressed_position(payload, offset):
+        try:
+            sym_table = payload[offset]
+            lat = _decode_compressed_lat(payload[offset + 1:offset + 5])
+            lon = _decode_compressed_lon(payload[offset + 5:offset + 9])
+            sym_code = payload[offset + 9]
+            comment = payload[offset + 13:] if len(payload) > offset + 13 else ""
+            if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+                return {
+                    "lat": lat,
+                    "lon": lon,
+                    "msg": comment.strip() if comment else None,
+                    "symbol_table": sym_table,
+                    "symbol_code": sym_code,
+                }, payload
+        except (ValueError, IndexError):
+            pass
+
+    return {}, payload
+
     return {}, payload
 
 

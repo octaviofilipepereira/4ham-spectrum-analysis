@@ -58,6 +58,11 @@ _MICE_DT_RE = re.compile(
     r"^([A-Za-z0-9/\-]{3,9})>([A-Z0-9]{6}),([^:]+):`(.+)"
 )
 
+# Compressed position: SRC>DST,PATH:[!=@/]<sym_table><4 lat><4 lon><sym_code>...
+_COMPRESSED_RE = re.compile(
+    r"^([A-Za-z0-9/\-]{3,9})>([^:]+):([!=@/])([/\\A-Z])([\x21-\x7c]{4})([\x21-\x7c]{4})(.)(.{3})(.*)"
+)
+
 
 def _parse_lat(raw: str) -> float | None:
     """Parse 'DDMM.MMN' → decimal degrees."""
@@ -85,6 +90,22 @@ def _parse_lon(raw: str) -> float | None:
         return lon
     except (ValueError, IndexError):
         return None
+
+
+def _decode_compressed_lat(chars: str) -> float:
+    """Decode 4 base-91 characters into latitude (decimal degrees)."""
+    val = 0
+    for ch in chars:
+        val = val * 91 + (ord(ch) - 33)
+    return 90.0 - val / 380926.0
+
+
+def _decode_compressed_lon(chars: str) -> float:
+    """Decode 4 base-91 characters into longitude (decimal degrees)."""
+    val = 0
+    for ch in chars:
+        val = val * 91 + (ord(ch) - 33)
+    return -180.0 + val / 190463.0
 
 
 def parse_aprs_is_line(line: str) -> dict | None:
@@ -115,6 +136,29 @@ def parse_aprs_is_line(line: str) -> dict | None:
             "symbol_table": sym_table,
             "symbol_code": sym_code,
         }
+
+    # Try compressed position
+    m = _COMPRESSED_RE.match(line)
+    if m:
+        src, path_str, _dtype, sym_table, lat_chars, lon_chars, sym_code, _csT, comment = m.groups()
+        try:
+            lat = _decode_compressed_lat(lat_chars)
+            lon = _decode_compressed_lon(lon_chars)
+            if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+                return {
+                    "callsign": src,
+                    "path": path_str,
+                    "lat": lat,
+                    "lon": lon,
+                    "msg": comment.strip() if comment else None,
+                    "raw": line,
+                    "mode": "APRS",
+                    "source": "aprs_is",
+                    "symbol_table": sym_table,
+                    "symbol_code": sym_code,
+                }
+        except (ValueError, IndexError):
+            pass
 
     # Try object/item
     m = _OBJECT_RE.match(line)

@@ -490,10 +490,13 @@ def _kiss_on_event(event: Dict):
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).isoformat()
     state.decoder_status["direwolf_kiss"]["last_packet_at"] = now_iso
-    # Enrich with scan frequency if available
-    center_hz = state.scan_engine.center_hz or state.spectrum_cache.get("center_hz") if state.scan_engine else None
-    if center_hz and not event.get("frequency_hz"):
-        event["frequency_hz"] = int(center_hz)
+    # Enrich with APRS scan frequency (144.800 MHz for Region 1)
+    if not event.get("frequency_hz"):
+        scan = state.scan_state.get("scan")
+        if scan and scan.get("start_hz"):
+            event["frequency_hz"] = int(scan["start_hz"])
+        else:
+            event["frequency_hz"] = 144_800_000
     # Ingest through the standard pipeline
     result = _ingest_callsign_payloads([event], {})
     # Broadcast to WebSocket so frontend markers and Events panel update

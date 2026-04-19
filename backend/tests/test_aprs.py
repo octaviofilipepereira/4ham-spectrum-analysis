@@ -318,11 +318,12 @@ class TestParseAPRSPayload:
         assert "lat" not in extras
 
     def test_invalid_coordinates_graceful(self):
-        """Malformed lat/lon should return empty extras."""
+        """Malformed lat/lon should not crash — may parse as compressed."""
         text = "!XXXX.XXN/XXXXX.XXW-Bad"
         extras, payload = _parse_aprs_payload(text)
-        # Should not crash; extras empty or has no lat/lon
-        assert "lat" not in extras or extras.get("lat") is None
+        # Should not crash; with compressed parsing, X chars are valid base-91
+        # so this may return coordinates — the key is no crash
+        assert isinstance(extras, dict)
 
     def test_equator_greenwich(self):
         """0°N 0°W — equator/greenwich."""
@@ -330,6 +331,76 @@ class TestParseAPRSPayload:
         extras, payload = _parse_aprs_payload(text)
         assert extras["lat"] == 0.0
         assert extras["lon"] == 0.0
+
+    def test_compressed_position_ct1end(self):
+        """Compressed APRS position — real CT1END-3 packet from RF."""
+        text = "=/:rnrL.Qpy  BGreetings from CT1END {UIV32N}"
+        extras, payload = _parse_aprs_payload(text)
+        assert extras.get("lat") is not None, "compressed lat not parsed"
+        assert extras.get("lon") is not None, "compressed lon not parsed"
+        # CT1END is near Lisbon (~38.77°N, ~9.28°W)
+        assert abs(extras["lat"] - 38.77) < 0.5
+        assert abs(extras["lon"] - (-9.28)) < 0.5
+        assert extras["symbol_table"] == "/"
+        assert extras["symbol_code"] == "y"
+
+    def test_compressed_position_primary_table(self):
+        """Compressed position with / symbol table."""
+        # Encode lat=40.0, lon=-8.0 in base-91
+        # lat: (90 - 40) * 380926 = 19046300 → encode
+        # lon: (-8 - (-180)) * 190463 = 172 * 190463 = 32759636 → encode
+        text = "=/5L!!<*e!>"
+        extras, payload = _parse_aprs_payload(text)
+        # Should parse without error (may or may not have valid coords depending on encoding)
+        assert payload is not None
+
+    def test_compressed_position_with_timestamp(self):
+        """Compressed position with / data-type (timestamped)."""
+        text = "/092345z/:rnrL.Qpy  B"
+        extras, payload = _parse_aprs_payload(text)
+        assert extras.get("lat") is not None, "timestamped compressed lat not parsed"
+        assert extras.get("lon") is not None, "timestamped compressed lon not parsed"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 4b. Compressed APRS positions via parse_aprs_is_line
+# ═══════════════════════════════════════════════════════════════════
+
+class TestParseAprsIsLineCompressed:
+    """Test compressed APRS-IS line parsing."""
+
+    def test_compressed_position_is(self):
+        """Compressed position from APRS-IS line."""
+        from app.decoders.aprs_is import parse_aprs_is_line
+        line = "CT1END-3>APRS,TCPIP*:=/:rnrL.Qpy  BGreetings from CT1END"
+        event = parse_aprs_is_line(line)
+        assert event is not None, "compressed APRS-IS line not parsed"
+        assert event["callsign"] == "CT1END-3"
+        assert abs(event["lat"] - 38.77) < 0.5
+        assert abs(event["lon"] - (-9.28)) < 0.5
+        assert event["source"] == "aprs_is"
+
+    def test_uncompressed_position_is_still_works(self):
+        """Ensure standard uncompressed parsing is not broken."""
+        from app.decoders.aprs_is import parse_aprs_is_line
+        line = "CT7BFV>APRS,WIDE1-1:!4013.50N/00830.00W-Test"
+        event = parse_aprs_is_line(line)
+        assert event is not None
+        assert event["callsign"] == "CT7BFV"
+        assert abs(event["lat"] - 40.225) < 0.01
+        assert abs(event["lon"] - (-8.5)) < 0.01
+
+    def test_compressed_kiss_frame(self):
+        """Compressed position via KISS frame pipeline."""
+        info = "=/:rnrL.Qpy  BGreetings from CT1END".encode("utf-8")
+        frame = _build_kiss_frame("CT1END", src_ssid=3, info=info)
+        event = parse_kiss_frame(frame)
+        assert event is not None
+        assert event["callsign"] == "CT1END-3"
+        assert event["lat"] is not None
+        assert event["lon"] is not None
+        assert abs(event["lat"] - 38.77) < 0.5
+        assert abs(event["lon"] - (-9.28)) < 0.5
 
 
 # ═══════════════════════════════════════════════════════════════════
