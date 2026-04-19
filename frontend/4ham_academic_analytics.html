@@ -867,6 +867,22 @@ Last update: 2026-04-03 UTC
         border-radius: 10px;
         background: #0d1117;
       }
+      /* APRS map fullscreen */
+      .aprs-map-wrapper { position: relative; }
+      .aprs-map-fullscreen-btn {
+        position: absolute; top: 10px; right: 10px; z-index: 1000;
+        background: rgba(15,23,42,.85); color: #fff; border: 1px solid #334155;
+        padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
+        cursor: pointer; backdrop-filter: blur(4px);
+      }
+      .aprs-map-fullscreen-btn:hover { background: #1e40af; }
+      .aprs-map-wrapper.fullscreen {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
+        border-radius: 0; background: #0d1117;
+      }
+      .aprs-map-wrapper.fullscreen #aprsLeafletMap {
+        height: 100vh !important; border-radius: 0;
+      }
       /* ── APRS marker styles (matches main interface) ── */
       #aprsLeafletMap .leaflet-div-icon { background: none; border: none; }
       .aprs-qth-icon { background: none !important; border: none !important; }
@@ -1235,7 +1251,10 @@ Last update: 2026-04-03 UTC
               <span><span class="swatch" style="background:#22c55e;"></span> APRS-IS (TCP)</span>
               <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
             </div>
-            <div id="aprsLeafletMap"></div>
+            <div class="aprs-map-wrapper" id="aprsMapWrapper">
+              <button class="aprs-map-fullscreen-btn" id="aprsFullscreenBtn" title="Fullscreen">⛶ Fullscreen</button>
+              <div id="aprsLeafletMap"></div>
+            </div>
           </article>
 
           <!-- Distance distribution -->
@@ -3912,6 +3931,30 @@ Last update: 2026-04-03 UTC
 
         // Invalidate size (in case tab was hidden)
         setTimeout(() => aprsMap.invalidateSize(), 200);
+
+        // Fullscreen toggle
+        const fsBtn = document.getElementById("aprsFullscreenBtn");
+        if (fsBtn && !fsBtn._bound) {
+          fsBtn._bound = true;
+          fsBtn.addEventListener("click", () => {
+            const wrapper = document.getElementById("aprsMapWrapper");
+            wrapper.classList.toggle("fullscreen");
+            const isFull = wrapper.classList.contains("fullscreen");
+            fsBtn.textContent = isFull ? "✕ Exit Fullscreen" : "⛶ Fullscreen";
+            setTimeout(() => aprsMap.invalidateSize(), 150);
+          });
+          // Escape key exits fullscreen
+          document.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") {
+              const wrapper = document.getElementById("aprsMapWrapper");
+              if (wrapper.classList.contains("fullscreen")) {
+                wrapper.classList.remove("fullscreen");
+                fsBtn.textContent = "⛶ Fullscreen";
+                setTimeout(() => aprsMap.invalidateSize(), 150);
+              }
+            }
+          });
+        }
       }
 
       // ── Distance histogram ────────────────────────────────────────────
