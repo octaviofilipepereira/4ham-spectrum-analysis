@@ -1198,11 +1198,11 @@ Last update: 2026-04-03 UTC
           <div class="field">
             <label data-i18n="period">Period</label>
             <div class="preset-row" id="aprsPresetRow">
-              <button class="preset-btn active" data-preset="30m">30m</button>
+              <button class="preset-btn" data-preset="30m">30m</button>
               <button class="preset-btn" data-preset="1h">1h</button>
               <button class="preset-btn" data-preset="3h">3h</button>
               <button class="preset-btn" data-preset="6h">6h</button>
-              <button class="preset-btn" data-preset="24h">24h</button>
+              <button class="preset-btn active" data-preset="24h">24h</button>
               <button class="preset-btn" data-preset="custom">Custom Period</button>
             </div>
             <div id="aprsCustomRange" style="display:none;margin-top:8px;gap:8px;align-items:center;flex-wrap:nowrap;width:100%;">
@@ -3628,7 +3628,7 @@ Last update: 2026-04-03 UTC
       let aprsMap = null;
       let aprsEvents = [];
       let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
-      let aprsCurrentPreset = "30m";
+      let aprsCurrentPreset = "24h";
       let aprsDataLoaded = false;
 
       // ── Haversine ──────────────────────────────────────────────────────
