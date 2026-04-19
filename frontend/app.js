@@ -593,6 +593,31 @@ const aprsMapArea = document.getElementById("aprsMapArea");
 const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
 const propagationCard = document.getElementById("propagationCard");
+const aprsMapFullscreenBtn = document.getElementById("aprsMapFullscreenBtn");
+
+// ── APRS Map fullscreen toggle ─────────────────────────────────────────
+if (aprsMapFullscreenBtn && aprsMapArea) {
+  aprsMapFullscreenBtn.addEventListener("click", () => {
+    const isFs = aprsMapArea.classList.toggle("aprs-map-area--fullscreen");
+    aprsMapFullscreenBtn.textContent = isFs ? "✕" : "⤢";
+    aprsMapFullscreenBtn.title = isFs ? "Exit fullscreen" : "Toggle fullscreen";
+    // Leaflet needs invalidateSize after container resize
+    if (aprsMapCtrl.isReady) {
+      setTimeout(() => aprsMapCtrl.invalidateSize(), 100);
+    }
+  });
+  // ESC to exit fullscreen
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && aprsMapArea.classList.contains("aprs-map-area--fullscreen")) {
+      aprsMapArea.classList.remove("aprs-map-area--fullscreen");
+      aprsMapFullscreenBtn.textContent = "⤢";
+      aprsMapFullscreenBtn.title = "Toggle fullscreen";
+      if (aprsMapCtrl.isReady) {
+        setTimeout(() => aprsMapCtrl.invalidateSize(), 100);
+      }
+    }
+  });
+}
 
 /**
  * Toggle between waterfall and APRS map views.

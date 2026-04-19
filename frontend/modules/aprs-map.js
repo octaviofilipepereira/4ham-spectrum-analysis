@@ -158,6 +158,9 @@ export class APRSMapController {
   /** Return true if the map has been initialised. */
   get isReady() { return this.#map !== null; }
 
+  /** Notify Leaflet that the container size changed (e.g. fullscreen toggle). */
+  invalidateSize() { if (this.#map) this.#map.invalidateSize(); }
+
   // ── Marker management ─────────────────────────────────────────────────
 
   /**
