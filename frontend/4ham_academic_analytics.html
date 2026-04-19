@@ -424,7 +424,7 @@ Last update: 2026-04-03 UTC
 
       .chart-panel > svg {
         width: 100%;
-        height: 280px;
+        height: 420px;
         display: block;
       }
 
@@ -444,11 +444,11 @@ Last update: 2026-04-03 UTC
       }
       .chart-panel-fill svg {
         flex: 1 1 0;
-        min-height: 280px;
+        min-height: 420px;
       }
 
       #heatmapChart {
-        height: 330px;
+        height: 495px;
       }
 
       .meta {
@@ -4014,7 +4014,7 @@ Last update: 2026-04-03 UTC
 
         if (!distances.length) return;
 
-        const W = 560, H = 300, M = { top: 20, right: 20, bottom: 40, left: 50 };
+        const W = 840, H = 450, M = { top: 20, right: 20, bottom: 40, left: 50 };
         svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
 
         const maxD = d3.max(distances);
@@ -4093,7 +4093,7 @@ Last update: 2026-04-03 UTC
           .sort((a, b) => b.count - a.count).slice(0, 20);
         if (!data.length) return;
 
-        const W = 560, H = Math.max(300, data.length * 22 + 40);
+        const W = 840, H = Math.max(450, data.length * 28 + 40);
         const M = { top: 10, right: 30, bottom: 20, left: 90 };
         svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
 
@@ -4141,11 +4141,11 @@ Last update: 2026-04-03 UTC
         const rf = rfCalls.size, tcp = tcpCalls.size;
         const total = rf + tcp;
 
-        const W = 300, H = 300;
+        const W = 450, H = 450;
         svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
 
         const pie = d3.pie().sort(null).value(d => d.value);
-        const arc = d3.arc().innerRadius(60).outerRadius(120);
+        const arc = d3.arc().innerRadius(90).outerRadius(180);
         const data = [
           { label: "RF", value: rf, color: "#3b82f6" },
           { label: "TCP", value: tcp, color: "#22c55e" }
