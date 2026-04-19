@@ -3652,10 +3652,15 @@ Last update: 2026-04-03 UTC
           end: end.toISOString()
         });
         try {
-          const resp = await fetch(`${_BASE}api/events?${params.toString()}`);
-          if (!resp.ok) return [];
-          return await resp.json();
-        } catch (_) {
+          const url = `${_BASE}api/events?${params.toString()}`;
+          console.log('[APRS] fetching:', url);
+          const resp = await fetch(url);
+          if (!resp.ok) { console.warn('[APRS] fetch not ok:', resp.status); return []; }
+          const data = await resp.json();
+          console.log('[APRS] fetched events:', data.length, '| sample:', data[0]);
+          return data;
+        } catch (err) {
+          console.error('[APRS] fetch error:', err);
           return [];
         }
       }
@@ -3688,6 +3693,7 @@ Last update: 2026-04-03 UTC
 
       function aprsRenderAll() {
         const filtered = aprsFilteredEvents();
+        console.log('[APRS] renderAll: total=', aprsEvents.length, 'filtered=', filtered.length, 'filter=', aprsSourceFilter);
         aprsUpdateKpis(filtered);
         aprsRenderMap(filtered);
         aprsDrawDistanceChart(filtered);
@@ -3732,7 +3738,9 @@ Last update: 2026-04-03 UTC
 
       // ── Leaflet map ───────────────────────────────────────────────────
       function aprsRenderMap(events) {
+        console.log('[APRS] renderMap: events=', events.length, 'Leaflet L=', typeof L);
         if (!aprsMap) {
+          console.log('[APRS] creating Leaflet map...');
           aprsMap = L.map("aprsLeafletMap", {
             center: [APRS_QTH_LAT, APRS_QTH_LON],
             zoom: 9,
@@ -3772,6 +3780,7 @@ Last update: 2026-04-03 UTC
           }
         });
 
+        console.log('[APRS] unique stations with position:', byCall.size);
         byCall.forEach((e, call) => {
           const src = (e.source || "").toLowerCase();
           const isRf = src === "direwolf" || src === "rf";
