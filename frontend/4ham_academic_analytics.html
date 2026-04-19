@@ -3818,7 +3818,7 @@ Last update: 2026-04-03 UTC
       }
 
       // ── Build rich popup (matches main interface) ─────────────────────
-      function aprsBuildPopup(e) {
+      function aprsBuildPopup(e, sources) {
         const call = e.callsign || "—";
         const lat = Number(e.lat);
         const lon = Number(e.lon);
@@ -3827,11 +3827,12 @@ Last update: 2026-04-03 UTC
         const path = e.path || e.via || "—";
         const msg = e.msg || e.comment || "";
         const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
-        const src = (e.source || "").toLowerCase();
-        const isRf = src === "direwolf" || src === "rf";
-        let sourceBadge = isRf
-          ? '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>'
-          : '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+        const srcSet = sources || new Set();
+        const hasRf = [...srcSet].some(s => s !== "aprs_is");
+        const hasTcp = srcSet.has("aprs_is");
+        let sourceBadge = "";
+        if (hasRf) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+        if (hasTcp) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
         let distText = "";
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
           const d = haversineKm(APRS_QTH_LAT, APRS_QTH_LON, lat, lon);
@@ -3900,22 +3901,30 @@ Last update: 2026-04-03 UTC
           if (layer._isAprsStation) aprsMap.removeLayer(layer);
         });
 
-        // De-duplicate by callsign (keep latest)
+        // De-duplicate by callsign — track all sources, prefer RF event
         const byCall = new Map();
+        const sourcesByCall = new Map();
         events.forEach(e => {
           if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign) return;
+          const src = (e.source || "").toLowerCase();
+          if (!sourcesByCall.has(e.callsign)) sourcesByCall.set(e.callsign, new Set());
+          if (src) sourcesByCall.get(e.callsign).add(src);
           const existing = byCall.get(e.callsign);
-          if (!existing || new Date(e.timestamp) > new Date(existing.timestamp)) {
+          const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
+          const isRf = src === "direwolf" || src === "rf";
+          const existingIsRf = existingSrc === "direwolf" || existingSrc === "rf";
+          // RF always wins; among same type, keep latest
+          if (!existing || (isRf && !existingIsRf) || (isRf === existingIsRf && new Date(e.timestamp) > new Date(existing.timestamp))) {
             byCall.set(e.callsign, e);
           }
         });
 
         byCall.forEach((e, call) => {
-          const src = (e.source || "").toLowerCase();
-          const isRf = src === "direwolf" || src === "rf";
+          const sources = sourcesByCall.get(call) || new Set();
+          const hasRf = [...sources].some(s => s !== "aprs_is");
+          const sourceClass = hasRf ? "aprs-marker-rf" : "aprs-marker-is";
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
-          const sourceClass = isRf ? "aprs-marker-rf" : "aprs-marker-is";
 
           const marker = L.marker([e.lat, e.lon], {
             icon: L.divIcon({
@@ -3926,7 +3935,7 @@ Last update: 2026-04-03 UTC
             })
           });
           marker._isAprsStation = true;
-          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e));
+          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, sources));
         });
 
         // Invalidate size (in case tab was hidden)
