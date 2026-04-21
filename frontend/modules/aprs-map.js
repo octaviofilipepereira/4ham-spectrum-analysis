@@ -56,7 +56,8 @@ export class APRSMapController {
   #qthLat = 39.5;
   #qthLon = -8.0;
   #stationCall = "";
-  #activeFilter = "all"; // "all" | "rf" | "tcp"
+  #activeFilter = "all"; // "all" | "rf" | "tcp" | "lora" | "rf_tcp" | "lora_tcp"
+  #contextMode = "APRS"; // "APRS" (VHF) | "LORA" (UHF) — affects what "all" means
 
   constructor(containerId) {
     this.#container = document.getElementById(containerId);
@@ -376,12 +377,25 @@ export class APRSMapController {
 
   /** Return the count of currently visible markers (respects active filter). */
   get filteredMarkerCount() {
-    if (this.#activeFilter === "all") return this.#markers.size;
+    if (this.#activeFilter === "all" && this.#contextMode !== "LORA") return this.#markers.size;
     let count = 0;
     for (const [, entry] of this.#markers) {
       if (this.#matchesFilter(entry)) count++;
     }
     return count;
+  }
+
+  /**
+   * Set the active context mode. "LORA" makes the "all" filter resolve to
+   * lora_aprs-only so VHF Direwolf/APRS-IS markers are hidden during a LoRa
+   * scan. Re-applies the current filter so visibility updates immediately.
+   * @param {string} mode "APRS" | "LORA"
+   */
+  setContextMode(mode) {
+    const next = String(mode || "").trim().toUpperCase() === "LORA" ? "LORA" : "APRS";
+    if (next === this.#contextMode) return;
+    this.#contextMode = next;
+    this.applyFilter(this.#activeFilter);
   }
 
   /**
@@ -402,8 +416,15 @@ export class APRSMapController {
 
   /** Check if a marker entry matches the active filter (uses perSource Map keys). */
   #matchesFilter(entry) {
-    if (this.#activeFilter === "all") return true;
     const perSource = entry.perSource || new Map();
+    if (this.#activeFilter === "all") {
+      // In LoRa context, "All" means LoRa-only (RF + any LoRa-IS) — never
+      // include VHF Direwolf or APRS-IS firehose, which would flood the map.
+      if (this.#contextMode === "LORA") {
+        return perSource.has("lora_aprs");
+      }
+      return true;
+    }
     if (this.#activeFilter === "rf") {
       // VHF RF only — Direwolf (anything not aprs_is and not lora_aprs).
       for (const s of perSource.keys()) {

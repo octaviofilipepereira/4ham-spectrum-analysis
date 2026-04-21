@@ -793,7 +793,8 @@ function _syncAprsMapContext() {
   let activeButtonFilter = "all";
   const validForMode = (f) => {
     if (!f) return false;
-    if (f === "all" || f === "tcp") return true;
+    if (f === "all") return true;
+    if (f === "tcp") return !isLora; // TCP button hidden in LoRa mode
     if (f === "rf") return !isLora;
     if (f === "lora") return isLora;
     return false;
@@ -801,6 +802,11 @@ function _syncAprsMapContext() {
   if (validForMode(saved)) {
     effectiveFilter = saved;
     activeButtonFilter = saved;
+  }
+  // Tell the map controller which radio context we're in so its "all" filter
+  // can suppress VHF Direwolf/APRS-IS markers during a LoRa scan.
+  if (typeof aprsMapCtrl.setContextMode === "function") {
+    aprsMapCtrl.setContextMode(isLora ? "LORA" : "APRS");
   }
   aprsMapCtrl.applyFilter(effectiveFilter);
 
@@ -819,10 +825,12 @@ function _syncAprsMapContext() {
       loraBtn.title = "LoRa APRS RF only (gr-lora_sdr, 433.775 MHz)";
     }
     if (tcpBtn) {
-      tcpBtn.textContent = isLora ? "🌐 LoRa TCP" : "🌐 TCP";
-      tcpBtn.title = isLora
-        ? "APRS-IS (TCP) — gateed worldwide; not LoRa-specific"
-        : "APRS-IS (TCP)";
+      // Hide the TCP (APRS-IS) button entirely in LoRa mode — APRS-IS is the
+      // global VHF firehose and is not LoRa-related, so exposing it would be
+      // misleading during a 433.775 MHz scan.
+      tcpBtn.classList.toggle("d-none", isLora);
+      tcpBtn.textContent = "🌐 TCP";
+      tcpBtn.title = "APRS-IS (TCP)";
     }
   }
 
