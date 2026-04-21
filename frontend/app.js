@@ -3817,7 +3817,11 @@ async function loadSettings() {
       if (btnAprs) btnAprs.classList.toggle('d-none', !aprsActive);
     }
     if (data.lora_aprs) {
-      const grLoraAvailable = Boolean(data.lora_aprs.available);
+      // Defensive: if backend doesn't report 'available' (older build pre-restart),
+      // trust 'enabled' so the UI doesn't hide LoRa-related buttons unjustly.
+      const grLoraAvailable = data.lora_aprs.available === undefined
+        ? Boolean(data.lora_aprs.enabled)
+        : Boolean(data.lora_aprs.available);
       if (loraAprsEnabledCheck) {
         loraAprsEnabledCheck.checked = data.lora_aprs.enabled === true;
         loraAprsEnabledCheck.disabled = false;
