@@ -846,6 +846,18 @@ Last update: 2026-04-03 UTC
         border-radius: 3px;
         flex-shrink: 0;
       }
+      .propmap-mobile-legends {
+        display: none;
+        margin-top: 10px;
+        gap: 8px;
+      }
+      .propmap-mobile-legends .propmap-legend {
+        position: static;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        pointer-events: auto;
+      }
       .propmap-band-filter {
         position: absolute;
         top: 8px;
@@ -1007,6 +1019,18 @@ Last update: 2026-04-03 UTC
         .propmap-band-btn {
           min-width: 42px;
           padding: 4px 8px;
+          font-size: 11px;
+        }
+
+        .propmap-wrap .propmap-legend {
+          display: none;
+        }
+
+        .propmap-mobile-legends {
+          display: grid;
+        }
+
+        .propmap-mobile-legends .propmap-legend-item {
           font-size: 11px;
         }
 
@@ -1406,6 +1430,7 @@ Last update: 2026-04-03 UTC
             </div>
             <p data-i18n="chart_propmap_desc">NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom (CTRL+ Mouse Wheel).</p>
             <div class="propmap-wrap" id="propMapWrap"></div>
+            <div class="propmap-mobile-legends" id="propMapMobileLegends"></div>
           </article>
 
           <div id="ionoBadge" class="iono-badge span-3" style="display:none;"></div>
@@ -2639,6 +2664,11 @@ Last update: 2026-04-03 UTC
         const cdata = _pmContactData;
         if (!iono || !cdata) return;
 
+        const mobileLegendHost = document.getElementById("propMapMobileLegends");
+        if (mobileLegendHost) {
+          mobileLegendHost.innerHTML = "";
+        }
+
         const sLat = (iono.qth && iono.qth.lat) || 39.5;
         const sLon = (iono.qth && iono.qth.lon) || -8.0;
         const contacts = cdata.contacts || [];
@@ -3101,6 +3131,11 @@ Last update: 2026-04-03 UTC
         note.textContent = t("pm_band_note");
         legendR.appendChild(note);
         wrap.appendChild(legendR);
+
+        if (mobileLegendHost) {
+          mobileLegendHost.appendChild(legendL.cloneNode(true));
+          mobileLegendHost.appendChild(legendR.cloneNode(true));
+        }
       }
 
       let stackedPercentMode = false;
