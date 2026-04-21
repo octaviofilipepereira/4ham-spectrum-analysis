@@ -3783,6 +3783,9 @@ async function loadSettings() {
       localStorage.setItem("4ham_lora_aprs_active", loraActive ? "1" : "0");
       const btn70cm = document.querySelector('[data-quick-band="70cm"]');
       if (btn70cm && loraActive) btn70cm.classList.remove('d-none');
+      // Update APRS mode button label to reflect LoRa availability
+      const btnAprsLora = document.querySelector('[data-quick-mode="APRS"]');
+      if (btnAprsLora) btnAprsLora.textContent = loraActive ? "APRS/LoRa" : "APRS";
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
