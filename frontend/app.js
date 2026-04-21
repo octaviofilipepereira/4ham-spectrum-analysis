@@ -474,6 +474,8 @@ function refreshQuickBandButtons() {
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
+  // Re-sync APRS map context when the active band changes
+  _syncAprsMapContext();
 }
 
 function refreshModeButtons() {
@@ -657,8 +659,8 @@ function setAprsMapVisible(showMap) {
   // Hide Go-to-MHz / SNR / DSP status — irrelevant in APRS mode
   if (vfoGotoGroup) vfoGotoGroup.hidden = showMap;
   if (showMap) {
-    // VFO → fixed APRS frequency
-    wfc.updateVFODisplay(144800000, 144800000);
+    // Sync VFO, filter and title to the active band context (2m=APRS, 70cm=LoRa)
+    _syncAprsMapContext();
 
     const locator = stationLocatorInput?.value || localStorage.getItem("4ham_station_locator") || "";
     const callsign = stationCallsignInput?.value || localStorage.getItem("4ham_station_callsign") || "";
@@ -714,6 +716,40 @@ function _updateAprsMapCount() {
     const n = aprsMapCtrl.filteredMarkerCount;
     aprsMapCountEl.textContent = `${n} station${n !== 1 ? "s" : ""}`;
   }
+}
+
+/** Sync the APRS map filter, title and VFO to the currently active band context. */
+function _syncAprsMapContext() {
+  if (!aprsMapArea || aprsMapArea.hidden) return;
+  const activeBand = bandSelect?.value || localStorage.getItem("4ham_active_band") || "2m";
+  const loraActive = localStorage.getItem("4ham_lora_aprs_active") === "1";
+  const is70cm = activeBand === "70cm" && loraActive;
+
+  // Apply the right combined filter (rf+IS for 2m, lora+IS for 70cm)
+  aprsMapCtrl.applyFilter(is70cm ? "lora_tcp" : "rf_tcp");
+
+  // Update filter button UI: reset active state, hide irrelevant source button
+  if (aprsMapFilterEl) {
+    aprsMapFilterEl.querySelectorAll(".aprs-filter-btn").forEach(b => b.classList.remove("aprs-filter-btn--active"));
+    const allBtn = aprsMapFilterEl.querySelector('[data-filter="all"]');
+    if (allBtn) allBtn.classList.add("aprs-filter-btn--active");
+    const rfBtn = aprsMapFilterEl.querySelector('[data-filter="rf"]');
+    const loraBtn = aprsMapFilterEl.querySelector('[data-filter="lora"]');
+    if (rfBtn) rfBtn.classList.toggle("d-none", is70cm);
+    if (loraBtn) loraBtn.classList.toggle("d-none", !is70cm);
+  }
+
+  // Update map title
+  const titleEl = aprsMapArea.querySelector(".aprs-map-header__title");
+  if (titleEl) titleEl.textContent = is70cm ? "📡 LoRa APRS — 433.775 MHz" : "📡 APRS Map — 144.800 MHz";
+
+  // Update VFO display
+  wfc.updateVFODisplay(
+    is70cm ? 433775000 : 144800000,
+    is70cm ? 433775000 : 144800000
+  );
+
+  _updateAprsMapCount();
 }
 
 function updateFullscreenButtonState() {
@@ -3778,14 +3814,14 @@ async function loadSettings() {
         const wantsLora = loraAprsEnabledCheck ? loraAprsEnabledCheck.checked : false;
         installLoraAprsBtn.classList.toggle("d-none", grLoraAvailable || !wantsLora);
       }
-      // Show/hide 70cm band button: available AND enabled
+      // Show/hide 70cm band button: available AND enabled; label as "LoRa" when active
       const loraActive = grLoraAvailable && Boolean(data.lora_aprs.enabled);
       localStorage.setItem("4ham_lora_aprs_active", loraActive ? "1" : "0");
       const btn70cm = document.querySelector('[data-quick-band="70cm"]');
-      if (btn70cm && loraActive) btn70cm.classList.remove('d-none');
-      // Update APRS mode button label to reflect LoRa availability
-      const btnAprsLora = document.querySelector('[data-quick-mode="APRS"]');
-      if (btnAprsLora) btnAprsLora.textContent = loraActive ? "APRS/LoRa" : "APRS";
+      if (btn70cm) {
+        btn70cm.classList.toggle('d-none', !loraActive);
+        btn70cm.textContent = loraActive ? "LoRa" : "70cm";
+      }
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";

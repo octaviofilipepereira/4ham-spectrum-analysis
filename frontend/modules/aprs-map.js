@@ -310,6 +310,17 @@ export class APRSMapController {
     if (this.#activeFilter === "lora") {
       return perSource.has("lora_aprs");
     }
+    if (this.#activeFilter === "rf_tcp") {
+      // RF + APRS-IS — excludes LoRa
+      for (const s of perSource.keys()) {
+        if (s !== "lora_aprs") return true;
+      }
+      return false;
+    }
+    if (this.#activeFilter === "lora_tcp") {
+      // LoRa + APRS-IS — excludes RF
+      return perSource.has("lora_aprs") || perSource.has("aprs_is");
+    }
     // tcp filter
     return perSource.has("aprs_is");
   }
