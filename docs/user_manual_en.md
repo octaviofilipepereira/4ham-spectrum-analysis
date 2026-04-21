@@ -282,6 +282,8 @@ It is especially useful for:
 
 Data is fetched from the server and **auto-refreshes every 60 seconds**. The header shows the timestamp of the last query and a countdown timer for the next refresh.
 
+When switching between the **HF** and **APRS** tabs, a brief loading overlay is displayed until the view finishes rendering, preventing the empty-map flash that occurred in earlier versions.
+
 ### Period selector
 
 | Preset | Period | Time resolution |
@@ -451,7 +453,7 @@ Scan Rotation lets you define a **sequence of slots (band + mode)** that the sys
 
 ### During rotation
 
-- The status bar shows in real time: current slot (band + mode), remaining countdown time, and the next slot.
+- The status bar updates every second (client-side tick): current slot (band + mode), live countdown, and the next slot.
 - A red pulsing dot confirms that rotation is active.
 - The **Stop scanning** button stops the rotation (and the current scan).
 - Data from all scanned bands/modes accumulates in the database and appears in the analytics dashboards.
