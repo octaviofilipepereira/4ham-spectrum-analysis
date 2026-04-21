@@ -4596,37 +4596,74 @@ Last update: 2026-04-03 UTC
         return map[c] || "📍";
       }
 
-      // ── Build rich popup (matches main interface) ─────────────────────
-      function aprsBuildPopup(e, sources) {
+      // ── Build rich popup (matches main interface exactly) ────────────
+      function aprsBuildPopup(e, perSource, seenRange) {
         const call = e.callsign || "—";
         const lat = Number(e.lat);
         const lon = Number(e.lon);
         const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
         const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-        const path = e.path || e.via || "—";
-        const msg = e.msg || e.comment || "";
         const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
-        const srcSet = sources || new Set();
-        const hasRf = [...srcSet].some(s => s !== "aprs_is");
-        const hasTcp = srcSet.has("aprs_is");
+        const ps = perSource instanceof Map ? perSource : new Map();
+
+        const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+        const hasLoRa = ps.has("lora_aprs");
+        const hasTCP = ps.has("aprs_is");
         let sourceBadge = "";
-        if (hasRf) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
-        if (hasTcp) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+        if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
+        if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+
         let distText = "";
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
           const d = haversineKm(aprsQthLat, aprsQthLon, lat, lon);
           distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
         }
-        const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+
+        // Per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+        const srcLabels = {
+          direwolf: { icon: "📻", name: "RF" },
+          lora_aprs: { icon: "📡", name: "LoRa" },
+          aprs_is: { icon: "🌐", name: "APRS-IS" },
+        };
+        const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+        let perSourceRows = "";
+        for (const key of orderedKeys) {
+          if (!ps.has(key)) continue;
+          const info = ps.get(key) || {};
+          const label = srcLabels[key] || { icon: "❓", name: key };
+          const path = info.path || "—";
+          const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+          perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
+            + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
+            + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+        }
+        for (const key of ps.keys()) {
+          if (orderedKeys.includes(key)) continue;
+          const info = ps.get(key) || {};
+          const path = info.path || "—";
+          const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+          perSourceRows += `<tr><td><strong>${aprsEscapeHtml(key)}</strong></td>`
+            + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
+            + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+        }
+
+        const msg = e.msg || e.comment || "";
+        const raw = e.raw || "";
+        const firstSeen = seenRange && seenRange.firstMs ? new Date(seenRange.firstMs).toLocaleTimeString() : "—";
+        const lastSeen = seenRange && seenRange.lastMs ? new Date(seenRange.lastMs).toLocaleTimeString() : "—";
+
         return `
           <div class="aprs-popup">
             <div class="aprs-popup__header">${emoji} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
             <table class="aprs-popup__table">
               <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
               ${distText}
-              <tr><td><strong>Path</strong></td><td>${aprsEscapeHtml(path)}</td></tr>
+              ${perSourceRows}
               ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
-              <tr><td><strong>Last seen</strong></td><td>${ts}</td></tr>
+              ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${aprsEscapeHtml(raw)}</td></tr>` : ""}
+              <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
+              <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>
             </table>
           </div>`;
       }
@@ -4685,6 +4722,7 @@ Last update: 2026-04-03 UTC
         // De-duplicate by callsign — track per-source (path+ts), prefer RF event for marker position
         const byCall = new Map();
         const perSourceByCall = new Map();
+        const seenRangeByCall = new Map(); // callsign -> { firstMs, lastMs }
         events.forEach(e => {
           if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign) return;
@@ -4701,6 +4739,16 @@ Last update: 2026-04-03 UTC
                 msg: e.msg || e.comment || "",
                 ts: e.timestamp || "",
               });
+            }
+          }
+          // Track first/last seen timestamps across all events for this callsign
+          const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : NaN;
+          if (Number.isFinite(tsMs)) {
+            const r = seenRangeByCall.get(e.callsign);
+            if (!r) seenRangeByCall.set(e.callsign, { firstMs: tsMs, lastMs: tsMs });
+            else {
+              if (tsMs < r.firstMs) r.firstMs = tsMs;
+              if (tsMs > r.lastMs) r.lastMs = tsMs;
             }
           }
           const existing = byCall.get(e.callsign);
@@ -4729,7 +4777,7 @@ Last update: 2026-04-03 UTC
             })
           });
           marker._isAprsStation = true;
-          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, perSource));
+            marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, perSource, seenRangeByCall.get(call)));
         });
 
         // Invalidate size (in case tab was hidden)
