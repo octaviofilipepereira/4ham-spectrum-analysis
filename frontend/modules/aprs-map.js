@@ -230,7 +230,6 @@ export class APRSMapController {
     });
 
     const sources = new Set();
-    const src = String(evt.source || "").toLowerCase();
     if (src) sources.add(src);
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
     marker.bindPopup(this.#buildPopup(data, sources));
