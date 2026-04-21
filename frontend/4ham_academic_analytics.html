@@ -2422,9 +2422,35 @@ Last update: 2026-04-03 UTC
         const goBtn = document.getElementById("hfStaleGoBtn");
         if (!banner || !bannerText || !goBtn) return;
 
-        // Hide if data exists in the requested period
+        // Detect whether the live scanner is currently pointed at a non-HF band
+        // (APRS / 2m / 70cm / VHF / UHF). In that case the HF data shown in the
+        // dashboard is not "real time" — it's historical — so we must always warn
+        // the user, even if there is HF data in the selected window.
+        const HF_BANDS = new Set(["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"]);
+        const scanSnap = lastScanRuntimeSnapshot;
+        let scanIsNonHf = false;
+        let currentScanBand = "";
+        let currentScanMode = "";
+        if (scanSnap && scanSnap.kind === "payload" && scanSnap.payload) {
+          const p = scanSnap.payload;
+          const state = String(p.state || "").toLowerCase();
+          const rot = p.rotation && p.rotation.running ? p.rotation : null;
+          const slot = rot && rot.current_slot ? rot.current_slot : null;
+          currentScanBand = String(slot?.band || p.scan?.band || "").trim();
+          currentScanMode = String(slot?.mode || p.decoder_mode || "").trim();
+          const isActive = state === "running" || state === "preview" || Boolean(rot);
+          if (isActive && currentScanBand && !HF_BANDS.has(currentScanBand)) {
+            scanIsNonHf = true;
+          }
+          // An APRS rotation slot always counts as non-HF even if band label is missing
+          if (isActive && String(currentScanMode).toUpperCase() === "APRS") {
+            scanIsNonHf = true;
+          }
+        }
+
+        // Hide only if HF data is present AND the live scanner is currently on HF
         const hasHfData = synthetic && synthetic.series && synthetic.series.length > 0;
-        if (hasHfData) {
+        if (hasHfData && !scanIsNonHf) {
           banner.classList.remove("visible");
           return;
         }
@@ -2448,10 +2474,27 @@ Last update: 2026-04-03 UTC
 
           const lastTs = new Date(lastHf.timestamp);
           const lastTsStr = lastTs.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }) + " UTC";
+          const ageMs = Date.now() - lastTs.getTime();
+          const ageMinutes = Math.floor(ageMs / 60000);
+          let ageStr;
+          if (ageMinutes < 1) ageStr = "há menos de 1 minuto";
+          else if (ageMinutes < 60) ageStr = `há ${ageMinutes} min`;
+          else if (ageMinutes < 1440) ageStr = `há ${Math.floor(ageMinutes / 60)} h`;
+          else ageStr = `há ${Math.floor(ageMinutes / 1440)} dias`;
           const _presetLabels = { "1h": "na última hora", "6h": "nas últimas 6 horas", "24h": "nas últimas 24 horas", "7d": "nos últimos 7 dias", "30d": "nos últimos 30 dias" };
           const periodStr = currentPreset === "custom" ? "no período selecionado" : (_presetLabels[currentPreset] || `nas últimas ${currentPreset}`);
 
-          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
+          if (scanIsNonHf) {
+            // Live scanner is on a non-HF band — data shown is historical, not real-time
+            const scanLabel = [currentScanMode, currentScanBand].filter(Boolean).join(" · ") || "não-HF";
+            bannerText.innerHTML = `<strong>Dados HF não estão em tempo real.</strong> O scanner está actualmente em <strong>${scanLabel}</strong> (não-HF). &nbsp;Último registo HF: <strong>${lastTsStr}</strong> (${ageStr}).`;
+          } else if (hasHfData) {
+            // Shouldn't reach here (hasHfData && !scanIsNonHf returned earlier), but guard
+            banner.classList.remove("visible");
+            return;
+          } else {
+            bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong> (${ageStr}).`;
+          }
           goBtn.textContent = "→ Ver os últimos dados de propagação HF";
           goBtn.style.display = "inline-block";
           goBtn.onclick = () => {
@@ -4221,7 +4264,7 @@ Last update: 2026-04-03 UTC
       let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
       let aprsCurrentPreset = "24h";
       let aprsDataLoaded = false;
-      const APRS_REFRESH_INTERVAL_MS = 30 * 1000;
+      const APRS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
       let aprsRefreshTimer = null;
       let aprsNextRefreshMs = null;
       let aprsCountdownTimer = null;

@@ -695,7 +695,9 @@ async function _loadRecentAprsEvents() {
   try {
     const now = new Date();
     const start = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-    const url = `/api/events?limit=200&start=${encodeURIComponent(start)}&end=${encodeURIComponent(now.toISOString())}`;
+    // No client-side limit — we need ALL APRS events in the window so every
+    // unique callsign shows up on the map (same behaviour as Academic Analytics).
+    const url = `/api/events?mode=APRS&start=${encodeURIComponent(start)}&end=${encodeURIComponent(now.toISOString())}`;
     const resp = await fetch(url, { headers: getAuthHeader() });
     if (!resp.ok) return;
     const data = await resp.json();
