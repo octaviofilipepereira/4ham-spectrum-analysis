@@ -117,7 +117,7 @@ Last update: 2026-04-03 UTC
         font-size: 0.82rem;
         font-weight: 600;
         text-align: right;
-        line-height: 1;
+        line-height: 1.25;
       }
 
       .scan-runtime-status::before {
@@ -962,6 +962,7 @@ Last update: 2026-04-03 UTC
           justify-content: center;
           padding: 12px 16px;
           font-size: 0.82rem;
+          text-align: center;
         }
 
         .chart-panel {
@@ -2243,7 +2244,7 @@ Last update: 2026-04-03 UTC
         if (!compact) {
           return "";
         }
-        return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1 $2");
+        return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1\u00A0$2");
       }
 
       function setScanRuntimeInfo(stateName, text) {
@@ -2280,11 +2281,11 @@ Last update: 2026-04-03 UTC
             const totalSec = Math.max(1, Math.ceil(secondsRaw));
             let formatted;
             if (totalSec < 60) {
-              formatted = `${totalSec} s`;
+              formatted = `${totalSec}\u00A0s`;
             } else {
               const m = Math.floor(totalSec / 60);
               const s = totalSec % 60;
-              formatted = s > 0 ? `${m} m ${s} s` : `${m} m`;
+              formatted = s > 0 ? `${m}\u00A0m ${s}\u00A0s` : `${m}\u00A0m`;
             }
             suffix = t("scan_status_switches_in", { time: formatted });
           }
