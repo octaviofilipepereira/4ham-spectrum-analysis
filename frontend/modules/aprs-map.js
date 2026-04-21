@@ -418,10 +418,14 @@ export class APRSMapController {
   #matchesFilter(entry) {
     const perSource = entry.perSource || new Map();
     if (this.#activeFilter === "all") {
-      // In LoRa context, "All" means LoRa-only (RF + any LoRa-IS) — never
-      // include VHF Direwolf or APRS-IS firehose, which would flood the map.
+      // In LoRa context, "All" means LoRa-RF + APRS-IS (LoRa·iGates re-inject
+      // their decoded frames into APRS-IS), but never VHF Direwolf — that
+      // would flood the 868 MHz map with unrelated 144.800 MHz traffic.
       if (this.#contextMode === "LORA") {
-        return perSource.has("lora_aprs");
+        for (const s of perSource.keys()) {
+          if (s === "lora_aprs" || s === "aprs_is") return true;
+        }
+        return false;
       }
       return true;
     }

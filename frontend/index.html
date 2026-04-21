@@ -144,7 +144,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT8">FT8</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="SSB">SSB</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="APRS">APRS</button>
-                  <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="LORA" title="LoRa APRS via gr-lora_sdr (433.775 MHz). Requires gr-lora_sdr and LoRa APRS enabled in Admin.">LoRa</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="LORA" title="LoRa APRS via gr-lora_sdr (868.000 MHz EU SRD; 433.775 MHz also supported). Requires gr-lora_sdr and LoRa APRS enabled in Admin.">LoRa</button>
                 </div>
                 <div class="d-none d-flex align-items-center gap-2" id="cwScanParamsRow">
                   <label class="form-label mb-0" for="cwStepHz">CW Step (Hz)</label>
@@ -302,7 +302,7 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="aprs-map-header__filter" id="aprsMapFilter">
                 <button class="aprs-filter-btn aprs-filter-btn--active" data-filter="all" title="Show all stations">All</button>
                 <button class="aprs-filter-btn" data-filter="rf" title="VHF RF only (Direwolf, 144.800 MHz)">📻 RF</button>
-                <button class="aprs-filter-btn" data-filter="lora" title="LoRa APRS only (gr-lora_sdr, 433.775 MHz)">📡 LoRa</button>
+                <button class="aprs-filter-btn" data-filter="lora" title="LoRa APRS only (gr-lora_sdr, 868.000 MHz)">📡 LoRa</button>
                 <button class="aprs-filter-btn" data-filter="tcp" title="APRS-IS (TCP)">🌐 TCP</button>
               </div>
               <span class="aprs-map-header__hint">Ctrl + Scroll = Zoom</span>
@@ -473,7 +473,7 @@ Last update: 2026-02-22 16:27:19 UTC
           <div class="modal-body">
             <p>
               The gr-lora_sdr GNU Radio Out-Of-Tree module (used to decode LoRa frames on
-              433.775 MHz / 70 cm) is not installed on this server.
+              868.000 MHz EU SRD / also 433.775 MHz / 70 cm) is not installed on this server.
               To install it without re-running the full 4ham installer, run the helper script below.
             </p>
             <p class="mb-2">
@@ -748,7 +748,7 @@ Last update: 2026-02-22 16:27:19 UTC
                 </div>
                 <small class="d-block mt-1">
                   When active, the backend listens on UDP <code>127.0.0.1:5687</code> for decoded LoRa frames
-                  forwarded by a gr-lora_sdr flowgraph (433.775 MHz / 70 cm). Decoded packets appear in the
+                  forwarded by a gr-lora_sdr flowgraph (868.000 MHz EU SRD by default; 433.775 MHz / 70 cm also supported). Decoded packets appear in the
                   live event stream and are stored in the event log with <code>source=lora_aprs</code>.
                   Requires <code>gr-lora_sdr</code> — if the badge above shows
                   <em>“gr-lora_sdr not installed”</em>, click <strong>Install gr-lora_sdr…</strong> for the

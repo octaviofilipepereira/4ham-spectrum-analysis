@@ -551,7 +551,7 @@ function renderScanContextSummary(scanState) {
     if (isAprs) {
       scanRangeSummaryEl.textContent = "144.800 MHz (APRS)";
     } else if (isLora) {
-      scanRangeSummaryEl.textContent = "433.775 MHz (LoRa APRS)";
+      scanRangeSummaryEl.textContent = "868.000 MHz (LoRa APRS)";
     } else {
       const scanRange = resolveDisplayedScanRange(scanState);
       scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
@@ -782,7 +782,7 @@ function _syncAprsMapContext() {
 
   // Mode-aware combined default (used when no user override is persisted, or
   // the persisted choice is incompatible with the current mode).
-  // In LoRa mode show ONLY genuine LoRa-RF stations (433.775 MHz) — including
+  // In LoRa mode show ONLY genuine LoRa-RF stations (868.000 MHz) — including
   // APRS-IS would flood the map with VHF traffic gateed worldwide.
   const combinedDefault = isLora ? "lora" : "rf_tcp";
 
@@ -793,8 +793,7 @@ function _syncAprsMapContext() {
   let activeButtonFilter = "all";
   const validForMode = (f) => {
     if (!f) return false;
-    if (f === "all") return true;
-    if (f === "tcp") return !isLora; // TCP button hidden in LoRa mode
+    if (f === "all" || f === "tcp") return true;
     if (f === "rf") return !isLora;
     if (f === "lora") return isLora;
     return false;
@@ -822,26 +821,28 @@ function _syncAprsMapContext() {
     if (loraBtn) {
       loraBtn.classList.toggle("d-none", !isLora);
       loraBtn.textContent = "📡 LoRa RF";
-      loraBtn.title = "LoRa APRS RF only (gr-lora_sdr, 433.775 MHz)";
+      loraBtn.title = "LoRa APRS RF only (gr-lora_sdr, 868.000 MHz)";
     }
     if (tcpBtn) {
-      // Hide the TCP (APRS-IS) button entirely in LoRa mode — APRS-IS is the
-      // global VHF firehose and is not LoRa-related, so exposing it would be
-      // misleading during a 433.775 MHz scan.
-      tcpBtn.classList.toggle("d-none", isLora);
-      tcpBtn.textContent = "🌐 TCP";
-      tcpBtn.title = "APRS-IS (TCP)";
+      // Keep the TCP (APRS-IS) button visible in LoRa mode — LoRa·iGates
+      // commonly forward decoded frames to APRS-IS, so the user may want to
+      // see them mapped (labelled "LoRa IS" to make the source explicit).
+      tcpBtn.classList.remove("d-none");
+      tcpBtn.textContent = isLora ? "🌐 LoRa IS" : "🌐 TCP";
+      tcpBtn.title = isLora
+        ? "APRS-IS feed (TCP) — includes LoRa frames re-injected by LoRa·iGates"
+        : "APRS-IS (TCP)";
     }
   }
 
   // Update map title
   const titleEl = aprsMapArea.querySelector(".aprs-map-header__title");
-  if (titleEl) titleEl.textContent = isLora ? "📡 LoRa APRS — 433.775 MHz" : "📡 APRS Map — 144.800 MHz";
+  if (titleEl) titleEl.textContent = isLora ? "📡 LoRa APRS — 868.000 MHz" : "📡 APRS Map — 144.800 MHz";
 
   // Update VFO display
   wfc.updateVFODisplay(
-    isLora ? 433775000 : 144800000,
-    isLora ? 433775000 : 144800000
+    isLora ? 868000000 : 144800000,
+    isLora ? 868000000 : 144800000
   );
 
   _updateAprsMapCount();
@@ -1258,10 +1259,11 @@ function applyEventsPanelFilters(items) {
 
 function applyEventsCardTypeFilter(items) {
   const source = Array.isArray(items) ? items : [];
-  // Suppress VHF APRS events (Direwolf 144.800 MHz + APRS-IS firehose) when
-  // the user is scanning LoRa — they pollute the events feed with traffic
-  // unrelated to the current 433.775 MHz scan. The "All Occupancy" filter
-  // bypasses this so the user can still inspect everything if needed.
+  // While scanning LoRa, drop VHF Direwolf APRS events (144.800 MHz) — they
+  // are unrelated to the 868 MHz LoRa scan and pollute the feed. APRS-IS
+  // events are kept because LoRa·iGates re-inject their decoded frames into
+  // APRS-IS, so users still benefit from seeing them. The "All Occupancy"
+  // filter bypasses this so the user can still inspect everything if needed.
   const modeUpper = String(selectedDecoderMode || "").trim().toUpperCase();
   const isLoraScan = modeUpper === "LORA";
   const stripVhfAprs = (list) => list.filter((eventItem) => {
@@ -1269,7 +1271,7 @@ function applyEventsCardTypeFilter(items) {
     const evMode = String(eventItem?.mode || "").trim().toUpperCase();
     if (evMode !== "APRS") return true;
     const src = String(eventItem?.source || "").trim().toLowerCase();
-    return src === "lora_aprs";
+    return src !== "direwolf";
   });
   const selected = String(eventsTypeFilter?.value || "all").trim();
   if (selected === "cw-candidate") {

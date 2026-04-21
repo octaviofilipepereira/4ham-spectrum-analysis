@@ -8,8 +8,9 @@ LoRa APRS decoder
 =================
 
 Receives raw LoRa-APRS payloads from an external SDR pipeline (default:
-``gr-lora_sdr`` running a flowgraph that decodes 433.775 MHz LoRa frames
-and forwards the demodulated bytes via UDP).
+``gr-lora_sdr`` running a flowgraph that decodes 868.000 MHz LoRa frames
+(EU SRD band; 433.775 MHz is also supported by re-tuning the SDR) and
+forwards the demodulated bytes via UDP).
 
 LoRa-APRS framing (OE5BPA / iss-LoRa convention)
 ------------------------------------------------

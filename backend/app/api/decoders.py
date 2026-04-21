@@ -832,9 +832,9 @@ def _lora_aprs_on_event(event: Dict):
         return
     now_iso = datetime.now(timezone.utc).isoformat()
     state.decoder_status["lora_aprs"]["last_packet_at"] = now_iso
-    # Enrich with LoRa-APRS frequency (433.775 MHz, IARU Region 1).
+    # Enrich with LoRa-APRS frequency (868.000 MHz EU SRD band, IARU Region 1).
     if not event.get("frequency_hz"):
-        event["frequency_hz"] = 433_775_000
+        event["frequency_hz"] = 868_000_000
     result = _ingest_callsign_payloads([event], {})
     if result and result.get("saved", 0) > 0:
         try:

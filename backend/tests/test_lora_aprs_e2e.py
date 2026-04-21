@@ -12,7 +12,7 @@ Exercises the full backend ingestion path *without* SDR hardware:
 What this validates beyond ``test_lora_aprs.py``:
 
 * The **backend API callback** (``_lora_aprs_on_event``) is wired
-  correctly, enriches each event with ``frequency_hz=433_775_000``,
+  correctly, enriches each event with ``frequency_hz=868_000_000``,
   and updates ``state.decoder_status["lora_aprs"]["last_packet_at"]``.
 * The status callback (``_lora_aprs_status_cb``) flips the
   ``connected`` flag and records the bound address.
@@ -67,7 +67,7 @@ class LoraAprsE2EApiTests(unittest.TestCase):
                 os.environ[k] = v
 
     def test_api_callback_enriches_event_with_frequency(self):
-        """``_lora_aprs_on_event`` must add frequency_hz=433.775 MHz."""
+        """``_lora_aprs_on_event`` must add frequency_hz=868.000 MHz."""
         # Import here so state singleton is fresh per test run.
         from app.api import decoders as decoders_mod
 
@@ -89,7 +89,7 @@ class LoraAprsE2EApiTests(unittest.TestCase):
             })
 
         self.assertEqual(len(captured), 1)
-        self.assertEqual(captured[0]["frequency_hz"], 433_775_000)
+        self.assertEqual(captured[0]["frequency_hz"], 868_000_000)
         self.assertEqual(captured[0]["source"], "lora_aprs")
         # last_packet_at should be set to a non-empty ISO string.
         last = decoders_mod.state.decoder_status["lora_aprs"]["last_packet_at"]
