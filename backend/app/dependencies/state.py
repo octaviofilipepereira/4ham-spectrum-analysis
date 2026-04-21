@@ -272,6 +272,13 @@ decoder_status = {
         "last_error": None,
         "internet_available": None,
     },
+    "lora_aprs": {
+        "enabled": _env_bool("LORA_APRS_ENABLE", False),
+        "address": None,
+        "connected": False,
+        "last_packet_at": None,
+        "last_error": None,
+    },
     "files": {
         "aprs": None,
         "cw": None,
