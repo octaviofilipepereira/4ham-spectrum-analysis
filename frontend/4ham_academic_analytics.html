@@ -191,28 +191,31 @@ Last update: 2026-04-03 UTC
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 24px;
-        height: 24px;
-        padding: 0;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        background: rgba(15, 28, 40, 0.68);
-        color: var(--text);
+        gap: 6px;
+        height: 28px;
+        padding: 0 12px;
+        border: 1px solid var(--mode-ssb);
+        border-radius: 8px;
+        background: rgba(96, 165, 250, 0.12);
+        color: var(--mode-ssb);
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         cursor: pointer;
         transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.2s;
-        line-height: 0;
+        line-height: 1;
       }
       .refresh-btn:hover {
-        background: rgba(255, 255, 255, 0.06);
-        border-color: var(--mode-ssb);
-        color: var(--mode-ssb);
+        background: var(--mode-ssb);
+        color: #0b1320;
       }
-      .refresh-btn:active { transform: scale(0.92); }
+      .refresh-btn:active { transform: scale(0.96); }
       .refresh-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
-      .refresh-btn svg { width: 14px; height: 14px; }
+      .refresh-btn svg { width: 16px; height: 16px; }
       .refresh-btn.spinning svg { animation: refreshSpin 0.9s linear infinite; }
       @keyframes refreshSpin {
         from { transform: rotate(0deg); }
@@ -1176,7 +1179,7 @@ Last update: 2026-04-03 UTC
         </div>
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
         <p id="apiLastFetchInfo">Last API data query: --</p>
-        <p id="nextRefreshInfo"><span id="nextRefreshText">Time until next data refresh: --</span><button type="button" id="manualRefreshBtn" class="refresh-btn" title="Refresh now" aria-label="Refresh now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"></path></svg></button></p>
+        <p id="nextRefreshInfo"><span id="nextRefreshText">Time until next data refresh: --</span><button type="button" id="manualRefreshBtn" class="refresh-btn" title="Refresh now" aria-label="Refresh now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"></path></svg><span data-i18n="refresh_now">Refresh now</span></button></p>
         <div class="view-selector-row">
           <div class="view-selector" id="viewSelector">
             <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
