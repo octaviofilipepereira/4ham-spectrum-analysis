@@ -957,18 +957,6 @@ Last update: 2026-04-03 UTC
           gap: 10px;
           margin-top: 14px;
         }
-        .view-selector {
-          width: 100%;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-        }
-        .view-btn {
-          white-space: normal;
-          text-align: center;
-          min-width: 0;
-          padding: 10px 12px;
-          font-size: 0.84rem;
-        }
         .view-selector-row .scan-runtime-status {
           width: 100%;
           justify-content: center;
@@ -1107,6 +1095,23 @@ Last update: 2026-04-03 UTC
         border-color: #2e7b72;
         color: #fff;
         font-weight: 600;
+      }
+
+      @media (max-width: 640px) {
+        .view-selector {
+          width: 100%;
+          display: flex;
+          flex-wrap: nowrap;
+        }
+
+        .view-selector .view-btn {
+          flex: 1 1 0;
+          min-width: 0;
+          white-space: normal;
+          text-align: center;
+          padding: 10px 12px;
+          font-size: 0.84rem;
+        }
       }
 
       /* ── APRS view ────────────────────────────────────────────── */
