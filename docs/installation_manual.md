@@ -265,6 +265,21 @@ The backend can connect to Direwolf KISS TCP and ingest APRS frames automaticall
 - `DIREWOLF_KISS_HOST`: host (default `127.0.0.1`)
 - `DIREWOLF_KISS_PORT`: TCP port (default `8001`)
 
+### APRS-IS (Internet APRS feed)
+In addition to the local RF pipeline (rtl_fm → Direwolf → KISS), the backend can also connect to a public **APRS-IS** gateway and receive packets reported by stations worldwide. Both feeds are merged into the same APRS map. APRS-IS uses only the Python standard library — no extra packages required.
+
+Defaults work out of the box. Override only to use a regional gateway or change the geographic radius:
+
+- `APRS_IS_HOST`: gateway hostname (default `rotate.aprs2.net`)
+  - Europe: `euro.aprs2.net`
+  - North America: `noam.aprs2.net`
+  - South America: `soam.aprs2.net`
+  - Asia: `asia.aprs2.net`
+- `APRS_IS_PORT`: TCP port (default `14580` — filtered feed, recommended)
+- `APRS_IS_RANGE_KM`: radius around your QTH for the server-side filter (default `150`). Larger values mean more traffic.
+
+The system uses your configured callsign and Maidenhead locator (Admin panel) to compute the APRS-IS passcode and the geographic filter automatically.
+
 ### Decoder process auto-start
 To auto-start WSJT-X and Direwolf when the backend starts:
 
