@@ -182,11 +182,11 @@ export class APRSMapController {
     if (existing) {
       // Update existing marker data
       existing.lastSeenMs = now;
-      // Track all sources this station was received from (RF + TCP)
+      // Track all sources this station was received from (RF + LoRa + TCP)
       const src = String(evt.source || "").toLowerCase();
-      const hadRF = [...existing.sources].some((s) => s !== "aprs_is");
+      const hadRF = [...existing.sources].some((s) => s !== "aprs_is" && s !== "lora_aprs");
       if (src) existing.sources.add(src);
-      const hasRF = [...existing.sources].some((s) => s !== "aprs_is");
+      const hasRF = [...existing.sources].some((s) => s !== "aprs_is" && s !== "lora_aprs");
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
@@ -215,8 +215,11 @@ export class APRSMapController {
     if (!hasPosition) return;
 
     const emoji = aprsSymbolEmoji(evt.symbol_table, evt.symbol_code);
-    const isRF = String(evt.source || "").toLowerCase() !== "aprs_is";
-    const sourceClass = isRF ? "aprs-marker-rf" : "aprs-marker-is";
+    const src = String(evt.source || "").toLowerCase();
+    let sourceClass;
+    if (src === "aprs_is") sourceClass = "aprs-marker-is";
+    else if (src === "lora_aprs") sourceClass = "aprs-marker-lora";
+    else sourceClass = "aprs-marker-rf";
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({
         className: `aprs-station-icon ${sourceClass}`,
@@ -285,11 +288,14 @@ export class APRSMapController {
     if (this.#activeFilter === "all") return true;
     const sources = entry.sources || new Set();
     if (this.#activeFilter === "rf") {
-      // Any non-aprs_is source counts as RF
+      // VHF RF only — Direwolf (anything not aprs_is and not lora_aprs).
       for (const s of sources) {
-        if (s !== "aprs_is") return true;
+        if (s !== "aprs_is" && s !== "lora_aprs") return true;
       }
       return false;
+    }
+    if (this.#activeFilter === "lora") {
+      return sources.has("lora_aprs");
     }
     // tcp filter
     return sources.has("aprs_is");
@@ -312,10 +318,12 @@ export class APRSMapController {
 
     // Source badges — show all sources this station was received from
     const srcSet = sources || new Set();
-    const hasRF = [...srcSet].some((s) => s !== "aprs_is");
+    const hasRF = [...srcSet].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+    const hasLoRa = srcSet.has("lora_aprs");
     const hasTCP = srcSet.has("aprs_is");
     let sourceBadge = "";
     if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+    if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
     if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
     // Distance from QTH

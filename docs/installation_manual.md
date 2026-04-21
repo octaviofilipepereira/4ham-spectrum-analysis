@@ -283,6 +283,35 @@ If you already have 4ham installed and chose **No** when the installer asked abo
 
 The helper script (`scripts/enable_aprs.sh`) installs Direwolf via `apt-get`, creates a default `config/direwolf.conf` (KISS TCP on port 8001) if missing, and is idempotent (safe to re-run). No backend restart is required afterwards.
 
+### LoRa APRS UDP listener
+The backend can also receive LoRa-APRS frames (433.775 MHz / 70 cm) decoded by an external `gr-lora_sdr` flowgraph and forwarded to a local UDP socket. Configure:
+
+- `LORA_APRS_ENABLE`: set to `1` to enable
+- `LORA_APRS_HOST`: bind address (default `127.0.0.1`)
+- `LORA_APRS_PORT`: UDP port (default `5687`)
+
+Frames are tagged with `source=lora_aprs` in the database and appear on the APRS map under the **📡 LoRa** filter.
+
+#### Enabling LoRa APRS on an existing install
+
+The `gr-lora_sdr` GNU Radio Out-Of-Tree module is not packaged in `apt`, so it must be built from source. To add LoRa APRS support without re-running the full installer:
+
+1. Open the web UI → **Admin Config** → section **LoRa APRS Packet Decoding (gr-lora_sdr)**.
+2. The badge shows *“gr-lora_sdr not installed”*.
+3. Tick **Enable LoRa APRS packet decoding (UDP listener)**. A button **Install gr-lora_sdr…** appears and an instruction modal opens automatically.
+4. On the server where 4ham runs, open a terminal and run:
+
+   ```bash
+   cd ~/4ham-spectrum-analysis
+   sudo bash scripts/enable_lora_aprs.sh
+   ```
+
+   The build typically takes 5–15 minutes (GNU Radio + CMake compilation). The script installs build dependencies, clones `tapparelj/gr-lora_sdr` into `/opt/gr-lora_sdr`, builds and installs it via CMake, refreshes the dynamic linker cache, and verifies the Python module imports.
+
+5. Reload the page. The badge turns green and you can save the LoRa APRS setting. No backend restart is required.
+
+After enabling, run a `gr-lora_sdr` flowgraph that forwards decoded payloads to UDP `127.0.0.1:5687` (example flowgraphs ship in `/opt/gr-lora_sdr/examples`). Recommended antenna: a dual-band VHF/UHF such as the **Diamond X50**, which covers both 144.800 MHz APRS and 433.775 MHz LoRa APRS without retuning.
+
 ### APRS-IS (Internet APRS feed)
 In addition to the local RF pipeline (rtl_fm → Direwolf → KISS), the backend can also connect to a public **APRS-IS** gateway and receive packets reported by stations worldwide. Both feeds are merged into the same APRS map. APRS-IS uses only the Python standard library — no extra packages required.
 

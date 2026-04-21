@@ -7,6 +7,21 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.13.0 - 2026-04-19
+
+### Added (ROADMAP 11.1 — LoRa APRS)
+- **LoRa APRS decoder**: new module `backend/app/decoders/lora_aprs.py` mirroring the Direwolf/KISS architecture. Listens on UDP `127.0.0.1:5687` (configurable) for frames forwarded by an external `gr-lora_sdr` flowgraph on 433.775 MHz (IARU Region 1, 70 cm). Strips OE5BPA `<\xff\x01` LoRa-APRS header, delegates parsing to the existing `parse_aprs_is_line()` and tags each event with `source="lora_aprs"` / `mode="APRS"` / `frequency_hz=433_775_000`.
+- **Decoder lifecycle integration**: `_start_lora_aprs_loop()` / `_stop_lora_aprs_loop()` in `backend/app/api/decoders.py`, autostart in `main.py` lifespan when `LORA_APRS_ENABLE=1`, status surfaced in `state.decoder_status["lora_aprs"]` (enabled / address / connected / last_packet_at / last_error).
+- **Admin Config toggle**: new section *LoRa APRS Packet Decoding (gr-lora_sdr)* with availability badge (uses `importlib.util.find_spec("gnuradio.lora_sdr")`), enable checkbox, and *Install gr-lora_sdr…* modal that auto-opens when the user ticks the box on a host where the module is missing.
+- **Install helper script**: `scripts/enable_lora_aprs.sh` (idempotent) installs GNU Radio + build deps via `apt`, clones `tapparelj/gr-lora_sdr` into `/opt/gr-lora_sdr`, builds and installs via CMake, refreshes `ldconfig`, and verifies the Python import. ENV overrides: `GR_LORA_SDR_SRC`, `GR_LORA_SDR_REPO`.
+- **Frontend APRS map filter**: extended map header from 3 to 4 buttons — *All / 📻 RF / 📡 LoRa / 🌐 TCP*. The RF filter now means *VHF Direwolf only* (excludes both `aprs_is` and `lora_aprs`); the new LoRa filter shows only `source=lora_aprs` stations. Popup source badges and Leaflet marker tints (`.aprs-marker-lora`, magenta hue) updated accordingly.
+- **Tests**: new `backend/tests/test_lora_aprs.py` with 9 cases covering header stripping, plain/compressed/garbage/empty payloads, ENV-driven config, and an end-to-end UDP loopback through `lora_aprs_loop()`.
+
+### Documentation
+- Added *Enabling LoRa APRS* sections to `docs/user_manual_en.md`, `docs/user_manual.md` (PT) and `docs/installation_manual.md` (build script, ENV vars, antenna recommendation: Diamond X50 dual-band).
+
+---
+
 ## v0.12.4 - 2026-04-18
 
 ### Added
