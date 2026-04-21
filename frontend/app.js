@@ -124,6 +124,13 @@ const installAprsBtn = document.getElementById("installAprsBtn");
 const installAprsCopyBtn = document.getElementById("installAprsCopyBtn");
 const installAprsCommandInput = document.getElementById("installAprsCommand");
 const installAprsReloadBtn = document.getElementById("installAprsReloadBtn");
+const loraAprsEnabledCheck = document.getElementById("loraAprsEnabled");
+const loraAprsAvailableBadge = document.getElementById("loraAprsAvailableBadge");
+const saveLoraAprsSettingsBtn = document.getElementById("saveLoraAprsSettings");
+const installLoraAprsBtn = document.getElementById("installLoraAprsBtn");
+const installLoraAprsCopyBtn = document.getElementById("installLoraAprsCopyBtn");
+const installLoraAprsCommandInput = document.getElementById("installLoraAprsCommand");
+const installLoraAprsReloadBtn = document.getElementById("installLoraAprsReloadBtn");
 const saveStationSettingsBtn = document.getElementById("saveStationSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
@@ -3748,6 +3755,32 @@ async function loadSettings() {
       if (btn2m) btn2m.classList.toggle('d-none', !aprsActive);
       if (btnAprs) btnAprs.classList.toggle('d-none', !aprsActive);
     }
+    if (data.lora_aprs) {
+      const grLoraAvailable = Boolean(data.lora_aprs.available);
+      if (loraAprsEnabledCheck) {
+        loraAprsEnabledCheck.checked = data.lora_aprs.enabled === true;
+        loraAprsEnabledCheck.disabled = false;
+        loraAprsEnabledCheck.dataset.grLoraAvailable = grLoraAvailable ? "1" : "0";
+      }
+      if (loraAprsAvailableBadge) {
+        if (grLoraAvailable) {
+          loraAprsAvailableBadge.textContent = "gr-lora_sdr installed";
+          loraAprsAvailableBadge.className = "badge bg-success ms-2";
+        } else {
+          loraAprsAvailableBadge.textContent = "gr-lora_sdr not installed";
+          loraAprsAvailableBadge.className = "badge bg-warning text-dark ms-2";
+        }
+      }
+      if (installLoraAprsBtn) {
+        const wantsLora = loraAprsEnabledCheck ? loraAprsEnabledCheck.checked : false;
+        installLoraAprsBtn.classList.toggle("d-none", grLoraAvailable || !wantsLora);
+      }
+      // Show/hide 70cm band button: available AND enabled
+      const loraActive = grLoraAvailable && Boolean(data.lora_aprs.enabled);
+      localStorage.setItem("4ham_lora_aprs_active", loraActive ? "1" : "0");
+      const btn70cm = document.querySelector('[data-quick-band="70cm"]');
+      if (btn70cm && loraActive) btn70cm.classList.remove('d-none');
+    }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
       audioOutputDeviceInput.value = data.audio_config.output_device || "";
@@ -4358,6 +4391,82 @@ if (installAprsCopyBtn && installAprsCommandInput) {
 }
 if (installAprsReloadBtn) {
   installAprsReloadBtn.addEventListener("click", () => {
+    window.location.reload();
+  });
+}
+
+// ── LoRa APRS save / toggle / install modal handlers ───────────────────
+if (saveLoraAprsSettingsBtn) {
+  saveLoraAprsSettingsBtn.addEventListener("click", async () => {
+    const enabled = loraAprsEnabledCheck ? loraAprsEnabledCheck.checked : false;
+    const grLoraAvailable = loraAprsEnabledCheck
+      ? loraAprsEnabledCheck.dataset.grLoraAvailable === "1"
+      : true;
+    if (enabled && !grLoraAvailable) {
+      const modalEl = document.getElementById("installLoraAprsModal");
+      if (modalEl && window.bootstrap) {
+        new bootstrap.Modal(modalEl).show();
+      }
+      return;
+    }
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ lora_aprs: { enabled } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save LoRa APRS setting");
+        showToastError(message);
+        return;
+      }
+      showToast(enabled ? "LoRa APRS packet decoding enabled" : "LoRa APRS packet decoding disabled");
+      const btn70cm = document.querySelector('[data-quick-band="70cm"]');
+      if (btn70cm && enabled) btn70cm.classList.remove('d-none');
+      localStorage.setItem("4ham_lora_aprs_active", enabled ? "1" : "0");
+    } catch (err) {
+      showToastError("Failed to save LoRa APRS setting");
+    }
+  });
+}
+
+if (loraAprsEnabledCheck) {
+  loraAprsEnabledCheck.addEventListener("change", () => {
+    const grLoraAvailable = loraAprsEnabledCheck.dataset.grLoraAvailable === "1";
+    const wantsLora = loraAprsEnabledCheck.checked;
+    if (installLoraAprsBtn) {
+      installLoraAprsBtn.classList.toggle("d-none", grLoraAvailable || !wantsLora);
+    }
+    if (wantsLora && !grLoraAvailable) {
+      const modalEl = document.getElementById("installLoraAprsModal");
+      if (modalEl && window.bootstrap) {
+        new bootstrap.Modal(modalEl).show();
+      }
+    }
+  });
+}
+
+if (installLoraAprsCopyBtn && installLoraAprsCommandInput) {
+  installLoraAprsCopyBtn.addEventListener("click", async () => {
+    const cmd = installLoraAprsCommandInput.value;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(cmd);
+      } else {
+        installLoraAprsCommandInput.select();
+        document.execCommand("copy");
+        installLoraAprsCommandInput.setSelectionRange(0, 0);
+      }
+      const original = installLoraAprsCopyBtn.textContent;
+      installLoraAprsCopyBtn.textContent = "Copied!";
+      setTimeout(() => { installLoraAprsCopyBtn.textContent = original; }, 1500);
+    } catch (err) {
+      showToastError("Could not copy command — please copy it manually.");
+    }
+  });
+}
+if (installLoraAprsReloadBtn) {
+  installLoraAprsReloadBtn.addEventListener("click", () => {
     window.location.reload();
   });
 }

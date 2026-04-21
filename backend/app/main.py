@@ -116,6 +116,15 @@ async def lifespan(app_instance: FastAPI):
         except Exception as exc:
             _log.warning("KISS loop startup failed: %s", exc)
 
+    # Auto-start LoRa-APRS UDP listener if enabled
+    if _state.decoder_status["lora_aprs"]["enabled"]:
+        try:
+            from app.api.decoders import _start_lora_aprs_loop
+            result = await _start_lora_aprs_loop(force=False)
+            _log.info("LoRa APRS loop startup: %s", result)
+        except Exception as exc:
+            _log.warning("LoRa APRS loop startup failed: %s", exc)
+
     # Auto-open preview if a real SDR device is available
     try:
         sdr_devices = [

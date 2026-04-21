@@ -460,6 +460,57 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
+    <!-- Install gr-lora_sdr (LoRa APRS) Modal -->
+    <div class="modal fade" id="installLoraAprsModal" tabindex="-1" aria-hidden="true" aria-labelledby="installLoraAprsModalLabel">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="installLoraAprsModalLabel">Install gr-lora_sdr — Enable LoRa APRS</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>
+              The gr-lora_sdr GNU Radio Out-Of-Tree module (used to decode LoRa frames on
+              433.775 MHz / 70 cm) is not installed on this server.
+              To install it without re-running the full 4ham installer, run the helper script below.
+            </p>
+            <p class="mb-2">
+              <strong>Run this command in a terminal on the server where 4ham is installed,
+              follow the prompts, then reload this page.</strong>
+            </p>
+            <div class="input-group input-group-sm mb-2">
+              <input type="text" class="form-control font-monospace" id="installLoraAprsCommand"
+                     value="sudo bash scripts/enable_lora_aprs.sh" readonly />
+              <button class="btn btn-outline-info" type="button" id="installLoraAprsCopyBtn" title="Copy to clipboard">
+                Copy
+              </button>
+            </div>
+            <small class="d-block mb-3 text-muted">
+              The script must be run from inside the 4ham project folder
+              (e.g. <code>cd ~/4ham-spectrum-analysis</code> first).
+              The build typically takes 5–15 minutes depending on hardware.
+            </small>
+            <details>
+              <summary class="small">What does the script do?</summary>
+              <ul class="small mt-2 mb-0">
+                <li>Installs GNU Radio + build dependencies via apt-get.</li>
+                <li>Clones <code>tapparelj/gr-lora_sdr</code> into <code>/opt/gr-lora_sdr</code>.</li>
+                <li>Builds and installs it with CMake to <code>/usr/local</code>.</li>
+                <li>Verifies the Python module <code>gnuradio.lora_sdr</code> imports successfully.</li>
+                <li>Prints next steps to enable LoRa APRS in this Admin Config panel.</li>
+              </ul>
+            </details>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-info btn-sm" id="installLoraAprsReloadBtn">
+              Reload page
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade app-modal" id="eventsSearchModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -673,6 +724,37 @@ Last update: 2026-02-22 16:27:19 UTC
               </div>
               <div class="col-12 mt-2">
                 <button class="btn btn-outline-info btn-sm" id="saveAprsSettings">Save APRS setting</button>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12">
+                <h3 class="h6 mb-1">
+                  LoRa APRS Packet Decoding (gr-lora_sdr)
+                  <span id="loraAprsAvailableBadge" class="badge bg-secondary ms-2">checking…</span>
+                  <button type="button"
+                    class="btn btn-sm btn-outline-warning ms-2 d-none"
+                    id="installLoraAprsBtn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#installLoraAprsModal">
+                    Install gr-lora_sdr…
+                  </button>
+                </h3>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="loraAprsEnabled" />
+                  <label class="form-check-label" for="loraAprsEnabled">Enable LoRa APRS packet decoding (UDP listener)</label>
+                </div>
+                <small class="d-block mt-1">
+                  When active, the backend listens on UDP <code>127.0.0.1:5687</code> for decoded LoRa frames
+                  forwarded by a gr-lora_sdr flowgraph (433.775 MHz / 70 cm). Decoded packets appear in the
+                  live event stream and are stored in the event log with <code>source=lora_aprs</code>.
+                  Requires <code>gr-lora_sdr</code> — if the badge above shows
+                  <em>“gr-lora_sdr not installed”</em>, click <strong>Install gr-lora_sdr…</strong> for the
+                  one-line command to install it without re-running the full installer.
+                </small>
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveLoraAprsSettings">Save LoRa APRS setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
