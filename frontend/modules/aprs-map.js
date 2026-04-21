@@ -182,11 +182,18 @@ export class APRSMapController {
     if (existing) {
       // Update existing marker data
       existing.lastSeenMs = now;
-      // Track all sources this station was received from (RF + LoRa + TCP)
+      // Track per-source last event (path/raw/msg/timestamp) — RF + LoRa + TCP
       const src = String(evt.source || "").toLowerCase();
-      const hadRF = [...existing.sources].some((s) => s !== "aprs_is" && s !== "lora_aprs");
-      if (src) existing.sources.add(src);
-      const hasRF = [...existing.sources].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+      const hadRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+      if (src) {
+        existing.perSource.set(src, {
+          path: evt.path || "",
+          raw: evt.raw || "",
+          msg: evt.msg || "",
+          ts: evt.timestamp || new Date().toISOString(),
+        });
+      }
+      const hasRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
@@ -202,7 +209,7 @@ export class APRSMapController {
           iconAnchor: [60, 14],
         }));
       }
-      existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.sources));
+      existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.perSource));
       // Re-evaluate filter visibility (source may have changed)
       const visible = this.#matchesFilter(existing);
       if (visible && !this.#map.hasLayer(existing.marker)) {
@@ -229,11 +236,18 @@ export class APRSMapController {
       }),
     });
 
-    const sources = new Set();
-    if (src) sources.add(src);
+    const perSource = new Map();
+    if (src) {
+      perSource.set(src, {
+        path: evt.path || "",
+        raw: evt.raw || "",
+        msg: evt.msg || "",
+        ts: evt.timestamp || new Date().toISOString(),
+      });
+    }
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
-    marker.bindPopup(this.#buildPopup(data, sources));
-    this.#markers.set(callsign, { marker, data, sources, lastSeenMs: now });
+    marker.bindPopup(this.#buildPopup(data, perSource));
+    this.#markers.set(callsign, { marker, data, perSource, lastSeenMs: now });
     // Only add to map if it passes the active filter
     if (this.#matchesFilter(this.#markers.get(callsign))) {
       marker.addTo(this.#map);
@@ -282,44 +296,41 @@ export class APRSMapController {
     }
   }
 
-  /** Check if a marker entry matches the active filter (uses sources Set). */
+  /** Check if a marker entry matches the active filter (uses perSource Map keys). */
   #matchesFilter(entry) {
     if (this.#activeFilter === "all") return true;
-    const sources = entry.sources || new Set();
+    const perSource = entry.perSource || new Map();
     if (this.#activeFilter === "rf") {
       // VHF RF only — Direwolf (anything not aprs_is and not lora_aprs).
-      for (const s of sources) {
+      for (const s of perSource.keys()) {
         if (s !== "aprs_is" && s !== "lora_aprs") return true;
       }
       return false;
     }
     if (this.#activeFilter === "lora") {
-      return sources.has("lora_aprs");
+      return perSource.has("lora_aprs");
     }
     // tcp filter
-    return sources.has("aprs_is");
+    return perSource.has("aprs_is");
   }
 
   // ── Private ───────────────────────────────────────────────────────────
 
-  #buildPopup(data, sources) {
+  #buildPopup(data, perSource) {
     const callsign = data.callsign || "—";
     const lat = Number(data.lat);
     const lon = Number(data.lon);
     const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
     const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-    const path = data.path || "—";
-    const msg = data.msg || "";
-    const raw = data.raw || "";
     const emoji = aprsSymbolEmoji(data.symbol_table, data.symbol_code);
     const firstSeen = data.firstSeenMs ? new Date(data.firstSeenMs).toLocaleTimeString() : "—";
     const lastSeen = data.lastSeenMs ? new Date(data.lastSeenMs).toLocaleTimeString() : "—";
 
-    // Source badges — show all sources this station was received from
-    const srcSet = sources || new Set();
-    const hasRF = [...srcSet].some((s) => s !== "aprs_is" && s !== "lora_aprs");
-    const hasLoRa = srcSet.has("lora_aprs");
-    const hasTCP = srcSet.has("aprs_is");
+    // Per-source tracking (path/raw/msg/ts for each source this station was heard on)
+    const ps = perSource instanceof Map ? perSource : new Map();
+    const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+    const hasLoRa = ps.has("lora_aprs");
+    const hasTCP = ps.has("aprs_is");
     let sourceBadge = "";
     if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
     if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
@@ -332,13 +343,46 @@ export class APRSMapController {
       distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
     }
 
+    // Build per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+    const srcLabels = {
+      direwolf: { icon: "📻", name: "RF" },
+      lora_aprs: { icon: "📡", name: "LoRa" },
+      aprs_is: { icon: "🌐", name: "APRS-IS" },
+    };
+    const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+    let perSourceRows = "";
+    for (const key of orderedKeys) {
+      if (!ps.has(key)) continue;
+      const info = ps.get(key) || {};
+      const label = srcLabels[key] || { icon: "❓", name: key };
+      const path = info.path || "—";
+      const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+      perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
+        + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
+        + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+    }
+    // Also handle unknown sources (shouldn't happen normally)
+    for (const key of ps.keys()) {
+      if (orderedKeys.includes(key)) continue;
+      const info = ps.get(key) || {};
+      const path = info.path || "—";
+      const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+      perSourceRows += `<tr><td><strong>${this.#escapeHtml(key)}</strong></td>`
+        + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
+        + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+    }
+
+    // Latest message/raw (from most recent event across any source)
+    const msg = data.msg || "";
+    const raw = data.raw || "";
+
     return `
       <div class="aprs-popup">
         <div class="aprs-popup__header">${emoji} <strong>${callsign}</strong> ${sourceBadge}</div>
         <table class="aprs-popup__table">
           <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
           ${distText}
-          <tr><td><strong>Path</strong></td><td>${this.#escapeHtml(path)}</td></tr>
+          ${perSourceRows}
           ${msg ? `<tr><td><strong>Comment</strong></td><td>${this.#escapeHtml(msg)}</td></tr>` : ""}
           ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${this.#escapeHtml(raw)}</td></tr>` : ""}
           <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>

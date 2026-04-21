@@ -4639,15 +4639,27 @@ Last update: 2026-04-03 UTC
           if (layer._isAprsStation) aprsMap.removeLayer(layer);
         });
 
-        // De-duplicate by callsign — track all sources, prefer RF event
+        // De-duplicate by callsign — track per-source (path+ts), prefer RF event for marker position
         const byCall = new Map();
-        const sourcesByCall = new Map();
+        const perSourceByCall = new Map();
         events.forEach(e => {
           if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign) return;
           const src = (e.source || "").toLowerCase();
-          if (!sourcesByCall.has(e.callsign)) sourcesByCall.set(e.callsign, new Set());
-          if (src) sourcesByCall.get(e.callsign).add(src);
+          if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
+          if (src) {
+            const ps = perSourceByCall.get(e.callsign);
+            const prev = ps.get(src);
+            // keep the most recent event for this source
+            if (!prev || (e.timestamp && new Date(e.timestamp) > new Date(prev.ts || 0))) {
+              ps.set(src, {
+                path: e.path || e.via || "",
+                raw: e.raw || "",
+                msg: e.msg || e.comment || "",
+                ts: e.timestamp || "",
+              });
+            }
+          }
           const existing = byCall.get(e.callsign);
           const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
           const isRf = src === "direwolf" || src === "rf";
@@ -4659,9 +4671,10 @@ Last update: 2026-04-03 UTC
         });
 
         byCall.forEach((e, call) => {
-          const sources = sourcesByCall.get(call) || new Set();
-          const hasRf = [...sources].some(s => s !== "aprs_is");
-          const sourceClass = hasRf ? "aprs-marker-rf" : "aprs-marker-is";
+          const perSource = perSourceByCall.get(call) || new Map();
+          const hasRf = [...perSource.keys()].some(s => s !== "aprs_is" && s !== "lora_aprs");
+          const hasLoRa = perSource.has("lora_aprs");
+          const sourceClass = hasRf ? "aprs-marker-rf" : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is");
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
 
           const marker = L.marker([e.lat, e.lon], {
@@ -4673,7 +4686,7 @@ Last update: 2026-04-03 UTC
             })
           });
           marker._isAprsStation = true;
-          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, sources));
+          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, perSource));
         });
 
         // Invalidate size (in case tab was hidden)
