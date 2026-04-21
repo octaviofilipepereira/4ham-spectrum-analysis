@@ -13,6 +13,7 @@ Mode decoder control and event ingestion endpoints.
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import asyncio
+import os
 import re
 
 import numpy as np
@@ -28,9 +29,22 @@ from app.dependencies.helpers import (
     record_decoder_event_saved,
     record_decoder_event_invalid,
     is_plausible_occupancy_event,
+    maidenhead_to_latlon,
 )
 from app.decoders.ingest import build_callsign_event
 from app.decoders.parsers import parse_aprs_line, parse_cw_text, parse_ssb_asr_text
+from app.decoders.direwolf_kiss import (
+    kiss_loop,
+    get_kiss_config,
+    describe_kiss,
+    parse_kiss_frame,
+)
+from app.decoders.aprs_is import (
+    aprs_is_loop,
+    check_internet,
+    parse_aprs_is_line,
+)
+from app.decoders.launchers import resolve_command, start_process, stop_process
 from app.decoders.ssb_asr import (
     feed_iq_ssb,
     is_ssb_asr_available,
@@ -461,6 +475,348 @@ async def _run_ssb_detector_loop() -> None:
         except Exception as exc:
             log(f"ssb_detector_loop_error:{exc}")
             await asyncio.sleep(0.5)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# KISS / APRS Loop — Direwolf TCP KISS interface
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _kiss_on_event(event: Dict):
+    """Callback invoked by kiss_loop for each decoded APRS frame."""
+    if not event or not isinstance(event, dict):
+        return
+    # Update last-packet timestamp
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+    state.decoder_status["direwolf_kiss"]["last_packet_at"] = now_iso
+    # Enrich with APRS scan frequency (144.800 MHz for Region 1)
+    if not event.get("frequency_hz"):
+        scan = state.scan_state.get("scan")
+        if scan and scan.get("start_hz"):
+            event["frequency_hz"] = int(scan["start_hz"])
+        else:
+            event["frequency_hz"] = 144_800_000
+    # Ingest through the standard pipeline
+    result = _ingest_callsign_payloads([event], {})
+    # Broadcast to WebSocket so frontend markers and Events panel update
+    if result and result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(event)
+        except Exception:
+            pass  # best-effort — DB persistence already succeeded
+
+
+def _kiss_status_cb(status: str, detail: str):
+    """Callback invoked by kiss_loop for connection state changes."""
+    kiss_st = state.decoder_status["direwolf_kiss"]
+    if status == "connected":
+        kiss_st["connected"] = True
+        kiss_st["address"] = detail
+        kiss_st["last_error"] = None
+    elif status == "disconnected":
+        kiss_st["connected"] = False
+    elif status == "error":
+        kiss_st["connected"] = False
+        kiss_st["last_error"] = detail
+
+
+def _sync_direwolf_mycall(cmd: list):
+    """Update MYCALL in direwolf.conf with the station callsign from settings."""
+    try:
+        settings = state.db.get_settings()
+        callsign = str((settings.get("station") or {}).get("callsign") or "").strip().upper()
+        if not callsign:
+            return
+        # Find the config file path from -c flag in the command
+        conf_path = None
+        for i, arg in enumerate(cmd):
+            if arg == "-c" and i + 1 < len(cmd):
+                conf_path = cmd[i + 1]
+                break
+        if not conf_path or not os.path.isfile(conf_path):
+            return
+        text = open(conf_path, "r").read()
+        updated = re.sub(r"^MYCALL\s+.*$", f"MYCALL {callsign}", text, flags=re.MULTILINE)
+        if updated != text:
+            open(conf_path, "w").write(updated)
+            log(f"direwolf_mycall_synced:{callsign}")
+    except Exception as exc:
+        log(f"direwolf_mycall_sync_failed:{exc}")
+
+
+async def _start_kiss_loop(force: bool = False) -> Dict:
+    """Start the KISS TCP loop that connects to Direwolf."""
+    config = get_kiss_config()
+    if not config:
+        if not force:
+            return {"started": False, "reason": "kiss_not_configured"}
+        return {"started": False, "reason": "kiss_not_configured"}
+
+    if state.kiss_task is not None and not state.kiss_task.done():
+        return {"started": False, "reason": "kiss_already_running"}
+
+    # Launch Direwolf / rtl_fm pipeline when needed
+    kiss_st = state.decoder_status["direwolf_kiss"]
+    should_launch = (force or kiss_st["autostart"]) and state.direwolf_process is None
+    if should_launch:
+        cmd = resolve_command("DIREWOLF_CMD", "direwolf -t 0 -p")
+        if cmd:
+            # Sync MYCALL in direwolf.conf with the station callsign from Admin Config
+            _sync_direwolf_mycall(cmd)
+
+            # Only launch rtl_fm → Direwolf pipeline when the user explicitly
+            # selects APRS mode (force=True).  rtl_fm grabs the RTL-SDR device
+            # exclusively, which would block the waterfall/SoapySDR scan.
+            # On autostart we only start the KISS TCP listener (no rtl_fm).
+            rtl_fm_cmd = resolve_command(
+                "RTL_FM_CMD",
+                "rtl_fm -f 144800000 -s 22050 -g 42",
+            ) if force else None
+
+            if rtl_fm_cmd:
+                try:
+                    import subprocess
+                    log_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..", "..", "logs",
+                    )
+                    log_dir = os.path.normpath(log_dir)
+                    os.makedirs(log_dir, exist_ok=True)
+                    dw_log_path = os.path.join(log_dir, "direwolf_pipe.log")
+                    dw_log_fp = open(dw_log_path, "w")
+
+                    env = dict(os.environ)
+                    env["FOURHAM_MANAGED"] = "1"
+                    env["FOURHAM_MANAGED_BY"] = "4ham-spectrum-analysis"
+
+                    # Use subprocess.Popen for real OS-level pipe between
+                    # rtl_fm stdout → Direwolf stdin (asyncio subprocess
+                    # doesn't support piping between two child processes).
+                    rtl_fm_proc = subprocess.Popen(
+                        rtl_fm_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        env=env,
+                    )
+                    state.rtl_fm_process = rtl_fm_proc
+
+                    # Start Direwolf in stdin-pipe mode, reading audio from rtl_fm
+                    dw_pipe_cmd = list(cmd) + ["-r", "22050", "-n", "1", "-b", "16", "-"]
+                    dw_proc = subprocess.Popen(
+                        dw_pipe_cmd,
+                        stdin=rtl_fm_proc.stdout,
+                        stdout=dw_log_fp,
+                        stderr=subprocess.STDOUT,
+                        env=env,
+                    )
+                    state.direwolf_process = dw_proc
+                    # Allow rtl_fm to receive SIGPIPE if Direwolf exits
+                    rtl_fm_proc.stdout.close()
+
+                    kiss_st["process_running"] = True
+                    kiss_st["process_pid"] = state.direwolf_process.pid
+                    log(
+                        f"rtl_fm_direwolf_pipeline_started:"
+                        f"rtl_fm_pid={rtl_fm_proc.pid} "
+                        f"direwolf_pid={state.direwolf_process.pid}"
+                    )
+                    # Give Direwolf time to open the KISS TCP port
+                    await asyncio.sleep(2.0)
+                except Exception as exc:
+                    log(f"rtl_fm_direwolf_pipeline_start_failed:{exc}")
+                    kiss_st["last_error"] = str(exc)
+                    # Clean up partial start
+                    if state.rtl_fm_process is not None:
+                        try:
+                            state.rtl_fm_process.kill()
+                        except Exception:
+                            pass
+                        state.rtl_fm_process = None
+            else:
+                # Autostart or rtl_fm not available: Direwolf soundcard mode
+                # (does NOT grab the RTL-SDR, safe for concurrent waterfall)
+                try:
+                    state.direwolf_process = await start_process(cmd)
+                    kiss_st["process_running"] = True
+                    kiss_st["process_pid"] = state.direwolf_process.pid
+                    log(f"direwolf_process_started:pid={state.direwolf_process.pid}")
+                    await asyncio.sleep(2.0)
+                except Exception as exc:
+                    log(f"direwolf_process_start_failed:{exc}")
+                    kiss_st["last_error"] = str(exc)
+
+    # Reset the dedicated KISS stop event so the loop starts fresh
+    state.kiss_stop.clear()
+
+    state.kiss_task = asyncio.create_task(
+        kiss_loop(
+            on_event=_kiss_on_event,
+            stop_event=state.kiss_stop,
+            logger=lambda msg: log(msg),
+            reconnect_delay=3.0,
+            status_cb=_kiss_status_cb,
+        )
+    )
+    kiss_st["enabled"] = True
+    kiss_st["address"] = describe_kiss()
+    log(f"kiss_loop_started:{describe_kiss()}")
+    return {"started": True, "reason": None}
+
+
+async def _stop_kiss_loop() -> Dict:
+    """Stop the KISS TCP loop."""
+    if state.kiss_task is None:
+        return {"stopped": False, "reason": "kiss_not_running"}
+
+    # Signal the KISS loop to stop (dedicated event, won't affect other decoders)
+    state.kiss_stop.set()
+
+    if not state.kiss_task.done():
+        state.kiss_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(state.kiss_task), timeout=3.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    state.kiss_task = None
+    state.decoder_status["direwolf_kiss"]["connected"] = False
+
+    # Stop rtl_fm process if it was used (rtl_fm → Direwolf pipeline)
+    # These are subprocess.Popen objects (sync), not asyncio subprocesses,
+    # so we use asyncio.to_thread for the blocking .wait() call.
+    import subprocess as _sp
+    for label, attr in [("rtl_fm", "rtl_fm_process"), ("direwolf", "direwolf_process")]:
+        proc = getattr(state, attr, None)
+        if proc is None:
+            continue
+        try:
+            if isinstance(proc, _sp.Popen):
+                proc.terminate()
+                try:
+                    await asyncio.to_thread(proc.wait, timeout=3)
+                except _sp.TimeoutExpired:
+                    proc.kill()
+                    await asyncio.to_thread(proc.wait, timeout=3)
+            else:
+                await stop_process(proc)
+            log(f"{label}_process_stopped:pid={proc.pid}")
+        except Exception as exc:
+            log(f"{label}_process_stop_failed:{exc}")
+        setattr(state, attr, None)
+        state.decoder_status["direwolf_kiss"]["process_running"] = False
+        state.decoder_status["direwolf_kiss"]["process_pid"] = None
+
+    log("kiss_loop_stopped")
+    return {"stopped": True, "reason": None}
+
+
+# ── APRS-IS (Internet feed) ─────────────────────────────────────────
+
+def _aprs_is_on_event(event: Dict):
+    """Callback invoked by aprs_is_loop for each decoded APRS-IS packet."""
+    if not event or not isinstance(event, dict):
+        return
+    now_iso = datetime.now(timezone.utc).isoformat()
+    state.decoder_status["aprs_is"]["last_packet_at"] = now_iso
+    # Enrich with APRS frequency
+    if not event.get("frequency_hz"):
+        event["frequency_hz"] = 144800000
+    result = _ingest_callsign_payloads([event], {})
+    if result and result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(event)
+        except Exception:
+            pass
+
+
+def _aprs_is_status_cb(status: str, detail: str):
+    """Callback invoked by aprs_is_loop for connection state changes."""
+    is_st = state.decoder_status["aprs_is"]
+    if status == "connected":
+        is_st["connected"] = True
+        is_st["address"] = detail
+        is_st["last_error"] = None
+    elif status == "disconnected":
+        is_st["connected"] = False
+    elif status in ("error", "connecting"):
+        if status == "error":
+            is_st["connected"] = False
+            is_st["last_error"] = detail
+
+
+def _get_station_coords() -> tuple:
+    """Return (callsign, lat, lon) from settings, or (None, None, None)."""
+    try:
+        settings = state.db.get_settings()
+        station = settings.get("station") or {}
+        callsign = str(station.get("callsign") or "").strip().upper()
+        locator = str(station.get("locator") or "").strip().upper()
+        if not callsign or not locator:
+            return None, None, None
+        pos = maidenhead_to_latlon(locator)
+        if not pos:
+            return callsign, None, None
+        return callsign, pos[0], pos[1]
+    except Exception:
+        return None, None, None
+
+
+async def _start_aprs_is_loop() -> Dict:
+    """Start the APRS-IS Internet feed loop."""
+    if state.aprs_is_task is not None and not state.aprs_is_task.done():
+        return {"started": False, "reason": "aprs_is_already_running"}
+
+    # Check internet connectivity
+    has_internet = await asyncio.to_thread(check_internet)
+    state.decoder_status["aprs_is"]["internet_available"] = has_internet
+    if not has_internet:
+        log("aprs_is_no_internet:skipping APRS-IS (no internet connectivity)")
+        return {"started": False, "reason": "no_internet"}
+
+    callsign, lat, lon = _get_station_coords()
+    if not callsign or lat is None or lon is None:
+        log("aprs_is_no_station_config:station callsign/locator not configured")
+        return {"started": False, "reason": "no_station_config"}
+
+    state.aprs_is_stop.clear()
+    state.aprs_is_task = asyncio.create_task(
+        aprs_is_loop(
+            callsign=callsign,
+            lat=lat,
+            lon=lon,
+            on_event=_aprs_is_on_event,
+            stop_event=state.aprs_is_stop,
+            logger=lambda msg: log(msg),
+            reconnect_delay=10.0,
+            status_cb=_aprs_is_status_cb,
+        )
+    )
+    state.decoder_status["aprs_is"]["enabled"] = True
+    log(f"aprs_is_loop_started:callsign={callsign} lat={lat:.4f} lon={lon:.4f}")
+    return {"started": True, "reason": None}
+
+
+async def _stop_aprs_is_loop() -> Dict:
+    """Stop the APRS-IS Internet feed loop."""
+    if state.aprs_is_task is None:
+        return {"stopped": False, "reason": "aprs_is_not_running"}
+
+    state.aprs_is_stop.set()
+    if not state.aprs_is_task.done():
+        state.aprs_is_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(state.aprs_is_task), timeout=3.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    state.aprs_is_task = None
+    state.decoder_status["aprs_is"]["connected"] = False
+    state.decoder_status["aprs_is"]["enabled"] = False
+    log("aprs_is_loop_stopped")
+    return {"stopped": True, "reason": None}
 
 
 async def _start_ssb_detector(force: bool = False) -> Dict:
@@ -1094,8 +1450,32 @@ def decoder_status(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
             "batch": True
         },
         "supported_modes": ["FT8", "FT4", "APRS", "CW", "SSB", "Unknown"],
-        "sources": ["direwolf", "cw", "asr", "dsp", "internal_ft", "external_ft", "internal_cw", "internal_ssb", "internal_psk"],
+        "sources": ["direwolf", "aprs_is", "cw", "asr", "dsp", "internal_ft", "external_ft", "internal_cw", "internal_ssb", "internal_psk"],
         "status": state.decoder_status
+    }
+
+
+@router.get("/aprs-connectivity")
+async def aprs_connectivity(_: bool = Depends(optional_verify_basic_auth)) -> Dict:
+    """
+    Check APRS connectivity: internet availability and APRS-IS status.
+    Used by frontend to show RF-only warning when no internet.
+    """
+    has_internet = await asyncio.to_thread(check_internet, 3.0)
+    state.decoder_status["aprs_is"]["internet_available"] = has_internet
+    return {
+        "internet": has_internet,
+        "aprs_is": {
+            "connected": state.decoder_status["aprs_is"]["connected"],
+            "enabled": state.decoder_status["aprs_is"]["enabled"],
+            "address": state.decoder_status["aprs_is"].get("address"),
+            "last_packet_at": state.decoder_status["aprs_is"].get("last_packet_at"),
+        },
+        "rf": {
+            "connected": state.decoder_status["direwolf_kiss"]["connected"],
+            "enabled": state.decoder_status["direwolf_kiss"]["enabled"],
+            "process_running": state.decoder_status["direwolf_kiss"]["process_running"],
+        },
     }
 
 

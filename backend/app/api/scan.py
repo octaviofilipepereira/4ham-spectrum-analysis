@@ -35,6 +35,10 @@ from app.api.decoders import (
     _stop_ft_external_decoder,
     _start_ssb_detector,
     _stop_ssb_detector,
+    _start_kiss_loop,
+    _stop_kiss_loop,
+    _start_aprs_is_loop,
+    _stop_aprs_is_loop,
 )
 
 
@@ -253,7 +257,22 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         start_hz = clipped_start_hz
         end_hz = clipped_end_hz
 
-    if start_hz <= 0 or end_hz <= 0 or end_hz <= start_hz:
+    # APRS mode: rtl_fm takes exclusive control of the SDR dongle.
+    # The ScanEngine must NOT open the device — rtl_fm will open it directly.
+    # We store the APRS frequency for display purposes only.
+    APRS_FREQ_HZ = 144_800_000
+    if decoder_mode == "aprs":
+        aprs_center = APRS_FREQ_HZ           # 144 800 000
+        scan["start_hz"] = aprs_center
+        scan["end_hz"] = aprs_center
+        scan["step_hz"] = 0                   # single step = parked
+        # Keep the full 2m band display range for the waterfall
+        scan.setdefault("band_display_start_hz", 144000000)
+        scan.setdefault("band_display_end_hz", 146000000)
+        start_hz = aprs_center
+        end_hz = aprs_center
+
+    if start_hz <= 0 or end_hz <= 0 or end_hz < start_hz:
         raise HTTPException(status_code=400, detail="Invalid scan range for selected band")
 
     # Store selected decoder mode in scan state and start appropriate decoder
@@ -347,19 +366,53 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
                     state.ft_external_decoder.set_modes(active_modes)
             state.ft_external_modes[:] = active_modes
         else:
-            # Other modes (SSB, APRS): stop FT/CW and start SSB detector for SSB
+            # Other modes (SSB, APRS): stop FT/CW and start mode-specific decoder
             if state.cw_decoder is not None:
                 await _stop_cw_decoder()
             if state.ft_external_decoder is not None:
                 await _stop_ft_external_decoder()
             if decoder_mode == "ssb":
+                await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
                 result = await _start_ssb_detector(force=True)
                 log(f"scan_ssb_detector_started:{result}")
+            elif decoder_mode == "aprs":
+                await _stop_ssb_detector()
+                # Stop KISS loop pre-scan so it can be restarted with the
+                # IQ→FM demodulator after the scan engine is running.
+                if state.kiss_task is not None:
+                    await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
             else:
                 await _stop_ssb_detector()
+                await _stop_kiss_loop()
+                await _stop_aprs_is_loop()
 
     # If device is open in preview mode, close it so the scan can take over.
     state.scan_engine.preview_close()
+
+    # APRS mode: rtl_fm takes exclusive control of the SDR — do NOT start
+    # the ScanEngine.  Launch the rtl_fm → Direwolf → KISS pipeline directly.
+    if decoder_mode == "aprs":
+
+        try:
+            result = await _start_kiss_loop(force=True)
+            log(f"scan_kiss_loop_started:{result}")
+
+            # Start APRS-IS Internet feed alongside the RF pipeline
+            aprs_is_result = await _start_aprs_is_loop()
+            log(f"scan_aprs_is_started:{aprs_is_result}")
+
+            state.scan_state["state"] = "running"
+            state.scan_state["device"] = normalized_payload.get("device", "rtl_sdr")
+            state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
+            state.scan_state["scan"] = scan
+            state.scan_state["scan_id"] = state.db.start_scan(scan, state.scan_state["started_at"])
+
+            log("scan_start:aprs")
+            return state.scan_state
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to start APRS: {exc}") from exc
 
     # Pre-check: ensure at least one real SDR device is connected.
     # Audio devices (SoapySDR audio plugin) are excluded — they are
@@ -406,7 +459,7 @@ async def scan_start(payload: dict, request: Request, _: None = Depends(verify_b
         state.scan_state["started_at"] = datetime.now(timezone.utc).isoformat()
         state.scan_state["scan"] = scan
         state.scan_state["scan_id"] = state.db.start_scan(scan, state.scan_state["started_at"])
-        
+
         log("scan_start")
         return state.scan_state
         
@@ -428,6 +481,8 @@ async def scan_stop(_: None = Depends(verify_basic_auth)) -> Dict:
     """
     await state.scan_engine.stop_async()
     await _stop_ssb_detector()
+    await _stop_kiss_loop()
+    await _stop_aprs_is_loop()
     # Stop rotation if active
     if state.scan_rotation and state.scan_rotation.running:
         await state.scan_rotation.stop()
@@ -573,7 +628,7 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
     
     # Manage decoder lifecycle based on mode transition
     if decoder_mode in ft_modes:
-        # FT8/FT4/WSPR mode: need FT external decoder, stop CW decoder
+        # FT8/FT4/WSPR mode: need FT external decoder, stop CW/SSB/KISS
         
         # Stop CW decoder if it's running
         if state.cw_decoder is not None:
@@ -586,6 +641,14 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             await _stop_ssb_detector()
         except Exception as exc:
             log(f"scan_ssb_detector_stop_failed:{exc}")
+        try:
+            await _stop_kiss_loop()
+        except Exception as exc:
+            log(f"scan_kiss_loop_stop_failed:{exc}")
+        try:
+            await _stop_aprs_is_loop()
+        except Exception as exc:
+            log(f"scan_aprs_is_stop_failed:{exc}")
         
         # Start FT external decoder if not already running
         if state.ft_external_decoder is None:
@@ -603,7 +666,7 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             log(f"scan_ft_external_modes_updated:{decoder_mode_upper}")
     
     elif decoder_mode in cw_modes:
-        # CW mode: need CW decoder, stop FT external decoder
+        # CW mode: need CW decoder, stop FT/SSB/KISS
         
         # Stop FT external decoder if it's running
         if state.ft_external_decoder is not None:
@@ -616,6 +679,14 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
             await _stop_ssb_detector()
         except Exception as exc:
             log(f"scan_ssb_detector_stop_failed:{exc}")
+        try:
+            await _stop_kiss_loop()
+        except Exception as exc:
+            log(f"scan_kiss_loop_stop_failed:{exc}")
+        try:
+            await _stop_aprs_is_loop()
+        except Exception as exc:
+            log(f"scan_aprs_is_stop_failed:{exc}")
 
         current_scan = dict(state.scan_state.get("scan") or {})
         cw_start_hz, cw_end_hz = _resolve_cw_sweep_bounds(
@@ -637,7 +708,7 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_cw_decoder_start_failed:{exc}")
     
     else:
-        # SSB/APRS mode: stop FT/CW decoders; start SSB detector for SSB
+        # SSB/APRS mode: stop FT/CW decoders; start mode-specific decoder
         
         # Stop CW decoder if running
         if state.cw_decoder is not None:
@@ -656,6 +727,16 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_ft_external_decoder_stop_failed:{exc}")
 
         if decoder_mode == "ssb":
+            # Stop KISS loop if switching away from APRS
+            try:
+                await _stop_kiss_loop()
+            except Exception as exc:
+                log(f"scan_kiss_loop_stop_failed:{exc}")
+            try:
+                await _stop_aprs_is_loop()
+            except Exception as exc:
+                log(f"scan_aprs_is_stop_failed:{exc}")
+
             current_scan = dict(state.scan_state.get("scan") or {})
             scan_start_hz = int(current_scan.get("start_hz", 0) or 0)
             scan_end_hz = int(current_scan.get("end_hz", 0) or 0)
@@ -687,11 +768,38 @@ async def change_decoder_mode(payload: dict, _: None = Depends(verify_basic_auth
                 log(f"scan_ssb_detector_started:{result}")
             except Exception as exc:
                 log(f"scan_ssb_detector_start_failed:{exc}")
+
+        elif decoder_mode == "aprs":
+            # Stop SSB detector if switching away from SSB
+            try:
+                await _stop_ssb_detector()
+            except Exception as exc:
+                log(f"scan_ssb_detector_stop_failed:{exc}")
+
+            try:
+                result = await _start_kiss_loop(force=True)
+                log(f"scan_kiss_loop_started:{result}")
+            except Exception as exc:
+                log(f"scan_kiss_loop_start_failed:{exc}")
+            try:
+                aprs_is_result = await _start_aprs_is_loop()
+                log(f"scan_aprs_is_started:{aprs_is_result}")
+            except Exception as exc:
+                log(f"scan_aprs_is_start_failed:{exc}")
+
         else:
             try:
                 await _stop_ssb_detector()
             except Exception as exc:
                 log(f"scan_ssb_detector_stop_failed:{exc}")
+            try:
+                await _stop_kiss_loop()
+            except Exception as exc:
+                log(f"scan_kiss_loop_stop_failed:{exc}")
+            try:
+                await _stop_aprs_is_loop()
+            except Exception as exc:
+                log(f"scan_aprs_is_stop_failed:{exc}")
 
     return {"status": "ok", "decoder_mode": decoder_mode}
 

@@ -16,7 +16,8 @@
 11. [Spectrogram Interpretation](#spectrogram-interpretation)
 12. [Data Export](#data-export)
 13. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
-14. [Troubleshooting](#troubleshooting)
+14. [APRS Decoding — VHF Pipeline](#aprs-decoding--vhf-pipeline)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -811,6 +812,56 @@ location /monitor/ {
 | Mixed content warning | External site is HTTPS, backend is HTTP | Ensure the proxy handles the HTTP→HTTPS transition (the browser only sees the external HTTPS URL) |
 | CORS errors in console | Direct browser→backend requests | Verify all API calls go through the proxy, not directly to the backend IP |
 | i18n / translations not loading | Missing proxy rule for `/i18n/` | Add the `i18n` rewrite/proxy rule |
+
+---
+
+## APRS Decoding — VHF Pipeline
+
+4HAM includes native APRS decoding from RF, using the RTL-SDR dongle tuned directly to the IARU Region 1 VHF APRS frequency (144.800 MHz). No internet connection is used — all decoding is performed locally from the signals received at the QTH.
+
+### Pipeline Architecture
+
+When the user selects **APRS** mode, the pipeline consists of three chained components:
+
+```
+RTL-SDR → rtl_fm → Direwolf → KISS TCP → 4HAM
+```
+
+#### 1. rtl_fm (FM Demodulator)
+
+- **Role:** "The radio" — tunes the RTL-SDR to 144.800 MHz and demodulates the NFM signal into PCM audio.
+- **Responsibility:** Receives the RF signal from the USB dongle, applies frequency demodulation (NFM), and produces a digital audio stream (22050 Hz, mono, 16-bit).
+- **Why rtl_fm:** It is a native C tool from the rtl-sdr project, tested and proven in thousands of APRS iGates worldwide. Unlike a Python demodulator, it guarantees low latency and reliable DSP quality.
+
+#### 2. Direwolf (Software TNC)
+
+- **Role:** "The decoder" — receives the PCM audio and decodes AX.25/APRS packets.
+- **Responsibility:** Decodes the AFSK 1200 baud tones (mark=1200 Hz, space=2200 Hz), extracts AX.25 frames (source and destination callsigns, APRS payload), and makes them available via the KISS protocol on a TCP port (default: 8001).
+- **Why Direwolf:** It is the reference software TNC for APRS on the Linux ecosystem. In KISS mode, it acts as a TCP server that 4HAM queries for decoded packets.
+
+#### 3. KISS TCP (Transport Protocol)
+
+- **Role:** "The postman" — delivery protocol between Direwolf and 4HAM.
+- **Responsibility:** Transports raw AX.25 frames from Direwolf to the 4HAM TCP client, using frames delimited by `0xC0` with escape sequences.
+- **What happens in 4HAM:** The `direwolf_kiss.py` module connects to Direwolf’s KISS server, receives the frames, parses AX.25 addresses (7-byte encoded callsigns), and extracts the APRS payload (position, symbol, comment). Each valid packet is recorded as an event in the database.
+
+### Behaviour When Switching Modes
+
+When the user leaves APRS mode and switches back to another scan mode (e.g., FT8 on 20m), 4HAM:
+1. Stops the rtl_fm and Direwolf processes
+2. Releases the RTL-SDR dongle
+3. Reopens the SDR via SoapySDR for normal HF/VHF scanning
+
+This cycle is automatic and transparent — simply select the desired scan mode.
+
+### Requirements
+
+| Component | Installation |
+|---|---|
+| `rtl-sdr` | `sudo apt install rtl-sdr` |
+| `direwolf` | `sudo apt install direwolf` |
+
+Both are installed automatically by the `install.sh` script.
 
 ---
 

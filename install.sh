@@ -79,12 +79,16 @@ validate_runtime_dependencies() {
     SoapySDRUtil
     rtl_test
     ffmpeg
-    direwolf
     jt9
     wsprd
     node
     npm
   )
+
+  # Direwolf is optional — only validate if APRS was selected
+  if [[ ${_install_direwolf:-0} -eq 1 ]]; then
+    required_cmds+=(direwolf)
+  fi
 
   for cmd in "${required_cmds[@]}"; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -216,12 +220,13 @@ This wizard will:
   1. Install system packages (SoapySDR, RTL-SDR, Python, Node.js, third-party decoders)
   2. Optionally build the RTL-SDR Blog v4 driver from source
   3. Optionally install OpenAI Whisper for SSB voice transcription
-  4. Create the Python virtual environment
-  5. Install frontend JavaScript dependencies (npm)
-  6. Set up your admin account (stored securely in the local DB)
-  7. Create the service environment file (.env in project root)
-  8. Validate critical runtime dependencies
-  9. Install and start the background service (systemd)
+  4. Optionally install Direwolf for APRS packet decoding
+  5. Create the Python virtual environment
+  6. Install frontend JavaScript dependencies (npm)
+  7. Set up your admin account (stored securely in the local DB)
+  8. Create the service environment file (.env in project root)
+  9. Validate critical runtime dependencies
+ 10. Install and start the background service (systemd)
 
 Requirements: internet access and sudo rights.
 Detected Linux: ${OS_PRETTY_NAME} (supported).
@@ -290,6 +295,28 @@ case "$_whisper_choice" in
     ;;
 esac
 
+# ── Direwolf / APRS ────────────────────────────────────────────────────────────
+_install_direwolf=0
+_direwolf_label="Não (adicionar depois: sudo apt install direwolf)"
+_direwolf_callsign="N0CALL"
+if whiptail --backtitle "$BT" --title "APRS — Direwolf TNC" \
+  --yesno "\
+Instalar Direwolf para descodificação APRS?
+
+Direwolf é um TNC (Terminal Node Controller) por software
+que descodifica pacotes AX.25/APRS na frequência 144.800 MHz
+(Região 1 IARU).
+
+O backend liga-se ao Direwolf via KISS TCP (porta 8001)
+para receber pacotes APRS em tempo real.
+
+  SIM  ->  Instalar Direwolf e criar configuração KISS.
+  NÃO  ->  Não instalar (pode adicionar manualmente depois)." \
+  18 70; then
+  _install_direwolf=1
+  _direwolf_label="Sim (Direwolf + KISS TCP na porta 8001)"
+fi
+
 # ── installation mode ──────────────────────────────────────────────────────────
 _install_mode="systemd"
 _install_mode_label="systemd (auto-start on boot)"
@@ -356,6 +383,7 @@ Ready to install. Summary:
 
   SDR driver  :  $_rtlv4_label
   ASR Whisper :  $_whisper_label
+  APRS/Direwolf: $_direwolf_label
   Install mode:  $_install_mode_label
   Admin user  :  $_admin_user
   Install log :  $LOG_FILE
@@ -376,7 +404,7 @@ run_sudo apt-get install -y \
   nodejs npm \
   soapysdr-tools libsoapysdr-dev \
   soapysdr-module-rtlsdr rtl-sdr \
-  direwolf wsjtx usbutils \
+  wsjtx usbutils \
   build-essential cmake libusb-1.0-0-dev \
   ffmpeg \
   >> "$LOG_FILE" 2>&1 \
@@ -420,9 +448,12 @@ BLACKLIST
   run_sudo apt-get install -y soapysdr-module-rtlsdr >> "$LOG_FILE" 2>&1 || true
 fi
 
-gauge_step 65 "Configuring USB device access (plugdev group)..."
+gauge_step 65 "Configuring USB and audio device access (plugdev + audio groups)..."
 if ! id -nG "$(id -un)" 2>/dev/null | grep -qw plugdev; then
   run_sudo usermod -aG plugdev "$(id -un)" >> "$LOG_FILE" 2>&1
+fi
+if ! id -nG "$(id -un)" 2>/dev/null | grep -qw audio; then
+  run_sudo usermod -aG audio "$(id -un)" >> "$LOG_FILE" 2>&1
 fi
 
 gauge_step 67 "Installing SDR udev rules..."
@@ -465,9 +496,9 @@ gauge_step 78 "Creating project environment defaults (.env)..."
 _env_defaults=(
   "FT_EXTERNAL_ENABLE=1"
   "FT_EXTERNAL_MODES=FT8,FT4"
-  "DIREWOLF_KISS_ENABLE=1"
-  "DIREWOLF_AUTOSTART=1"
-  "DIREWOLF_CMD=direwolf -t 0 -p"
+  "DIREWOLF_KISS_ENABLE=${_install_direwolf}"
+  "DIREWOLF_AUTOSTART=${_install_direwolf}"
+  "DIREWOLF_CMD=direwolf -t 0 -p -c ${ROOT_DIR}/config/direwolf.conf"
   "SSB_INTERNAL_ENABLE=1"
   "WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}"
 )
@@ -485,9 +516,9 @@ APP_HOST=127.0.0.1
 APP_PORT=8000
 FT_EXTERNAL_ENABLE=1
 FT_EXTERNAL_MODES=FT8,FT4
-DIREWOLF_KISS_ENABLE=1
-DIREWOLF_AUTOSTART=1
-DIREWOLF_CMD=direwolf -t 0 -p
+DIREWOLF_KISS_ENABLE=${_install_direwolf}
+DIREWOLF_AUTOSTART=${_install_direwolf}
+DIREWOLF_CMD=direwolf -t 0 -p -c ${ROOT_DIR}/config/direwolf.conf
 SSB_INTERNAL_ENABLE=1
 WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}
 EOF
@@ -522,7 +553,116 @@ if [[ $_install_whisper -eq 1 ]]; then
   fi
 fi
 
-gauge_step 93 "Saving admin credentials to database..."
+if [[ $_install_direwolf -eq 1 ]]; then
+  gauge_step 93 "Installing Direwolf TNC for APRS..."
+  run_sudo apt-get install -y direwolf >> "$LOG_FILE" 2>&1 || { \
+    echo "[WARN] Direwolf install failed — APRS will not be available" >> "$LOG_FILE"; \
+    _install_direwolf=0; }
+
+  if [[ $_install_direwolf -eq 1 ]]; then
+    # ── Detect ALSA capture devices for Direwolf ─────────────────────────
+    close_gauge
+    _dw_adevice="null null"
+    _dw_adevice_label="null (sem áudio — configurar depois)"
+    _alsa_menu_items=()
+    _alsa_menu_items+=("null" "Sem áudio — configurar depois manualmente")
+    _alsa_menu_items+=("default" "Dispositivo ALSA/PulseAudio por omissão")
+
+    # Parse arecord -l to build hw:CARD,DEV entries
+    while IFS= read -r _aline; do
+      if [[ "$_aline" =~ ^card\ ([0-9]+):\ ([^\[]+)\[([^\]]+)\].*device\ ([0-9]+):\ (.+)\[(.*)\] ]]; then
+        _acard="${BASH_REMATCH[1]}"
+        _adev="${BASH_REMATCH[4]}"
+        _aname="${BASH_REMATCH[3]}"
+        _adesc="${BASH_REMATCH[6]}"
+        _alsa_hw="plughw:${_acard},${_adev}"
+        _alsa_menu_items+=("${_alsa_hw}" "${_aname} — ${_adesc}")
+      fi
+    done < <(arecord -l 2>/dev/null || true)
+
+    _item_count=$(( ${#_alsa_menu_items[@]} / 2 ))
+    _menu_height=$(( _item_count + 8 ))
+    [[ $_menu_height -gt 22 ]] && _menu_height=22
+
+    _dw_choice=$(whiptail --backtitle "$BT" \
+      --title "APRS — Dispositivo de Áudio para Direwolf" \
+      --menu "\
+Selecione o dispositivo de captura de áudio (entrada) para
+o Direwolf usar na descodificação APRS.
+
+Ligue o rádio (144.800 MHz) à entrada de áudio (line-in)
+da placa de som antes de iniciar o Direwolf.
+
+Se não souber qual escolher, selecione 'null' e
+configure depois em config/direwolf.conf." \
+      "$_menu_height" 78 "$_item_count" \
+      "${_alsa_menu_items[@]}" \
+      3>&1 1>&2 2>&3) || _dw_choice="null"
+
+    case "$_dw_choice" in
+      null)
+        _dw_adevice="null null"
+        _dw_adevice_label="null (sem áudio — configurar depois)"
+        ;;
+      default)
+        _dw_adevice="default"
+        _dw_adevice_label="default (ALSA/PulseAudio)"
+        ;;
+      *)
+        _dw_adevice="${_dw_choice} null"
+        _dw_adevice_label="${_dw_choice} (só receção)"
+        ;;
+    esac
+
+    start_gauge "Installing 4ham-spectrum-analysis - please wait..."
+    gauge_step 94 "Creating Direwolf configuration for KISS TCP..."
+    mkdir -p "$ROOT_DIR/config"
+    if [[ ! -f "$ROOT_DIR/config/direwolf.conf" ]]; then
+      cat > "$ROOT_DIR/config/direwolf.conf" <<DWEOF
+# ──────────────────────────────────────────────────────────────
+# Direwolf configuration for 4ham-spectrum-analysis (APRS)
+# Generated by install.sh — $(date +%Y-%m-%d)
+# ──────────────────────────────────────────────────────────────
+
+# Station callsign
+MYCALL ${_direwolf_callsign}
+
+# ── Audio device ──────────────────────────────────────────────
+# Detected and selected during installation.
+# To change later, edit this file or re-run the installer.
+#
+# Options:
+#   plughw:CARD,DEV  — ALSA hardware device (soundcard line-in)
+#   default          — system default audio device
+#   null null        — no audio (test mode only)
+#
+# For rtl_fm pipe mode (receive via RTL-SDR on 144.800 MHz):
+#   rtl_fm -f 144.800e6 -s 22050 -g 40 - | direwolf -c config/direwolf.conf -r 22050 -
+ADEVICE ${_dw_adevice}
+
+# Channel 0 — 1200 baud AFSK modem (APRS standard)
+CHANNEL 0
+MODEM 1200
+
+# ── KISS TCP server ──────────────────────────────────────────
+# The 4ham backend connects here to receive decoded APRS frames.
+KISSPORT 8001
+
+# ── APRS settings ────────────────────────────────────────────
+# Receive only — no digipeating or beaconing by default.
+# Uncomment and configure if you want to beacon your position:
+# PBEACON delay=1 every=30 overlay=S symbol="igate" \\
+#   lat=00^00.00N long=000^00.00W \\
+#   comment="4ham iGate"
+
+# Disable AGWPE port (only KISS TCP is used)
+AGWPORT 0
+DWEOF
+    fi
+  fi
+fi
+
+gauge_step 95 "Saving admin credentials to database..."
 mkdir -p "$ROOT_DIR/data"
 
 # Write the Python setup script to a temp file so we can pipe the password

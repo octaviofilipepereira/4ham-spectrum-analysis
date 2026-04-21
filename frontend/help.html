@@ -74,6 +74,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#propmap">QTH-Centric Propagation Map</a></li>
       <li><a href="#ionobadge">Ionospheric Space Weather panel</a></li>
       <li><a href="#launcher">Desktop launcher</a></li>
+      <li><a href="#aprs-pipeline">APRS decoding &mdash; VHF pipeline</a></li>
       <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
     </ol>
   </nav>
@@ -944,9 +945,65 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     </p>
   </section>
 
-  <!-- 16. FAQ -->
+  <!-- 17. APRS PIPELINE -->
+  <section id="aprs-pipeline">
+    <h2 class="section-title">17 · APRS decoding — VHF pipeline</h2>
+
+    <p>
+      4ham includes native APRS decoding from RF, using the RTL-SDR dongle tuned directly to the
+      IARU Region&nbsp;1 VHF APRS frequency (<strong>144.800&nbsp;MHz</strong>). No internet connection is used —
+      all decoding is performed locally from the signals received at the QTH.
+    </p>
+
+    <h3 class="sub-title">Pipeline architecture</h3>
+    <p>When you select <strong>APRS</strong> mode, the pipeline consists of three chained components:</p>
+    <pre style="background:#161b22; color:#c9d1d9; padding:1em; border-radius:8px; font-size:0.95rem; overflow-x:auto;">
+RTL-SDR → rtl_fm → Direwolf → KISS TCP → 4ham</pre>
+
+    <h3 class="sub-title">1. rtl_fm — FM demodulator</h3>
+    <ul>
+      <li><strong>Role:</strong> "The radio" — tunes the RTL-SDR to 144.800&nbsp;MHz and demodulates the NFM signal into PCM audio.</li>
+      <li><strong>Responsibility:</strong> Receives the RF signal from the USB dongle, applies frequency demodulation (NFM), and produces a digital audio stream (22 050&nbsp;Hz, mono, 16-bit).</li>
+      <li><strong>Why rtl_fm:</strong> It is a native C tool from the rtl-sdr project, tested and proven in thousands of APRS iGates worldwide. Unlike a Python demodulator, it guarantees low latency and reliable DSP quality.</li>
+    </ul>
+
+    <h3 class="sub-title">2. Direwolf — Software TNC</h3>
+    <ul>
+      <li><strong>Role:</strong> "The decoder" — receives the PCM audio and decodes AX.25/APRS packets.</li>
+      <li><strong>Responsibility:</strong> Decodes the AFSK 1200&nbsp;baud tones (mark=1200&nbsp;Hz, space=2200&nbsp;Hz), extracts AX.25 frames (source and destination callsigns, APRS payload), and makes them available via the KISS protocol on a TCP port (default: 8001).</li>
+      <li><strong>Why Direwolf:</strong> It is the reference software TNC for APRS on the Linux ecosystem. In KISS mode it acts as a TCP server that 4ham queries for decoded packets.</li>
+    </ul>
+
+    <h3 class="sub-title">3. KISS TCP — Transport protocol</h3>
+    <ul>
+      <li><strong>Role:</strong> "The postman" — delivery protocol between Direwolf and 4ham.</li>
+      <li><strong>Responsibility:</strong> Transports raw AX.25 frames from Direwolf to the 4ham TCP client, using frames delimited by <code>0xC0</code> with escape sequences.</li>
+      <li><strong>What happens in 4ham:</strong> The <code>direwolf_kiss.py</code> module connects to Direwolf's KISS server, receives the frames, parses AX.25 addresses (7-byte encoded callsigns), and extracts the APRS payload (position, symbol, comment). Each valid packet is recorded as an event in the database.</li>
+    </ul>
+
+    <h3 class="sub-title">Behaviour when switching modes</h3>
+    <p>When you leave APRS mode and switch back to another scan mode (e.g. FT8 on 20 m), 4ham:</p>
+    <ol>
+      <li>Stops the rtl_fm and Direwolf processes</li>
+      <li>Releases the RTL-SDR dongle</li>
+      <li>Reopens the SDR via SoapySDR for normal HF/VHF scanning</li>
+    </ol>
+    <p>This cycle is automatic and transparent — simply select the desired scan mode.</p>
+
+    <h3 class="sub-title">Requirements</h3>
+    <table>
+      <thead><tr><th>Component</th><th>Installation</th></tr></thead>
+      <tbody>
+        <tr><td><code>rtl-sdr</code></td><td><code>sudo apt install rtl-sdr</code></td></tr>
+        <tr><td><code>direwolf</code></td><td><code>sudo apt install direwolf</code></td></tr>
+      </tbody>
+    </table>
+    <p>Both are installed automatically by the <code>install.sh</code> script.</p>
+  </section>
+
+  <!-- 18. FAQ -->
   <section id="faq">
-    <h2 class="section-title">16 · FAQ &amp; troubleshooting</h2>
+    <h2 class="section-title">18 · FAQ &amp; troubleshooting</h2>
 
     <h3 class="sub-title">The waterfall is blank / shows "No live spectrum data"</h3>
     <p>This appears only when a scan is running but no FFT frames arrive. Check:</p>

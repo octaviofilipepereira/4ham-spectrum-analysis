@@ -52,6 +52,12 @@
     "last_api_query": "Last API data query: {time}",
     "next_refresh": "Time until next data refresh: {time}",
     "refreshing": "Refreshing data...",
+    "scan_status_unavailable": "Scan status unavailable",
+    "scan_status_stopped": "No active scan",
+    "scan_status_running_label": "Current scan",
+    "scan_status_rotation_label": "Rotation active",
+    "scan_status_preview_label": "Preview active",
+    "scan_status_switches_in": "switches in {seconds} s",
     "simulated_fallback": "Simulated dataset (API fallback)",
     "update_freq_min": "Every {n} minute{s} (dashboard auto-refresh)",
     "update_freq_sec": "Every {n} seconds (dashboard auto-refresh)",
@@ -109,7 +115,37 @@
     "help_top_callsigns": "Ranks the top 20 callsigns by total hits after applying period, band, and mode filters. Longer bars indicate more repeated detections. Use it to identify dominant stations and verify whether concentration changes when filters or time windows change.",
     "help_prop_band": "Shows the propagation quality score (0-100) per band, based on confirmed decodes only \u2014 events with a verified callsign, regardless of mode. Higher bars mean better propagation on that band. Events without a callsign reflect band occupancy and do not contribute to this score.",
     "help_prop_trend": "Plots the global propagation score over time at hourly resolution. Score is derived from confirmed decodes only \u2014 events with a verified callsign, regardless of mode. Events without a callsign are not reflected here. Rising segments suggest improving propagation; falling segments suggest degradation. The dashed line marks the period average.",
-    "help_iono": "Real-time space weather data from <strong>NOAA Space Weather Prediction Center</strong>, adapted to your QTH position using Local Solar Time.<br><br><strong>SFI</strong> \u2014 Solar Flux Index (10.7 cm). Higher = better HF propagation.<br><strong>Kp</strong> \u2014 Planetary geomagnetic index (0\u20139). Lower = calmer ionosphere.<br><strong>foF2</strong> \u2014 Critical frequency of F2 layer. Bands below foF2 support NVIS.<br><br><strong>Band status legend:</strong><br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'></span> <strong>Open</strong> \u2014 Well below MUF, good propagation expected<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'></span> <strong>Marginal</strong> \u2014 Near MUF limit (80\u2013100%), unstable propagation<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'></span> <strong>Closed</strong> \u2014 Above MUF, no F2 propagation<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'></span> <strong>Absorbed</strong> \u2014 Daytime D-layer absorption (low bands)"
+    "help_iono": "Real-time space weather data from <strong>NOAA Space Weather Prediction Center</strong>, adapted to your QTH position using Local Solar Time.<br><br><strong>SFI</strong> \u2014 Solar Flux Index (10.7 cm). Higher = better HF propagation.<br><strong>Kp</strong> \u2014 Planetary geomagnetic index (0\u20139). Lower = calmer ionosphere.<br><strong>foF2</strong> \u2014 Critical frequency of F2 layer. Bands below foF2 support NVIS.<br><br><strong>Band status legend:</strong><br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'></span> <strong>Open</strong> \u2014 Well below MUF, good propagation expected<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'></span> <strong>Marginal</strong> \u2014 Near MUF limit (80\u2013100%), unstable propagation<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'></span> <strong>Closed</strong> \u2014 Above MUF, no F2 propagation<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'></span> <strong>Absorbed</strong> \u2014 Daytime D-layer absorption (low bands)",
+
+    "view_hf": "HF Propagation & Digital Mode Analysis",
+    "view_aprs": "APRS Network Topology & Coverage",
+    "aprs_all_time": "All time",
+
+    "aprs_kpi_stations": "Total stations",
+    "aprs_kpi_events": "Total packets",
+    "aprs_kpi_rf_tcp": "RF / TCP",
+    "aprs_kpi_max_dist": "Max distance",
+    "aprs_kpi_digipeaters": "Unique digipeaters",
+
+    "aprs_chart_map": "APRS Station Map",
+    "aprs_chart_map_desc": "All stations with position in the selected period \u2014 RF (blue) and APRS-IS (green).",
+    "aprs_chart_distance": "Distance Distribution",
+    "aprs_chart_distance_desc": "Distribution of station distances from QTH (km).",
+    "aprs_chart_timeline": "Temporal Activity",
+    "aprs_chart_timeline_desc": "Hourly APRS packet volume for the selected period.",
+    "aprs_chart_top_stations": "Top Active Stations",
+    "aprs_chart_top_stations_desc": "Top 20 APRS callsigns by number of packets.",
+    "aprs_chart_source": "Source Breakdown",
+    "aprs_chart_source_desc": "RF vs APRS-IS packet ratio.",
+
+    "aprs_meta_source": "Data source",
+    "aprs_meta_coverage": "Coverage radius",
+
+    "help_aprs_map": "Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: blue for RF (direwolf), green for TCP (APRS-IS). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps.",
+    "help_aprs_distance": "Histogram showing the distribution of station distances from your QTH. Each bar represents a distance bin. Use it to understand your station's coverage profile and identify gaps.",
+    "help_aprs_timeline": "Shows APRS packet count aggregated by hour for the selected period. Use peaks and troughs to identify active and quiet windows on the APRS network.",
+    "help_aprs_top_stations": "Ranks the top 20 APRS callsigns by total packet count after applying period and source filters. Longer bars indicate more active stations.",
+    "help_aprs_source": "Shows the proportion of APRS packets received via RF (local radio) versus TCP (APRS-IS internet). A high RF ratio indicates good local radio coverage."
   },
 
   "pt": {
@@ -165,6 +201,12 @@
     "last_api_query": "Última consulta de dados: {time}",
     "next_refresh": "Próxima actualização em: {time}",
     "refreshing": "A actualizar dados...",
+    "scan_status_unavailable": "Estado do scan indisponível",
+    "scan_status_stopped": "Sem scan activo",
+    "scan_status_running_label": "Scan em curso",
+    "scan_status_rotation_label": "Rotação activa",
+    "scan_status_preview_label": "Pré-escuta activa",
+    "scan_status_switches_in": "muda em {seconds} s",
     "simulated_fallback": "Dados simulados (fallback da API)",
     "update_freq_min": "A cada {n} minuto{s} (auto-refresh do dashboard)",
     "update_freq_sec": "A cada {n} segundos (auto-refresh do dashboard)",
@@ -222,6 +264,36 @@
     "help_top_callsigns": "Classifica os top 20 indicativos por total de detecções após aplicar filtros de período, banda e modo. Barras mais longas indicam mais detecções repetidas. Use para identificar estações dominantes e verificar se a concentração muda com filtros ou janelas temporais diferentes.",
     "help_prop_band": "Mostra a pontuação de qualidade de propagação (0-100) por banda, baseada apenas em descodificações confirmadas \u2014 eventos com indicativo verificado, independentemente do modo. Barras mais altas significam melhor propagação nessa banda. Eventos sem indicativo reflectem ocupação de banda e não contribuem para esta pontuação.",
     "help_prop_trend": "Traça a pontuação global de propagação ao longo do tempo com resolução horária. A pontuação é derivada apenas de descodificações confirmadas \u2014 eventos com indicativo verificado, independentemente do modo. Eventos sem indicativo não são reflectidos aqui. Segmentos ascendentes sugerem propagação a melhorar; descendentes sugerem degradação. A linha tracejada marca a média do período.",
-    "help_iono": "Dados de meteorologia espacial em tempo real do <strong>NOAA Space Weather Prediction Center</strong>, adaptados à posição do seu QTH usando Hora Solar Local.<br><br><strong>SFI</strong> \u2014 Índice de Fluxo Solar (10,7 cm). Maior = melhor propagação HF.<br><strong>Kp</strong> \u2014 Índice geomagnético planetário (0\u20139). Menor = ionosfera mais calma.<br><strong>foF2</strong> \u2014 Frequência crítica da camada F2. Bandas abaixo de foF2 suportam NVIS.<br><br><strong>Legenda de estado das bandas:</strong><br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'></span> <strong>Aberta</strong> \u2014 Bem abaixo da MUF, boa propagação esperada<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'></span> <strong>Marginal</strong> \u2014 Próximo do limite MUF (80\u2013100%), propagação instável<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'></span> <strong>Fechada</strong> \u2014 Acima da MUF, sem propagação F2<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'></span> <strong>Absorvida</strong> \u2014 Absorção da camada D diurna (bandas baixas)"
+    "help_iono": "Dados de meteorologia espacial em tempo real do <strong>NOAA Space Weather Prediction Center</strong>, adaptados à posição do seu QTH usando Hora Solar Local.<br><br><strong>SFI</strong> \u2014 Índice de Fluxo Solar (10,7 cm). Maior = melhor propagação HF.<br><strong>Kp</strong> \u2014 Índice geomagnético planetário (0\u20139). Menor = ionosfera mais calma.<br><strong>foF2</strong> \u2014 Frequência crítica da camada F2. Bandas abaixo de foF2 suportam NVIS.<br><br><strong>Legenda de estado das bandas:</strong><br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ade80;margin-right:4px;'></span> <strong>Aberta</strong> \u2014 Bem abaixo da MUF, boa propagação esperada<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#facc15;margin-right:4px;'></span> <strong>Marginal</strong> \u2014 Próximo do limite MUF (80\u2013100%), propagação instável<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#94a3b8;margin-right:4px;'></span> <strong>Fechada</strong> \u2014 Acima da MUF, sem propagação F2<br><span style='display:inline-block;width:10px;height:10px;border-radius:3px;background:#fb923c;margin-right:4px;'></span> <strong>Absorvida</strong> \u2014 Absorção da camada D diurna (bandas baixas)",
+
+    "view_hf": "Propagação HF & Análise de Modos Digitais",
+    "view_aprs": "Topologia & Cobertura da Rede APRS",
+    "aprs_all_time": "Todo o período",
+
+    "aprs_kpi_stations": "Total de estações",
+    "aprs_kpi_events": "Total de pacotes",
+    "aprs_kpi_rf_tcp": "RF / TCP",
+    "aprs_kpi_max_dist": "Distância máxima",
+    "aprs_kpi_digipeaters": "Digipeaters únicos",
+
+    "aprs_chart_map": "Mapa de Estações APRS",
+    "aprs_chart_map_desc": "Todas as estações com posição no período seleccionado \u2014 RF (azul) e APRS-IS (verde).",
+    "aprs_chart_distance": "Distribuição de Distâncias",
+    "aprs_chart_distance_desc": "Distribuição das distâncias das estações ao QTH (km).",
+    "aprs_chart_timeline": "Actividade Temporal",
+    "aprs_chart_timeline_desc": "Volume horário de pacotes APRS no período seleccionado.",
+    "aprs_chart_top_stations": "Estações Mais Activas",
+    "aprs_chart_top_stations_desc": "Top 20 indicativos APRS por número de pacotes.",
+    "aprs_chart_source": "Repartição por Fonte",
+    "aprs_chart_source_desc": "Proporção de pacotes RF vs APRS-IS.",
+
+    "aprs_meta_source": "Fonte dos dados",
+    "aprs_meta_coverage": "Raio de cobertura",
+
+    "help_aprs_map": "Mapa Leaflet mostrando todas as estações APRS com posição conhecida no período seleccionado. Marcadores coloridos por fonte: azul para RF (direwolf), verde para TCP (APRS-IS). O marcador amarelo é o QTH da sua estação. O círculo mostra o raio de 50 km. Clique num marcador para ver indicativo, distância, caminho e timestamps.",
+    "help_aprs_distance": "Histograma mostrando a distribuição de distâncias das estações ao seu QTH. Cada barra representa um intervalo de distância. Use-o para compreender o perfil de cobertura da sua estação e identificar lacunas.",
+    "help_aprs_timeline": "Mostra a contagem de pacotes APRS agregada por hora no período seleccionado. Use picos e vales para identificar janelas activas e inactivas na rede APRS.",
+    "help_aprs_top_stations": "Classifica os top 20 indicativos APRS por contagem total de pacotes após aplicar filtros de período e fonte. Barras mais longas indicam estações mais activas.",
+    "help_aprs_source": "Mostra a proporção de pacotes APRS recebidos via RF (rádio local) versus TCP (internet APRS-IS). Uma proporção RF alta indica boa cobertura rádio local."
   }
 }

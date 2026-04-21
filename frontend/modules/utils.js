@@ -169,6 +169,30 @@ export function isValidLocator(value) {
   return /^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(text);
 }
 
+/**
+ * Convert a Maidenhead grid locator to latitude/longitude (centre of square).
+ * @param {string} locator - e.g. "IN51" or "IN51mu"
+ * @returns {{lat: number, lon: number}|null}
+ */
+export function maidenheadToLatLon(locator) {
+  const loc = String(locator || "").trim().toUpperCase();
+  if (loc.length < 4) return null;
+  const A = "A".charCodeAt(0);
+  const lon = (loc.charCodeAt(0) - A) * 20 - 180;
+  const lat = (loc.charCodeAt(1) - A) * 10 - 90;
+  const lonSub = Number(loc[2]) * 2;
+  const latSub = Number(loc[3]) * 1;
+  let finalLon = lon + lonSub + 1;   // centre of subsquare
+  let finalLat = lat + latSub + 0.5;
+  if (loc.length >= 6) {
+    const lonSS = (loc.charCodeAt(4) - A) * (2 / 24);
+    const latSS = (loc.charCodeAt(5) - A) * (1 / 24);
+    finalLon = lon + lonSub + lonSS + (1 / 24);
+    finalLat = lat + latSub + latSS + (0.5 / 24);
+  }
+  return { lat: finalLat, lon: finalLon };
+}
+
 // ---------------------------------------------------------------------------
 // SSB spectral proof detection
 // ---------------------------------------------------------------------------

@@ -16,7 +16,8 @@
 11. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
 12. [Exportação de Dados](#exportação-de-dados)
 13. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
-14. [Resolução de Problemas](#resolução-de-problemas)
+14. [Descodificação APRS — Pipeline VHF](#descodificação-aprs--pipeline-vhf)
+15. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -811,6 +812,56 @@ location /monitor/ {
 | Aviso de conteúdo misto | Site externo usa HTTPS, backend usa HTTP | Garantir que o proxy trata a transição HTTP→HTTPS (o browser só vê o URL HTTPS externo) |
 | Erros CORS na consola | Pedidos directos browser→backend | Verificar que todos os pedidos API passam pelo proxy, não directamente para o IP do backend |
 | i18n / traduções não carregam | Regra de proxy para `/i18n/` em falta | Adicionar a regra de rewrite/proxy para i18n |
+
+---
+
+## Descodificação APRS — Pipeline VHF
+
+O 4HAM inclui descodificação APRS nativa a partir de RF, utilizando o dongle RTL-SDR ligado diretamente na frequência APRS VHF da Região 1 IARU (144.800 MHz). Não é utilizada ligação à internet — toda a descodificação é feita localmente a partir dos sinais recebidos pelo QTH.
+
+### Arquitetura do Pipeline
+
+Quando o utilizador seleciona o modo **APRS**, o pipeline é composto por três componentes em cadeia:
+
+```
+RTL-SDR → rtl_fm → Direwolf → KISS TCP → 4HAM
+```
+
+#### 1. rtl_fm (Demodulador FM)
+
+- **Papel:** "O rádio" — sintoniza o RTL-SDR em 144.800 MHz e demodula o sinal NFM para áudio PCM.
+- **Responsabilidade:** Receber o sinal RF do dongle USB, aplicar a desmodulação de frequência (NFM) e produzir uma stream de áudio digital (22050 Hz, mono, 16-bit).
+- **Porquê rtl_fm:** É uma ferramenta nativa em C do projecto rtl-sdr, testada e comprovada em milhares de iGates APRS em todo o mundo. Ao contrário de um demodulador Python, garante baixa latência e qualidade de DSP fiável.
+
+#### 2. Direwolf (Software TNC)
+
+- **Papel:** "O descodificador" — recebe o áudio PCM e descodifica os pacotes AX.25/APRS.
+- **Responsabilidade:** Descodificar os tons AFSK 1200 baud (mark=1200 Hz, space=2200 Hz), extrair os frames AX.25 (indicativos de origem e destino, payload APRS) e disponibilizá-los via protocolo KISS numa porta TCP (por defeito: 8001).
+- **Porquê Direwolf:** É o software TNC de referência para APRS no ecossistema Linux. Em modo KISS, funciona como um servidor TCP que o 4HAM consulta para obter os pacotes descodificados.
+
+#### 3. KISS TCP (Protocolo de Transporte)
+
+- **Papel:** "O carteiro" — protocolo de entrega entre o Direwolf e o 4HAM.
+- **Responsabilidade:** Transportar os frames AX.25 em bruto desde o Direwolf até ao cliente TCP do 4HAM, utilizando tramas delimitadas por `0xC0` com sequências de escape.
+- **O que acontece no 4HAM:** O módulo `direwolf_kiss.py` liga-se ao servidor KISS do Direwolf, recebe os frames, faz o parse dos endereços AX.25 (indicativos de 7 bytes) e extrai o payload APRS (posição, símbolo, comentário). Cada pacote válido é registado como um evento na base de dados.
+
+### Comportamento ao Mudar de Modo
+
+Quando o utilizador sai do modo APRS e volta para outro modo de scan (ex.: FT8 em 20m), o 4HAM:
+1. Pára os processos rtl_fm e Direwolf
+2. Liberta o dongle RTL-SDR
+3. Reabre o SDR via SoapySDR para o scan normal de HF/VHF
+
+Este ciclo é automático e transparente — basta selecionar o modo de scan desejado.
+
+### Requisitos
+
+| Componente | Instalação |
+|---|---|
+| `rtl-sdr` | `sudo apt install rtl-sdr` |
+| `direwolf` | `sudo apt install direwolf` |
+
+Ambos são instalados automaticamente pelo script `install.sh`.
 
 ---
 

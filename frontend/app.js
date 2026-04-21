@@ -24,14 +24,17 @@ import {
   isValidCallsign,
   extractCallsignFromRaw,
   isValidLocator,
+  maidenheadToLatLon,
   _isSsbSpectralProof,
   extractDecodedText,
   getAuthHeader,
   wsUrl,
 } from "./modules/utils.js";
 import { WaterfallController } from "./modules/waterfall.js";
+import { APRSMapController } from "./modules/aprs-map.js";
 
 const statusEl = document.getElementById("status");
+const vfoGotoGroup = document.querySelector(".vfo-goto-group");
 const eventsEl = document.getElementById("events");
 const eventsSearchCallsignInput = document.getElementById("eventsSearchCallsign");
 const eventsSearchModeInput = document.getElementById("eventsSearchMode");
@@ -114,9 +117,15 @@ const showNonSdrDevicesToggle = document.getElementById("showNonSdrDevices");
 const ssbAsrEnabledCheck = document.getElementById("ssbAsrEnabled");
 const ssbAsrAvailableBadge = document.getElementById("ssbAsrAvailableBadge");
 const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
+const aprsEnabledCheck = document.getElementById("aprsEnabled");
+const aprsAvailableBadge = document.getElementById("aprsAvailableBadge");
+const saveAprsSettingsBtn = document.getElementById("saveAprsSettings");
+const saveStationSettingsBtn = document.getElementById("saveStationSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
 const stationLocatorInput = document.getElementById("stationLocator");
+const stationLatInput = document.getElementById("stationLat");
+const stationLonInput = document.getElementById("stationLon");
 const stationQthInput = document.getElementById("stationQth");
 const deviceClassSelect = document.getElementById("deviceClass");
 const devicePpmInput = document.getElementById("devicePpm");
@@ -132,6 +141,15 @@ const audioTxGainInput = document.getElementById("audioTxGain");
 const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
 const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
+
+// Immediately show/hide APRS-related buttons from cached state (avoids flash)
+{
+  const cachedAprs = localStorage.getItem("4ham_aprs_active") === "1";
+  const btn2m = document.querySelector('[data-quick-band="2m"]');
+  const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+  if (btn2m) btn2m.classList.toggle('d-none', !cachedAprs);
+  if (btnAprs) btnAprs.classList.toggle('d-none', !cachedAprs);
+}
 
 // Selected decoder mode for scan
 let selectedDecoderMode = null;
@@ -505,8 +523,13 @@ function resolveCwDecoderSegment(scanState) {
 
 function renderScanContextSummary(scanState) {
   if (scanRangeSummaryEl) {
-    const scanRange = resolveDisplayedScanRange(scanState);
-    scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
+    const isAprs = String(selectedDecoderMode || "").trim().toUpperCase() === "APRS";
+    if (isAprs) {
+      scanRangeSummaryEl.textContent = "144.800 MHz (APRS)";
+    } else {
+      const scanRange = resolveDisplayedScanRange(scanState);
+      scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
+    }
   }
 
   if (!cwSegmentSummaryWrapEl || !cwSegmentSummaryEl) {
@@ -564,6 +587,120 @@ const wfc = new WaterfallController(
     showToast: (msg) => showToast(msg),
   }
 );
+
+// ── APRS Map controller ────────────────────────────────────────────────
+const aprsMapCtrl = new APRSMapController("aprsMap");
+const aprsMapArea = document.getElementById("aprsMapArea");
+const waterfallArea = document.getElementById("waterfallArea");
+const aprsMapCountEl = document.getElementById("aprsMapCount");
+const propagationCard = document.getElementById("propagationCard");
+const aprsMapFullscreenBtn = document.getElementById("aprsMapFullscreenBtn");
+const _aprsMapFsBtnLabel = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;vertical-align:-1px;"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/></svg>Fullscreen';
+
+function _setAprsMapFullscreen(fullscreen) {
+  aprsMapArea.classList.toggle("aprs-map-area--fullscreen", fullscreen);
+  aprsMapFullscreenBtn.innerHTML = fullscreen ? "✕ Exit" : _aprsMapFsBtnLabel;
+  aprsMapFullscreenBtn.title = fullscreen ? "Exit fullscreen (ESC)" : "Fullscreen (ESC to exit)";
+  if (aprsMapCtrl.isReady) {
+    setTimeout(() => aprsMapCtrl.invalidateSize(), 100);
+  }
+}
+
+// ── APRS Map fullscreen toggle ─────────────────────────────────────────
+if (aprsMapFullscreenBtn && aprsMapArea) {
+  aprsMapFullscreenBtn.addEventListener("click", () => {
+    _setAprsMapFullscreen(!aprsMapArea.classList.contains("aprs-map-area--fullscreen"));
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && aprsMapArea.classList.contains("aprs-map-area--fullscreen")) {
+      _setAprsMapFullscreen(false);
+    }
+  });
+}
+
+// ── APRS Map source filter (All / RF / TCP) ────────────────────────────
+const aprsMapFilterEl = document.getElementById("aprsMapFilter");
+if (aprsMapFilterEl) {
+  aprsMapFilterEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".aprs-filter-btn");
+    if (!btn) return;
+    const filter = btn.dataset.filter;
+    aprsMapFilterEl.querySelectorAll(".aprs-filter-btn").forEach((b) =>
+      b.classList.toggle("aprs-filter-btn--active", b === btn)
+    );
+    aprsMapCtrl.applyFilter(filter);
+    _updateAprsMapCount();
+  });
+}
+
+/**
+ * Toggle between waterfall and APRS map views.
+ * When APRS mode is active the propagation card is replaced by the APRS map
+ * (side-by-side with the Events card) and the VFO shows 144.800 MHz.
+ * @param {boolean} showMap - true → show map, false → show waterfall
+ */
+function setAprsMapVisible(showMap) {
+  if (aprsMapArea) aprsMapArea.hidden = !showMap;
+  if (waterfallArea) waterfallArea.hidden = showMap;
+  if (propagationCard) propagationCard.hidden = showMap;
+  // Hide Go-to-MHz / SNR / DSP status — irrelevant in APRS mode
+  if (vfoGotoGroup) vfoGotoGroup.hidden = showMap;
+  if (showMap) {
+    // VFO → fixed APRS frequency
+    wfc.updateVFODisplay(144800000, 144800000);
+
+    const locator = stationLocatorInput?.value || localStorage.getItem("4ham_station_locator") || "";
+    const callsign = stationCallsignInput?.value || localStorage.getItem("4ham_station_callsign") || "";
+    const exactLat = stationLatInput?.value ? parseFloat(stationLatInput.value) : null;
+    const exactLon = stationLonInput?.value ? parseFloat(stationLonInput.value) : null;
+    if (!aprsMapCtrl.isReady) {
+      aprsMapCtrl.init(locator, callsign, exactLat, exactLon);
+      // Load recent APRS events from the DB
+      _loadRecentAprsEvents();
+    } else {
+      aprsMapCtrl.show();
+    }
+    // Non-blocking connectivity check — warn if no internet (RF-only)
+    _checkAprsConnectivity();
+  } else {
+    aprsMapCtrl.hide();
+  }
+}
+
+/** Best-effort APRS-IS connectivity check — shows toast if offline. */
+async function _checkAprsConnectivity() {
+  try {
+    const resp = await fetch("/api/decoders/aprs-connectivity", { headers: getAuthHeader() });
+    if (!resp.ok) return;
+    const info = await resp.json();
+    if (!info.internet) {
+      showToast("⚠️ No internet — APRS limited to RF reception only (144.800 MHz)");
+    }
+  } catch { /* best-effort */ }
+}
+
+/** Fetch recent APRS events from the API and populate the map. */
+async function _loadRecentAprsEvents() {
+  try {
+    const now = new Date();
+    const start = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+    const url = `/api/events?limit=200&start=${encodeURIComponent(start)}&end=${encodeURIComponent(now.toISOString())}`;
+    const resp = await fetch(url, { headers: getAuthHeader() });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const events = Array.isArray(data) ? data : (data.events || []);
+    const aprsEvents = events.filter((e) => String(e.mode || "").toUpperCase() === "APRS");
+    aprsMapCtrl.loadHistory(aprsEvents);
+    _updateAprsMapCount();
+  } catch { /* best-effort */ }
+}
+
+function _updateAprsMapCount() {
+  if (aprsMapCountEl) {
+    const n = aprsMapCtrl.filteredMarkerCount;
+    aprsMapCountEl.textContent = `${n} station${n !== 1 ? "s" : ""}`;
+  }
+}
 
 function updateFullscreenButtonState() {
   if (!waterfallFullscreenBtn) {
@@ -940,6 +1077,12 @@ function pushLiveEventToPanel(eventPayload) {
   wfc.updateCallsignCacheFromEvent(eventPayload);
   latestEvents = [eventPayload, ...latestEvents];
   renderEventsPanelFromCache();
+
+  // Feed APRS events to the map (if in APRS mode)
+  if (String(eventPayload.mode || "").toUpperCase() === "APRS" && aprsMapCtrl.isReady) {
+    aprsMapCtrl.addEvent(eventPayload);
+    _updateAprsMapCount();
+  }
   
   // Update fullscreen modal if it's open
   if (eventsFullscreenModal && eventsFullscreenModal.classList.contains('show')) {
@@ -1852,6 +1995,9 @@ async function stopScan() {
   isScanRunning = false;
   localStorage.removeItem("4ham_active_band");
 
+  // Hide APRS map when scan stops
+  setAprsMapVisible(false);
+
   // Clear waterfall marker caches when scan stops
   wfc.clearMarkerCaches();
   latestEvents = []; // Clear events list
@@ -1881,6 +2027,7 @@ async function syncScanState() {
       }
       // Deselect mode button when scan transitions running → stopped
       if (wasRunning && !nextRunning && selectedDecoderMode) {
+        setAprsMapVisible(false);
         selectedDecoderMode = null;
         refreshModeButtons();
       }
@@ -1892,6 +2039,7 @@ async function syncScanState() {
     if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
       selectedDecoderMode = backendMode;
       wfc.recenterForMode(backendMode);
+      setAprsMapVisible(backendMode === "APRS");
       refreshModeButtons();
       // Sync the events panel filter with the restored mode
       if (eventsSearchModeInput.value !== backendMode) {
@@ -2033,7 +2181,7 @@ let rotationRunning = false;
 let _rotationPollTimer = null;
 
 const ROTATION_BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m"];
-const ROTATION_MODES = ["CW", "WSPR", "FT4", "FT8", "SSB"];
+const ROTATION_MODES = ["CW", "WSPR", "FT4", "FT8", "SSB", "APRS"];
 
 function renderRotationSlots() {
   const mode = rotationModeSelect.value;
@@ -2933,6 +3081,9 @@ exportPngBtn.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  // Ignore shortcuts when typing in an input, textarea, or contenteditable
+  const tag = event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || event.target.isContentEditable) return;
   if (event.key === "s") {
     if (!isScanRunning) {
       toggleScan();
@@ -3168,12 +3319,22 @@ async function fetchDecoderStatus() {
       }
     }
 
-    // Direwolf KISS
-    const kissState = kiss.enabled ? (kiss.connected ? "Connected" : "Disconnected") : "Disabled";
-    const kissDisabledReason = kiss.last_error
-      ? ` (${kiss.last_error})`
-      : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
-    if (kissStatusModalEl) kissStatusModalEl.textContent = kiss.enabled ? kissState : `Disabled${kissDisabledReason}`;
+    // Direwolf KISS / APRS
+    if (kissStatusModalEl) {
+      if (kiss.enabled) {
+        const connLabel = kiss.connected ? "Connected" : "Reconnecting…";
+        const addrLabel = kiss.address ? ` (${kiss.address})` : "";
+        const lastPkt = kiss.last_packet_at
+          ? ` · last pkt ${new Date(kiss.last_packet_at).toLocaleTimeString()}`
+          : "";
+        kissStatusModalEl.textContent = `${connLabel}${addrLabel}${lastPkt}`;
+      } else {
+        const reason = kiss.last_error
+          ? ` (${kiss.last_error})`
+          : " (set DIREWOLF_KISS_ENABLE=1 or DIREWOLF_KISS_PORT)";
+        kissStatusModalEl.textContent = `Disabled${reason}`;
+      }
+    }
 
     if (decoderLastEventModalEl) decoderLastEventModalEl.textContent = lastEvent;
     if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
@@ -3518,6 +3679,19 @@ async function loadSettings() {
       stationOperatorInput.value = data.station.operator || "";
       stationLocatorInput.value = data.station.locator || "";
       stationQthInput.value = data.station.qth || "";
+      if (stationLatInput) stationLatInput.value = data.station.lat ?? "";
+      if (stationLonInput) stationLonInput.value = data.station.lon ?? "";
+      // Auto-fill lat/lon from locator if not yet set
+      if (stationLatInput && stationLonInput && !stationLatInput.value && !stationLonInput.value) {
+        const loc = data.station.locator || "";
+        if (isValidLocator(loc) && loc.trim().length >= 4) {
+          const pos = maidenheadToLatLon(loc);
+          if (pos) {
+            stationLatInput.value = pos.lat.toFixed(6);
+            stationLonInput.value = pos.lon.toFixed(6);
+          }
+        }
+      }
     }
     if (data.auth) {
       setAuthFields(data.auth || {});
@@ -3538,6 +3712,27 @@ async function loadSettings() {
           if (ssbAsrEnabledCheck) { ssbAsrEnabledCheck.checked = false; ssbAsrEnabledCheck.disabled = true; }
         }
       }
+    }
+    if (data.aprs) {
+      if (aprsEnabledCheck) aprsEnabledCheck.checked = data.aprs.enabled === true;
+      if (aprsAvailableBadge) {
+        if (data.aprs.available) {
+          aprsAvailableBadge.textContent = "Direwolf installed";
+          aprsAvailableBadge.className = "badge bg-success ms-2";
+          if (aprsEnabledCheck) aprsEnabledCheck.disabled = false;
+        } else {
+          aprsAvailableBadge.textContent = "Direwolf not installed";
+          aprsAvailableBadge.className = "badge bg-warning text-dark ms-2";
+          if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
+        }
+      }
+      // Show/hide 2m band + APRS mode buttons: available AND enabled
+      const aprsActive = Boolean(data.aprs.available) && Boolean(data.aprs.enabled);
+      localStorage.setItem("4ham_aprs_active", aprsActive ? "1" : "0");
+      const btn2m = document.querySelector('[data-quick-band="2m"]');
+      const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+      if (btn2m) btn2m.classList.toggle('d-none', !aprsActive);
+      if (btnAprs) btnAprs.classList.toggle('d-none', !aprsActive);
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
@@ -3724,6 +3919,8 @@ saveSettingsBtn.addEventListener("click", async () => {
       operator: stationOperatorInput.value.trim(),
       locator: stationLocatorInput.value.trim(),
       qth: stationQthInput.value.trim(),
+      lat: stationLatInput?.value ? parseFloat(stationLatInput.value) : null,
+      lon: stationLonInput?.value ? parseFloat(stationLonInput.value) : null,
     },
     device_config: buildDeviceConfigPayload(),
     audio_config: buildAudioConfigPayload(),
@@ -4068,6 +4265,105 @@ if (saveAsrSettingsBtn) {
   });
 }
 
+if (saveAprsSettingsBtn) {
+  saveAprsSettingsBtn.addEventListener("click", async () => {
+    const enabled = aprsEnabledCheck ? aprsEnabledCheck.checked : false;
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ aprs: { enabled } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save APRS setting");
+        showToastError(message);
+        return;
+      }
+      showToast(enabled ? "APRS packet decoding enabled" : "APRS packet decoding disabled");
+      // Immediately show/hide 2m & APRS buttons
+      const btn2m = document.querySelector('[data-quick-band="2m"]');
+      const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+      if (btn2m) btn2m.classList.toggle('d-none', !enabled);
+      if (btnAprs) btnAprs.classList.toggle('d-none', !enabled);
+      localStorage.setItem("4ham_aprs_active", enabled ? "1" : "0");
+    } catch (err) {
+      showToastError("Failed to save APRS setting");
+    }
+  });
+}
+
+// ── Locator → Lat/Lon auto-fill ─────────────────────────────────────────
+if (stationLocatorInput) {
+  stationLocatorInput.addEventListener("input", () => {
+    const val = stationLocatorInput.value.trim();
+    if (isValidLocator(val) && val.length >= 4) {
+      const pos = maidenheadToLatLon(val);
+      if (pos && stationLatInput && stationLonInput) {
+        stationLatInput.value = pos.lat.toFixed(6);
+        stationLonInput.value = pos.lon.toFixed(6);
+      }
+    }
+  });
+}
+
+// ── Save User & Station ─────────────────────────────────────────────────
+if (saveStationSettingsBtn) {
+  saveStationSettingsBtn.addEventListener("click", async () => {
+    if (!isValidCallsign(stationCallsignInput.value)) {
+      showToastError("Invalid callsign format");
+      return;
+    }
+    if (!stationLocatorInput.value.trim()) {
+      showToastError("Locator/Grid is required (e.g. IN51 or IN51ab)");
+      stationLocatorInput.focus();
+      return;
+    }
+    if (!isValidLocator(stationLocatorInput.value)) {
+      showToastError("Invalid locator format (use IN51 or IN51ab)");
+      return;
+    }
+    if (!stationQthInput.value.trim()) {
+      showToastError("QTH is required (e.g. Lisboa)");
+      stationQthInput.focus();
+      return;
+    }
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({
+          station: {
+            callsign: stationCallsignInput.value.trim(),
+            operator: stationOperatorInput.value.trim(),
+            locator: stationLocatorInput.value.trim(),
+            qth: stationQthInput.value.trim(),
+            lat: stationLatInput?.value ? parseFloat(stationLatInput.value) : null,
+            lon: stationLonInput?.value ? parseFloat(stationLonInput.value) : null,
+          },
+        }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save station settings");
+        showToastError(message);
+        return;
+      }
+      showToast("User & Station saved");
+      // Refresh APRS map with updated coordinates
+      if (aprsMapCtrl.isReady) {
+        const lat = stationLatInput?.value ? parseFloat(stationLatInput.value) : null;
+        const lon = stationLonInput?.value ? parseFloat(stationLonInput.value) : null;
+        aprsMapCtrl.init(
+          stationLocatorInput.value.trim(),
+          stationCallsignInput.value.trim(),
+          lat, lon
+        );
+      }
+    } catch (err) {
+      showToastError("Failed to save station settings");
+    }
+  });
+}
+
 if (showNonSdrDevicesToggle) {
   showNonSdrDevicesToggle.addEventListener("change", () => {
     showNonSdrDevices = Boolean(showNonSdrDevicesToggle.checked);
@@ -4160,6 +4456,12 @@ if (quickModeButtons.length) {
           selectedDecoderMode = mode;
           wfc.selectedDecoderMode = mode;
           eventsSearchModeInput.value = mode;
+          // APRS operates on 2m — auto-switch band before restarting
+          if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
+            bandSelect.value = "2m";
+            localStorage.setItem("4ham_active_band", "2m");
+            refreshQuickBandButtons();
+          }
           // Clear old markers from previous mode to prevent pollution
           wfc.clearDecodedMarkerCache();
           refreshModeButtons();
@@ -4167,6 +4469,7 @@ if (quickModeButtons.length) {
           // Immediately reload events for the new mode
           fetchEvents();
           fetchTotal();
+          setAprsMapVisible(mode === "APRS");
           showToast(`Mode switched to ${mode}`);
         } catch (err) {
           showToastError(`Failed to switch mode: ${err.message}`);
@@ -4182,14 +4485,20 @@ if (quickModeButtons.length) {
       if (selectedDecoderMode === mode) {
         selectedDecoderMode = null;
         eventsSearchModeInput.value = "";
+        setAprsMapVisible(false);
         refreshModeButtons();
         logLine(`Modo desseleccionado: ${mode}`);
         fetchEvents();
         fetchTotal();
       } else {
         selectedDecoderMode = mode;
+        // APRS operates on 2m (144.800 MHz) — auto-switch band
+        if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
+          await switchBandLive("2m");
+        }
         wfc.recenterForMode(mode);
         eventsSearchModeInput.value = mode;
+        setAprsMapVisible(mode === "APRS");
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
         fetchEvents();

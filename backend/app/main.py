@@ -74,7 +74,7 @@ async def _retention_loop():
 async def lifespan(app_instance: FastAPI):
     """Auto-start enabled decoders on startup and stop them gracefully on shutdown."""
     from app.dependencies import state as _state
-    from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder, _start_cw_decoder
+    from app.api.decoders import _start_ft_external_decoder, _start_ft_internal_decoder, _start_cw_decoder, _start_kiss_loop, _stop_kiss_loop
 
     # Restore ASR enabled/disabled state from DB settings
     try:
@@ -107,6 +107,14 @@ async def lifespan(app_instance: FastAPI):
             _log.info("CW decoder startup: %s", result)
         except Exception as exc:
             _log.warning("CW decoder startup failed: %s", exc)
+
+    # Auto-start KISS/APRS loop if Direwolf KISS is configured
+    if _state.decoder_status["direwolf_kiss"]["enabled"]:
+        try:
+            result = await _start_kiss_loop(force=False)
+            _log.info("KISS loop startup: %s", result)
+        except Exception as exc:
+            _log.warning("KISS loop startup failed: %s", exc)
 
     # Auto-open preview if a real SDR device is available
     try:
@@ -185,6 +193,11 @@ async def lifespan(app_instance: FastAPI):
     if _state.ft_internal_decoder:
         try:
             await _stop_ft_internal_decoder()
+        except Exception:
+            pass
+    if _state.kiss_task and not _state.kiss_task.done():
+        try:
+            await _stop_kiss_loop()
         except Exception:
             pass
 

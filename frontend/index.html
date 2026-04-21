@@ -16,6 +16,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <meta http-equiv="Expires" content="0" />
     <title>4ham Spectrum Analysis</title>
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css?v=20260301000400" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
   </head>
@@ -124,6 +125,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT4">FT4</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT8">FT8</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="SSB">SSB</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="APRS">APRS</button>
                 </div>
                 <div class="d-none d-flex align-items-center gap-2" id="cwScanParamsRow">
                   <label class="form-label mb-0" for="cwStepHz">CW Step (Hz)</label>
@@ -274,7 +276,26 @@ Last update: 2026-02-22 16:27:19 UTC
           </div>
         </div>
         <div class="col-12 col-propmap-custom">
-          <div class="card panel h-100">
+          <!-- APRS map (hidden by default, shown when decoder mode is APRS) -->
+          <div class="aprs-map-area aprs-map-area--propslot h-100" id="aprsMapArea" hidden>
+            <div class="aprs-map-header">
+              <span class="aprs-map-header__title">📡 APRS Map — 144.800 MHz</span>
+              <div class="aprs-map-header__filter" id="aprsMapFilter">
+                <button class="aprs-filter-btn aprs-filter-btn--active" data-filter="all" title="Show all stations">All</button>
+                <button class="aprs-filter-btn" data-filter="rf" title="RF only (144.800 MHz)">📻 RF</button>
+                <button class="aprs-filter-btn" data-filter="tcp" title="APRS-IS (TCP)">🌐 TCP</button>
+              </div>
+              <span class="aprs-map-header__hint">Ctrl + Scroll = Zoom</span>
+              <span class="aprs-map-header__count" id="aprsMapCount">0 stations</span>
+              <button class="aprs-map-header__fullscreen" id="aprsMapFullscreenBtn" title="Fullscreen (ESC to exit)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;vertical-align:-1px;">
+                  <path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/>
+                </svg>Fullscreen
+              </button>
+            </div>
+            <div id="aprsMap" class="aprs-map"></div>
+          </div>
+          <div class="card panel h-100" id="propagationCard">
             <div class="card-body d-flex flex-column">
               <div class="d-flex align-items-center gap-2 mb-1">
                 <h2 class="h5 mb-0">Propagation Map</h2>
@@ -558,6 +579,25 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="btn btn-outline-info btn-sm" id="saveAsrSettings">Save ASR setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12">
+                <h3 class="h6 mb-1">APRS Packet Decoding (Direwolf) <span id="aprsAvailableBadge" class="badge bg-secondary ms-2">checking…</span></h3>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="aprsEnabled" />
+                  <label class="form-check-label" for="aprsEnabled">Enable APRS packet decoding via Direwolf KISS TCP</label>
+                </div>
+                <small class="d-block mt-1">
+                  When active, the backend starts Direwolf and connects to its KISS TCP port to decode APRS packets on
+                  144.800 MHz (VHF). Decoded packets appear in the live event stream and are stored in the event log.
+                  Requires <code>direwolf</code> — install it via the installer or manually:
+                  <code>sudo apt install direwolf</code>. You can enable/disable this at any time without restarting.
+                </small>
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveAprsSettings">Save APRS setting</button>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">User &amp; Station</h3></div>
               <div class="col-6">
                 <label class="form-label">Callsign</label>
@@ -574,6 +614,17 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-6">
                 <label class="form-label">QTH <span class="text-danger">*</span></label>
                 <input type="text" id="stationQth" placeholder="Lisboa" class="form-control form-control-sm" required />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Latitude</label>
+                <input type="number" step="any" id="stationLat" placeholder="40.2035" class="form-control form-control-sm" />
+              </div>
+              <div class="col-6">
+                <label class="form-label">Longitude</label>
+                <input type="number" step="any" id="stationLon" placeholder="-8.4112" class="form-control form-control-sm" />
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveStationSettings">Save User &amp; Station</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12"><h3 class="h6 mb-1">Device Configuration</h3></div>
@@ -1039,6 +1090,7 @@ Last update: 2026-02-22 16:27:19 UTC
     </footer>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
     <script src="map.js?v=20260408120000"></script>

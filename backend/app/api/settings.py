@@ -11,14 +11,101 @@ Application settings management endpoints.
 
 from typing import Dict
 
+import os
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
 
 from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
+from app.dependencies.utils import command_exists
 from app.decoders.ssb_asr import is_ssb_asr_available, set_asr_enabled
 
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# APRS / Direwolf auto-configuration helpers
+# ---------------------------------------------------------------------------
+
+_DIREWOLF_CONF_TEMPLATE = """\
+# Direwolf configuration for 4ham-spectrum-analysis (APRS)
+# Auto-generated — edit as needed.
+
+MYCALL N0CALL
+
+ADEVICE default null
+
+CHANNEL 0
+MODEM 1200
+
+KISSPORT 8001
+AGWPORT 0
+"""
+
+
+def _project_root() -> Path:
+    """Return the project root (parent of backend/)."""
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _ensure_aprs_config():
+    """Create direwolf.conf + set runtime env vars if not already configured.
+
+    Called when the user enables APRS from Admin Config.  Ensures:
+    1. ``config/direwolf.conf`` exists (created from template if missing).
+    2. ``DIREWOLF_KISS_ENABLE``, ``DIREWOLF_AUTOSTART``, and
+       ``DIREWOLF_CMD`` are set in ``os.environ`` so the current process
+       can start Direwolf without a restart.
+    3. The same values are persisted to the ``.env`` file so they survive
+       a backend restart.
+    4. ``state.decoder_status["direwolf_kiss"]`` flags are updated.
+    """
+    root = _project_root()
+    conf_path = root / "config" / "direwolf.conf"
+
+    # 1. Create config/direwolf.conf if it doesn't exist
+    if not conf_path.exists():
+        conf_path.parent.mkdir(parents=True, exist_ok=True)
+        conf_path.write_text(_DIREWOLF_CONF_TEMPLATE)
+
+    # 2. Set runtime env vars
+    os.environ["DIREWOLF_KISS_ENABLE"] = "1"
+    os.environ["DIREWOLF_AUTOSTART"] = "1"
+    if not os.environ.get("DIREWOLF_CMD"):
+        os.environ["DIREWOLF_CMD"] = f"direwolf -t 0 -p -c {conf_path}"
+
+    # 3. Persist to .env file
+    _persist_env_vars(root / ".env", {
+        "DIREWOLF_KISS_ENABLE": "1",
+        "DIREWOLF_AUTOSTART": "1",
+        "DIREWOLF_CMD": os.environ["DIREWOLF_CMD"],
+    })
+
+    # 4. Update runtime state
+    kiss_st = state.decoder_status["direwolf_kiss"]
+    kiss_st["enabled"] = True
+    kiss_st["autostart"] = True
+
+
+def _persist_env_vars(env_path: Path, env_vars: dict):
+    """Add or update key=value pairs in a .env file."""
+    lines = []
+    if env_path.exists():
+        lines = env_path.read_text().splitlines()
+
+    for key, value in env_vars.items():
+        found = False
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(f"{key}=") or stripped.startswith(f"export {key}="):
+                lines[i] = f"{key}={value}"
+                found = True
+                break
+        if not found:
+            lines.append(f"{key}={value}")
+
+    env_path.write_text("\n".join(lines) + "\n")
 
 
 @router.get("")
@@ -48,6 +135,15 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "enabled": bool(asr_cfg.get("enabled", True)),
         "available": is_ssb_asr_available(),
     }
+    aprs_cfg = settings.get("aprs") or {}
+    kiss_st = state.decoder_status.get("direwolf_kiss") or {}
+    settings["aprs"] = {
+        "enabled": bool(kiss_st.get("enabled", False)),
+        "available": command_exists("direwolf"),
+        "connected": bool(kiss_st.get("connected", False)),
+        "autostart": bool(kiss_st.get("autostart", False)),
+        "address": kiss_st.get("address"),
+    }
     settings["auth"] = {
         "enabled": bool(state.auth_required),
         "user": state.auth_user if state.auth_required else "",
@@ -57,7 +153,7 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
 
 
 @router.post("")
-def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
+async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
     """
     Save application settings.
     
@@ -116,6 +212,21 @@ def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> Dict:
         enabled = bool(asr.get("enabled", True))
         existing["asr"] = {"enabled": enabled}
         set_asr_enabled(enabled)
+
+    if "aprs" in payload:
+        from app.api.decoders import _start_kiss_loop, _stop_kiss_loop
+        import asyncio
+        aprs = payload.get("aprs") or {}
+        aprs_enabled = bool(aprs.get("enabled", False))
+        kiss_st = state.decoder_status.get("direwolf_kiss") or {}
+        currently_enabled = bool(kiss_st.get("enabled", False))
+        if aprs_enabled and not currently_enabled:
+            _ensure_aprs_config()
+            asyncio.create_task(_start_kiss_loop(force=True))
+        elif not aprs_enabled and currently_enabled:
+            asyncio.create_task(_stop_kiss_loop())
+            state.decoder_status["direwolf_kiss"]["enabled"] = False
+        existing["aprs"] = {"enabled": aprs_enabled}
 
     state.db.save_settings(existing)
     return {"status": "ok"}

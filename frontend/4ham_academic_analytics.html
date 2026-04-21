@@ -11,6 +11,7 @@ Last update: 2026-04-03 UTC
     <meta name="google" content="notranslate" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>4ham Academic Analytics</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <style>
       :root {
         --bg: #0b1118;
@@ -81,6 +82,76 @@ Last update: 2026-04-03 UTC
       .hero p {
         margin: 8px 0 0;
         color: var(--text-muted);
+      }
+
+      .hero-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .hero-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      .lang-toggle {
+        display: inline-flex;
+        gap: 4px;
+      }
+
+      .scan-runtime-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(15, 28, 40, 0.68);
+        color: var(--text);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-align: right;
+      }
+
+      .scan-runtime-status::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+        flex: 0 0 auto;
+      }
+
+      .scan-runtime-status.running::before {
+        background: var(--ok);
+        box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.14);
+      }
+
+      .scan-runtime-status.rotation::before {
+        background: var(--warn);
+        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
+      }
+
+      .scan-runtime-status.preview::before {
+        background: var(--mode-ssb);
+        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.14);
+      }
+
+      .scan-runtime-status.stopped::before {
+        background: var(--text-muted);
+        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+      }
+
+      .scan-runtime-status.unavailable::before {
+        background: var(--danger);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14);
       }
 
       #nextRefreshInfo {
@@ -421,10 +492,20 @@ Last update: 2026-04-03 UTC
         grid-column: span 12;
       }
 
-      svg {
+      .chart-panel > svg {
         width: 100%;
-        height: 280px;
+        height: 600px;
         display: block;
+      }
+
+      /* Protect Leaflet internals from chart CSS */
+      .leaflet-container svg {
+        width: auto !important;
+        height: auto !important;
+        display: inline !important;
+      }
+      .leaflet-container img {
+        max-width: none !important;
       }
 
       .chart-panel-fill {
@@ -433,11 +514,11 @@ Last update: 2026-04-03 UTC
       }
       .chart-panel-fill svg {
         flex: 1 1 0;
-        min-height: 280px;
+        min-height: 600px;
       }
 
       #heatmapChart {
-        height: 330px;
+        height: 700px;
       }
 
       .meta {
@@ -754,6 +835,15 @@ Last update: 2026-04-03 UTC
           padding: 14px;
         }
 
+        .hero-side {
+          width: 100%;
+          align-items: flex-start;
+        }
+
+        .scan-runtime-status {
+          text-align: left;
+        }
+
         .cards {
           grid-template-columns: repeat(2, 1fr);
         }
@@ -804,6 +894,191 @@ Last update: 2026-04-03 UTC
         color: #fff !important;
         font-weight: 700;
       }
+
+      /* ── View selector toggle ──────────────────────────────────── */
+      .view-selector {
+        display: inline-flex;
+        gap: 4px;
+        background: rgba(15,28,40,0.6);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 3px;
+        margin-top: 10px;
+      }
+      .view-btn {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        padding: 6px 16px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+      }
+      .view-btn:hover {
+        color: var(--text);
+        background: rgba(255,255,255,0.05);
+      }
+      .view-btn.active {
+        background: #1b4a44;
+        border-color: #2e7b72;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* ── APRS view ────────────────────────────────────────────── */
+      .aprs-view { display: none; }
+      .aprs-view.active { display: block; }
+      .hf-view { display: block; }
+      .hf-view.hidden { display: none; }
+
+      #hfStaleBanner {
+        display: none;
+        align-items: flex-start;
+        gap: 10px;
+        background: rgba(251,191,36,0.12);
+        border: 1px solid rgba(251,191,36,0.45);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 0 0 14px 0;
+        font-size: 0.88rem;
+        color: var(--text);
+        line-height: 1.5;
+      }
+      #hfStaleBanner.visible { display: flex; }
+      #hfStaleBanner .stale-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+      #hfStaleBanner .stale-body { flex: 1; }
+      #hfStaleBanner .stale-link {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 4px 12px;
+        border-radius: 6px;
+        background: rgba(251,191,36,0.2);
+        border: 1px solid rgba(251,191,36,0.5);
+        color: #fbbf24;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+      #hfStaleBanner .stale-link:hover { background: rgba(251,191,36,0.35); }
+
+      .aprs-cards {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      #aprsLeafletMap {
+        width: 100%;
+        height: 720px;
+        border-radius: 10px;
+        background: #0d1117;
+      }
+      /* APRS map fullscreen */
+      .aprs-map-wrapper { position: relative; }
+      .aprs-map-fullscreen-btn {
+        position: absolute; top: 10px; right: 10px; z-index: 1000;
+        background: rgba(15,23,42,.85); color: #fff; border: 1px solid #334155;
+        padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
+        cursor: pointer; backdrop-filter: blur(4px);
+      }
+      .aprs-map-fullscreen-btn:hover { background: #1e40af; }
+      .aprs-map-wrapper.fullscreen {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
+        border-radius: 0; background: #0d1117;
+      }
+      .aprs-map-wrapper.fullscreen #aprsLeafletMap {
+        height: 100vh !important; border-radius: 0;
+      }
+      /* ── APRS marker styles (matches main interface) ── */
+      #aprsLeafletMap .leaflet-div-icon { background: none; border: none; }
+      .aprs-qth-icon { background: none !important; border: none !important; }
+      .aprs-qth-label {
+        display: inline-block;
+        background: #1e40af;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      }
+      .aprs-station-icon { background: none !important; border: none !important; }
+      .aprs-station-label {
+        display: inline-block;
+        background: #0f172a;
+        color: #38bdf8;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        border: 1px solid #334155;
+        box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      }
+      .aprs-popup { font-size: 12px; line-height: 1.5; min-width: 200px; }
+      .aprs-popup__header { font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+      .aprs-popup__table { width: 100%; border-collapse: collapse; }
+      .aprs-popup__table td { padding: 1px 6px 1px 0; vertical-align: top; }
+      .aprs-popup__table td:first-child { white-space: nowrap; color: #475569; width: 85px; }
+      .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
+      .aprs-source-rf { background: #dcfce7; color: #166534; }
+      .aprs-source-is { background: #dbeafe; color: #1e40af; }
+      .aprs-marker-rf { filter: hue-rotate(90deg) saturate(1.3); }
+      .aprs-marker-is { filter: hue-rotate(200deg) saturate(1.1); }
+
+      .aprs-source-legend {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin: 6px 4px 8px;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .aprs-source-legend .swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+
+      .aprs-filter-row {
+        display: flex;
+        gap: 6px;
+        margin: 8px 4px 10px;
+      }
+      .aprs-filter-btn {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0f1c28;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        padding: 4px 12px;
+        cursor: pointer;
+      }
+      .aprs-filter-btn.active {
+        background: #1b4a44;
+        border-color: #2e7b72;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      @media (max-width: 1100px) {
+        .aprs-cards {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 640px) {
+        .aprs-cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
@@ -813,18 +1088,34 @@ Last update: 2026-04-03 UTC
     </div>
     <div class="wrap">
       <section class="hero">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div class="hero-head">
           <h1 id="dashboardTitle">4ham Spectrum Analysis v0.12.4 - Academic Analytics</h1>
-          <div class="lang-toggle" style="display:inline-flex;gap:4px;">
-            <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
-            <button type="button" class="lang-btn" data-lang="pt" onclick="setLang('pt')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">PT</button>
+          <div class="hero-side">
+            <div class="lang-toggle">
+              <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
+              <button type="button" class="lang-btn" data-lang="pt" onclick="setLang('pt')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">PT</button>
+            </div>
+            <div id="scanRuntimeInfo" class="scan-runtime-status unavailable" role="status" aria-live="polite">Scan status unavailable</div>
           </div>
         </div>
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
         <p id="apiLastFetchInfo">Last API data query: --</p>
         <p id="nextRefreshInfo">Time until next data refresh: --</p>
+        <div class="view-selector" id="viewSelector">
+          <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
+          <button type="button" class="view-btn" data-view="aprs" data-i18n="view_aprs">APRS Network Topology &amp; Coverage</button>
+        </div>
       </section>
 
+      <div id="hfView" class="hf-view">
+      <div id="hfStaleBanner" role="alert">
+        <span class="stale-icon">⚠️</span>
+        <div class="stale-body">
+          <span id="hfStaleBannerText"></span>
+          <br>
+          <button class="stale-link" id="hfStaleGoBtn"></button>
+        </div>
+      </div>
       <section class="panel">
         <div class="controls">
           <div class="field">
@@ -1016,6 +1307,165 @@ Last update: 2026-04-03 UTC
           </div>
         </section>
       </section>
+      </div><!-- /hfView -->
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- APRS Network Topology & Coverage view                      -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <div id="aprsView" class="aprs-view">
+      <section class="panel">
+        <!-- APRS period controls -->
+        <div class="controls" style="grid-template-columns: 2fr auto auto;">
+          <div class="field">
+            <label data-i18n="period">Period</label>
+            <div class="preset-row" id="aprsPresetRow">
+              <button class="preset-btn" data-preset="30m">30m</button>
+              <button class="preset-btn" data-preset="1h">1h</button>
+              <button class="preset-btn" data-preset="3h">3h</button>
+              <button class="preset-btn" data-preset="6h">6h</button>
+              <button class="preset-btn active" data-preset="24h">24h</button>
+              <button class="preset-btn" data-preset="custom">Custom Period</button>
+            </div>
+            <div id="aprsCustomRange" style="display:none;margin-top:8px;flex-direction:column;gap:6px;width:100%;">
+              <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">From</label>
+                <input type="datetime-local" id="aprsCustomStart" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">To</label>
+                <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+              </div>
+              <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="align-self:flex-start;margin-top:2px">Apply Filters</button>
+            </div>
+          </div>
+          <div class="aprs-filter-row" style="margin:0;align-self:end;">
+            <button class="aprs-filter-btn active" data-filter="all" data-i18n="all">All</button>
+            <button class="aprs-filter-btn" data-filter="rf">📻 RF</button>
+            <button class="aprs-filter-btn" data-filter="tcp">🌐 TCP</button>
+          </div>
+          <div class="export-wrap" id="aprsExportWrap" style="align-self:end;">
+            <button class="apply-btn export-btn" id="aprsExportBtn" type="button">Export ▾</button>
+            <ul class="export-menu" id="aprsExportMenu" role="menu">
+              <li><button data-aprsfmt="csv">CSV</button></li>
+              <li><button data-aprsfmt="xlsx">XLSX</button></li>
+              <li><button data-aprsfmt="json">JSON</button></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- APRS KPIs -->
+        <div class="aprs-cards">
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_stations">Total stations</span>
+            <div class="value" id="aprsKpiStations">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_events">Total packets</span>
+            <div class="value" id="aprsKpiEvents">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_rf_tcp">RF / TCP</span>
+            <div class="value" id="aprsKpiRfTcp">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_max_dist">Max distance</span>
+            <div class="value" id="aprsKpiMaxDist">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="aprs_kpi_digipeaters">Unique digipeaters</span>
+            <div class="value" id="aprsKpiDigipeaters">--</div>
+          </div>
+        </div>
+
+        <!-- APRS Map -->
+        <div class="grid">
+          <article class="chart-panel span-12">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_map">APRS Station Map</h3>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: blue for RF (direwolf), green for TCP (APRS-IS). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
+            </div>
+            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (blue) and APRS-IS (green).</p>
+            <div class="aprs-source-legend">
+              <span><span class="swatch" style="background:#3b82f6;"></span> RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#22c55e;"></span> APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
+            </div>
+            <div class="aprs-map-wrapper" id="aprsMapWrapper">
+              <button class="aprs-map-fullscreen-btn" id="aprsFullscreenBtn" title="Fullscreen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Fullscreen</button>
+              <div id="aprsLeafletMap"></div>
+            </div>
+          </article>
+
+          <!-- Distance distribution -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_distance">Distance Distribution</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Distance Distribution chart" data-help-title="Distance Distribution" data-help-text="Histogram showing the distribution of station distances from your QTH. Each bar represents a distance bin. Use it to understand your station's coverage profile and identify gaps." data-i18n-help-text="help_aprs_distance" data-i18n-help-title="aprs_chart_distance">i</button>
+            </div>
+            <p data-i18n="aprs_chart_distance_desc">Distribution of station distances from QTH (km).</p>
+            <svg id="aprsDistChart"></svg>
+          </article>
+
+          <!-- Temporal activity -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_timeline">Temporal Activity</h3>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Temporal Activity chart" data-help-title="Temporal Activity" data-help-text="Shows APRS packet count aggregated by hour for the selected period. Use peaks and troughs to identify active and quiet windows on the APRS network." data-i18n-help-text="help_aprs_timeline" data-i18n-help-title="aprs_chart_timeline">i</button>
+            </div>
+            <p data-i18n="aprs_chart_timeline_desc">Hourly APRS packet volume for the selected period.</p>
+            <svg id="aprsTimelineChart"></svg>
+          </article>
+
+          <!-- Top stations -->
+          <article class="chart-panel chart-panel-fill span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_top_stations">Top Active Stations</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Top Active Stations chart" data-help-title="Top Active Stations" data-help-text="Ranks the top 20 APRS callsigns by total packet count after applying period and source filters. Longer bars indicate more active stations." data-i18n-help-text="help_aprs_top_stations" data-i18n-help-title="aprs_chart_top_stations">i</button>
+            </div>
+            <p data-i18n="aprs_chart_top_stations_desc">Top 20 APRS callsigns by number of packets.</p>
+            <svg id="aprsTopStationsChart"></svg>
+          </article>
+
+          <!-- Source breakdown (RF vs TCP pie/bar) -->
+          <article class="chart-panel span-6">
+            <div class="chart-header">
+              <h3 data-i18n="aprs_chart_source">Source Breakdown</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Source Breakdown chart" data-help-title="Source Breakdown" data-help-text="Shows the proportion of APRS packets received via RF (local radio) versus TCP (APRS-IS internet). A high RF ratio indicates good local radio coverage." data-i18n-help-text="help_aprs_source" data-i18n-help-title="aprs_chart_source">i</button>
+            </div>
+            <p data-i18n="aprs_chart_source_desc">RF vs APRS-IS packet ratio.</p>
+            <svg id="aprsSourceChart"></svg>
+          </article>
+        </div>
+
+        <section class="meta">
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="k" data-i18n="meta_snapshot">Data snapshot</span>
+              <span class="v" id="aprsMetaSnapshot">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="meta_period">Analyzed period</span>
+              <span class="v" id="aprsMetaPeriod">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k">Próxima atualização</span>
+              <span class="v" id="aprsNextRefreshInfo">--</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="aprs_meta_source">Data source</span>
+              <span class="v" id="aprsMetaSource">APRS-IS + Direwolf</span>
+            </div>
+            <div class="meta-item">
+              <span class="k" data-i18n="aprs_meta_coverage">Coverage radius</span>
+              <span class="v">50 km</span>
+            </div>
+          </div>
+          <div class="footnote">
+            Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; &copy; 2026 Octávio Filipe Gonçalves | License: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a>
+          </div>
+        </section>
+      </section>
+      </div><!-- /aprsView -->
     </div>
 
     <div class="chart-help-layer" id="chartHelpLayer" role="status" aria-live="polite">
@@ -1040,6 +1490,7 @@ Last update: 2026-04-03 UTC
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
     <script src="lib/xlsx.mini.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
       const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
@@ -1100,6 +1551,7 @@ Last update: 2026-04-03 UTC
         document.querySelectorAll(".lang-btn").forEach(btn => {
           btn.classList.toggle("active", btn.dataset.lang === _i18nLang);
         });
+        renderScanRuntimeInfo();
       }
 
       function setLang(lang) {
@@ -1115,6 +1567,7 @@ Last update: 2026-04-03 UTC
         if (typeof fetchIonosphericBadge === "function") fetchIonosphericBadge();
         if (typeof refreshPropMap === "function") refreshPropMap();
         if (lastResolvedRange) renderFromCurrentRange();
+        if (aprsDataLoaded && aprsView && aprsView.style.display !== "none") aprsRenderAll();
         const queryAt = new Date();
         if (apiLastFetchInfo) apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
       }
@@ -1146,6 +1599,7 @@ Last update: 2026-04-03 UTC
       let _appVersion = "";
       const apiLastFetchInfo = document.getElementById("apiLastFetchInfo");
       const nextRefreshInfo = document.getElementById("nextRefreshInfo");
+      const scanRuntimeInfo = document.getElementById("scanRuntimeInfo");
       const chartHelpLayer = document.getElementById("chartHelpLayer");
       const chartHelpLayerTitle = document.getElementById("chartHelpLayerTitle");
       const chartHelpLayerText = document.getElementById("chartHelpLayerText");
@@ -1163,6 +1617,7 @@ Last update: 2026-04-03 UTC
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
+      let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
 
       updateMetaUpdateFrequency();
 
@@ -1560,6 +2015,111 @@ Last update: 2026-04-03 UTC
         hourBandDescription.textContent = t("chart_heatmap_desc");
       }
 
+      function normalizeScanModeLabel(mode) {
+        const normalized = String(mode || "").trim().toLowerCase();
+        if (!normalized) {
+          return "";
+        }
+        const labels = {
+          ft8: "FT8",
+          ft4: "FT4",
+          wspr: "WSPR",
+          cw: "CW",
+          ssb: "SSB",
+          aprs: "APRS",
+        };
+        return labels[normalized] || normalized.toUpperCase().replaceAll("_", " ");
+      }
+
+      function formatScanBandLabel(band) {
+        const compact = String(band || "").trim();
+        if (!compact) {
+          return "";
+        }
+        return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1 $2");
+      }
+
+      function setScanRuntimeInfo(stateName, text) {
+        if (!scanRuntimeInfo) {
+          return;
+        }
+        scanRuntimeInfo.textContent = text;
+        scanRuntimeInfo.classList.remove("running", "rotation", "preview", "stopped", "unavailable");
+        scanRuntimeInfo.classList.add(stateName);
+      }
+
+      function renderScanRuntimeInfo() {
+        if (!scanRuntimeInfo) {
+          return;
+        }
+
+        if (!lastScanRuntimeSnapshot || lastScanRuntimeSnapshot.kind !== "payload") {
+          setScanRuntimeInfo("unavailable", t("scan_status_unavailable"));
+          return;
+        }
+
+        const payload = lastScanRuntimeSnapshot.payload || {};
+        const state = String(payload.state || "").trim().toLowerCase();
+        const rotation = payload.rotation && payload.rotation.running ? payload.rotation : null;
+        const rotationSlot = rotation && rotation.current_slot ? rotation.current_slot : null;
+        const modeLabel = normalizeScanModeLabel(rotationSlot?.mode || payload.decoder_mode);
+        const bandLabel = formatScanBandLabel(rotationSlot?.band || payload.scan?.band);
+        const details = [modeLabel, bandLabel].filter(Boolean).join(" · ");
+
+        if (rotationSlot) {
+          const secondsRaw = Number(rotation.time_remaining_s);
+          const suffix = Number.isFinite(secondsRaw)
+            ? t("scan_status_switches_in", { seconds: Math.max(1, Math.ceil(secondsRaw)) })
+            : "";
+          let text = t("scan_status_rotation_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          if (suffix) {
+            text = `${text} · ${suffix}`;
+          }
+          setScanRuntimeInfo("rotation", text);
+          return;
+        }
+
+        if (state === "preview") {
+          let text = t("scan_status_preview_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("preview", text);
+          return;
+        }
+
+        if (state === "running") {
+          let text = t("scan_status_running_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("running", text);
+          return;
+        }
+
+        setScanRuntimeInfo("stopped", t("scan_status_stopped"));
+      }
+
+      async function fetchScanRuntimeStatus() {
+        try {
+          const resp = await fetch(`${_BASE}api/scan/status`);
+          if (!resp.ok) {
+            throw new Error("scan status request failed");
+          }
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {
+            throw new Error("scan status payload invalid");
+          }
+          lastScanRuntimeSnapshot = { kind: "payload", payload };
+        } catch (_) {
+          lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+        }
+        renderScanRuntimeInfo();
+      }
+
       async function loadAndRender() {
         if (isLoading) {
           return;
@@ -1574,7 +2134,10 @@ Last update: 2026-04-03 UTC
           lastResolvedRange = { start, end };
           lastFilters = { band: selectedBand, mode: selectedMode };
 
-          const loaded = await fetchAcademicDataset(start, end, selectedBand, selectedMode);
+          const [loaded] = await Promise.all([
+            fetchAcademicDataset(start, end, selectedBand, selectedMode),
+            fetchScanRuntimeStatus(),
+          ]);
           if (!loaded && metaSnapshot) {
             dataSource = "simulated";
             metaSnapshot.textContent = t("simulated_fallback");
@@ -1582,9 +2145,72 @@ Last update: 2026-04-03 UTC
           renderFromCurrentRange();
           fetchIonosphericBadge();
           refreshPropMap();
+          _checkHfStaleBanner(start, end);
         } finally {
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
+        }
+      }
+
+      async function _checkHfStaleBanner(start, end) {
+        const banner = document.getElementById("hfStaleBanner");
+        const bannerText = document.getElementById("hfStaleBannerText");
+        const goBtn = document.getElementById("hfStaleGoBtn");
+        if (!banner || !bannerText || !goBtn) return;
+
+        // Hide if data exists in the requested period
+        const hasHfData = synthetic && synthetic.series && synthetic.series.length > 0;
+        if (hasHfData) {
+          banner.classList.remove("visible");
+          return;
+        }
+
+        // Fetch the timestamp of the last non-APRS event
+        // No mode filter: fetch most recent events (DESC order) and find the first non-APRS one
+        try {
+          const params = new URLSearchParams({ limit: 20 });
+          const resp = await fetch(`${_BASE}api/events?${params.toString()}`);
+          if (!resp.ok) { banner.classList.remove("visible"); return; }
+          const events = await resp.json();
+          // Find last non-APRS event among the most recent 20
+          const lastHf = Array.isArray(events) ? events.find(e => e.mode && e.mode.toUpperCase() !== "APRS") : null;
+
+          if (!lastHf) {
+            bannerText.textContent = "Não existem dados HF na base de dados.";
+            goBtn.style.display = "none";
+            banner.classList.add("visible");
+            return;
+          }
+
+          const lastTs = new Date(lastHf.timestamp);
+          const lastTsStr = lastTs.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }) + " UTC";
+          const _presetLabels = { "1h": "na última hora", "6h": "nas últimas 6 horas", "24h": "nas últimas 24 horas", "7d": "nos últimos 7 dias", "30d": "nos últimos 30 dias" };
+          const periodStr = currentPreset === "custom" ? "no período selecionado" : (_presetLabels[currentPreset] || `nas últimas ${currentPreset}`);
+
+          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
+          goBtn.textContent = "→ Ver os últimos dados de propagação HF";
+          goBtn.style.display = "inline-block";
+          goBtn.onclick = () => {
+            // Switch to custom preset and set range around last HF data
+            const windowMs = 6 * 3600 * 1000; // 6h window centred on last HF event
+            const newEnd = new Date(lastTs.getTime() + 30 * 60 * 1000);
+            const newStart = new Date(newEnd.getTime() - windowMs);
+            // Activate custom preset
+            currentPreset = "custom";
+            sessionStorage.setItem("4ham_preset", "custom");
+            for (const b of presetRow.querySelectorAll("button[data-preset]")) {
+              b.classList.toggle("active", b.dataset.preset === "custom");
+            }
+            const customRange = document.getElementById("customRange");
+            if (customRange) customRange.style.display = "grid";
+            // Fill in the date inputs
+            if (startInput) startInput.value = toLocalDateTimeValue(newStart);
+            if (endInput) endInput.value = toLocalDateTimeValue(newEnd);
+            loadAndRender();
+          };
+          banner.classList.add("visible");
+        } catch (_) {
+          banner.classList.remove("visible");
         }
       }
 
@@ -2294,7 +2920,10 @@ Last update: 2026-04-03 UTC
 
         updateKpis(filteredSeries, filteredCallsigns, start, end);
         // Prefer server-computed propagation (accurate); fall back to JS computation for simulated data
-        const propagation = serverPropagation || computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end);
+        // Always recompute locally from filtered data (APRS already excluded from series)
+        const propagation = (filteredSeries.length > 0)
+          ? computePropagationAnalytics(filteredSeries, filteredCallsigns, start, end)
+          : { overallScore: 0, stability: 0, bestBand: null, byBand: [], trend: [] };
         updatePropagationKpis(propagation);
         drawTimeline(filteredSeries, start, end);
         drawStackedByBandMode(filteredSeries);
@@ -2347,9 +2976,13 @@ Last update: 2026-04-03 UTC
             dashboardTitle.textContent = t("dashboard_title_tpl", { version: appVersion });
           }
 
-          const series = Array.isArray(payload.data.series) ? payload.data.series : [];
-          const callsigns = Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [];
-          const rawEvts = Array.isArray(payload.data.raw_events) ? payload.data.raw_events : [];
+          // Filter out APRS from HF academic dataset (APRS has its own dedicated view)
+          const series = (Array.isArray(payload.data.series) ? payload.data.series : [])
+            .filter(r => r.mode !== "APRS");
+          const callsigns = (Array.isArray(payload.data.callsigns) ? payload.data.callsigns : [])
+            .filter(r => r.mode !== "APRS");
+          const rawEvts = (Array.isArray(payload.data.raw_events) ? payload.data.raw_events : [])
+            .filter(r => r.mode !== "APRS");
 
           synthetic = {
             series: series
@@ -2374,8 +3007,11 @@ Last update: 2026-04-03 UTC
           };
 
           // Use server-computed propagation data (accurate, uses real per-event data)
+          // Exclude APRS-dominated bands (2m, 70cm) from HF propagation analysis
+          const APRS_BANDS = new Set(["2m", "70cm"]);
           const kpis = payload.kpis || {};
-          const propBands = Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [];
+          const propBands = (Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [])
+            .filter(r => !APRS_BANDS.has(r.band));
           const propTrend = Array.isArray(payload.data.propagation_trend) ? payload.data.propagation_trend : [];
           if (propBands.length > 0 || kpis.propagation_score != null) {
             const byBandArray = BANDS.map((b) => {
@@ -2387,6 +3023,7 @@ Last update: 2026-04-03 UTC
               .filter((r) => !Number.isNaN(r.ts.getTime()))
               .sort((a, b) => a.ts - b.ts);
             const overallScore = Number(kpis.propagation_score || 0);
+            // Skip APRS bands for best_band calculation
             const bestBandData = propBands.length > 0 ? propBands[0] : null;
             const bestBand = bestBandData
               ? { band: bestBandData.band, score: Number(bestBandData.score), events: Number(bestBandData.events) }
@@ -3290,6 +3927,945 @@ Last update: 2026-04-03 UTC
       function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
       }
+
+      // ══════════════════════════════════════════════════════════════════════
+      //  APRS View — logic, map, charts
+      // ══════════════════════════════════════════════════════════════════════
+
+      const APRS_QTH_DEFAULT_LAT = 39.5;
+      const APRS_QTH_DEFAULT_LON = -8.0;
+      const APRS_RANGE_KM = 50;
+
+      let aprsQthLat = APRS_QTH_DEFAULT_LAT;
+      let aprsQthLon = APRS_QTH_DEFAULT_LON;
+      let aprsStationCallsign = "CT7BFV";
+      let aprsStationLocator = "";
+      let aprsQthLoaded = false;
+
+      let aprsMap = null;
+      let aprsEvents = [];
+      let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
+      let aprsCurrentPreset = "24h";
+      let aprsDataLoaded = false;
+      const APRS_REFRESH_INTERVAL_MS = 30 * 1000;
+      let aprsRefreshTimer = null;
+      let aprsNextRefreshMs = null;
+      let aprsCountdownTimer = null;
+
+      // ── Haversine ──────────────────────────────────────────────────────
+      function haversineKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function aprsMaidenheadToLatLon(locator) {
+        const loc = String(locator || "").trim().toUpperCase();
+        if (!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(loc)) {
+          return null;
+        }
+        const A = "A".charCodeAt(0);
+        const lon = (loc.charCodeAt(0) - A) * 20 - 180;
+        const lat = (loc.charCodeAt(1) - A) * 10 - 90;
+        const lonSub = Number(loc[2]) * 2;
+        const latSub = Number(loc[3]);
+        let finalLon = lon + lonSub + 1;
+        let finalLat = lat + latSub + 0.5;
+        if (loc.length >= 6) {
+          const lonSS = (loc.charCodeAt(4) - A) * (2 / 24);
+          const latSS = (loc.charCodeAt(5) - A) * (1 / 24);
+          finalLon = lon + lonSub + lonSS + (1 / 24);
+          finalLat = lat + latSub + latSS + (0.5 / 24);
+        }
+        return { lat: finalLat, lon: finalLon };
+      }
+
+      async function aprsEnsureStationQth() {
+        if (aprsQthLoaded) return;
+        try {
+          const lsCallsign = localStorage.getItem("4ham_station_callsign") || "";
+          const lsLocator = localStorage.getItem("4ham_station_locator") || "";
+          if (lsCallsign) aprsStationCallsign = lsCallsign;
+          if (lsLocator) aprsStationLocator = lsLocator;
+
+          const resp = await fetch(`${_BASE}api/settings`);
+          if (!resp.ok) {
+            aprsQthLoaded = true;
+            return;
+          }
+          const data = await resp.json();
+          const station = data.station || {};
+          aprsStationCallsign = station.callsign || aprsStationCallsign;
+          aprsStationLocator = station.locator || "";
+
+          const lat = Number.parseFloat(station.lat);
+          const lon = Number.parseFloat(station.lon);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            aprsQthLat = lat;
+            aprsQthLon = lon;
+          } else {
+            const pos = aprsMaidenheadToLatLon(aprsStationLocator);
+            if (pos) {
+              aprsQthLat = pos.lat;
+              aprsQthLon = pos.lon;
+            }
+          }
+        } catch (_err) {
+          // Keep defaults when station settings are unavailable.
+        } finally {
+          aprsQthLoaded = true;
+        }
+      }
+
+      // ── View toggle ───────────────────────────────────────────────────
+      const viewSelector = document.getElementById("viewSelector");
+      const hfView = document.getElementById("hfView");
+      const aprsView = document.getElementById("aprsView");
+
+      if (viewSelector) {
+        viewSelector.addEventListener("click", (e) => {
+          const btn = e.target.closest(".view-btn");
+          if (!btn) return;
+          const view = btn.dataset.view;
+          viewSelector.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          if (view === "aprs") {
+            hfView.style.display = "none";
+            aprsView.style.display = "block";
+            if (!aprsDataLoaded) {
+              aprsLoadAndRender();
+            } else {
+              if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
+              aprsStartAutoRefresh();
+            }
+          } else {
+            hfView.style.display = "block";
+            aprsView.style.display = "none";
+            aprsStopAutoRefresh();
+          }
+          localStorage.setItem("academic_active_view", view);
+        });
+      }
+
+      // Restore last active view (default: hf)
+      const savedView = localStorage.getItem("academic_active_view") || "hf";
+      if (savedView === "aprs" && aprsView) {
+        hfView.style.display = "none";
+        aprsView.style.display = "block";
+        viewSelector?.querySelectorAll(".view-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.view === "aprs");
+        });
+        if (!aprsDataLoaded) aprsLoadAndRender();
+      } else {
+        if (aprsView) aprsView.style.display = "none";
+      }
+
+      // ── APRS period presets ───────────────────────────────────────────
+      const aprsPresetRow = document.getElementById("aprsPresetRow");
+      const aprsApplyBtn = document.getElementById("aprsApplyBtn");
+
+      if (aprsPresetRow) {
+        aprsPresetRow.addEventListener("click", (e) => {
+          const btn = e.target.closest(".preset-btn");
+          if (!btn) return;
+          aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          aprsCurrentPreset = btn.dataset.preset;
+          const customRange = document.getElementById("aprsCustomRange");
+          if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
+          if (aprsCurrentPreset === "custom") {
+            aprsStopAutoRefresh();
+          } else {
+            aprsLoadAndRender();
+          }
+        });
+      }
+      if (aprsApplyBtn) {
+        aprsApplyBtn.addEventListener("click", () => aprsLoadAndRender());
+      }
+
+      // ── APRS source filter ────────────────────────────────────────────
+      document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          aprsSourceFilter = btn.dataset.filter;
+          aprsRenderAll();
+        });
+      });
+
+      // ── Period resolution ─────────────────────────────────────────────
+      function aprsResolvePeriod() {
+        const now = new Date();
+        let start;
+        switch (aprsCurrentPreset) {
+          case "30m": start = new Date(now - 30 * 60e3); break;
+          case "1h":  start = new Date(now - 3600e3); break;
+          case "3h":  start = new Date(now - 3 * 3600e3); break;
+          case "6h":  start = new Date(now - 6 * 3600e3); break;
+          case "24h": start = new Date(now - 24 * 3600e3); break;
+          case "custom": {
+            const s = document.getElementById("aprsCustomStart")?.value;
+            const e = document.getElementById("aprsCustomEnd")?.value;
+            return {
+              start: s ? new Date(s) : new Date(now - 30 * 60e3),
+              end:   e ? new Date(e) : now
+            };
+          }
+          default: start = new Date(now - 30 * 60e3);
+        }
+        return { start, end: now };
+      }
+
+      // ── Fetch APRS events from API ────────────────────────────────────
+      async function aprsFetchEvents(start, end) {
+        const params = new URLSearchParams({
+          mode: "APRS",
+          start: start.toISOString(),
+          end: end.toISOString()
+        });
+        try {
+          const resp = await fetch(`${_BASE}api/events?${params.toString()}`);
+          if (!resp.ok) return [];
+          return await resp.json();
+        } catch (_) {
+          return [];
+        }
+      }
+
+      // ── Filter by source ──────────────────────────────────────────────
+      function aprsFilteredEvents() {
+        if (aprsSourceFilter === "all") return aprsEvents;
+        return aprsEvents.filter(e => {
+          const src = (e.source || "").toLowerCase();
+          if (aprsSourceFilter === "rf") return src === "direwolf" || src === "rf";
+          if (aprsSourceFilter === "tcp") return src === "aprs_is" || src === "aprs-is" || src === "tcp" || src === "aprsis";
+          return true;
+        });
+      }
+
+      // ── Main load ─────────────────────────────────────────────────────
+      async function aprsLoadAndRender() {
+        await aprsEnsureStationQth();
+        const { start, end } = aprsResolvePeriod();
+        aprsEvents = await aprsFetchEvents(start, end);
+        aprsDataLoaded = true;
+
+        // Update meta
+        const snap = document.getElementById("aprsMetaSnapshot");
+        const period = document.getElementById("aprsMetaPeriod");
+        if (snap) snap.textContent = fmtDateUtc(new Date());
+        if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
+
+        aprsRenderAll();
+        aprsStartAutoRefresh();
+      }
+
+      // ── APRS auto-refresh (30 s) ─────────────────────────────────────
+      function aprsStartAutoRefresh() {
+        aprsStopAutoRefresh();
+        if (aprsCurrentPreset === "custom") return;
+        aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
+        aprsRefreshTimer = window.setInterval(async () => {
+          aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
+          await aprsLoadAndRender();
+        }, APRS_REFRESH_INTERVAL_MS);
+        if (!aprsCountdownTimer) {
+          aprsCountdownTimer = window.setInterval(aprsUpdateCountdown, 250);
+        }
+        aprsUpdateCountdown();
+      }
+
+      function aprsStopAutoRefresh() {
+        if (aprsRefreshTimer) { clearInterval(aprsRefreshTimer); aprsRefreshTimer = null; }
+        if (aprsCountdownTimer) { clearInterval(aprsCountdownTimer); aprsCountdownTimer = null; }
+        aprsNextRefreshMs = null;
+        const el = document.getElementById("aprsNextRefreshInfo");
+        if (el) el.textContent = "--";
+      }
+
+      function aprsUpdateCountdown() {
+        const el = document.getElementById("aprsNextRefreshInfo");
+        if (!el || !aprsNextRefreshMs) return;
+        const rem = Math.max(0, aprsNextRefreshMs - Date.now());
+        const s = Math.ceil(rem / 1000);
+        el.textContent = s > 0 ? `${s}s` : "a atualizar…";
+      }
+
+      function aprsRenderAll() {
+        const filtered = aprsFilteredEvents();
+        aprsUpdateKpis(filtered);
+        aprsRenderMap(filtered);
+        aprsDrawDistanceChart(filtered);
+        aprsDrawTimelineChart(filtered);
+        aprsDrawTopStationsChart(filtered);
+        aprsDrawSourceChart();
+      }
+
+      // ── KPIs ──────────────────────────────────────────────────────────
+      function aprsUpdateKpis(events) {
+        const callsigns = new Set(events.map(e => e.callsign).filter(Boolean));
+        const rfCount = events.filter(e => {
+          const s = (e.source || "").toLowerCase();
+          return s === "direwolf" || s === "rf";
+        }).length;
+        const tcpCount = events.length - rfCount;
+
+        let maxDist = 0;
+        const digipeaters = new Set();
+        events.forEach(e => {
+          if (Number.isFinite(e.lat) && Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0)) {
+            const d = haversineKm(aprsQthLat, aprsQthLon, e.lat, e.lon);
+            if (d > maxDist) maxDist = d;
+          }
+          // Extract digipeaters from path
+          const path = e.path || e.via || "";
+          if (path) {
+            path.split(",").forEach(p => {
+              const call = p.replace(/\*$/, "").trim();
+              if (call && call !== e.callsign) digipeaters.add(call);
+            });
+          }
+        });
+
+        const el = (id) => document.getElementById(id);
+        el("aprsKpiStations").textContent = formatInt(callsigns.size);
+        el("aprsKpiEvents").textContent = formatInt(events.length);
+        el("aprsKpiRfTcp").textContent = `${formatInt(rfCount)} / ${formatInt(tcpCount)}`;
+        el("aprsKpiMaxDist").textContent = maxDist > 0 ? `${Math.round(maxDist)} km` : "--";
+        el("aprsKpiDigipeaters").textContent = formatInt(digipeaters.size);
+      }
+
+      // ── HTML escape helper ────────────────────────────────────────────
+      function aprsEscapeHtml(str) {
+        const d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+      }
+
+      // ── APRS symbol → emoji (matches main interface) ──────────────────
+      function aprsSymbolEmoji(table, code) {
+        if (!code) return "📡";
+        const c = code.charCodeAt ? code : String.fromCharCode(code);
+        const map = {
+          ">": "🚗", k: "🚚", b: "🚲", R: "🚐", Y: "⛵",
+          f: "🚒", a: "🚑", U: "🚌", v: "🚐", j: "🏍️",
+          "[": "🏃", O: "🎈", "^": "✈️", X: "🚁", "'": "✈️",
+          "-": "🏠", "#": "📡", "&": "⛽", n: "📶", r: "📻",
+          I: "📻", "/": "⚡", "\\": "⚡", _: "🌤️", W: "🌊",
+        };
+        return map[c] || "📍";
+      }
+
+      // ── Build rich popup (matches main interface) ─────────────────────
+      function aprsBuildPopup(e, sources) {
+        const call = e.callsign || "—";
+        const lat = Number(e.lat);
+        const lon = Number(e.lon);
+        const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
+        const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
+        const path = e.path || e.via || "—";
+        const msg = e.msg || e.comment || "";
+        const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+        const srcSet = sources || new Set();
+        const hasRf = [...srcSet].some(s => s !== "aprs_is");
+        const hasTcp = srcSet.has("aprs_is");
+        let sourceBadge = "";
+        if (hasRf) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+        if (hasTcp) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+        let distText = "";
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          const d = haversineKm(aprsQthLat, aprsQthLon, lat, lon);
+          distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
+        }
+        const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+        return `
+          <div class="aprs-popup">
+            <div class="aprs-popup__header">${emoji} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
+            <table class="aprs-popup__table">
+              <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
+              ${distText}
+              <tr><td><strong>Path</strong></td><td>${aprsEscapeHtml(path)}</td></tr>
+              ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
+              <tr><td><strong>Last seen</strong></td><td>${ts}</td></tr>
+            </table>
+          </div>`;
+      }
+
+      // ── Leaflet map (matches main interface) ──────────────────────────
+      function aprsRenderMap(events) {
+        const mapEl = document.getElementById("aprsLeafletMap");
+        if (!aprsMap) {
+          aprsMap = L.map("aprsLeafletMap", {
+            center: [aprsQthLat, aprsQthLon],
+            zoom: 9,
+            zoomControl: true,
+            attributionControl: true,
+            scrollWheelZoom: false
+          });
+          // Ctrl+scroll to zoom
+          mapEl.addEventListener("wheel", (ev) => {
+            if (ev.ctrlKey) {
+              ev.preventDefault();
+              aprsMap.zoomIn(ev.deltaY < 0 ? 1 : -1);
+            }
+          }, { passive: false });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+            maxZoom: 18
+          }).addTo(aprsMap);
+
+          // QTH marker (divIcon with label — same as main interface)
+          L.marker([aprsQthLat, aprsQthLon], {
+            icon: L.divIcon({
+              className: "aprs-qth-icon",
+              html: `<span class="aprs-qth-label">📻 ${aprsStationCallsign || "QTH"}</span>`,
+              iconSize: [80, 28],
+              iconAnchor: [40, 14]
+            }),
+            zIndexOffset: 1000
+          }).addTo(aprsMap).bindPopup(
+            `<strong>${aprsStationCallsign || "QTH"}</strong><br>` +
+            `Grid: ${aprsStationLocator || "-"}<br>` +
+            `${aprsQthLat.toFixed(4)}°N  ${aprsQthLon.toFixed(4)}°E`
+          );
+
+          // Range circle
+          L.circle([aprsQthLat, aprsQthLon], {
+            radius: APRS_RANGE_KM * 1000,
+            color: "#00bfff", fillColor: "#00bfff", fillOpacity: 0.05,
+            weight: 1, dashArray: "6 4"
+          }).addTo(aprsMap);
+        }
+
+        // Clear previous station markers (keep base layers)
+        aprsMap.eachLayer(layer => {
+          if (layer._isAprsStation) aprsMap.removeLayer(layer);
+        });
+
+        // De-duplicate by callsign — track all sources, prefer RF event
+        const byCall = new Map();
+        const sourcesByCall = new Map();
+        events.forEach(e => {
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
+          if (!e.callsign) return;
+          const src = (e.source || "").toLowerCase();
+          if (!sourcesByCall.has(e.callsign)) sourcesByCall.set(e.callsign, new Set());
+          if (src) sourcesByCall.get(e.callsign).add(src);
+          const existing = byCall.get(e.callsign);
+          const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
+          const isRf = src === "direwolf" || src === "rf";
+          const existingIsRf = existingSrc === "direwolf" || existingSrc === "rf";
+          // RF always wins; among same type, keep latest
+          if (!existing || (isRf && !existingIsRf) || (isRf === existingIsRf && new Date(e.timestamp) > new Date(existing.timestamp))) {
+            byCall.set(e.callsign, e);
+          }
+        });
+
+        byCall.forEach((e, call) => {
+          const sources = sourcesByCall.get(call) || new Set();
+          const hasRf = [...sources].some(s => s !== "aprs_is");
+          const sourceClass = hasRf ? "aprs-marker-rf" : "aprs-marker-is";
+          const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+
+          const marker = L.marker([e.lat, e.lon], {
+            icon: L.divIcon({
+              className: `aprs-station-icon ${sourceClass}`,
+              html: `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>`,
+              iconSize: [120, 28],
+              iconAnchor: [60, 14]
+            })
+          });
+          marker._isAprsStation = true;
+          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, sources));
+        });
+
+        // Invalidate size (in case tab was hidden)
+        setTimeout(() => aprsMap.invalidateSize(), 200);
+
+        // Fullscreen toggle
+        const fsBtn = document.getElementById("aprsFullscreenBtn");
+        if (fsBtn && !fsBtn._bound) {
+          fsBtn._bound = true;
+          fsBtn.addEventListener("click", () => {
+            const wrapper = document.getElementById("aprsMapWrapper");
+            wrapper.classList.toggle("fullscreen");
+            const isFull = wrapper.classList.contains("fullscreen");
+            fsBtn.innerHTML = isFull ? "✖ Sair do Ecrã Completo" : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Fullscreen';
+            setTimeout(() => aprsMap.invalidateSize(), 150);
+          });
+          // Escape key exits fullscreen
+          document.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") {
+              const wrapper = document.getElementById("aprsMapWrapper");
+              if (wrapper.classList.contains("fullscreen")) {
+                wrapper.classList.remove("fullscreen");
+                fsBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Fullscreen';
+                setTimeout(() => aprsMap.invalidateSize(), 150);
+              }
+            }
+          });
+        }
+      }
+
+      // ── Distance histogram ────────────────────────────────────────────
+      function aprsDrawDistanceChart(events) {
+        const svg = d3.select("#aprsDistChart");
+        svg.selectAll("*").remove();
+
+        const distances = [];
+        const seen = new Set();
+        events.forEach(e => {
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
+          if (!e.callsign || seen.has(e.callsign)) return;
+          seen.add(e.callsign);
+          distances.push(haversineKm(aprsQthLat, aprsQthLon, e.lat, e.lon));
+        });
+
+        if (!distances.length) return;
+
+        const W = 1200, H = 600, M = { top: 20, right: 20, bottom: 60, left: 70 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const maxD = d3.max(distances);
+        const binCount = Math.min(20, Math.ceil(maxD / 10));
+        const binGen = d3.bin().domain([0, maxD]).thresholds(binCount);
+        const bins = binGen(distances);
+
+        const x = d3.scaleLinear().domain([0, maxD]).range([M.left, W - M.right]);
+        const y = d3.scaleLinear().domain([0, d3.max(bins, b => b.length)]).nice().range([H - M.bottom, M.top]);
+
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(8).tickFormat(d => `${Math.round(d)} km`))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+
+        svg.selectAll("rect.bar").data(bins).join("rect")
+          .attr("class", "bar")
+          .attr("x", d => x(d.x0) + 1)
+          .attr("y", d => y(d.length))
+          .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 2))
+          .attr("height", d => y(0) - y(d.length))
+          .attr("fill", "#3b82f6").attr("rx", 2);
+      }
+
+      // ── Timeline chart ────────────────────────────────────────────────
+      function aprsDrawTimelineChart(events) {
+        const svg = d3.select("#aprsTimelineChart");
+        svg.selectAll("*").remove();
+        if (!events.length) return;
+
+        const W = 1200, H = 600, M = { top: 20, right: 20, bottom: 60, left: 70 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        // Aggregate by hour
+        const hourMap = new Map();
+        events.forEach(e => {
+          const ts = new Date(e.timestamp);
+          if (isNaN(ts)) return;
+          const key = d3.utcFormat("%Y-%m-%dT%H:00Z")(ts);
+          hourMap.set(key, (hourMap.get(key) || 0) + 1);
+        });
+        const data = Array.from(hourMap, ([k, v]) => ({ time: new Date(k), count: v }))
+          .sort((a, b) => a.time - b.time);
+        if (!data.length) return;
+
+        const x = d3.scaleUtc().domain(d3.extent(data, d => d.time)).range([M.left, W - M.right]);
+        const y = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([H - M.bottom, M.top]);
+
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(6).tickFormat(d3.utcFormat("%b %d")))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+
+        const area = d3.area()
+          .x(d => x(d.time)).y0(y(0)).y1(d => y(d.count)).curve(d3.curveMonotoneX);
+        svg.append("path").datum(data).attr("d", area)
+          .attr("fill", "rgba(59,130,246,0.25)").attr("stroke", "#3b82f6").attr("stroke-width", 1.5);
+      }
+
+      // ── Top stations bar chart ────────────────────────────────────────
+      function aprsDrawTopStationsChart(events) {
+        const svg = d3.select("#aprsTopStationsChart");
+        svg.selectAll("*").remove();
+        if (!events.length) return;
+
+        const countMap = new Map();
+        events.forEach(e => {
+          if (!e.callsign) return;
+          countMap.set(e.callsign, (countMap.get(e.callsign) || 0) + 1);
+        });
+        const data = Array.from(countMap, ([k, v]) => ({ callsign: k, count: v }))
+          .sort((a, b) => b.count - a.count).slice(0, 20);
+        if (!data.length) return;
+
+        const W = 1200, H = Math.max(600, data.length * 38 + 40);
+        const M = { top: 10, right: 60, bottom: 20, left: 150 };
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const x = d3.scaleLinear().domain([0, d3.max(data, d => d.count)]).nice().range([M.left, W - M.right]);
+        const y = d3.scaleBand().domain(data.map(d => d.callsign)).range([M.top, H - M.bottom]).padding(0.2);
+
+        svg.append("g").attr("transform", `translate(${M.left},0)`)
+          .call(d3.axisLeft(y))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+        svg.append("g").attr("transform", `translate(0,${H - M.bottom})`)
+          .call(d3.axisBottom(x).ticks(5))
+          .selectAll("text").style("fill", "var(--text-muted)").style("font-size", "18px");
+
+        svg.selectAll("rect.bar").data(data).join("rect")
+          .attr("class", "bar")
+          .attr("x", M.left)
+          .attr("y", d => y(d.callsign))
+          .attr("width", d => x(d.count) - M.left)
+          .attr("height", y.bandwidth())
+          .attr("fill", "#22c55e").attr("rx", 2);
+
+        svg.selectAll("text.val").data(data).join("text")
+          .attr("class", "val")
+          .attr("x", d => x(d.count) + 6)
+          .attr("y", d => y(d.callsign) + y.bandwidth() / 2)
+          .attr("dy", "0.35em")
+          .text(d => d.count)
+          .style("fill", "var(--text-muted)").style("font-size", "16px");
+      }
+
+      // ── Source breakdown (donut) ──────────────────────────────────────
+      function aprsDrawSourceChart() {
+        const svg = d3.select("#aprsSourceChart");
+        svg.selectAll("*").remove();
+
+        const all = aprsEvents; // always use unfiltered for this chart
+        if (!all.length) return;
+
+        const rfCalls = new Set(), tcpCalls = new Set();
+        all.forEach(e => {
+          const s = (e.source || "").toLowerCase();
+          if (s === "direwolf" || s === "rf") rfCalls.add(e.callsign);
+          else tcpCalls.add(e.callsign);
+        });
+        const rf = rfCalls.size, tcp = tcpCalls.size;
+        const total = rf + tcp;
+
+        const W = 600, H = 600;
+        svg.attr("viewBox", `0 0 ${W} ${H}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+        const pie = d3.pie().sort(null).value(d => d.value);
+        const arc = d3.arc().innerRadius(120).outerRadius(240);
+        const data = [
+          { label: "RF", value: rf, color: "#3b82f6" },
+          { label: "TCP", value: tcp, color: "#22c55e" }
+        ];
+
+        const g = svg.append("g").attr("transform", `translate(${W / 2},${H / 2})`);
+        g.selectAll("path").data(pie(data)).join("path")
+          .attr("d", arc)
+          .attr("fill", d => d.data.color)
+          .attr("stroke", "var(--panel)").attr("stroke-width", 2);
+
+        g.selectAll("text.lbl").data(pie(data)).join("text")
+          .attr("class", "lbl")
+          .attr("transform", d => `translate(${arc.centroid(d)})`)
+          .attr("text-anchor", "middle")
+          .attr("dy", "-0.3em")
+          .text(d => d.data.label)
+          .style("fill", "#fff").style("font-size", "20px").style("font-weight", "600");
+
+        g.selectAll("text.pct").data(pie(data)).join("text")
+          .attr("class", "pct")
+          .attr("transform", d => `translate(${arc.centroid(d)})`)
+          .attr("text-anchor", "middle")
+          .attr("dy", "1em")
+          .text(d => `${Math.round(d.data.value / total * 100)}%`)
+          .style("fill", "#fff").style("font-size", "17px");
+
+        // Total in centre
+        g.append("text").attr("text-anchor", "middle").attr("dy", "0.35em")
+          .text(formatInt(total))
+          .style("fill", "var(--text)").style("font-size", "30px").style("font-weight", "700");
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      //  APRS Academic Export
+      // ══════════════════════════════════════════════════════════════════════
+
+      (function () {
+        const exportBtn  = document.getElementById("aprsExportBtn");
+        const exportMenu = document.getElementById("aprsExportMenu");
+        if (!exportBtn || !exportMenu) return;
+
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          exportMenu.classList.toggle("open");
+        });
+        document.addEventListener("click", () => exportMenu.classList.remove("open"));
+        exportMenu.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-aprsfmt]");
+          if (!btn) return;
+          exportMenu.classList.remove("open");
+          aprsRunExport(btn.dataset.aprsfmt);
+        });
+      })();
+
+      function _aprsSourceLabel(src) {
+        const s = (src || "").toLowerCase();
+        if (s === "direwolf" || s === "rf") return "RF (Direwolf)";
+        if (s === "aprs_is" || s === "aprs-is" || s === "tcp" || s === "aprsis") return "APRS-IS (TCP)";
+        return src || "unknown";
+      }
+
+      async function buildAprsExportData() {
+        const filtered = aprsFilteredEvents();
+        const { start, end } = aprsResolvePeriod();
+
+        // ── Metadata ──────────────────────────────────────────────────────
+        let softwareVersion = "unknown";
+        try {
+          const vr = await fetch(`${_BASE}api/version`);
+          if (vr.ok) { const vj = await vr.json(); softwareVersion = vj.version || vj.app_version || "unknown"; }
+        } catch (_) {}
+
+        let stationCallsign = aprsStationCallsign || "CT7BFV";
+        let stationLocator = aprsStationLocator || "";
+        let stationLat = aprsQthLat;
+        let stationLon = aprsQthLon;
+        try {
+          const sr = await fetch(`${_BASE}api/settings`);
+          if (sr.ok) {
+            const sj = await sr.json();
+            const st = sj.station || {};
+            stationCallsign = st.callsign || stationCallsign;
+            stationLocator  = st.locator  || stationLocator;
+            stationLat = parseFloat(st.lat) || stationLat;
+            stationLon = parseFloat(st.lon) || stationLon;
+          }
+        } catch (_) {}
+
+        const rfCount  = filtered.filter(e => { const s = (e.source||"").toLowerCase(); return s==="direwolf"||s==="rf"; }).length;
+        const tcpCount = filtered.length - rfCount;
+        const uniqueStations = new Set(filtered.map(e => e.callsign).filter(Boolean)).size;
+        const sourceFilterLabel = aprsSourceFilter === "all" ? "all" : aprsSourceFilter === "rf" ? "rf_only" : "aprs_is_only";
+
+        const metadata = {
+          "Station_Callsign":         stationCallsign,
+          "Station_Locator":          stationLocator,
+          "Station_Lat_deg":          stationLat,
+          "Station_Lon_deg":          stationLon,
+          "Export_Timestamp_UTC":     new Date().toISOString(),
+          "Period_Start_UTC":         start.toISOString(),
+          "Period_End_UTC":           end.toISOString(),
+          "Source_Filter":            sourceFilterLabel,
+          "Total_Packets_Exported":   filtered.length,
+          "Unique_Stations":          uniqueStations,
+          "RF_Packets":               rfCount,
+          "APRS_IS_Packets":          tcpCount,
+          "Observation_Frequency_Hz": 144800000,
+          "Observation_Band":         "2m (144 MHz)",
+          "QTH_Reference_Range_km":   APRS_RANGE_KM,
+          "Software":                 "4ham-spectrum-analysis",
+          "Software_Version":         softwareVersion,
+          "Data_Source":              "APRS-IS (TCP) + Direwolf (RF)",
+          "Reproducibility_Note":     "Raw_Frame field contains the original APRS frame for independent verification."
+        };
+
+        // ── Packets (raw, 1 row per packet) ───────────────────────────────
+        const packets = filtered
+          .slice()
+          .sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""))
+          .map(e => {
+            const lat = Number.isFinite(e.lat) && (e.lat !== 0 || e.lon !== 0) ? e.lat : null;
+            const lon = Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0) ? e.lon : null;
+            const dist = (lat !== null && lon !== null)
+              ? Number(haversineKm(stationLat, stationLon, lat, lon).toFixed(3))
+              : null;
+            return {
+              "Packet_ID":       e.id ?? "",
+              "Timestamp_UTC":   e.timestamp || "",
+              "Callsign":        e.callsign  || "",
+              "Source":          _aprsSourceLabel(e.source),
+              "Frequency_Hz":    e.frequency_hz ?? 144800000,
+              "Latitude_deg":    lat ?? "",
+              "Longitude_deg":   lon ?? "",
+              "Distance_km":     dist ?? "",
+              "SNR_dB":          (e.snr_db != null) ? Number(e.snr_db) : "",
+              "Path":            e.path || e.via || "",
+              "Comment":         e.msg  || e.comment || "",
+              "Raw_Frame":       e.raw  || "",
+            };
+          });
+
+        // ── Stations (deduplicated, 1 row per callsign) ───────────────────
+        const stationMap = new Map(); // callsign → aggregated
+        filtered.forEach(e => {
+          if (!e.callsign) return;
+          const src = (e.source || "").toLowerCase();
+          const isRf = src === "direwolf" || src === "rf";
+          let st = stationMap.get(e.callsign);
+          if (!st) {
+            st = {
+              callsign: e.callsign, total: 0, rf: 0, tcp: 0,
+              firstSeen: e.timestamp, lastSeen: e.timestamp,
+              lat: null, lon: null, pathLast: "", snrMax: null,
+              _rfSeen: false
+            };
+            stationMap.set(e.callsign, st);
+          }
+          st.total++;
+          if (isRf) st.rf++; else st.tcp++;
+          if (e.timestamp < st.firstSeen) st.firstSeen = e.timestamp;
+          if (e.timestamp > st.lastSeen) {
+            st.lastSeen = e.timestamp;
+            st.pathLast = e.path || e.via || "";
+            // Prefer RF position; otherwise take latest
+            if (isRf || !st._rfSeen) {
+              if (Number.isFinite(e.lat) && Number.isFinite(e.lon) && (e.lat !== 0 || e.lon !== 0)) {
+                st.lat = e.lat; st.lon = e.lon;
+              }
+              if (isRf) st._rfSeen = true;
+            }
+          }
+          if (isRf && e.snr_db != null) {
+            if (st.snrMax === null || e.snr_db > st.snrMax) st.snrMax = e.snr_db;
+          }
+        });
+
+        const stations = [...stationMap.values()]
+          .sort((a, b) => b.total - a.total)
+          .map(st => {
+            const dist = (st.lat !== null && st.lon !== null)
+              ? Number(haversineKm(stationLat, stationLon, st.lat, st.lon).toFixed(3))
+              : null;
+            const srcType = (st.rf > 0 && st.tcp > 0) ? "RF + APRS-IS"
+                          : (st.rf > 0)                ? "RF only"
+                          :                              "APRS-IS only";
+            return {
+              "Callsign":           st.callsign,
+              "Total_Packets":      st.total,
+              "RF_Packets":         st.rf,
+              "APRS_IS_Packets":    st.tcp,
+              "Source_Type":        srcType,
+              "First_Seen_UTC":     st.firstSeen || "",
+              "Last_Seen_UTC":      st.lastSeen  || "",
+              "Latitude_deg":       st.lat  ?? "",
+              "Longitude_deg":      st.lon  ?? "",
+              "Distance_km":        dist    ?? "",
+              "Path_Last":          st.pathLast  || "",
+              "Max_SNR_dB_RF":      st.snrMax !== null ? Number(st.snrMax.toFixed(1)) : "",
+            };
+          });
+
+        // ── Timeline (hourly buckets) ──────────────────────────────────────
+        const buckets = new Map();
+        const bucketKey = (ts) => {
+          const d = new Date(ts);
+          d.setMinutes(0, 0, 0);
+          return d.toISOString();
+        };
+        filtered.forEach(e => {
+          if (!e.timestamp) return;
+          const k = bucketKey(e.timestamp);
+          let b = buckets.get(k);
+          if (!b) { b = { bucket: k, total: 0, rf: 0, tcp: 0, stations: new Set(), rfStations: new Set(), isStations: new Set() }; buckets.set(k, b); }
+          const src = (e.source || "").toLowerCase();
+          const isRf = src === "direwolf" || src === "rf";
+          b.total++;
+          if (isRf) { b.rf++; b.rfStations.add(e.callsign); }
+          else       { b.tcp++; b.isStations.add(e.callsign); }
+          b.stations.add(e.callsign);
+        });
+        // Fill empty buckets between start and end
+        const bucketStart = new Date(start); bucketStart.setMinutes(0, 0, 0);
+        for (let t = new Date(bucketStart); t <= end; t = new Date(t.getTime() + 3600000)) {
+          const k = t.toISOString().slice(0, 14) + "00:00.000Z";
+          if (!buckets.has(k)) buckets.set(k, { bucket: k, total: 0, rf: 0, tcp: 0, stations: new Set(), rfStations: new Set(), isStations: new Set() });
+        }
+        const timeline = [...buckets.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, b]) => ({
+            "Bucket_UTC":         b.bucket,
+            "Total_Packets":      b.total,
+            "RF_Packets":         b.rf,
+            "APRS_IS_Packets":    b.tcp,
+            "Unique_Stations":    b.stations.size,
+            "RF_Only_Stations":   [...b.rfStations].filter(c => !b.isStations.has(c)).length,
+            "IS_Only_Stations":   [...b.isStations].filter(c => !b.rfStations.has(c)).length,
+          }));
+
+        return { metadata, packets, stations, timeline };
+      }
+
+      function _aprsExportFilename(fmt) {
+        const { start, end } = aprsResolvePeriod();
+        const ts = (d) => d.toISOString().slice(0, 16).replace(/[:T]/g, "-");
+        return `4ham-aprs_${ts(start)}_${ts(end)}.${fmt}`;
+      }
+
+      async function aprsRunExport(fmt) {
+        const data = await buildAprsExportData();
+
+        if (fmt === "json") {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          triggerDownload(blob, _aprsExportFilename("json"));
+          return;
+        }
+
+        if (fmt === "csv") {
+          // Export packets sheet as CSV (most useful for external tools)
+          const cols = Object.keys(data.packets[0] || {
+            Packet_ID: "", Timestamp_UTC: "", Callsign: "", Source: "",
+            Frequency_Hz: "", Latitude_deg: "", Longitude_deg: "", Distance_km: "",
+            SNR_dB: "", Path: "", Comment: "", Raw_Frame: ""
+          });
+          const escCsv = (v) => {
+            const s = String(v ?? "");
+            return (s.includes(",") || s.includes('"') || s.includes("\n"))
+              ? `"${s.replace(/"/g, '""')}"` : s;
+          };
+          const lines = [
+            `# 4ham-spectrum-analysis APRS Export`,
+            `# Generated: ${data.metadata.Export_Timestamp_UTC}`,
+            `# Station: ${data.metadata.Station_Callsign}  Locator: ${data.metadata.Station_Locator}`,
+            `# Period: ${data.metadata.Period_Start_UTC} → ${data.metadata.Period_End_UTC}`,
+            `# Source filter: ${data.metadata.Source_Filter}`,
+            `# Packets: ${data.metadata.Total_Packets_Exported}  RF: ${data.metadata.RF_Packets}  APRS-IS: ${data.metadata.APRS_IS_Packets}`,
+            cols.join(","),
+            ...data.packets.map(r => cols.map(c => escCsv(r[c])).join(","))
+          ];
+          const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+          triggerDownload(blob, _aprsExportFilename("csv"));
+          return;
+        }
+
+        if (fmt === "xlsx") {
+          if (!window.XLSX) { alert("SheetJS not loaded — cannot export XLSX"); return; }
+          const wb = XLSX.utils.book_new();
+
+          // Sheet 1: Metadata (key-value)
+          const metaRows = Object.entries(data.metadata).map(([k, v]) => ({ "Field": k, "Value": String(v) }));
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(metaRows), "Metadata");
+
+          // Sheet 2: Packets
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.packets), "Packets");
+
+          // Sheet 3: Stations
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.stations), "Stations");
+
+          // Sheet 4: Timeline
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.timeline), "Timeline");
+
+          XLSX.writeFile(wb, _aprsExportFilename("xlsx"));
+        }
+      }
+
     </script>
   </body>
 </html>

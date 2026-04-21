@@ -264,6 +264,14 @@ decoder_status = {
         "process_running": False,
         "process_pid": None
     },
+    "aprs_is": {
+        "enabled": False,
+        "connected": False,
+        "address": None,
+        "last_packet_at": None,
+        "last_error": None,
+        "internet_available": None,
+    },
     "files": {
         "aprs": None,
         "cw": None,
@@ -318,8 +326,12 @@ decoder_status = {
 # Decoder tasks and processes
 decoder_tasks = []
 decoder_stop = asyncio.Event()
+kiss_stop = asyncio.Event()
 kiss_task = None
+aprs_is_stop = asyncio.Event()
+aprs_is_task = None
 direwolf_process = None
+rtl_fm_process = None
 ft_internal_decoder = None
 ft_external_decoder = None
 cw_decoder = None
