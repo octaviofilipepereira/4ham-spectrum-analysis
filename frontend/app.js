@@ -666,6 +666,7 @@ function setAprsMapVisible(showMap) {
     const exactLon = stationLonInput?.value ? parseFloat(stationLonInput.value) : null;
     if (!aprsMapCtrl.isReady) {
       aprsMapCtrl.init(locator, callsign, exactLat, exactLon);
+      aprsMapCtrl.show();
       // Load recent APRS events from the DB
       _loadRecentAprsEvents();
     } else {
