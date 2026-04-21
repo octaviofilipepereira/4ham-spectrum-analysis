@@ -39,6 +39,17 @@ def health(_: None = Depends(verify_basic_auth)) -> Dict:
     }
 
 
+@router.get("/version")
+def version() -> Dict[str, str]:
+    """
+    Public application version endpoint.
+
+    No authentication required — version is innocuous metadata used by the
+    frontend to display the running version in the UI header and help page.
+    """
+    return {"version": APP_VERSION, "app_version": APP_VERSION}
+
+
 @router.get("/devices")
 def devices(
     _: None = Depends(verify_basic_auth),
