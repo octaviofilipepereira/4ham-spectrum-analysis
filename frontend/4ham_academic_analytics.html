@@ -4483,6 +4483,31 @@ Last update: 2026-04-03 UTC
         }
       }
 
+      // Last-known-position snapshot (callsign → {lat, lon}) computed from a
+      // wider 24h window. Used as fallback when the user-selected period only
+      // contains digipeated/status frames (no lat/lon) for a given callsign.
+      let aprsPositionSnapshot = new Map();
+      async function aprsRefreshPositionSnapshot(now) {
+        const newSnap = new Map();
+        try {
+          const start = new Date(now.getTime() - 24 * 3600 * 1000);
+          const list = await aprsFetchEvents(start, now);
+          for (const e of list) {
+            if (!e || !e.callsign) continue;
+            const lat = Number(e.lat);
+            const lon = Number(e.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (lat === 0 && lon === 0) continue;
+            const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+            const prev = newSnap.get(e.callsign);
+            if (!prev || tsMs >= prev.tsMs) {
+              newSnap.set(e.callsign, { lat, lon, tsMs });
+            }
+          }
+          aprsPositionSnapshot = newSnap;
+        } catch (_) { /* keep previous snapshot on failure */ }
+      }
+
       // ── Filter by source ──────────────────────────────────────────────
       function aprsFilteredEvents() {
         if (aprsSourceFilter === "all") return aprsEvents;
@@ -4501,7 +4526,14 @@ Last update: 2026-04-03 UTC
         try {
           await aprsEnsureStationQth();
           const { start, end } = aprsResolvePeriod();
-          aprsEvents = await aprsFetchEvents(start, end);
+          // Fetch the activity events for the user-selected period and a
+          // 24h position snapshot in parallel — the snapshot anchors markers
+          // for callsigns whose positioned beacons fall outside the period.
+          const [evs] = await Promise.all([
+            aprsFetchEvents(start, end),
+            aprsRefreshPositionSnapshot(end),
+          ]);
+          aprsEvents = evs;
           aprsDataLoaded = true;
 
           // Update meta
@@ -4752,6 +4784,8 @@ Last update: 2026-04-03 UTC
 
         // Pre-pass: latest known position per callsign (any source) so that
         // digipeated/status frames without lat/lon still anchor a marker.
+        // Falls back to the wider 24h `aprsPositionSnapshot` for callsigns
+        // whose positioned beacons fall outside the user-selected period.
         const positionByCall = new Map();
         events.forEach(e => {
           if (!e.callsign) return;
@@ -4763,6 +4797,12 @@ Last update: 2026-04-03 UTC
             positionByCall.set(e.callsign, { lat: e.lat, lon: e.lon, tsMs });
           }
         });
+        if (aprsPositionSnapshot instanceof Map) {
+          for (const [call, pos] of aprsPositionSnapshot) {
+            if (!call || positionByCall.has(call)) continue;
+            positionByCall.set(call, { lat: pos.lat, lon: pos.lon, tsMs: 0 });
+          }
+        }
 
         events.forEach(e => {
           if (!e.callsign) return;
