@@ -1254,8 +1254,16 @@ Last update: 2026-04-03 UTC
       .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
       .aprs-source-rf { background: #dcfce7; color: #166534; }
       .aprs-source-is { background: #dbeafe; color: #1e40af; }
-      .aprs-marker-rf { filter: hue-rotate(90deg) saturate(1.3); }
-      .aprs-marker-is { filter: hue-rotate(200deg) saturate(1.1); }
+      /* Marker source colours — must match the legend swatches below */
+      .aprs-marker-rf   .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
+      .aprs-marker-rf   .aprs-station-leader,
+      .aprs-marker-rf   .aprs-station-anchor  { background: #22c55e; }
+      .aprs-marker-is   .aprs-station-label   { color: #3b82f6; border-color: #3b82f6; }
+      .aprs-marker-is   .aprs-station-leader,
+      .aprs-marker-is   .aprs-station-anchor  { background: #3b82f6; }
+      .aprs-marker-lora .aprs-station-label   { color: #ec4899; border-color: #ec4899; }
+      .aprs-marker-lora .aprs-station-leader,
+      .aprs-marker-lora .aprs-station-anchor  { background: #ec4899; }
 
       .aprs-source-legend {
         display: flex;
@@ -1614,12 +1622,13 @@ Last update: 2026-04-03 UTC
           <article class="chart-panel span-12">
             <div class="chart-header">
               <h3 data-i18n="aprs_chart_map">APRS Station Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: blue for RF (direwolf), green for TCP (APRS-IS). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: green for RF (Direwolf, 144.800 MHz), blue for APRS-IS (TCP/internet), magenta for LoRa APRS (433.775 MHz). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
             </div>
-            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (blue) and APRS-IS (green).</p>
+            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (green), APRS-IS (blue) and LoRa APRS (magenta).</p>
             <div class="aprs-source-legend">
-              <span><span class="swatch" style="background:#3b82f6;"></span> RF (Direwolf)</span>
-              <span><span class="swatch" style="background:#22c55e;"></span> APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#22c55e;"></span> 📻 RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#3b82f6;"></span> 🌐 APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#ec4899;"></span> 📡 LoRa APRS</span>
               <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
             </div>
             <div class="aprs-map-wrapper" id="aprsMapWrapper">
