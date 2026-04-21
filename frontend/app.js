@@ -1250,16 +1250,29 @@ function applyEventsPanelFilters(items) {
 
 function applyEventsCardTypeFilter(items) {
   const source = Array.isArray(items) ? items : [];
+  // Suppress VHF APRS events (Direwolf 144.800 MHz + APRS-IS firehose) when
+  // the user is scanning LoRa — they pollute the events feed with traffic
+  // unrelated to the current 433.775 MHz scan. The "All Occupancy" filter
+  // bypasses this so the user can still inspect everything if needed.
+  const modeUpper = String(selectedDecoderMode || "").trim().toUpperCase();
+  const isLoraScan = modeUpper === "LORA";
+  const stripVhfAprs = (list) => list.filter((eventItem) => {
+    if (!isLoraScan) return true;
+    const evMode = String(eventItem?.mode || "").trim().toUpperCase();
+    if (evMode !== "APRS") return true;
+    const src = String(eventItem?.source || "").trim().toLowerCase();
+    return src === "lora_aprs";
+  });
   const selected = String(eventsTypeFilter?.value || "all").trim();
   if (selected === "cw-candidate") {
-    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW_CANDIDATE");
+    return stripVhfAprs(source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW_CANDIDATE"));
   }
   if (selected === "ssb-traffic") {
-    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC");
+    return stripVhfAprs(source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "SSB_TRAFFIC"));
   }
   if (selected === "ssb-callsign") {
     // SSB callsign events where a valid amateur callsign was identified
-    return source.filter((eventItem) => {
+    return stripVhfAprs(source.filter((eventItem) => {
       const mode = String(eventItem?.mode || "").trim().toUpperCase();
       if (mode !== "SSB" && mode !== "SSB_TRAFFIC") return false;
       if (String(eventItem?.type || "").trim() !== "callsign") return false;
@@ -1267,26 +1280,26 @@ function applyEventsCardTypeFilter(items) {
       if (cs) return true;
       const fromRaw = extractCallsignFromRaw(eventItem?.raw);
       return fromRaw.length > 0;
-    });
+    }));
   }
   if (selected === "cw-only") {
-    return source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW");
+    return stripVhfAprs(source.filter((eventItem) => String(eventItem?.mode || "").trim().toUpperCase() === "CW"));
   }
   if (selected === "callsign-only") {
-    return source.filter((eventItem) => {
+    return stripVhfAprs(source.filter((eventItem) => {
       const modeText = String(eventItem?.mode || "").trim().toUpperCase();
       const allowRawCallsignInference = modeText !== "SSB";
       const callsignText = String(
         eventItem?.callsign || (allowRawCallsignInference ? extractCallsignFromRaw(eventItem?.raw) : "") || ""
       ).trim();
       return callsignText.length > 0;
-    });
+    }));
   }
   if (selected === "all-occupancy") {
     return source;
   }
   // Default "all" — show callsign events only (suppress raw occupancy noise)
-  return source.filter((eventItem) => String(eventItem?.type || "").trim() === "callsign");
+  return stripVhfAprs(source.filter((eventItem) => String(eventItem?.type || "").trim() === "callsign"));
 }
 
 function hasEventsSearchCriteria() {
