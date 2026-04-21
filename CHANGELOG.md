@@ -24,7 +24,6 @@ Last update: 2026-04-18 UTC
 ### Fixed
 - **LoRa APRS install badge false-negative**: the Admin Config availability probe now checks both the backend interpreter and the host `python3`, avoiding a misleading *"gr-lora_sdr not installed"* status when the GNU Radio module is correctly installed system-wide but the 4ham backend runs inside an isolated `.venv`.
 - **Background APRS ingest gating**: `direwolf`, `aprs_is`, and `lora_aprs` events are no longer discarded when the main scan engine is stopped, in preview, or focused on another decoder mode. This fixes LoRa APRS frames being received on UDP `5687` but silently skipped unless a matching active scan was running.
-- **Manual launcher port override**: `scripts/server_control.sh` and `scripts/4ham_launcher.sh` now honour `APP_HOST` / `APP_PORT` from the environment or `.env`, so local/manual installs can move away from a busy default port like `8000` without editing the scripts themselves.
 
 ---
 

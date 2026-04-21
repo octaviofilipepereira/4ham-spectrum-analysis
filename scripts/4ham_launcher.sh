@@ -10,37 +10,7 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTROL="$ROOT_DIR/scripts/server_control.sh"
-ENV_FILE="$ROOT_DIR/.env"
-
-read_env_value() {
-  local key="$1"
-  local default_value="$2"
-  local value="${!key:-}"
-  if [[ -n "$value" ]]; then
-    echo "$value"
-    return 0
-  fi
-  if [[ -f "$ENV_FILE" ]]; then
-    value="$(grep -E "^(export[[:space:]]+)?${key}=" "$ENV_FILE" | tail -n 1 || true)"
-    if [[ -n "$value" ]]; then
-      value="${value#export }"
-      value="${value#*=}"
-      value="${value%\"}"
-      value="${value#\"}"
-      value="${value%\'}"
-      value="${value#\'}"
-    fi
-  fi
-  echo "${value:-$default_value}"
-}
-
-APP_HOST="$(read_env_value APP_HOST "127.0.0.1")"
-APP_PORT="$(read_env_value APP_PORT "8000")"
-URL_HOST="127.0.0.1"
-if [[ "$APP_HOST" != "0.0.0.0" && "$APP_HOST" != "::" ]]; then
-  URL_HOST="$APP_HOST"
-fi
-URL="http://${URL_HOST}:${APP_PORT}/"
+URL="http://127.0.0.1:8000/"
 
 # ── colours ────────────────────────────────────────────────────────────────────
 RST='\033[0m'
