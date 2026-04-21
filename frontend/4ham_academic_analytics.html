@@ -4425,19 +4425,31 @@ Last update: 2026-04-03 UTC
 
       // ── Main load ─────────────────────────────────────────────────────
       async function aprsLoadAndRender() {
-        await aprsEnsureStationQth();
-        const { start, end } = aprsResolvePeriod();
-        aprsEvents = await aprsFetchEvents(start, end);
-        aprsDataLoaded = true;
+        const overlay = document.getElementById("loadingOverlay");
+        overlay?.classList.add("active");
+        try {
+          await aprsEnsureStationQth();
+          const { start, end } = aprsResolvePeriod();
+          aprsEvents = await aprsFetchEvents(start, end);
+          aprsDataLoaded = true;
 
-        // Update meta
-        const snap = document.getElementById("aprsMetaSnapshot");
-        const period = document.getElementById("aprsMetaPeriod");
-        if (snap) snap.textContent = fmtDateUtc(new Date());
-        if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
+          // Update meta
+          const snap = document.getElementById("aprsMetaSnapshot");
+          const period = document.getElementById("aprsMetaPeriod");
+          if (snap) snap.textContent = fmtDateUtc(new Date());
+          if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
 
-        aprsRenderAll();
-        aprsStartAutoRefresh();
+          aprsRenderAll();
+          aprsStartAutoRefresh();
+
+          // Wait for next paint so the overlay only clears after the DOM/map is ready.
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          if (aprsMap) {
+            aprsMap.invalidateSize();
+          }
+        } finally {
+          overlay?.classList.remove("active");
+        }
       }
 
       // ── APRS auto-refresh (30 s) ─────────────────────────────────────
