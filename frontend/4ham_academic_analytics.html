@@ -241,6 +241,10 @@ Last update: 2026-04-03 UTC
         margin-bottom: 16px;
       }
 
+      .controls.controls-aprs {
+        grid-template-columns: 2fr auto auto;
+      }
+
       .field label {
         display: block;
         font-size: 0.8rem;
@@ -903,9 +907,21 @@ Last update: 2026-04-03 UTC
           padding: 12px;
         }
 
+        .hero {
+          padding: 16px;
+        }
+
+        .hero h1 {
+          font-size: clamp(1.1rem, 4.8vw, 1.4rem);
+        }
+
         .hero-side {
           width: 100%;
           align-items: flex-start;
+        }
+
+        .lang-toggle {
+          flex-wrap: wrap;
         }
 
         .scan-runtime-status {
@@ -913,12 +929,12 @@ Last update: 2026-04-03 UTC
         }
 
         .cards {
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: 1fr;
         }
 
-        /* !important to override inline style on APRS controls */
-        .controls {
-          grid-template-columns: 1fr !important;
+        .controls,
+        .controls.controls-aprs {
+          grid-template-columns: 1fr;
         }
 
         .custom-range {
@@ -929,37 +945,90 @@ Last update: 2026-04-03 UTC
           grid-template-columns: 1fr;
         }
 
-        /* tabs + badge: stack vertically, full width */
+        .preset-row,
+        .legend,
+        .aprs-source-legend,
+        .aprs-filter-row {
+          flex-wrap: wrap;
+        }
+
         .view-selector-row {
-          flex-direction: column;
           align-items: stretch;
+          gap: 10px;
           margin-top: 14px;
         }
         .view-selector {
           width: 100%;
-          flex-direction: column;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
         }
         .view-btn {
           white-space: normal;
           text-align: center;
-          padding: 10px 16px;
-          font-size: 0.88rem;
+          min-width: 0;
+          padding: 10px 12px;
+          font-size: 0.84rem;
         }
         .view-selector-row .scan-runtime-status {
-          padding: 9px 16px;
+          width: 100%;
+          justify-content: center;
+          padding: 12px 16px;
           font-size: 0.82rem;
         }
 
-        /* shorten tall charts and maps for portrait viewport */
-        .chart-panel > svg  { height: 260px; }
-        .chart-panel-fill svg { min-height: 260px; }
-        #heatmapChart       { height: 300px; }
-        .propmap-wrap       { height: 300px; }
+        .chart-panel {
+          padding: 10px 8px;
+        }
 
-        /* misc */
-        #nextRefreshInfo  { margin-top: 14px; }
-        .aprs-filter-row  { flex-wrap: wrap; }
-        .export-btn       { min-width: unset; }
+        .chart-header {
+          align-items: flex-start;
+        }
+
+        .chart-panel > svg {
+          height: 340px;
+        }
+
+        .chart-panel-fill svg {
+          min-height: 340px;
+        }
+
+        #heatmapChart {
+          height: 400px;
+        }
+
+        .propmap-wrap {
+          height: 340px;
+        }
+
+        .propmap-legend {
+          max-width: calc(50% - 18px);
+          padding: 6px 8px;
+        }
+
+        .propmap-legend-item {
+          font-size: 10px;
+          gap: 5px;
+        }
+
+        .propmap-legend-swatch {
+          width: 12px;
+          height: 12px;
+        }
+
+        .propmap-band-btn {
+          min-width: 42px;
+          padding: 4px 8px;
+          font-size: 11px;
+        }
+
+        #nextRefreshInfo {
+          margin-top: 14px;
+          align-items: flex-start;
+        }
+
+        .export-btn {
+          min-width: unset;
+        }
       }
 
       /* ── Loading overlay ─────────────────────────────────────── */
@@ -1189,10 +1258,10 @@ Last update: 2026-04-03 UTC
       }
       @media (max-width: 640px) {
         .aprs-cards {
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: 1fr;
         }
         #aprsLeafletMap {
-          height: 400px;
+          height: 460px;
         }
       }
     </style>
@@ -1433,7 +1502,7 @@ Last update: 2026-04-03 UTC
       <div id="aprsView" class="aprs-view">
       <section class="panel">
         <!-- APRS period controls -->
-        <div class="controls" style="grid-template-columns: 2fr auto auto;">
+        <div class="controls controls-aprs">
           <div class="field">
             <label data-i18n="period">Period</label>
             <div class="preset-row" id="aprsPresetRow">
