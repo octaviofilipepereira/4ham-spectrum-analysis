@@ -282,6 +282,8 @@ Ao contrário do dashboard principal (que mostra dados em tempo real, evento a e
 
 Os dados vêm do servidor e são **atualizados automaticamente a cada 60 segundos**. O cabeçalho mostra o timestamp da última consulta e um contador regressivo para o próximo refresh.
 
+Ao comutar entre os separadores **HF** e **APRS**, é mostrado um overlay de carregamento até a vista terminar de renderizar, evitando o breve flash de mapa vazio que existia em versões anteriores.
+
 ### Seletor de período
 
 | Preset | Período | Resolução temporal |
@@ -451,7 +453,7 @@ O Scan Rotation permite definir uma **sequência de slots (banda + modo)** que o
 
 ### Durante a rotação
 
-- A barra de estado mostra em tempo real: slot atual (banda + modo), tempo restante no countdown, e o próximo slot.
+- A barra de estado actualiza a cada segundo (tick client-side): slot actual (banda + modo), countdown em tempo real, e o próximo slot.
 - O indicador de pulsação vermelho confirma que a rotação está ativa.
 - O botão **Stop scanning** para a rotação (e o scan atual).
 - Os dados de todas as bandas/modos varridos acumulam-se na base de dados e aparecem nos dashboards analíticos.

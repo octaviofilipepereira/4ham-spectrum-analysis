@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-18 UTC
+Last update: 2026-04-21 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -97,6 +97,11 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.13.1
+- **Live rotation countdown**: scan rotation status bar now updates every second client-side, eliminating the static countdown that only refreshed on page reload.
+- **Loading overlay on tab switch**: switching between HF and APRS views now shows a loading overlay, preventing the brief empty-map flash while the DOM paints.
+- **LoRa & Mesh Protocols roadmap**: documented integration plan for LoRa APRS, Meshtastic, MeshCore, and LoRaWAN session key decryption (implementation pending).
 
 ### v0.12.4
 - **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
