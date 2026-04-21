@@ -616,10 +616,6 @@ const wfc = new WaterfallController(
 
 // ── APRS Map controller ────────────────────────────────────────────────
 const aprsMapCtrl = new APRSMapController("aprsMap");
-// Tracks the mode (APRS vs LORA) the map was last loaded for, so we only
-// clear+reload markers when the user actually switches modes — not on every
-// syncScanState poll (which calls setAprsMapVisible(true) repeatedly).
-let _aprsMapLoadedMode = null;
 const aprsMapArea = document.getElementById("aprsMapArea");
 const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
@@ -688,22 +684,15 @@ function setAprsMapVisible(showMap) {
     if (!aprsMapCtrl.isReady) {
       aprsMapCtrl.init(locator, callsign, exactLat, exactLon);
       aprsMapCtrl.show();
-      _aprsMapLoadedMode = _isLoraMapContext() ? "LORA" : "APRS";
-      _loadRecentAprsEvents();
     } else {
       aprsMapCtrl.show();
-      // Only clear and reload when the active mode actually changed
-      // (e.g. user switched from 2m+APRS to 70cm+LoRA). On every other
-      // call (syncScanState polls, band toggles within the same mode)
-      // keep the existing markers — they get refreshed live via the
-      // events stream.
-      const currentMode = _isLoraMapContext() ? "LORA" : "APRS";
-      if (_aprsMapLoadedMode !== currentMode) {
-        aprsMapCtrl.clearMarkers();
-        _aprsMapLoadedMode = currentMode;
-        _loadRecentAprsEvents();
-      }
+      // Drop stale markers from a previous mode before reloading so the
+      // LoRa map doesn't keep showing 2m direwolf stations and vice versa.
+      aprsMapCtrl.clearMarkers();
     }
+    // Reload events on every show so the map reflects the current mode
+    // (APRS-RF vs LoRa-APRS), filtered by source inside _loadRecentAprsEvents.
+    _loadRecentAprsEvents();
     // Non-blocking connectivity check — warn if no internet (RF-only)
     _checkAprsConnectivity();
   } else {
