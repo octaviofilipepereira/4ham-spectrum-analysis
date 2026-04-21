@@ -1641,7 +1641,7 @@ h1,
 }
 .aprs-qth-label {
   display: inline-block;
-  background: #1e40af;
+  background: #3b82f6;
   color: #fff;
   padding: 2px 8px;
   border-radius: 4px;
@@ -1740,16 +1740,16 @@ h1,
 }
 /* Leaflet marker source colours — applied to label text, leader line and
    anchor dot so the on-map colour matches the legend exactly.
-     RF (Direwolf, VHF radio)    → green
-     APRS-IS (TCP / internet)    → blue
+     RF (Direwolf, VHF radio)    → orange
+     APRS-IS (TCP / internet)    → green
      LoRa APRS (433 MHz)         → magenta                                */
-.aprs-marker-rf .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
+.aprs-marker-rf .aprs-station-label   { color: #f97316; border-color: #f97316; }
 .aprs-marker-rf .aprs-station-leader,
-.aprs-marker-rf .aprs-station-anchor  { background: #22c55e; }
+.aprs-marker-rf .aprs-station-anchor  { background: #f97316; }
 
-.aprs-marker-is .aprs-station-label   { color: #3b82f6; border-color: #3b82f6; }
+.aprs-marker-is .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
 .aprs-marker-is .aprs-station-leader,
-.aprs-marker-is .aprs-station-anchor  { background: #3b82f6; }
+.aprs-marker-is .aprs-station-anchor  { background: #22c55e; }
 
 .aprs-marker-lora .aprs-station-label { color: #ec4899; border-color: #ec4899; }
 .aprs-marker-lora .aprs-station-leader,

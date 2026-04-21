@@ -1219,7 +1219,7 @@ Last update: 2026-04-03 UTC
       .aprs-qth-icon { background: none !important; border: none !important; }
       .aprs-qth-label {
         display: inline-block;
-        background: #1e40af;
+        background: #3b82f6;
         color: #fff;
         padding: 2px 8px;
         border-radius: 4px;
@@ -1255,12 +1255,12 @@ Last update: 2026-04-03 UTC
       .aprs-source-rf { background: #dcfce7; color: #166534; }
       .aprs-source-is { background: #dbeafe; color: #1e40af; }
       /* Marker source colours — must match the legend swatches below */
-      .aprs-marker-rf   .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
+      .aprs-marker-rf   .aprs-station-label   { color: #f97316; border-color: #f97316; }
       .aprs-marker-rf   .aprs-station-leader,
-      .aprs-marker-rf   .aprs-station-anchor  { background: #22c55e; }
-      .aprs-marker-is   .aprs-station-label   { color: #3b82f6; border-color: #3b82f6; }
+      .aprs-marker-rf   .aprs-station-anchor  { background: #f97316; }
+      .aprs-marker-is   .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
       .aprs-marker-is   .aprs-station-leader,
-      .aprs-marker-is   .aprs-station-anchor  { background: #3b82f6; }
+      .aprs-marker-is   .aprs-station-anchor  { background: #22c55e; }
       .aprs-marker-lora .aprs-station-label   { color: #ec4899; border-color: #ec4899; }
       .aprs-marker-lora .aprs-station-leader,
       .aprs-marker-lora .aprs-station-anchor  { background: #ec4899; }
@@ -1622,14 +1622,14 @@ Last update: 2026-04-03 UTC
           <article class="chart-panel span-12">
             <div class="chart-header">
               <h3 data-i18n="aprs_chart_map">APRS Station Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: green for RF (Direwolf, 144.800 MHz), blue for APRS-IS (TCP/internet), magenta for LoRa APRS (433.775 MHz). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: orange for RF (Direwolf, 144.800 MHz), green for APRS-IS (TCP/internet), magenta for LoRa APRS (433.775 MHz). The blue marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
             </div>
-            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (green), APRS-IS (blue) and LoRa APRS (magenta).</p>
+            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (orange), APRS-IS (green) and LoRa APRS (magenta).</p>
             <div class="aprs-source-legend">
-              <span><span class="swatch" style="background:#22c55e;"></span> 📻 RF (Direwolf)</span>
-              <span><span class="swatch" style="background:#3b82f6;"></span> 🌐 APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#f97316;"></span> 📻 RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#22c55e;"></span> 🌐 APRS-IS (TCP)</span>
               <span><span class="swatch" style="background:#ec4899;"></span> 📡 LoRa APRS</span>
-              <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
+              <span><span class="swatch" style="background:#3b82f6;"></span> QTH</span>
             </div>
             <div class="aprs-map-wrapper" id="aprsMapWrapper">
               <button class="aprs-map-fullscreen-btn" id="aprsFullscreenBtn" title="Fullscreen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Fullscreen</button>
