@@ -900,7 +900,7 @@ Last update: 2026-04-03 UTC
 
       @media (max-width: 640px) {
         .wrap {
-          padding: 14px;
+          padding: 12px;
         }
 
         .hero-side {
@@ -916,8 +916,9 @@ Last update: 2026-04-03 UTC
           grid-template-columns: repeat(2, 1fr);
         }
 
+        /* !important to override inline style on APRS controls */
         .controls {
-          grid-template-columns: 1fr;
+          grid-template-columns: 1fr !important;
         }
 
         .custom-range {
@@ -927,6 +928,38 @@ Last update: 2026-04-03 UTC
         .meta-grid {
           grid-template-columns: 1fr;
         }
+
+        /* tabs + badge: stack vertically, full width */
+        .view-selector-row {
+          flex-direction: column;
+          align-items: stretch;
+          margin-top: 14px;
+        }
+        .view-selector {
+          width: 100%;
+          flex-direction: column;
+        }
+        .view-btn {
+          white-space: normal;
+          text-align: center;
+          padding: 10px 16px;
+          font-size: 0.88rem;
+        }
+        .view-selector-row .scan-runtime-status {
+          padding: 9px 16px;
+          font-size: 0.82rem;
+        }
+
+        /* shorten tall charts and maps for portrait viewport */
+        .chart-panel > svg  { height: 260px; }
+        .chart-panel-fill svg { min-height: 260px; }
+        #heatmapChart       { height: 300px; }
+        .propmap-wrap       { height: 300px; }
+
+        /* misc */
+        #nextRefreshInfo  { margin-top: 14px; }
+        .aprs-filter-row  { flex-wrap: wrap; }
+        .export-btn       { min-width: unset; }
       }
 
       /* ── Loading overlay ─────────────────────────────────────── */
@@ -1157,6 +1190,9 @@ Last update: 2026-04-03 UTC
       @media (max-width: 640px) {
         .aprs-cards {
           grid-template-columns: repeat(2, 1fr);
+        }
+        #aprsLeafletMap {
+          height: 400px;
         }
       }
     </style>
