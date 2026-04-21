@@ -156,10 +156,20 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
 // Immediately show/hide APRS-related buttons from cached state (avoids flash)
 {
   const cachedAprs = localStorage.getItem("4ham_aprs_active") === "1";
+  const cachedLora = localStorage.getItem("4ham_lora_aprs_active") === "1";
   const btn2m = document.querySelector('[data-quick-band="2m"]');
   const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
+  const btn70cm = document.querySelector('[data-quick-band="70cm"]');
+  const btnLora = document.querySelector('[data-quick-mode="LORA"]');
   if (btn2m) btn2m.classList.toggle('d-none', !cachedAprs);
   if (btnAprs) btnAprs.classList.toggle('d-none', !cachedAprs);
+  if (btn70cm) btn70cm.classList.toggle('d-none', !cachedLora);
+  if (btnLora) btnLora.classList.toggle('d-none', !cachedLora);
+}
+
+/** Maps a UI quick-mode value to the backend decoder mode (LORA → APRS). */
+function _backendMode(uiMode) {
+  return String(uiMode || "").trim().toUpperCase() === "LORA" ? "APRS" : uiMode;
 }
 
 // Selected decoder mode for scan
@@ -537,8 +547,11 @@ function resolveCwDecoderSegment(scanState) {
 function renderScanContextSummary(scanState) {
   if (scanRangeSummaryEl) {
     const isAprs = String(selectedDecoderMode || "").trim().toUpperCase() === "APRS";
+    const isLora = String(selectedDecoderMode || "").trim().toUpperCase() === "LORA";
     if (isAprs) {
       scanRangeSummaryEl.textContent = "144.800 MHz (APRS)";
+    } else if (isLora) {
+      scanRangeSummaryEl.textContent = "433.775 MHz (LoRa APRS)";
     } else {
       const scanRange = resolveDisplayedScanRange(scanState);
       scanRangeSummaryEl.textContent = formatScanRangeSummary(scanRange?.start_hz, scanRange?.end_hz);
@@ -718,15 +731,17 @@ function _updateAprsMapCount() {
   }
 }
 
-/** Sync the APRS map filter, title and VFO to the currently active band context. */
+/** Sync the APRS map filter, title and VFO to the currently active mode (APRS vs LORA). */
 function _syncAprsMapContext() {
   if (!aprsMapArea || aprsMapArea.hidden) return;
-  const activeBand = bandSelect?.value || localStorage.getItem("4ham_active_band") || "2m";
-  const loraActive = localStorage.getItem("4ham_lora_aprs_active") === "1";
-  const is70cm = activeBand === "70cm" && loraActive;
+  // Decide context from the selected mode (preferred) or fall back to band
+  const modeUpper = String(selectedDecoderMode || "").trim().toUpperCase();
+  const isLora = modeUpper === "LORA"
+    || (modeUpper !== "APRS" && (bandSelect?.value === "70cm")
+        && localStorage.getItem("4ham_lora_aprs_active") === "1");
 
-  // Apply the right combined filter (rf+IS for 2m, lora+IS for 70cm)
-  aprsMapCtrl.applyFilter(is70cm ? "lora_tcp" : "rf_tcp");
+  // Apply the right combined filter (rf+IS for APRS, lora+IS for LoRa)
+  aprsMapCtrl.applyFilter(isLora ? "lora_tcp" : "rf_tcp");
 
   // Update filter button UI: reset active state, hide irrelevant source button
   if (aprsMapFilterEl) {
@@ -735,18 +750,18 @@ function _syncAprsMapContext() {
     if (allBtn) allBtn.classList.add("aprs-filter-btn--active");
     const rfBtn = aprsMapFilterEl.querySelector('[data-filter="rf"]');
     const loraBtn = aprsMapFilterEl.querySelector('[data-filter="lora"]');
-    if (rfBtn) rfBtn.classList.toggle("d-none", is70cm);
-    if (loraBtn) loraBtn.classList.toggle("d-none", !is70cm);
+    if (rfBtn) rfBtn.classList.toggle("d-none", isLora);
+    if (loraBtn) loraBtn.classList.toggle("d-none", !isLora);
   }
 
   // Update map title
   const titleEl = aprsMapArea.querySelector(".aprs-map-header__title");
-  if (titleEl) titleEl.textContent = is70cm ? "📡 LoRa APRS — 433.775 MHz" : "📡 APRS Map — 144.800 MHz";
+  if (titleEl) titleEl.textContent = isLora ? "📡 LoRa APRS — 433.775 MHz" : "📡 APRS Map — 144.800 MHz";
 
   // Update VFO display
   wfc.updateVFODisplay(
-    is70cm ? 433775000 : 144800000,
-    is70cm ? 433775000 : 144800000
+    isLora ? 433775000 : 144800000,
+    isLora ? 433775000 : 144800000
   );
 
   _updateAprsMapCount();
@@ -1980,7 +1995,7 @@ async function startScan() {
   const selectedBand = bandSelect.value;
   localStorage.setItem("4ham_active_band", selectedBand);
   const range = getScanRangeForBand(selectedBand);
-  const decoderModeToSend = selectedDecoderMode ? selectedDecoderMode.toLowerCase() : "";
+  const decoderModeToSend = selectedDecoderMode ? _backendMode(selectedDecoderMode).toLowerCase() : "";
   const requestPayload = {
     device: selectedDeviceId,
     decoder_mode: decoderModeToSend,
@@ -2028,8 +2043,8 @@ async function startScan() {
   // Sync the events filter with the selected decoder mode so only
   // events from this mode appear in the panel.
   if (selectedDecoderMode) {
-    wfc.recenterForMode(selectedDecoderMode);
-    eventsSearchModeInput.value = selectedDecoderMode;
+    wfc.recenterForMode(_backendMode(selectedDecoderMode));
+    eventsSearchModeInput.value = _backendMode(selectedDecoderMode);
     fetchEvents();
     fetchTotal();
   }
@@ -2073,7 +2088,7 @@ async function syncScanState() {
       setStatus(nextRunning ? "Scan running" : isPreview ? "Monitor mode" : "Scan stopped");
       updateScanButtonState();
       if (!wasRunning && nextRunning && selectedDecoderMode) {
-        wfc.recenterForMode(selectedDecoderMode);
+        wfc.recenterForMode(_backendMode(selectedDecoderMode));
       }
       // Deselect mode button when scan transitions running → stopped
       if (wasRunning && !nextRunning && selectedDecoderMode) {
@@ -2086,8 +2101,15 @@ async function syncScanState() {
     // Only sync when a scan is actually running — when stopped, the stale
     // decoder_mode in scan_state should not force a button selection.
     const backendMode = String(data?.decoder_mode || "").trim().toUpperCase();
-    if (nextRunning && backendMode && backendMode !== selectedDecoderMode) {
-      selectedDecoderMode = backendMode;
+    if (nextRunning && backendMode && backendMode !== _backendMode(selectedDecoderMode)) {
+      // Disambiguate APRS vs LORA based on band when restoring from backend
+      const backendBandRaw = String(data?.scan?.band || "").trim();
+      const loraActive = localStorage.getItem("4ham_lora_aprs_active") === "1";
+      if (backendMode === "APRS" && backendBandRaw === "70cm" && loraActive) {
+        selectedDecoderMode = "LORA";
+      } else {
+        selectedDecoderMode = backendMode;
+      }
       wfc.recenterForMode(backendMode);
       setAprsMapVisible(backendMode === "APRS");
       refreshModeButtons();
@@ -3814,14 +3836,13 @@ async function loadSettings() {
         const wantsLora = loraAprsEnabledCheck ? loraAprsEnabledCheck.checked : false;
         installLoraAprsBtn.classList.toggle("d-none", grLoraAvailable || !wantsLora);
       }
-      // Show/hide 70cm band button: available AND enabled; label as "LoRa" when active
+      // Show/hide 70cm band + LoRa mode buttons: available AND enabled
       const loraActive = grLoraAvailable && Boolean(data.lora_aprs.enabled);
       localStorage.setItem("4ham_lora_aprs_active", loraActive ? "1" : "0");
       const btn70cm = document.querySelector('[data-quick-band="70cm"]');
-      if (btn70cm) {
-        btn70cm.classList.toggle('d-none', !loraActive);
-        btn70cm.textContent = loraActive ? "LoRa" : "70cm";
-      }
+      const btnLora = document.querySelector('[data-quick-mode="LORA"]');
+      if (btn70cm) btn70cm.classList.toggle('d-none', !loraActive);
+      if (btnLora) btnLora.classList.toggle('d-none', !loraActive);
     }
     if (data.audio_config) {
       audioInputDeviceInput.value = data.audio_config.input_device || "";
@@ -4464,7 +4485,9 @@ if (saveLoraAprsSettingsBtn) {
       }
       showToast(enabled ? "LoRa APRS packet decoding enabled" : "LoRa APRS packet decoding disabled");
       const btn70cm = document.querySelector('[data-quick-band="70cm"]');
-      if (btn70cm && enabled) btn70cm.classList.remove('d-none');
+      const btnLora = document.querySelector('[data-quick-mode="LORA"]');
+      if (btn70cm) btn70cm.classList.toggle('d-none', !enabled);
+      if (btnLora) btnLora.classList.toggle('d-none', !enabled);
       localStorage.setItem("4ham_lora_aprs_active", enabled ? "1" : "0");
     } catch (err) {
       showToastError("Failed to save LoRa APRS setting");
@@ -4675,12 +4698,16 @@ if (quickModeButtons.length) {
         try {
           await stopScan();
           selectedDecoderMode = mode;
-          wfc.selectedDecoderMode = mode;
-          eventsSearchModeInput.value = mode;
-          // APRS operates on 2m — auto-switch band before restarting
+          wfc.selectedDecoderMode = _backendMode(mode);
+          eventsSearchModeInput.value = _backendMode(mode);
+          // APRS operates on 2m, LORA on 70cm — auto-switch band before restarting
           if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
             bandSelect.value = "2m";
             localStorage.setItem("4ham_active_band", "2m");
+            refreshQuickBandButtons();
+          } else if (mode === "LORA" && bandSelect && bandSelect.value !== "70cm") {
+            bandSelect.value = "70cm";
+            localStorage.setItem("4ham_active_band", "70cm");
             refreshQuickBandButtons();
           }
           // Clear old markers from previous mode to prevent pollution
@@ -4690,7 +4717,7 @@ if (quickModeButtons.length) {
           // Immediately reload events for the new mode
           fetchEvents();
           fetchTotal();
-          setAprsMapVisible(mode === "APRS");
+          setAprsMapVisible(mode === "APRS" || mode === "LORA");
           showToast(`Mode switched to ${mode}`);
         } catch (err) {
           showToastError(`Failed to switch mode: ${err.message}`);
@@ -4713,13 +4740,15 @@ if (quickModeButtons.length) {
         fetchTotal();
       } else {
         selectedDecoderMode = mode;
-        // APRS operates on 2m (144.800 MHz) — auto-switch band
+        // APRS operates on 2m, LORA on 70cm — auto-switch band
         if (mode === "APRS" && bandSelect && bandSelect.value !== "2m") {
           await switchBandLive("2m");
+        } else if (mode === "LORA" && bandSelect && bandSelect.value !== "70cm") {
+          await switchBandLive("70cm");
         }
-        wfc.recenterForMode(mode);
-        eventsSearchModeInput.value = mode;
-        setAprsMapVisible(mode === "APRS");
+        wfc.recenterForMode(_backendMode(mode));
+        eventsSearchModeInput.value = _backendMode(mode);
+        setAprsMapVisible(mode === "APRS" || mode === "LORA");
         refreshModeButtons();
         logLine(`Modo selecionado: ${mode}`);
         fetchEvents();
