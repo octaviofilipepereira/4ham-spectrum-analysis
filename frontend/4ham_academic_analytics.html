@@ -4308,6 +4308,9 @@ Last update: 2026-04-03 UTC
           viewSelector.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
 
+          const overlay = document.getElementById("loadingOverlay");
+          overlay?.classList.add("active");
+
           if (view === "aprs") {
             hfView.style.display = "none";
             aprsView.style.display = "block";
@@ -4316,11 +4319,13 @@ Last update: 2026-04-03 UTC
             } else {
               if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
               aprsStartAutoRefresh();
+              requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
             }
           } else {
             hfView.style.display = "block";
             aprsView.style.display = "none";
             aprsStopAutoRefresh();
+            requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
           }
           localStorage.setItem("academic_active_view", view);
         });
