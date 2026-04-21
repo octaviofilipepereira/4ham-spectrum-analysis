@@ -182,6 +182,44 @@ Last update: 2026-04-03 UTC
 
       #nextRefreshInfo {
         margin-top: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .refresh-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: rgba(15, 28, 40, 0.68);
+        color: var(--text);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.2s;
+        line-height: 0;
+      }
+      .refresh-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--mode-ssb);
+        color: var(--mode-ssb);
+      }
+      .refresh-btn:active { transform: scale(0.92); }
+      .refresh-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .refresh-btn svg { width: 14px; height: 14px; }
+      .refresh-btn.spinning svg { animation: refreshSpin 0.9s linear infinite; }
+      @keyframes refreshSpin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .refresh-btn.spinning svg { animation: none !important; }
       }
 
       .panel {
@@ -1138,7 +1176,7 @@ Last update: 2026-04-03 UTC
         </div>
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
         <p id="apiLastFetchInfo">Last API data query: --</p>
-        <p id="nextRefreshInfo">Time until next data refresh: --</p>
+        <p id="nextRefreshInfo"><span id="nextRefreshText">Time until next data refresh: --</span><button type="button" id="manualRefreshBtn" class="refresh-btn" title="Refresh now" aria-label="Refresh now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"></path></svg></button></p>
         <div class="view-selector-row">
           <div class="view-selector" id="viewSelector">
             <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
@@ -1640,6 +1678,8 @@ Last update: 2026-04-03 UTC
       let _appVersion = "";
       const apiLastFetchInfo = document.getElementById("apiLastFetchInfo");
       const nextRefreshInfo = document.getElementById("nextRefreshInfo");
+      const nextRefreshText = document.getElementById("nextRefreshText");
+      const manualRefreshBtn = document.getElementById("manualRefreshBtn");
       const scanRuntimeInfo = document.getElementById("scanRuntimeInfo");
       const chartHelpLayer = document.getElementById("chartHelpLayer");
       const chartHelpLayerTitle = document.getElementById("chartHelpLayerTitle");
@@ -1695,6 +1735,19 @@ Last update: 2026-04-03 UTC
 
       applyBtn.addEventListener("click", () => {
         loadAndRender();
+      });
+
+      manualRefreshBtn?.addEventListener("click", async () => {
+        if (isLoading) return;
+        manualRefreshBtn.disabled = true;
+        manualRefreshBtn.classList.add("spinning");
+        try {
+          nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
+          await loadAndRender();
+        } finally {
+          manualRefreshBtn.classList.remove("spinning");
+          manualRefreshBtn.disabled = false;
+        }
       });
 
       // ── Export ──────────────────────────────────────────────────────────────
@@ -3115,18 +3168,18 @@ Last update: 2026-04-03 UTC
       }
 
       function updateNextRefreshInfo() {
-        if (!nextRefreshInfo) {
+        if (!nextRefreshText) {
           return;
         }
         if (!nextRefreshDeadlineMs) {
-          nextRefreshInfo.textContent = t("next_refresh", { time: "--" });
+          nextRefreshText.textContent = t("next_refresh", { time: "--" });
           return;
         }
 
         const remainingMs = nextRefreshDeadlineMs - Date.now();
         if (remainingMs <= 0) {
           if (!isLoading) {
-            nextRefreshInfo.textContent = t("refreshing");
+            nextRefreshText.textContent = t("refreshing");
             nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
             loadAndRender();
           }
@@ -3136,7 +3189,7 @@ Last update: 2026-04-03 UTC
         const totalSeconds = Math.ceil(remainingMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
-        nextRefreshInfo.textContent = t("next_refresh", { time: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` });
+        nextRefreshText.textContent = t("next_refresh", { time: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}` });
       }
 
       function updateKpis(seriesRows, callsignRows, start, end) {
