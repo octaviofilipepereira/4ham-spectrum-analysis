@@ -412,6 +412,54 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
+    <!-- Install Direwolf (APRS) Modal -->
+    <div class="modal fade" id="installAprsModal" tabindex="-1" aria-hidden="true" aria-labelledby="installAprsModalLabel">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="installAprsModalLabel">Install Direwolf — Enable APRS</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>
+              Direwolf (the software TNC used for APRS packet decoding) is not installed on this server.
+              To install it without re-running the full 4ham installer, run the helper script below.
+            </p>
+            <p class="mb-2">
+              <strong>Run this command in a terminal on the server where 4ham is installed,
+              follow the prompts, then reload this page.</strong>
+            </p>
+            <div class="input-group input-group-sm mb-2">
+              <input type="text" class="form-control font-monospace" id="installAprsCommand"
+                     value="sudo bash scripts/enable_aprs.sh" readonly />
+              <button class="btn btn-outline-info" type="button" id="installAprsCopyBtn" title="Copy to clipboard">
+                Copy
+              </button>
+            </div>
+            <small class="d-block mb-3 text-muted">
+              The script must be run from inside the 4ham project folder
+              (e.g. <code>cd ~/4ham-spectrum-analysis</code> first).
+            </small>
+            <details>
+              <summary class="small">What does the script do?</summary>
+              <ul class="small mt-2 mb-0">
+                <li>Detects your Linux distribution (Debian/Ubuntu/Mint/Raspbian).</li>
+                <li>Installs Direwolf via <code>apt-get install direwolf</code> (asks for your sudo password).</li>
+                <li>Creates a default <code>config/direwolf.conf</code> if missing (KISS TCP on port 8001).</li>
+                <li>Prints next steps to enable APRS in this Admin Config panel.</li>
+              </ul>
+            </details>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-info btn-sm" id="installAprsReloadBtn">
+              Reload page
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade app-modal" id="eventsSearchModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -598,7 +646,17 @@ Last update: 2026-02-22 16:27:19 UTC
               </div>
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12">
-                <h3 class="h6 mb-1">APRS Packet Decoding (Direwolf) <span id="aprsAvailableBadge" class="badge bg-secondary ms-2">checking…</span></h3>
+                <h3 class="h6 mb-1">
+                  APRS Packet Decoding (Direwolf)
+                  <span id="aprsAvailableBadge" class="badge bg-secondary ms-2">checking…</span>
+                  <button type="button"
+                    class="btn btn-sm btn-outline-warning ms-2 d-none"
+                    id="installAprsBtn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#installAprsModal">
+                    Install Direwolf…
+                  </button>
+                </h3>
               </div>
               <div class="col-12">
                 <div class="form-check">
@@ -608,8 +666,9 @@ Last update: 2026-02-22 16:27:19 UTC
                 <small class="d-block mt-1">
                   When active, the backend starts Direwolf and connects to its KISS TCP port to decode APRS packets on
                   144.800 MHz (VHF). Decoded packets appear in the live event stream and are stored in the event log.
-                  Requires <code>direwolf</code> — install it via the installer or manually:
-                  <code>sudo apt install direwolf</code>. You can enable/disable this at any time without restarting.
+                  Requires <code>direwolf</code> — if the badge above shows <em>“Direwolf not installed”</em>, click
+                  <strong>Install Direwolf…</strong> for the one-line command to install it without re-running the
+                  full installer.
                 </small>
               </div>
               <div class="col-12 mt-2">
