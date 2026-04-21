@@ -4804,6 +4804,36 @@ Last update: 2026-04-03 UTC
           }
         }
 
+        // Resolve marker collisions: when several callsigns share virtually
+        // the same coordinate (e.g. CQ0PCB and CQ0DCO-B at the Coimbra
+        // repeater site, ~40 m apart) their labels overlap and only the
+        // last-drawn marker is visible. Group by ~110 m buckets and spread
+        // colliding callsigns on a small circle around the original point.
+        {
+          const BUCKET_DEG = 0.001;   // ~110 m at PT latitudes
+          const RADIUS_DEG = 0.0006;  // ~65 m offset
+          const buckets = new Map();
+          for (const [call, pos] of positionByCall) {
+            const key = `${Math.round(pos.lat / BUCKET_DEG)}|${Math.round(pos.lon / BUCKET_DEG)}`;
+            if (!buckets.has(key)) buckets.set(key, []);
+            buckets.get(key).push(call);
+          }
+          for (const [, calls] of buckets) {
+            if (calls.length < 2) continue;
+            calls.sort();
+            const cosLat = Math.cos((positionByCall.get(calls[0]).lat * Math.PI) / 180) || 1;
+            calls.forEach((call, i) => {
+              const angle = (i / calls.length) * 2 * Math.PI;
+              const pos = positionByCall.get(call);
+              positionByCall.set(call, {
+                lat: pos.lat + RADIUS_DEG * Math.cos(angle),
+                lon: pos.lon + (RADIUS_DEG * Math.sin(angle)) / cosLat,
+                tsMs: pos.tsMs,
+              });
+            });
+          }
+        }
+
         events.forEach(e => {
           if (!e.callsign) return;
           // Inherit last-known position when this frame doesn't carry one.
@@ -4813,6 +4843,12 @@ Last update: 2026-04-03 UTC
             const inherited = positionByCall.get(e.callsign);
             if (!inherited) return; // truly no position known anywhere
             e = { ...e, lat: inherited.lat, lon: inherited.lon };
+          } else {
+            // Always honour the (possibly collision-resolved) per-callsign
+            // position so positioned beacons render on the same offset
+            // coordinate as their digipeated frames.
+            const resolved = positionByCall.get(e.callsign);
+            if (resolved) e = { ...e, lat: resolved.lat, lon: resolved.lon };
           }
           const src = (e.source || "").toLowerCase();
           if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());

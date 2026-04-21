@@ -307,6 +307,34 @@ export class APRSMapController {
       }
     }
 
+    // Resolve marker collisions: when several callsigns share virtually the
+    // same coordinate (e.g. CQ0PCB and CQ0DCO-B at the Coimbra repeater
+    // site, ~40 m apart) their 120-px wide labels overlap and only the
+    // last-drawn marker is visible. Group by ~110 m buckets and spread
+    // colliding callsigns on a small circle around the original point.
+    const COLLISION_BUCKET_DEG = 0.001; // ~110 m at PT latitudes
+    const COLLISION_RADIUS_DEG = 0.0006; // ~65 m offset
+    const buckets = new Map();
+    for (const [call, pos] of positionByCall) {
+      const key = `${Math.round(pos.lat / COLLISION_BUCKET_DEG)}|${Math.round(pos.lon / COLLISION_BUCKET_DEG)}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(call);
+    }
+    for (const [, calls] of buckets) {
+      if (calls.length < 2) continue;
+      calls.sort();
+      const cosLat = Math.cos((positionByCall.get(calls[0]).lat * Math.PI) / 180) || 1;
+      calls.forEach((call, i) => {
+        const angle = (i / calls.length) * 2 * Math.PI;
+        const pos = positionByCall.get(call);
+        positionByCall.set(call, {
+          lat: pos.lat + COLLISION_RADIUS_DEG * Math.cos(angle),
+          lon: pos.lon + (COLLISION_RADIUS_DEG * Math.sin(angle)) / cosLat,
+          tsMs: pos.tsMs,
+        });
+      });
+    }
+
     // Iterate oldest → newest so per-source timestamps reflect the most
     // recent frame and the rendered marker icon picks the latest source.
     const sorted = events.slice().sort((a, b) => {
@@ -319,9 +347,14 @@ export class APRSMapController {
       const lat = Number(evt.lat);
       const lon = Number(evt.lon);
       const hasPos = Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0);
-      if (!hasPos && call && positionByCall.has(call)) {
+      // Always honour the (possibly collision-resolved) per-callsign
+      // position so positioned beacons and digipeated frames render at
+      // the same offset coordinate and don't snap back over a neighbour.
+      if (call && positionByCall.has(call)) {
         const p = positionByCall.get(call);
         this.addEvent({ ...evt, lat: p.lat, lon: p.lon });
+      } else if (hasPos) {
+        this.addEvent(evt);
       } else {
         this.addEvent(evt);
       }
