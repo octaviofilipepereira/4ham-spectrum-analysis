@@ -2309,10 +2309,13 @@ Last update: 2026-04-03 UTC
         const details = [modeLabel, bandLabel].filter(Boolean).join(" · ");
 
         if (rotationSlot) {
-          const secondsRaw = Number(rotation.time_remaining_s);
+          const baseSeconds = Number(rotation.time_remaining_s);
+          const receivedAt = Number(lastScanRuntimeSnapshot.receivedAt) || Date.now();
+          const elapsed = Math.max(0, (Date.now() - receivedAt) / 1000);
+          const secondsRaw = Number.isFinite(baseSeconds) ? baseSeconds - elapsed : NaN;
           let suffix = "";
           if (Number.isFinite(secondsRaw)) {
-            const totalSec = Math.max(1, Math.ceil(secondsRaw));
+            const totalSec = Math.max(0, Math.ceil(secondsRaw));
             let formatted;
             if (totalSec < 60) {
               formatted = `${totalSec}\u00A0s`;
@@ -2365,11 +2368,20 @@ Last update: 2026-04-03 UTC
           if (!payload || typeof payload !== "object") {
             throw new Error("scan status payload invalid");
           }
-          lastScanRuntimeSnapshot = { kind: "payload", payload };
+          lastScanRuntimeSnapshot = { kind: "payload", payload, receivedAt: Date.now() };
         } catch (_) {
-          lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+          lastScanRuntimeSnapshot = { kind: "unavailable", payload: null, receivedAt: Date.now() };
         }
         renderScanRuntimeInfo();
+        startScanRuntimeTicker();
+      }
+
+      let scanRuntimeTicker = null;
+      function startScanRuntimeTicker() {
+        if (scanRuntimeTicker) return;
+        scanRuntimeTicker = window.setInterval(() => {
+          renderScanRuntimeInfo();
+        }, 1000);
       }
 
       async function loadAndRender() {
