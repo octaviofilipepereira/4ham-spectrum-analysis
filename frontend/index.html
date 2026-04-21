@@ -19,6 +19,24 @@ Last update: 2026-02-22 16:27:19 UTC
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css?v=20260301000400" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
+    <script>
+      // Fire version fetch as early as possible (no auth required)
+      fetch("/api/version").then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          var v = d.version || d.app_version;
+          if (!v) return;
+          var apply = function () {
+            var el = document.getElementById("appVersionBadge");
+            if (el) el.textContent = "v" + v;
+          };
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", apply, { once: true });
+          } else {
+            apply();
+          }
+        }).catch(function () {});
+    </script>
   </head>
   <body>
     <main class="app container-fluid py-4">

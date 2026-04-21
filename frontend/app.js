@@ -4598,18 +4598,6 @@ async function startApplication() {
   initMenuDropdownModalBehavior();
 
   try {
-    const vr = await fetch("/api/version", { headers: { ...getAuthHeader() } });
-    if (vr.ok) {
-      const vj = await vr.json();
-      const v = vj.version || vj.app_version;
-      if (v) {
-        const el = document.getElementById("appVersionBadge");
-        if (el) el.textContent = "v" + v;
-      }
-    }
-  } catch (_) { /* best effort */ }
-
-  try {
     const res = await fetch("/api/health");
     if (res.ok) {
       const data = await res.json();
