@@ -84,6 +84,76 @@ Last update: 2026-04-03 UTC
         color: var(--text-muted);
       }
 
+      .hero-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .hero-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      .lang-toggle {
+        display: inline-flex;
+        gap: 4px;
+      }
+
+      .scan-runtime-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(15, 28, 40, 0.68);
+        color: var(--text);
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-align: right;
+      }
+
+      .scan-runtime-status::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+        flex: 0 0 auto;
+      }
+
+      .scan-runtime-status.running::before {
+        background: var(--ok);
+        box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.14);
+      }
+
+      .scan-runtime-status.rotation::before {
+        background: var(--warn);
+        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
+      }
+
+      .scan-runtime-status.preview::before {
+        background: var(--mode-ssb);
+        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.14);
+      }
+
+      .scan-runtime-status.stopped::before {
+        background: var(--text-muted);
+        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+      }
+
+      .scan-runtime-status.unavailable::before {
+        background: var(--danger);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14);
+      }
+
       #nextRefreshInfo {
         margin-top: 4px;
       }
@@ -765,6 +835,15 @@ Last update: 2026-04-03 UTC
           padding: 14px;
         }
 
+        .hero-side {
+          width: 100%;
+          align-items: flex-start;
+        }
+
+        .scan-runtime-status {
+          text-align: left;
+        }
+
         .cards {
           grid-template-columns: repeat(2, 1fr);
         }
@@ -1009,11 +1088,14 @@ Last update: 2026-04-03 UTC
     </div>
     <div class="wrap">
       <section class="hero">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+        <div class="hero-head">
           <h1 id="dashboardTitle">4ham Spectrum Analysis v0.12.4 - Academic Analytics</h1>
-          <div class="lang-toggle" style="display:inline-flex;gap:4px;">
-            <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
-            <button type="button" class="lang-btn" data-lang="pt" onclick="setLang('pt')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">PT</button>
+          <div class="hero-side">
+            <div class="lang-toggle">
+              <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
+              <button type="button" class="lang-btn" data-lang="pt" onclick="setLang('pt')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">PT</button>
+            </div>
+            <div id="scanRuntimeInfo" class="scan-runtime-status unavailable" role="status" aria-live="polite">Scan status unavailable</div>
           </div>
         </div>
         <p style="font-size:12px;color:var(--text-muted);margin:4px 0 2px;">Coded &amp; Powered by CT7BFV &nbsp;&middot;&nbsp; Octávio Filipe Gonçalves &nbsp;&middot;&nbsp; <a href="https://github.com/octaviofilipepereira/4ham-spectrum-analysis" target="_blank" rel="noopener noreferrer" style="color:var(--mode-ssb);">4ham Spectrum Analysis</a></p>
@@ -1469,6 +1551,7 @@ Last update: 2026-04-03 UTC
         document.querySelectorAll(".lang-btn").forEach(btn => {
           btn.classList.toggle("active", btn.dataset.lang === _i18nLang);
         });
+        renderScanRuntimeInfo();
       }
 
       function setLang(lang) {
@@ -1516,6 +1599,7 @@ Last update: 2026-04-03 UTC
       let _appVersion = "";
       const apiLastFetchInfo = document.getElementById("apiLastFetchInfo");
       const nextRefreshInfo = document.getElementById("nextRefreshInfo");
+      const scanRuntimeInfo = document.getElementById("scanRuntimeInfo");
       const chartHelpLayer = document.getElementById("chartHelpLayer");
       const chartHelpLayerTitle = document.getElementById("chartHelpLayerTitle");
       const chartHelpLayerText = document.getElementById("chartHelpLayerText");
@@ -1533,6 +1617,7 @@ Last update: 2026-04-03 UTC
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
+      let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
 
       updateMetaUpdateFrequency();
 
@@ -1930,6 +2015,111 @@ Last update: 2026-04-03 UTC
         hourBandDescription.textContent = t("chart_heatmap_desc");
       }
 
+      function normalizeScanModeLabel(mode) {
+        const normalized = String(mode || "").trim().toLowerCase();
+        if (!normalized) {
+          return "";
+        }
+        const labels = {
+          ft8: "FT8",
+          ft4: "FT4",
+          wspr: "WSPR",
+          cw: "CW",
+          ssb: "SSB",
+          aprs: "APRS",
+        };
+        return labels[normalized] || normalized.toUpperCase().replaceAll("_", " ");
+      }
+
+      function formatScanBandLabel(band) {
+        const compact = String(band || "").trim();
+        if (!compact) {
+          return "";
+        }
+        return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1 $2");
+      }
+
+      function setScanRuntimeInfo(stateName, text) {
+        if (!scanRuntimeInfo) {
+          return;
+        }
+        scanRuntimeInfo.textContent = text;
+        scanRuntimeInfo.classList.remove("running", "rotation", "preview", "stopped", "unavailable");
+        scanRuntimeInfo.classList.add(stateName);
+      }
+
+      function renderScanRuntimeInfo() {
+        if (!scanRuntimeInfo) {
+          return;
+        }
+
+        if (!lastScanRuntimeSnapshot || lastScanRuntimeSnapshot.kind !== "payload") {
+          setScanRuntimeInfo("unavailable", t("scan_status_unavailable"));
+          return;
+        }
+
+        const payload = lastScanRuntimeSnapshot.payload || {};
+        const state = String(payload.state || "").trim().toLowerCase();
+        const rotation = payload.rotation && payload.rotation.running ? payload.rotation : null;
+        const rotationSlot = rotation && rotation.current_slot ? rotation.current_slot : null;
+        const modeLabel = normalizeScanModeLabel(rotationSlot?.mode || payload.decoder_mode);
+        const bandLabel = formatScanBandLabel(rotationSlot?.band || payload.scan?.band);
+        const details = [modeLabel, bandLabel].filter(Boolean).join(" · ");
+
+        if (rotationSlot) {
+          const secondsRaw = Number(rotation.time_remaining_s);
+          const suffix = Number.isFinite(secondsRaw)
+            ? t("scan_status_switches_in", { seconds: Math.max(1, Math.ceil(secondsRaw)) })
+            : "";
+          let text = t("scan_status_rotation_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          if (suffix) {
+            text = `${text} · ${suffix}`;
+          }
+          setScanRuntimeInfo("rotation", text);
+          return;
+        }
+
+        if (state === "preview") {
+          let text = t("scan_status_preview_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("preview", text);
+          return;
+        }
+
+        if (state === "running") {
+          let text = t("scan_status_running_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("running", text);
+          return;
+        }
+
+        setScanRuntimeInfo("stopped", t("scan_status_stopped"));
+      }
+
+      async function fetchScanRuntimeStatus() {
+        try {
+          const resp = await fetch(`${_BASE}api/scan/status`);
+          if (!resp.ok) {
+            throw new Error("scan status request failed");
+          }
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {
+            throw new Error("scan status payload invalid");
+          }
+          lastScanRuntimeSnapshot = { kind: "payload", payload };
+        } catch (_) {
+          lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+        }
+        renderScanRuntimeInfo();
+      }
+
       async function loadAndRender() {
         if (isLoading) {
           return;
@@ -1944,7 +2134,10 @@ Last update: 2026-04-03 UTC
           lastResolvedRange = { start, end };
           lastFilters = { band: selectedBand, mode: selectedMode };
 
-          const loaded = await fetchAcademicDataset(start, end, selectedBand, selectedMode);
+          const [loaded] = await Promise.all([
+            fetchAcademicDataset(start, end, selectedBand, selectedMode),
+            fetchScanRuntimeStatus(),
+          ]);
           if (!loaded && metaSnapshot) {
             dataSource = "simulated";
             metaSnapshot.textContent = t("simulated_fallback");
