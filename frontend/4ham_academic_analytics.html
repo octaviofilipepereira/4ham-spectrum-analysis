@@ -107,51 +107,77 @@ Last update: 2026-04-03 UTC
       .scan-runtime-status {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         max-width: 100%;
-        padding: 6px 12px;
+        padding: 9px 16px;
         border: 1px solid var(--line);
-        border-radius: 999px;
+        border-radius: 10px;
         background: rgba(15, 28, 40, 0.68);
         color: var(--text);
         font-size: 0.82rem;
         font-weight: 600;
         text-align: right;
+        line-height: 1;
       }
 
       .scan-runtime-status::before {
         content: "";
-        width: 8px;
-        height: 8px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
         background: var(--text-muted);
-        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+        box-shadow: 0 0 0 3px rgba(159, 180, 200, 0.18);
         flex: 0 0 auto;
+      }
+
+      @keyframes scanPulse {
+        0%   { transform: scale(1);   opacity: 1;   box-shadow: 0 0 0 0   rgba(52, 211, 153, 0.55); }
+        70%  { transform: scale(1.1); opacity: 0.85; box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+        100% { transform: scale(1);   opacity: 1;   box-shadow: 0 0 0 0   rgba(52, 211, 153, 0); }
       }
 
       .scan-runtime-status.running::before {
         background: var(--ok);
-        box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.14);
+        box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.20);
+        animation: scanPulse 1.4s ease-out infinite;
+      }
+
+      @keyframes scanPulseWarn {
+        0%   { transform: scale(1);   box-shadow: 0 0 0 0   rgba(251, 191, 36, 0.55); }
+        70%  { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
+        100% { transform: scale(1);   box-shadow: 0 0 0 0   rgba(251, 191, 36, 0); }
       }
 
       .scan-runtime-status.rotation::before {
         background: var(--warn);
-        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
+        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.20);
+        animation: scanPulseWarn 1.4s ease-out infinite;
+      }
+
+      @keyframes scanPulseInfo {
+        0%   { transform: scale(1);   box-shadow: 0 0 0 0   rgba(96, 165, 250, 0.55); }
+        70%  { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
+        100% { transform: scale(1);   box-shadow: 0 0 0 0   rgba(96, 165, 250, 0); }
       }
 
       .scan-runtime-status.preview::before {
         background: var(--mode-ssb);
-        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.14);
+        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.20);
+        animation: scanPulseInfo 1.4s ease-out infinite;
       }
 
       .scan-runtime-status.stopped::before {
         background: var(--text-muted);
-        box-shadow: 0 0 0 4px rgba(159, 180, 200, 0.12);
+        box-shadow: 0 0 0 3px rgba(159, 180, 200, 0.18);
       }
 
       .scan-runtime-status.unavailable::before {
         background: var(--danger);
-        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .scan-runtime-status::before { animation: none !important; }
       }
 
       #nextRefreshInfo {
