@@ -118,6 +118,27 @@ verify_install() {
   exit 1
 }
 
+# Persist FEATURE_LORA_APRS=true in the project's .env so the backend exposes
+# LoRa controls (and the lifespan auto-starts the UDP listener when enabled).
+# Idempotent: replaces an existing line or appends if missing.
+enable_feature_flag() {
+  local env_file="$ROOT_DIR/.env"
+  if [[ ! -f "$env_file" ]]; then
+    echo "FEATURE_LORA_APRS=true" > "$env_file"
+    echo -e "${G}Created${N} $env_file with FEATURE_LORA_APRS=true"
+    return 0
+  fi
+  if grep -qE '^[[:space:]]*(export[[:space:]]+)?FEATURE_LORA_APRS=' "$env_file"; then
+    # Replace existing value (handles both `KEY=` and `export KEY=` forms).
+    sed -i -E 's|^[[:space:]]*(export[[:space:]]+)?FEATURE_LORA_APRS=.*$|FEATURE_LORA_APRS=true|' "$env_file"
+    echo -e "${G}Updated${N} FEATURE_LORA_APRS=true in $env_file"
+  else
+    printf '\nFEATURE_LORA_APRS=true\n' >> "$env_file"
+    echo -e "${G}Appended${N} FEATURE_LORA_APRS=true to $env_file"
+  fi
+  echo -e "${Y}Note:${N} restart the backend (e.g. ${C}bash scripts/server_control.sh restart${N}) for the flag to take effect."
+}
+
 print_next_steps() {
   echo
   echo -e "${B}${G}LoRa APRS support is now ready.${N}"
@@ -153,6 +174,7 @@ main() {
   clone_or_update_repo
   build_and_install
   verify_install
+  enable_feature_flag
   print_next_steps
 }
 

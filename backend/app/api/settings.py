@@ -21,6 +21,7 @@ from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
 from app.dependencies.utils import command_exists
 from app.decoders.ssb_asr import is_ssb_asr_available, set_asr_enabled
+from app.core import features as _features
 
 
 router = APIRouter()
@@ -219,12 +220,17 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "address": kiss_st.get("address"),
     }
     lora_st = state.decoder_status.get("lora_aprs") or {}
-    settings["lora_aprs"] = {
-        "enabled": bool(lora_st.get("enabled", False)),
-        "available": _gr_lora_sdr_available(),
-        "connected": bool(lora_st.get("connected", False)),
-        "address": lora_st.get("address"),
-    }
+    if _features.lora_aprs_enabled():
+        settings["lora_aprs"] = {
+            "enabled": bool(lora_st.get("enabled", False)),
+            "available": _gr_lora_sdr_available(),
+            "connected": bool(lora_st.get("connected", False)),
+            "address": lora_st.get("address"),
+        }
+    else:
+        # Feature off — strip any persisted lora_aprs key so the frontend
+        # cannot accidentally render LoRa controls from cached settings.
+        settings.pop("lora_aprs", None)
     settings["auth"] = {
         "enabled": bool(state.auth_required),
         "user": state.auth_user if state.auth_required else "",
@@ -309,7 +315,7 @@ async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> 
             state.decoder_status["direwolf_kiss"]["enabled"] = False
         existing["aprs"] = {"enabled": aprs_enabled}
 
-    if "lora_aprs" in payload:
+    if "lora_aprs" in payload and _features.lora_aprs_enabled():
         from app.api.decoders import _start_lora_aprs_loop, _stop_lora_aprs_loop
         import asyncio
         lora = payload.get("lora_aprs") or {}

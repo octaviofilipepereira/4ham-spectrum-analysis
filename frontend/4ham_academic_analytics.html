@@ -1386,7 +1386,6 @@ Last update: 2026-04-03 UTC
               <option>12m</option>
               <option>10m</option>
               <option>2m</option>
-              <option>70cm</option>
             </select>
           </div>
 
@@ -1733,7 +1732,7 @@ Last update: 2026-04-03 UTC
     <script src="lib/xlsx.mini.min.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>
     <script>
-      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
+      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
       const MODE_COLORS = {
         SSB: getCssVar("--mode-ssb"),
@@ -3338,8 +3337,8 @@ Last update: 2026-04-03 UTC
           };
 
           // Use server-computed propagation data (accurate, uses real per-event data)
-          // Exclude APRS-dominated bands (2m, 70cm) from HF propagation analysis
-          const APRS_BANDS = new Set(["2m", "70cm"]);
+          // Exclude APRS-dominated VHF bands from HF propagation analysis
+          const APRS_BANDS = new Set(["2m"]);
           const kpis = payload.kpis || {};
           const propBands = (Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [])
             .filter(r => !APRS_BANDS.has(r.band));

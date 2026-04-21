@@ -34,8 +34,9 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
+from app.core import features as _features
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -116,8 +117,10 @@ async def lifespan(app_instance: FastAPI):
         except Exception as exc:
             _log.warning("KISS loop startup failed: %s", exc)
 
-    # Auto-start LoRa-APRS UDP listener if enabled
-    if _state.decoder_status["lora_aprs"]["enabled"]:
+    # Auto-start LoRa-APRS UDP listener — gated by FEATURE_LORA_APRS feature
+    # flag (default off). When the feature is disabled, the entire LoRa
+    # subsystem stays dormant: no UDP listener, no settings exposure, no UI.
+    if _features.lora_aprs_enabled() and _state.decoder_status["lora_aprs"]["enabled"]:
         try:
             from app.api.decoders import _start_lora_aprs_loop
             result = await _start_lora_aprs_loop(force=False)
@@ -291,6 +294,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
+app.include_router(features_api.router, prefix="/api/features", tags=["Features"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers

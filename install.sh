@@ -501,6 +501,9 @@ _env_defaults=(
   "DIREWOLF_CMD=direwolf -t 0 -p -c ${ROOT_DIR}/config/direwolf.conf"
   "SSB_INTERNAL_ENABLE=1"
   "WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}"
+  # Optional subsystem (LoRa-APRS via gr-lora_sdr) — hidden by default.
+  # Run scripts/enable_lora_aprs.sh to flip this to true.
+  "FEATURE_LORA_APRS=false"
 )
 if [[ -f "$ENV_FILE" ]]; then
   for _kv in "${_env_defaults[@]}"; do
@@ -521,6 +524,9 @@ DIREWOLF_AUTOSTART=${_install_direwolf}
 DIREWOLF_CMD=direwolf -t 0 -p -c ${ROOT_DIR}/config/direwolf.conf
 SSB_INTERNAL_ENABLE=1
 WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}
+# Optional subsystem (LoRa-APRS via gr-lora_sdr) — hidden by default.
+# Run scripts/enable_lora_aprs.sh to flip this to true.
+FEATURE_LORA_APRS=false
 EOF
 fi
 

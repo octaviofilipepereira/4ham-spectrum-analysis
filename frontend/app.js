@@ -167,6 +167,47 @@ const adminSetupStatus = document.getElementById("adminSetupStatus");
   if (btnLora) btnLora.classList.toggle('d-none', !cachedLora);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Feature flags (FEATURE_LORA_APRS et al.) — fetched once at boot from
+// /api/features (public, unauthenticated). When LoRa-APRS is disabled
+// (default), all LoRa-related UI surfaces stay hidden regardless of cached
+// localStorage flags. This keeps the default install free of dead-end
+// controls for hardware/flowgraph the user has not installed.
+// ─────────────────────────────────────────────────────────────────────────
+window.FEATURES = window.FEATURES || { lora_aprs: false };
+(async function loadFeatureFlags() {
+  try {
+    const resp = await fetch("/api/features");
+    if (resp.ok) {
+      const data = await resp.json();
+      window.FEATURES = Object.assign({ lora_aprs: false }, data || {});
+    }
+  } catch (_err) { /* keep defaults */ }
+  applyFeatureVisibility();
+})();
+
+function applyFeatureVisibility() {
+  const loraOn = !!(window.FEATURES && window.FEATURES.lora_aprs);
+  if (!loraOn) {
+    // Clear any stale "LoRa active" cache so the quick buttons stay hidden.
+    try { localStorage.setItem("4ham_lora_aprs_active", "0"); } catch (_e) {}
+    const hideSelectors = [
+      '[data-quick-mode="LORA"]',
+      '[data-quick-band="70cm"]',
+      '[data-filter="lora"]',
+      '#loraAprsAdminSection',
+    ];
+    hideSelectors.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
+        el.classList.add('d-none');
+        // Belt-and-suspenders: also style display:none in case d-none is
+        // overridden by a more specific rule (e.g. flex containers).
+        el.style.display = 'none';
+      });
+    });
+  }
+}
+
 /** Maps a UI quick-mode value to the backend decoder mode (LORA → APRS). */
 function _backendMode(uiMode) {
   return String(uiMode || "").trim().toUpperCase() === "LORA" ? "APRS" : uiMode;
