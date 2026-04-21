@@ -21,6 +21,9 @@ Last update: 2026-04-18 UTC
 ### Documentation
 - Added *Enabling LoRa APRS* sections to `docs/user_manual_en.md`, `docs/user_manual.md` (PT) and `docs/installation_manual.md` (build script, ENV vars, antenna recommendation: Diamond X50 dual-band).
 
+### Fixed
+- **LoRa APRS install badge false-negative**: the Admin Config availability probe now checks both the backend interpreter and the host `python3`, avoiding a misleading *"gr-lora_sdr not installed"* status when the GNU Radio module is correctly installed system-wide but the 4ham backend runs inside an isolated `.venv`.
+
 ---
 
 ## v0.12.4 - 2026-04-18

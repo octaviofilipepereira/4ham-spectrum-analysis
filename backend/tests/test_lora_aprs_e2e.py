@@ -27,6 +27,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -142,6 +143,40 @@ class LoraAprsE2EApiTests(unittest.TestCase):
         decoders_mod._lora_aprs_on_event(None)
         decoders_mod._lora_aprs_on_event({})
         decoders_mod._lora_aprs_on_event("not a dict")  # type: ignore[arg-type]
+
+
+class LoraAprsAvailabilityProbeTests(unittest.TestCase):
+    """Regression tests for the LoRa availability badge probe."""
+
+    def test_probe_uses_current_interpreter_when_available(self):
+        from app.api import settings as settings_mod
+
+        with patch("importlib.util.find_spec", return_value=object()), patch.object(
+            settings_mod.subprocess, "run"
+        ) as run_mock:
+            self.assertTrue(settings_mod._gr_lora_sdr_available())
+            run_mock.assert_not_called()
+
+    def test_probe_falls_back_to_system_python(self):
+        from app.api import settings as settings_mod
+
+        with patch("importlib.util.find_spec", return_value=None), patch.object(
+            settings_mod.subprocess,
+            "run",
+            return_value=SimpleNamespace(returncode=0),
+        ) as run_mock:
+            self.assertTrue(settings_mod._gr_lora_sdr_available())
+            run_mock.assert_called_once()
+
+    def test_probe_returns_false_when_both_checks_fail(self):
+        from app.api import settings as settings_mod
+
+        with patch("importlib.util.find_spec", return_value=None), patch.object(
+            settings_mod.subprocess,
+            "run",
+            return_value=SimpleNamespace(returncode=1),
+        ):
+            self.assertFalse(settings_mod._gr_lora_sdr_available())
 
 
 @unittest.skipUnless(SENDER_SCRIPT.exists(), "udp sender script missing")

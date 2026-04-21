@@ -12,6 +12,7 @@ Application settings management endpoints.
 from typing import Dict
 
 import os
+import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -93,10 +94,35 @@ def _ensure_aprs_config():
 # ---------------------------------------------------------------------------
 
 def _gr_lora_sdr_available() -> bool:
-    """Probe whether the gr-lora_sdr Python module is importable."""
+    """Probe whether the gr-lora_sdr host install is available.
+
+    The backend runs inside ``.venv``, while GNU Radio OOT modules are
+    commonly installed into the system Python used by
+    ``gnuradio-companion`` / external flowgraphs.  Check both
+    interpreters so the Admin badge reflects the real host capability,
+    not only the backend virtualenv.
+    """
     try:
         import importlib.util
-        return importlib.util.find_spec("gnuradio.lora_sdr") is not None
+        if importlib.util.find_spec("gnuradio.lora_sdr") is not None:
+            return True
+    except Exception:
+        pass
+
+    try:
+        probe = subprocess.run(
+            [
+                "python3",
+                "-c",
+                "import importlib.util, sys; "
+                "sys.exit(0 if importlib.util.find_spec('gnuradio.lora_sdr') else 1)",
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+        return probe.returncode == 0
     except Exception:
         return False
 
