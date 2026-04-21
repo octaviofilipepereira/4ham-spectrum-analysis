@@ -4236,6 +4236,14 @@ Last update: 2026-04-03 UTC
         return d3.utcFormat("%Y-%m-%d %H:%M UTC")(date);
       }
 
+      // Local time in Portuguese format DD/MM/YYYY HH:MM (24h).
+      function fmtLocalPt(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} `
+          + `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
       function toLocalDateTimeValue(date) {
         const pad = (n) => String(n).padStart(2, "0");
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -4261,8 +4269,8 @@ Last update: 2026-04-03 UTC
 
       let aprsMap = null;
       let aprsEvents = [];
-      let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
-      let aprsCurrentPreset = "24h";
+      let aprsSourceFilter = localStorage.getItem("4ham_aprs_filter") || "all"; // "all" | "rf" | "tcp"
+      let aprsCurrentPreset = localStorage.getItem("4ham_aprs_preset") || "24h";
       let aprsDataLoaded = false;
       const APRS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
       let aprsRefreshTimer = null;
@@ -4361,7 +4369,9 @@ Last update: 2026-04-03 UTC
               aprsLoadAndRender();
             } else {
               if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
-              aprsStartAutoRefresh();
+              // Only (re)start the auto-refresh if not already armed — avoids
+              // resetting the 5-min countdown each time the user toggles tabs.
+              if (!aprsRefreshTimer) aprsStartAutoRefresh();
               requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
             }
           } else {
@@ -4392,12 +4402,20 @@ Last update: 2026-04-03 UTC
       const aprsApplyBtn = document.getElementById("aprsApplyBtn");
 
       if (aprsPresetRow) {
+        // Reflect persisted preset in the active button state on load
+        aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.preset === aprsCurrentPreset);
+        });
+        const _customRangeInit = document.getElementById("aprsCustomRange");
+        if (_customRangeInit) _customRangeInit.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
+
         aprsPresetRow.addEventListener("click", (e) => {
           const btn = e.target.closest(".preset-btn");
           if (!btn) return;
           aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           aprsCurrentPreset = btn.dataset.preset;
+          try { localStorage.setItem("4ham_aprs_preset", aprsCurrentPreset); } catch (_) {}
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
           if (aprsCurrentPreset === "custom") {
@@ -4412,11 +4430,16 @@ Last update: 2026-04-03 UTC
       }
 
       // ── APRS source filter ────────────────────────────────────────────
+      // Reflect persisted filter in the active button state on load
+      document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.filter === aprsSourceFilter);
+      });
       document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
         btn.addEventListener("click", () => {
           document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           aprsSourceFilter = btn.dataset.filter;
+          try { localStorage.setItem("4ham_aprs_filter", aprsSourceFilter); } catch (_) {}
           aprsRenderAll();
         });
       });
@@ -4527,8 +4550,11 @@ Last update: 2026-04-03 UTC
         const el = document.getElementById("aprsNextRefreshInfo");
         if (!el || !aprsNextRefreshMs) return;
         const rem = Math.max(0, aprsNextRefreshMs - Date.now());
-        const s = Math.ceil(rem / 1000);
-        el.textContent = s > 0 ? `${s}s` : "a atualizar…";
+        const total = Math.ceil(rem / 1000);
+        if (total <= 0) { el.textContent = "a atualizar…"; return; }
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        el.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
       }
 
       function aprsRenderAll() {
@@ -4633,7 +4659,7 @@ Last update: 2026-04-03 UTC
           const info = ps.get(key) || {};
           const label = srcLabels[key] || { icon: "❓", name: key };
           const path = info.path || "—";
-          const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+          const tsStr = info.ts ? fmtLocalPt(new Date(info.ts)) : "—";
           perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
             + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
             + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
@@ -4642,7 +4668,7 @@ Last update: 2026-04-03 UTC
           if (orderedKeys.includes(key)) continue;
           const info = ps.get(key) || {};
           const path = info.path || "—";
-          const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+          const tsStr = info.ts ? fmtLocalPt(new Date(info.ts)) : "—";
           perSourceRows += `<tr><td><strong>${aprsEscapeHtml(key)}</strong></td>`
             + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
             + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
@@ -4650,8 +4676,8 @@ Last update: 2026-04-03 UTC
 
         const msg = e.msg || e.comment || "";
         const raw = e.raw || "";
-        const firstSeen = seenRange && seenRange.firstMs ? new Date(seenRange.firstMs).toLocaleTimeString() : "—";
-        const lastSeen = seenRange && seenRange.lastMs ? new Date(seenRange.lastMs).toLocaleTimeString() : "—";
+        const firstSeen = seenRange && seenRange.firstMs ? fmtLocalPt(new Date(seenRange.firstMs)) : "—";
+        const lastSeen = seenRange && seenRange.lastMs ? fmtLocalPt(new Date(seenRange.lastMs)) : "—";
 
         return `
           <div class="aprs-popup">
@@ -4723,9 +4749,31 @@ Last update: 2026-04-03 UTC
         const byCall = new Map();
         const perSourceByCall = new Map();
         const seenRangeByCall = new Map(); // callsign -> { firstMs, lastMs }
+
+        // Pre-pass: latest known position per callsign (any source) so that
+        // digipeated/status frames without lat/lon still anchor a marker.
+        const positionByCall = new Map();
         events.forEach(e => {
-          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign) return;
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
+          if (e.lat === 0 && e.lon === 0) return;
+          const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+          const prev = positionByCall.get(e.callsign);
+          if (!prev || tsMs >= prev.tsMs) {
+            positionByCall.set(e.callsign, { lat: e.lat, lon: e.lon, tsMs });
+          }
+        });
+
+        events.forEach(e => {
+          if (!e.callsign) return;
+          // Inherit last-known position when this frame doesn't carry one.
+          const hasOwnPos = Number.isFinite(e.lat) && Number.isFinite(e.lon)
+            && !(e.lat === 0 && e.lon === 0);
+          if (!hasOwnPos) {
+            const inherited = positionByCall.get(e.callsign);
+            if (!inherited) return; // truly no position known anywhere
+            e = { ...e, lat: inherited.lat, lon: inherited.lon };
+          }
           const src = (e.source || "").toLowerCase();
           if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
           if (src) {

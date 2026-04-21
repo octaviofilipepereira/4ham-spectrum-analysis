@@ -646,6 +646,7 @@ if (aprsMapFullscreenBtn && aprsMapArea) {
 
 // ── APRS Map source filter (All / RF / TCP) ────────────────────────────
 const aprsMapFilterEl = document.getElementById("aprsMapFilter");
+const APRS_FILTER_LS_KEY = "4ham_aprs_map_filter"; // user-selected button (all/rf/lora/tcp)
 if (aprsMapFilterEl) {
   aprsMapFilterEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".aprs-filter-btn");
@@ -654,6 +655,7 @@ if (aprsMapFilterEl) {
     aprsMapFilterEl.querySelectorAll(".aprs-filter-btn").forEach((b) =>
       b.classList.toggle("aprs-filter-btn--active", b === btn)
     );
+    try { localStorage.setItem(APRS_FILTER_LS_KEY, filter); } catch (_) {}
     aprsMapCtrl.applyFilter(filter);
     _updateAprsMapCount();
   });
@@ -719,9 +721,47 @@ async function _loadRecentAprsEvents() {
     const data = await resp.json();
     const events = Array.isArray(data) ? data : (data.events || []);
     const aprsEvents = events.filter((e) => String(e.mode || "").toUpperCase() === "APRS");
-    aprsMapCtrl.loadHistory(aprsEvents);
+
+    // Wider 24h fetch used ONLY to derive a per-callsign last-known-position
+    // snapshot, so digipeated/status frames in the 30-min activity window
+    // (which often lack lat/lon) still render at the station's last position.
+    const positionSnapshot = await _fetchAprsPositionSnapshot(now);
+
+    aprsMapCtrl.loadHistory(aprsEvents, positionSnapshot);
     _updateAprsMapCount();
   } catch { /* best-effort */ }
+}
+
+/**
+ * Fetch a 24-hour APRS position snapshot from the API and reduce it to a
+ * Map<callsign, {lat, lon}> with the most recent positioned event per
+ * callsign.
+ * @param {Date} now
+ * @returns {Promise<Map<string, {lat:number, lon:number}>>}
+ */
+async function _fetchAprsPositionSnapshot(now) {
+  const snapshot = new Map();
+  try {
+    const start = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+    const url = `/api/events?mode=APRS&start=${encodeURIComponent(start)}&end=${encodeURIComponent(now.toISOString())}`;
+    const resp = await fetch(url, { headers: getAuthHeader() });
+    if (!resp.ok) return snapshot;
+    const data = await resp.json();
+    const list = Array.isArray(data) ? data : (data.events || []);
+    for (const e of list) {
+      if (String(e.mode || "").toUpperCase() !== "APRS") continue;
+      const call = String(e.callsign || "").trim().toUpperCase();
+      if (!call) continue;
+      const lat = Number(e.lat);
+      const lon = Number(e.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      if (lat === 0 && lon === 0) continue;
+      const tsMs = e.timestamp ? Date.parse(e.timestamp) : 0;
+      const prev = snapshot.get(call);
+      if (!prev || tsMs >= prev.tsMs) snapshot.set(call, { lat, lon, tsMs });
+    }
+  } catch { /* best-effort */ }
+  return snapshot;
 }
 
 function _updateAprsMapCount() {
@@ -740,14 +780,33 @@ function _syncAprsMapContext() {
     || (modeUpper !== "APRS" && (bandSelect?.value === "70cm")
         && localStorage.getItem("4ham_lora_aprs_active") === "1");
 
-  // Apply the right combined filter (rf+IS for APRS, lora+IS for LoRa)
-  aprsMapCtrl.applyFilter(isLora ? "lora_tcp" : "rf_tcp");
+  // Mode-aware combined default (used when no user override is persisted, or
+  // the persisted choice is incompatible with the current mode).
+  const combinedDefault = isLora ? "lora_tcp" : "rf_tcp";
+
+  // Honour user-selected filter from previous session if compatible with mode.
+  let saved = null;
+  try { saved = localStorage.getItem(APRS_FILTER_LS_KEY); } catch (_) {}
+  let effectiveFilter = combinedDefault;
+  let activeButtonFilter = "all";
+  const validForMode = (f) => {
+    if (!f) return false;
+    if (f === "all" || f === "tcp") return true;
+    if (f === "rf") return !isLora;
+    if (f === "lora") return isLora;
+    return false;
+  };
+  if (validForMode(saved)) {
+    effectiveFilter = saved;
+    activeButtonFilter = saved;
+  }
+  aprsMapCtrl.applyFilter(effectiveFilter);
 
   // Update filter button UI: reset active state, hide irrelevant source button
   if (aprsMapFilterEl) {
     aprsMapFilterEl.querySelectorAll(".aprs-filter-btn").forEach(b => b.classList.remove("aprs-filter-btn--active"));
-    const allBtn = aprsMapFilterEl.querySelector('[data-filter="all"]');
-    if (allBtn) allBtn.classList.add("aprs-filter-btn--active");
+    const activeBtn = aprsMapFilterEl.querySelector(`[data-filter="${activeButtonFilter}"]`);
+    if (activeBtn) activeBtn.classList.add("aprs-filter-btn--active");
     const rfBtn = aprsMapFilterEl.querySelector('[data-filter="rf"]');
     const loraBtn = aprsMapFilterEl.querySelector('[data-filter="lora"]');
     if (rfBtn) rfBtn.classList.toggle("d-none", isLora);

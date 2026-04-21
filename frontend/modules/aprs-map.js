@@ -13,6 +13,14 @@
 
 /* global L */
 
+// Local time in Portuguese format DD/MM/YYYY HH:MM (24h).
+function _fmtPtLocal(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export const APRS_MARKER_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const APRS_RANGE_KM = 50;
 const APRS_CLEANUP_INTERVAL_MS = 60 * 1000; // check every minute
@@ -254,10 +262,70 @@ export class APRSMapController {
     }
   }
 
-  /** Load a batch of historical events (e.g. from DB on APRS mode entry). */
-  loadHistory(events) {
+  /**
+   * Load a batch of historical events (e.g. from DB on APRS mode entry).
+   *
+   * Pre-pass: for each callsign, find the most recent event carrying a
+   * valid position. Position-less events (digipeated status frames, MIC-E
+   * messages without coords, etc.) inherit that position so they still
+   * register as markers and contribute their per-source path/timestamp.
+   *
+   * @param {Array<object>} events - APRS events from the API
+   * @param {Map<string, {lat:number, lon:number, ts?:string}>} [positionSnapshot]
+   *        Optional callsign → last-known-position map (typically derived
+   *        from a wider time window) used as a fallback when no positioned
+   *        event exists in `events` for a given callsign.
+   */
+  loadHistory(events, positionSnapshot) {
     if (!Array.isArray(events)) return;
-    events.forEach((evt) => this.addEvent(evt));
+
+    // Build per-callsign latest known position from the batch itself.
+    const positionByCall = new Map();
+    for (const evt of events) {
+      const call = String(evt?.callsign || "").trim().toUpperCase();
+      if (!call) continue;
+      const lat = Number(evt.lat);
+      const lon = Number(evt.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      if (lat === 0 && lon === 0) continue;
+      const tsMs = evt.timestamp ? Date.parse(evt.timestamp) : 0;
+      const prev = positionByCall.get(call);
+      if (!prev || tsMs >= prev.tsMs) {
+        positionByCall.set(call, { lat, lon, tsMs });
+      }
+    }
+    // Fall back to the optional wider snapshot for callsigns not positioned
+    // in the current activity batch.
+    if (positionSnapshot instanceof Map) {
+      for (const [call, pos] of positionSnapshot) {
+        const key = String(call || "").trim().toUpperCase();
+        if (!key || positionByCall.has(key)) continue;
+        const lat = Number(pos?.lat);
+        const lon = Number(pos?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        positionByCall.set(key, { lat, lon, tsMs: 0 });
+      }
+    }
+
+    // Iterate oldest → newest so per-source timestamps reflect the most
+    // recent frame and the rendered marker icon picks the latest source.
+    const sorted = events.slice().sort((a, b) => {
+      const ta = a?.timestamp ? Date.parse(a.timestamp) : 0;
+      const tb = b?.timestamp ? Date.parse(b.timestamp) : 0;
+      return ta - tb;
+    });
+    for (const evt of sorted) {
+      const call = String(evt?.callsign || "").trim().toUpperCase();
+      const lat = Number(evt.lat);
+      const lon = Number(evt.lon);
+      const hasPos = Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0);
+      if (!hasPos && call && positionByCall.has(call)) {
+        const p = positionByCall.get(call);
+        this.addEvent({ ...evt, lat: p.lat, lon: p.lon });
+      } else {
+        this.addEvent(evt);
+      }
+    }
   }
 
   /** Remove all station markers (not QTH). */
@@ -334,8 +402,8 @@ export class APRSMapController {
     const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
     const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
     const emoji = aprsSymbolEmoji(data.symbol_table, data.symbol_code);
-    const firstSeen = data.firstSeenMs ? new Date(data.firstSeenMs).toLocaleTimeString() : "—";
-    const lastSeen = data.lastSeenMs ? new Date(data.lastSeenMs).toLocaleTimeString() : "—";
+    const firstSeen = data.firstSeenMs ? _fmtPtLocal(new Date(data.firstSeenMs)) : "—";
+    const lastSeen = data.lastSeenMs ? _fmtPtLocal(new Date(data.lastSeenMs)) : "—";
 
     // Per-source tracking (path/raw/msg/ts for each source this station was heard on)
     const ps = perSource instanceof Map ? perSource : new Map();
@@ -367,7 +435,7 @@ export class APRSMapController {
       const info = ps.get(key) || {};
       const label = srcLabels[key] || { icon: "❓", name: key };
       const path = info.path || "—";
-      const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+      const tsStr = info.ts ? _fmtPtLocal(new Date(info.ts)) : "—";
       perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
         + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
         + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
@@ -377,7 +445,7 @@ export class APRSMapController {
       if (orderedKeys.includes(key)) continue;
       const info = ps.get(key) || {};
       const path = info.path || "—";
-      const tsStr = info.ts ? new Date(info.ts).toLocaleTimeString() : "—";
+      const tsStr = info.ts ? _fmtPtLocal(new Date(info.ts)) : "—";
       perSourceRows += `<tr><td><strong>${this.#escapeHtml(key)}</strong></td>`
         + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
         + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
