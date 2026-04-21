@@ -87,7 +87,7 @@ export class APRSMapController {
     if (!this.#map) {
       this.#map = L.map(this.#container, {
         center: [this.#qthLat, this.#qthLon],
-        zoom: 11,
+        zoom: 9,
         zoomControl: true,
         attributionControl: true,
         scrollWheelZoom: false,
@@ -104,8 +104,13 @@ export class APRSMapController {
         maxZoom: 18,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
       }).addTo(this.#map);
+      // Frame the QTH with a ~80 km radius (160 km diameter visible) so the
+      // user can immediately see all reachable stations; user can still
+      // zoom out manually for a wider view.
+      this.#fitToQthRadius(80000);
     } else {
-      this.#map.setView([this.#qthLat, this.#qthLon], 11);
+      this.#map.setView([this.#qthLat, this.#qthLon], 9);
+      this.#fitToQthRadius(80000);
     }
 
     // QTH marker
@@ -430,6 +435,13 @@ export class APRSMapController {
   }
 
   // ── Private ───────────────────────────────────────────────────────────
+
+  /** Fit the map view to a circle of `radiusM` metres around the QTH. */
+  #fitToQthRadius(radiusM) {
+    if (!this.#map) return;
+    const tmp = L.circle([this.#qthLat, this.#qthLon], { radius: radiusM });
+    this.#map.fitBounds(tmp.getBounds(), { padding: [20, 20] });
+  }
 
   /** Build a station icon. When the callsign collides with others at the
    *  same geographic point (per #stackByCall), the icon includes a vertical

@@ -4753,6 +4753,9 @@ Last update: 2026-04-03 UTC
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
             maxZoom: 18
           }).addTo(aprsMap);
+          // Frame the QTH with a ~80 km radius (160 km diameter visible).
+          const tmpCircle = L.circle([aprsQthLat, aprsQthLon], { radius: 80000 });
+          aprsMap.fitBounds(tmpCircle.getBounds(), { padding: [20, 20] });
 
           // QTH marker (divIcon with label — same as main interface)
           L.marker([aprsQthLat, aprsQthLon], {
