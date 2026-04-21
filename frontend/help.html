@@ -1061,6 +1061,14 @@ sudo bash scripts/enable_lora_aprs.sh</pre>
       uses its own SDR resource (Direwolf via <code>rtl_fm</code>, gr-lora_sdr via its own
       flowgraph) — typically on two separate RTL-SDR dongles.
     </p>
+    <p>
+      <strong>Tip — validate without hardware:</strong> the repository ships a developer tool
+      <code>scripts/lora_aprs_udp_sender.py</code> that sends synthetic LoRa-APRS frames (with the
+      proper <code>&lt;\xff\x01</code> OE5BPA header) to the local UDP listener. Use it to verify
+      the backend, parser, DB and the <strong>📡 LoRa</strong> map filter end-to-end, before
+      hooking up a real <code>gr-lora_sdr</code> flowgraph:
+    </p>
+<pre>python3 scripts/lora_aprs_udp_sender.py --count 3 --interval 1</pre>
   </section>
 
   <!-- 18. FAQ -->

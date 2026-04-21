@@ -312,6 +312,17 @@ The `gr-lora_sdr` GNU Radio Out-Of-Tree module is not packaged in `apt`, so it m
 
 After enabling, run a `gr-lora_sdr` flowgraph that forwards decoded payloads to UDP `127.0.0.1:5687` (example flowgraphs ship in `/opt/gr-lora_sdr/examples`). Recommended antenna: a dual-band VHF/UHF such as the **Diamond X50**, which covers both 144.800 MHz APRS and 433.775 MHz LoRa APRS without retuning.
 
+#### Validating the LoRa APRS pipeline without SDR hardware
+
+Before connecting a real `gr-lora_sdr` flowgraph, you can verify the backend listener, parser, DB ingest, and frontend filter end-to-end using the bundled developer sender:
+
+```bash
+cd ~/4ham-spectrum-analysis
+python3 scripts/lora_aprs_udp_sender.py --count 3 --interval 1
+```
+
+This sends three synthetic LoRa-APRS frames (with the standard `<\xff\x01` OE5BPA header) to `127.0.0.1:5687`. With the toggle enabled, the events should appear immediately on the APRS map under the **📡 LoRa** filter and be persisted to the database with `source=lora_aprs` and `frequency_hz=433775000`.
+
 ### APRS-IS (Internet APRS feed)
 In addition to the local RF pipeline (rtl_fm → Direwolf → KISS), the backend can also connect to a public **APRS-IS** gateway and receive packets reported by stations worldwide. Both feeds are merged into the same APRS map. APRS-IS uses only the Python standard library — no extra packages required.
 
