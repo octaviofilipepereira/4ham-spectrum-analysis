@@ -120,6 +120,10 @@ const saveAsrSettingsBtn = document.getElementById("saveAsrSettings");
 const aprsEnabledCheck = document.getElementById("aprsEnabled");
 const aprsAvailableBadge = document.getElementById("aprsAvailableBadge");
 const saveAprsSettingsBtn = document.getElementById("saveAprsSettings");
+const installAprsBtn = document.getElementById("installAprsBtn");
+const installAprsCopyBtn = document.getElementById("installAprsCopyBtn");
+const installAprsCommandInput = document.getElementById("installAprsCommand");
+const installAprsReloadBtn = document.getElementById("installAprsReloadBtn");
 const saveStationSettingsBtn = document.getElementById("saveStationSettings");
 const stationCallsignInput = document.getElementById("stationCallsign");
 const stationOperatorInput = document.getElementById("stationOperator");
@@ -3720,10 +3724,12 @@ async function loadSettings() {
           aprsAvailableBadge.textContent = "Direwolf installed";
           aprsAvailableBadge.className = "badge bg-success ms-2";
           if (aprsEnabledCheck) aprsEnabledCheck.disabled = false;
+          if (installAprsBtn) installAprsBtn.classList.add("d-none");
         } else {
           aprsAvailableBadge.textContent = "Direwolf not installed";
           aprsAvailableBadge.className = "badge bg-warning text-dark ms-2";
           if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
+          if (installAprsBtn) installAprsBtn.classList.remove("d-none");
         }
       }
       // Show/hide 2m band + APRS mode buttons: available AND enabled
@@ -4289,6 +4295,32 @@ if (saveAprsSettingsBtn) {
     } catch (err) {
       showToastError("Failed to save APRS setting");
     }
+  });
+}
+
+// ── Install Direwolf modal — copy command + reload page ─────────────────
+if (installAprsCopyBtn && installAprsCommandInput) {
+  installAprsCopyBtn.addEventListener("click", async () => {
+    const cmd = installAprsCommandInput.value;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(cmd);
+      } else {
+        installAprsCommandInput.select();
+        document.execCommand("copy");
+        installAprsCommandInput.setSelectionRange(0, 0);
+      }
+      const original = installAprsCopyBtn.textContent;
+      installAprsCopyBtn.textContent = "Copied!";
+      setTimeout(() => { installAprsCopyBtn.textContent = original; }, 1500);
+    } catch (err) {
+      showToastError("Could not copy command — please copy it manually.");
+    }
+  });
+}
+if (installAprsReloadBtn) {
+  installAprsReloadBtn.addEventListener("click", () => {
+    window.location.reload();
   });
 }
 
