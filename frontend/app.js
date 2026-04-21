@@ -811,8 +811,19 @@ function _syncAprsMapContext() {
     if (activeBtn) activeBtn.classList.add("aprs-filter-btn--active");
     const rfBtn = aprsMapFilterEl.querySelector('[data-filter="rf"]');
     const loraBtn = aprsMapFilterEl.querySelector('[data-filter="lora"]');
+    const tcpBtn = aprsMapFilterEl.querySelector('[data-filter="tcp"]');
     if (rfBtn) rfBtn.classList.toggle("d-none", isLora);
-    if (loraBtn) loraBtn.classList.toggle("d-none", !isLora);
+    if (loraBtn) {
+      loraBtn.classList.toggle("d-none", !isLora);
+      loraBtn.textContent = "📡 LoRa RF";
+      loraBtn.title = "LoRa APRS RF only (gr-lora_sdr, 433.775 MHz)";
+    }
+    if (tcpBtn) {
+      tcpBtn.textContent = isLora ? "🌐 LoRa TCP" : "🌐 TCP";
+      tcpBtn.title = isLora
+        ? "APRS-IS (TCP) — gateed worldwide; not LoRa-specific"
+        : "APRS-IS (TCP)";
+    }
   }
 
   // Update map title
