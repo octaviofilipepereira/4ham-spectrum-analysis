@@ -969,6 +969,7 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
     """
     saved = 0
     errors = []
+    background_aprs_sources = {"direwolf", "aprs_is", "lora_aprs"}
     
     for idx, item in enumerate(items):
         if not isinstance(item, dict):
@@ -992,9 +993,13 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
             errors.append({"index": idx, "error": "invalid_event"})
             record_decoder_event_invalid()
             continue
+
+        is_background_aprs = str(event.get("source") or "").strip().lower() in background_aprs_sources
         
-        # Only save events during active scan (not in preview or stopped mode)
-        if state.scan_state.get("state") != "running":
+        # Background APRS sources (Direwolf / APRS-IS / LoRa APRS) are
+        # independent feeders and must be ingested even when the main scan
+        # engine is stopped, in preview, or focused on another mode.
+        if state.scan_state.get("state") != "running" and not is_background_aprs:
             continue
         
         # Filter events by selected decoder mode (case-insensitive).
@@ -1003,7 +1008,7 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
         _FT_FAMILY = {"FT8", "FT4"}
         event_mode = str(event.get("mode", "")).strip().upper()
         selected_mode = str(state.scan_state.get("decoder_mode", "")).strip().upper()
-        if selected_mode and event_mode != selected_mode:
+        if selected_mode and event_mode != selected_mode and not is_background_aprs:
             if not (event_mode in _FT_FAMILY and selected_mode in _FT_FAMILY):
                 continue  # Ignore events from different decoder modes
         

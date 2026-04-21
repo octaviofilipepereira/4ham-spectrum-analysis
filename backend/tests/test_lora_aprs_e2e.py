@@ -179,6 +179,112 @@ class LoraAprsAvailabilityProbeTests(unittest.TestCase):
             self.assertFalse(settings_mod._gr_lora_sdr_available())
 
 
+class BackgroundAprsIngestTests(unittest.TestCase):
+    """Regression tests for background APRS ingestion outside active scan."""
+
+    def setUp(self):
+        from app.api import decoders as decoders_mod
+
+        self.decoders_mod = decoders_mod
+        self.saved_scan_state = dict(decoders_mod.state.scan_state)
+
+    def tearDown(self):
+        self.decoders_mod.state.scan_state.clear()
+        self.decoders_mod.state.scan_state.update(self.saved_scan_state)
+
+    def test_lora_aprs_saves_even_when_scan_stopped(self):
+        decoders_mod = self.decoders_mod
+        decoders_mod.state.scan_state.clear()
+        decoders_mod.state.scan_state.update({
+            "state": "stopped",
+            "decoder_mode": "SSB",
+            "device": "rtlsdr:0",
+            "scan_id": 321,
+        })
+
+        inserted = []
+        with patch.object(decoders_mod.state.db, "insert_callsign", side_effect=inserted.append), \
+             patch.object(decoders_mod, "touch_decoder_source"), \
+             patch.object(decoders_mod, "record_decoder_event_saved"), \
+             patch.object(decoders_mod, "record_decoder_event_invalid"):
+            result = decoders_mod._ingest_callsign_payloads([
+                {
+                    "callsign": "CT7BFV-9",
+                    "mode": "APRS",
+                    "source": "lora_aprs",
+                    "frequency_hz": 433_775_000,
+                    "lat": 40.123,
+                    "lon": -8.456,
+                    "raw": "CT7BFV-9>APLM01,WIDE1-1:!4012.34N/00824.56W>Test",
+                    "msg": "Test",
+                }
+            ], {})
+
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(len(inserted), 1)
+        self.assertEqual(inserted[0]["source"], "lora_aprs")
+        self.assertEqual(inserted[0]["band"], "70cm")
+        self.assertEqual(inserted[0]["scan_id"], 321)
+
+    def test_lora_aprs_bypasses_selected_mode_filter(self):
+        decoders_mod = self.decoders_mod
+        decoders_mod.state.scan_state.clear()
+        decoders_mod.state.scan_state.update({
+            "state": "running",
+            "decoder_mode": "SSB",
+            "device": "rtlsdr:0",
+            "scan_id": 654,
+        })
+
+        inserted = []
+        with patch.object(decoders_mod.state.db, "insert_callsign", side_effect=inserted.append), \
+             patch.object(decoders_mod, "touch_decoder_source"), \
+             patch.object(decoders_mod, "record_decoder_event_saved"), \
+             patch.object(decoders_mod, "record_decoder_event_invalid"):
+            result = decoders_mod._ingest_callsign_payloads([
+                {
+                    "callsign": "CT7BFV-9",
+                    "mode": "APRS",
+                    "source": "lora_aprs",
+                    "frequency_hz": 433_775_000,
+                    "lat": 40.123,
+                    "lon": -8.456,
+                    "raw": "CT7BFV-9>APLM01,WIDE1-1:!4012.34N/00824.56W>Test",
+                }
+            ], {})
+
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(len(inserted), 1)
+
+    def test_non_background_event_still_requires_active_scan(self):
+        decoders_mod = self.decoders_mod
+        decoders_mod.state.scan_state.clear()
+        decoders_mod.state.scan_state.update({
+            "state": "stopped",
+            "decoder_mode": "FT8",
+            "device": "rtlsdr:0",
+            "scan_id": 999,
+        })
+
+        inserted = []
+        with patch.object(decoders_mod.state.db, "insert_callsign", side_effect=inserted.append), \
+             patch.object(decoders_mod, "touch_decoder_source"), \
+             patch.object(decoders_mod, "record_decoder_event_saved"), \
+             patch.object(decoders_mod, "record_decoder_event_invalid"):
+            result = decoders_mod._ingest_callsign_payloads([
+                {
+                    "callsign": "CT1ABC",
+                    "mode": "FT8",
+                    "source": "external_ft",
+                    "frequency_hz": 14_074_000,
+                    "raw": "CQ CT1ABC IN51",
+                }
+            ], {})
+
+        self.assertEqual(result["saved"], 0)
+        self.assertEqual(inserted, [])
+
+
 @unittest.skipUnless(SENDER_SCRIPT.exists(), "udp sender script missing")
 class LoraAprsE2ESenderTests(unittest.TestCase):
     """End-to-end test driven by the real ``lora_aprs_udp_sender.py`` CLI."""
