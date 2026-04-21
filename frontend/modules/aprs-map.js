@@ -51,6 +51,7 @@ export class APRSMapController {
   #qthMarker = null;
   #rangeCircle = null;
   #markers = new Map(); // callsign → { marker, data, lastSeenMs }
+  #stackByCall = new Map(); // callsign → vertical stack index (collision)
   #cleanupTimer = null;
   #qthLat = 39.5;
   #qthLon = -8.0;
@@ -235,12 +236,19 @@ export class APRSMapController {
     if (src === "aprs_is") sourceClass = "aprs-marker-is";
     else if (src === "lora_aprs") sourceClass = "aprs-marker-lora";
     else sourceClass = "aprs-marker-rf";
+    // Vertically stack overlapping labels: even indices stack upward,
+    // odd indices stack downward. Step = label height (28) + 4 px gap.
+    const stackIdx = this.#stackByCall.get(callsign) || 0;
+    const stackStep = 32;
+    const yShift = stackIdx === 0
+      ? 0
+      : (stackIdx % 2 === 1 ? Math.ceil(stackIdx / 2) * stackStep : -(stackIdx / 2) * stackStep);
     const marker = L.marker([lat, lon], {
       icon: L.divIcon({
         className: `aprs-station-icon ${sourceClass}`,
         html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
         iconSize: [120, 28],
-        iconAnchor: [60, 14],
+        iconAnchor: [60, 14 + yShift],
       }),
     });
 
@@ -310,10 +318,12 @@ export class APRSMapController {
     // Resolve marker collisions: when several callsigns share virtually the
     // same coordinate (e.g. CQ0PCB and CQ0DCO-B at the Coimbra repeater
     // site, ~40 m apart) their 120-px wide labels overlap and only the
-    // last-drawn marker is visible. Group by ~110 m buckets and spread
-    // colliding callsigns on a small circle around the original point.
+    // last-drawn marker is visible. A purely geographic offset is too
+    // small at typical APRS zoom levels, so we stack the labels vertically
+    // by adjusting iconAnchor Y. Compute per-callsign stack index here and
+    // store it on the controller so addEvent() can pick it up.
     const COLLISION_BUCKET_DEG = 0.001; // ~110 m at PT latitudes
-    const COLLISION_RADIUS_DEG = 0.0006; // ~65 m offset
+    const stackByCall = new Map();
     const buckets = new Map();
     for (const [call, pos] of positionByCall) {
       const key = `${Math.round(pos.lat / COLLISION_BUCKET_DEG)}|${Math.round(pos.lon / COLLISION_BUCKET_DEG)}`;
@@ -323,17 +333,9 @@ export class APRSMapController {
     for (const [, calls] of buckets) {
       if (calls.length < 2) continue;
       calls.sort();
-      const cosLat = Math.cos((positionByCall.get(calls[0]).lat * Math.PI) / 180) || 1;
-      calls.forEach((call, i) => {
-        const angle = (i / calls.length) * 2 * Math.PI;
-        const pos = positionByCall.get(call);
-        positionByCall.set(call, {
-          lat: pos.lat + COLLISION_RADIUS_DEG * Math.cos(angle),
-          lon: pos.lon + (COLLISION_RADIUS_DEG * Math.sin(angle)) / cosLat,
-          tsMs: pos.tsMs,
-        });
-      });
+      calls.forEach((call, i) => stackByCall.set(call, i));
     }
+    this.#stackByCall = stackByCall;
 
     // Iterate oldest → newest so per-source timestamps reflect the most
     // recent frame and the rendered marker icon picks the latest source.
