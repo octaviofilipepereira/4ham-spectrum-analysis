@@ -170,7 +170,8 @@ async def lifespan(app_instance: FastAPI):
     # Auto-start preset scheduler if there are enabled schedules
     try:
         enabled = [s for s in _state.db.get_preset_schedules() if s.get("enabled")]
-        if enabled:
+        _sched_kv = _state.db.get_kv("preset_scheduler_enabled")
+        if enabled and _sched_kv != "0":
             from app.scan.preset_scheduler import PresetScheduler
             from app.api.scan import _apply_preset_by_id, _stop_active_rotation
             scheduler = PresetScheduler(

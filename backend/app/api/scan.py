@@ -1362,6 +1362,7 @@ async def scheduler_start(
     )
     state.preset_scheduler = scheduler
     await scheduler.start()
+    state.db.set_kv("preset_scheduler_enabled", "1")
     log("preset_scheduler_started")
     return scheduler.status()
 
@@ -1374,5 +1375,6 @@ async def scheduler_stop(
     if not state.preset_scheduler or not state.preset_scheduler.running:
         raise HTTPException(status_code=400, detail="Scheduler is not running")
     await state.preset_scheduler.stop()
+    state.db.set_kv("preset_scheduler_enabled", "0")
     log("preset_scheduler_stopped")
     return state.preset_scheduler.status()
