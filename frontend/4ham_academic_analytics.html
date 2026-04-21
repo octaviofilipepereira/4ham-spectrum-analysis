@@ -857,6 +857,7 @@ Last update: 2026-04-03 UTC
         flex-direction: column;
         gap: 4px;
         pointer-events: auto;
+        min-width: 0;
       }
       .propmap-band-filter {
         position: absolute;
@@ -1028,10 +1029,18 @@ Last update: 2026-04-03 UTC
 
         .propmap-mobile-legends {
           display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          align-items: start;
+          gap: 6px;
         }
 
         .propmap-mobile-legends .propmap-legend-item {
-          font-size: 11px;
+          font-size: 10px;
+          line-height: 1.2;
+        }
+
+        .propmap-mobile-legends .propmap-legend {
+          padding: 6px 8px;
         }
 
         #nextRefreshInfo {
