@@ -998,7 +998,29 @@ RTL-SDR → rtl_fm → Direwolf → KISS TCP → 4ham</pre>
         <tr><td><code>direwolf</code></td><td><code>sudo apt install direwolf</code></td></tr>
       </tbody>
     </table>
-    <p>Both are installed automatically by the <code>install.sh</code> script.</p>
+    <p>Both are installed automatically by the <code>install.sh</code> script when you choose to enable APRS.</p>
+
+    <h3 class="sub-title">Enabling APRS on an existing install</h3>
+    <p>
+      If you already have 4ham installed and chose <em>not</em> to install Direwolf, you can
+      add APRS support without re-running the full installer:
+    </p>
+    <ol>
+      <li>Open <strong>Admin Config</strong> → section <strong>APRS Packet Decoding (Direwolf)</strong>.</li>
+      <li>The badge will show <em>“Direwolf not installed”</em>.</li>
+      <li>Tick <strong>“Enable APRS packet decoding via Direwolf KISS TCP”</strong>. A button
+          <strong>Install Direwolf…</strong> appears and an instruction modal opens automatically.</li>
+      <li>Open a terminal on the server where 4ham runs and execute the command shown:
+        <pre>cd ~/4ham-spectrum-analysis
+sudo bash scripts/enable_aprs.sh</pre>
+      </li>
+      <li>Reload the browser. The badge turns green and you can save the APRS setting.</li>
+    </ol>
+    <p>
+      The helper script installs Direwolf via <code>apt-get</code>, creates a default
+      <code>config/direwolf.conf</code> (KISS TCP on port 8001) if missing, and is idempotent
+      (safe to re-run). No backend restart is needed afterwards.
+    </p>
   </section>
 
   <!-- 18. FAQ -->

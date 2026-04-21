@@ -863,7 +863,22 @@ This cycle is automatic and transparent — simply select the desired scan mode.
 | `rtl-sdr` | `sudo apt install rtl-sdr` |
 | `direwolf` | `sudo apt install direwolf` |
 
-Both are installed automatically by the `install.sh` script.
+Both are installed automatically by the `install.sh` script when you choose to enable APRS.
+
+### Enabling APRS on an existing install
+
+If you already have 4ham installed and did not enable Direwolf at install time, you can add APRS without re-running the full installer:
+
+1. Open **Admin Config** → **APRS Packet Decoding (Direwolf)**.
+2. Tick **Enable APRS packet decoding via Direwolf KISS TCP** — the **Install Direwolf…** modal opens automatically.
+3. Run the displayed command in a terminal on the server:
+
+   ```bash
+   cd ~/4ham-spectrum-analysis
+   sudo bash scripts/enable_aprs.sh
+   ```
+
+4. Reload the browser, then click **Save APRS setting**. The badge turns green and APRS starts immediately (no backend restart).
 
 ---
 

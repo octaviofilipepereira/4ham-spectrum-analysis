@@ -265,6 +265,24 @@ The backend can connect to Direwolf KISS TCP and ingest APRS frames automaticall
 - `DIREWOLF_KISS_HOST`: host (default `127.0.0.1`)
 - `DIREWOLF_KISS_PORT`: TCP port (default `8001`)
 
+#### Enabling APRS on an existing install
+
+If you already have 4ham installed and chose **No** when the installer asked about Direwolf, you can add APRS support without re-running the full installer:
+
+1. Open the web UI → **Admin Config** → section **APRS Packet Decoding (Direwolf)**.
+2. The badge shows *“Direwolf not installed”*.
+3. Tick **Enable APRS packet decoding via Direwolf KISS TCP**. A button **Install Direwolf…** appears and an instruction modal opens automatically.
+4. On the server where 4ham runs, open a terminal and run:
+
+   ```bash
+   cd ~/4ham-spectrum-analysis
+   sudo bash scripts/enable_aprs.sh
+   ```
+
+5. Reload the page. The badge turns green and you can save the APRS setting.
+
+The helper script (`scripts/enable_aprs.sh`) installs Direwolf via `apt-get`, creates a default `config/direwolf.conf` (KISS TCP on port 8001) if missing, and is idempotent (safe to re-run). No backend restart is required afterwards.
+
 ### APRS-IS (Internet APRS feed)
 In addition to the local RF pipeline (rtl_fm → Direwolf → KISS), the backend can also connect to a public **APRS-IS** gateway and receive packets reported by stations worldwide. Both feeds are merged into the same APRS map. APRS-IS uses only the Python standard library — no extra packages required.
 
