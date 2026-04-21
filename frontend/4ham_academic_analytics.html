@@ -2109,9 +2109,19 @@ Last update: 2026-04-03 UTC
 
         if (rotationSlot) {
           const secondsRaw = Number(rotation.time_remaining_s);
-          const suffix = Number.isFinite(secondsRaw)
-            ? t("scan_status_switches_in", { seconds: Math.max(1, Math.ceil(secondsRaw)) })
-            : "";
+          let suffix = "";
+          if (Number.isFinite(secondsRaw)) {
+            const totalSec = Math.max(1, Math.ceil(secondsRaw));
+            let formatted;
+            if (totalSec < 60) {
+              formatted = `${totalSec} s`;
+            } else {
+              const m = Math.floor(totalSec / 60);
+              const s = totalSec % 60;
+              formatted = s > 0 ? `${m} m ${s} s` : `${m} m`;
+            }
+            suffix = t("scan_status_switches_in", { time: formatted });
+          }
           let text = t("scan_status_rotation_label");
           if (details) {
             text = `${text}: ${details}`;
