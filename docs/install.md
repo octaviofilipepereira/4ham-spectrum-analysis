@@ -147,6 +147,7 @@ Notes:
 - Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
 - To auto-start Direwolf at backend startup, install the binary and set:
 	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
+- **Adding APRS to an existing install:** if you skipped Direwolf during the original installer run, open the web UI → **Admin Config** → tick *Enable APRS packet decoding via Direwolf KISS TCP*. A modal will instruct you to run `sudo bash scripts/enable_aprs.sh` on the server. The helper script is idempotent and does not touch the rest of the installation.
 - **SSB Voice Signature (Whisper ASR):** to enable real-time SSB voice transcription after installation, activate the venv and run `pip install openai-whisper`, then enable ASR in Admin → Settings. The `tiny` model is auto-downloaded on first use. Full transcription pipeline requires `ffmpeg` (installed by the auto-installer).
 
 ## Waterfall tooltip
