@@ -20,6 +20,37 @@ LOG_DIR="$ROOT_DIR/logs"
 LOG_FILE="$LOG_DIR/backend.log"
 PID_FILE="$LOG_DIR/backend.pid"
 PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+ENV_FILE="$ROOT_DIR/.env"
+
+read_env_value() {
+  local key="$1"
+  local default_value="$2"
+  local value="${!key:-}"
+  if [[ -n "$value" ]]; then
+    echo "$value"
+    return 0
+  fi
+  if [[ -f "$ENV_FILE" ]]; then
+    value="$(grep -E "^(export[[:space:]]+)?${key}=" "$ENV_FILE" | tail -n 1 || true)"
+    if [[ -n "$value" ]]; then
+      value="${value#export }"
+      value="${value#*=}"
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+    fi
+  fi
+  echo "${value:-$default_value}"
+}
+
+APP_HOST="$(read_env_value APP_HOST "0.0.0.0")"
+APP_PORT="$(read_env_value APP_PORT "8000")"
+DISPLAY_HOST="127.0.0.1"
+if [[ "$APP_HOST" != "0.0.0.0" && "$APP_HOST" != "::" ]]; then
+  DISPLAY_HOST="$APP_HOST"
+fi
+APP_URL="http://${DISPLAY_HOST}:${APP_PORT}/"
 
 usage() {
   cat <<EOF
@@ -37,6 +68,14 @@ EOF
 
 collect_uvicorn_pids() {
   pgrep -f 'uvicorn app.main:app' 2>/dev/null || true
+}
+
+port_listening() {
+  ss -ltn 2>/dev/null | awk -v suffix=":${APP_PORT}" '$4 ~ suffix"$" { found=1 } END { exit(found ? 0 : 1) }'
+}
+
+port_listener_details() {
+  ss -ltnp 2>/dev/null | awk -v suffix=":${APP_PORT}" '$4 ~ suffix"$"'
 }
 
 kill_process_tree() {
@@ -129,26 +168,32 @@ do_start() {
     exit 0
   fi
 
+  if port_listening; then
+    echo "Error: port ${APP_PORT} is already in use." >&2
+    port_listener_details >&2 || true
+    exit 1
+  fi
+
   mkdir -p "$LOG_DIR"
 
   local env_args=()
-  if [[ -f "$ROOT_DIR/.env" ]]; then
-    env_args=(--env-file "$ROOT_DIR/.env")
+  if [[ -f "$ENV_FILE" ]]; then
+    env_args=(--env-file "$ENV_FILE")
   fi
 
   # Run from ROOT_DIR so relative paths (data/, config/, etc.) resolve correctly.
   cd "$ROOT_DIR"
   nohup "$PYTHON_BIN" -m uvicorn app.main:app \
     --app-dir "$BACKEND_DIR" \
-    --host 0.0.0.0 \
-    --port 8000 \
+    --host "$APP_HOST" \
+    --port "$APP_PORT" \
     "${env_args[@]}" \
     >> "$LOG_FILE" 2>&1 &
   local pid="$!"
   echo "$pid" > "$PID_FILE"
   echo "Server started (PID: $pid)"
   echo "Log : $LOG_FILE"
-  echo "URL : http://127.0.0.1:8000/"
+  echo "URL : $APP_URL"
 }
 
 do_stop() {
@@ -189,12 +234,12 @@ do_status() {
   fi
 
   echo
-  echo "=== Port 8000 ==="
-  ss -ltnp 2>/dev/null | grep ':8000' || echo "Port 8000 is not listening."
+  echo "=== Port ${APP_PORT} ==="
+  port_listener_details || echo "Port ${APP_PORT} is not listening."
 
   echo
   echo "=== API health ==="
-  curl -s -m 3 http://127.0.0.1:8000/api/scan/status 2>/dev/null || echo "API not responding."
+  curl -s -m 3 "${APP_URL}api/scan/status" 2>/dev/null || echo "API not responding."
 
   echo
   echo "=== Last 20 log lines ==="
