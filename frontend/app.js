@@ -684,15 +684,11 @@ function setAprsMapVisible(showMap) {
     if (!aprsMapCtrl.isReady) {
       aprsMapCtrl.init(locator, callsign, exactLat, exactLon);
       aprsMapCtrl.show();
+      // Load recent APRS events from the DB
+      _loadRecentAprsEvents();
     } else {
       aprsMapCtrl.show();
-      // Drop stale markers from a previous mode before reloading so the
-      // LoRa map doesn't keep showing 2m direwolf stations and vice versa.
-      aprsMapCtrl.clearMarkers();
     }
-    // Reload events on every show so the map reflects the current mode
-    // (APRS-RF vs LoRa-APRS), filtered by source inside _loadRecentAprsEvents.
-    _loadRecentAprsEvents();
     // Non-blocking connectivity check — warn if no internet (RF-only)
     _checkAprsConnectivity();
   } else {
@@ -712,31 +708,6 @@ async function _checkAprsConnectivity() {
   } catch { /* best-effort */ }
 }
 
-/** Decide whether the active APRS map context is LoRa (433 MHz) or RF (144 MHz). */
-function _isLoraMapContext() {
-  const modeUpper = String(selectedDecoderMode || "").trim().toUpperCase();
-  if (modeUpper === "LORA") return true;
-  if (modeUpper === "APRS") return false;
-  // Fallback: derive from band when no mode is selected (e.g. just after refresh).
-  return bandSelect?.value === "70cm"
-    && localStorage.getItem("4ham_lora_aprs_active") === "1";
-}
-
-/**
- * Filter raw APRS-mode events down to the events relevant for the current
- * map context. LoRa map keeps only `lora_aprs` source; RF/APRS map excludes
- * `lora_aprs`. APRS-IS events are kept on the RF map (mixed-source default)
- * but are excluded from the LoRa map to avoid 2m callsigns leaking in.
- */
-function _filterEventsForActiveMapMode(events) {
-  const lora = _isLoraMapContext();
-  return events.filter((e) => {
-    const src = String(e.source || "").trim().toLowerCase();
-    if (lora) return src === "lora_aprs";
-    return src !== "lora_aprs";
-  });
-}
-
 /** Fetch recent APRS events from the API and populate the map. */
 async function _loadRecentAprsEvents() {
   try {
@@ -749,9 +720,7 @@ async function _loadRecentAprsEvents() {
     if (!resp.ok) return;
     const data = await resp.json();
     const events = Array.isArray(data) ? data : (data.events || []);
-    const aprsEvents = _filterEventsForActiveMapMode(
-      events.filter((e) => String(e.mode || "").toUpperCase() === "APRS")
-    );
+    const aprsEvents = events.filter((e) => String(e.mode || "").toUpperCase() === "APRS");
 
     // Wider 24h fetch used ONLY to derive a per-callsign last-known-position
     // snapshot, so digipeated/status frames in the 30-min activity window
@@ -766,8 +735,7 @@ async function _loadRecentAprsEvents() {
 /**
  * Fetch a 24-hour APRS position snapshot from the API and reduce it to a
  * Map<callsign, {lat, lon}> with the most recent positioned event per
- * callsign. Restricted to the events relevant for the active map mode so the
- * LoRa map doesn't inherit positions from 2m RF callsigns.
+ * callsign.
  * @param {Date} now
  * @returns {Promise<Map<string, {lat:number, lon:number}>>}
  */
@@ -779,11 +747,9 @@ async function _fetchAprsPositionSnapshot(now) {
     const resp = await fetch(url, { headers: getAuthHeader() });
     if (!resp.ok) return snapshot;
     const data = await resp.json();
-    const list = _filterEventsForActiveMapMode(
-      (Array.isArray(data) ? data : (data.events || []))
-        .filter((e) => String(e.mode || "").toUpperCase() === "APRS")
-    );
+    const list = Array.isArray(data) ? data : (data.events || []);
     for (const e of list) {
+      if (String(e.mode || "").toUpperCase() !== "APRS") continue;
       const call = String(e.callsign || "").trim().toUpperCase();
       if (!call) continue;
       const lat = Number(e.lat);
@@ -4822,11 +4788,6 @@ if (quickModeButtons.length) {
           scanActionInFlight = false;
           updateScanButtonState();
           wfc.hideTransition();
-          // Defensive re-sync so the mode buttons and APRS map context
-          // always reflect `selectedDecoderMode` after the switch — even if
-          // a concurrent syncScanState poll briefly desynced the UI.
-          refreshModeButtons();
-          if (!aprsMapArea?.hidden) _syncAprsMapContext();
         }
         return;
       }
