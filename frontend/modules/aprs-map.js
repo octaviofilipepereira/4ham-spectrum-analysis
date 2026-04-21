@@ -87,7 +87,7 @@ export class APRSMapController {
     if (!this.#map) {
       this.#map = L.map(this.#container, {
         center: [this.#qthLat, this.#qthLon],
-        zoom: 11,
+        zoom: 12,
         zoomControl: true,
         attributionControl: true,
         scrollWheelZoom: false,
@@ -105,7 +105,7 @@ export class APRSMapController {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
       }).addTo(this.#map);
     } else {
-      this.#map.setView([this.#qthLat, this.#qthLon], 11);
+      this.#map.setView([this.#qthLat, this.#qthLon], 12);
     }
 
     // QTH marker
