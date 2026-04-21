@@ -305,18 +305,36 @@ export class APRSMapController {
     // small at typical APRS zoom levels, so we stack the labels vertically
     // by adjusting iconAnchor Y. Compute per-callsign stack index here and
     // store it on the controller so addEvent() can pick it up.
+    // Use a 3x3 neighborhood scan over a fine bucket grid so two stations
+    // 40 m apart that fall on opposite sides of a bucket boundary still
+    // collide. Bucket size = ~110 m, neighborhood reach = ~330 m.
     const COLLISION_BUCKET_DEG = 0.001; // ~110 m at PT latitudes
     const stackByCall = new Map();
-    const buckets = new Map();
+    const grid = new Map(); // "bx|by" -> [callsign, ...]
     for (const [call, pos] of positionByCall) {
-      const key = `${Math.round(pos.lat / COLLISION_BUCKET_DEG)}|${Math.round(pos.lon / COLLISION_BUCKET_DEG)}`;
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(call);
+      const bx = Math.round(pos.lat / COLLISION_BUCKET_DEG);
+      const by = Math.round(pos.lon / COLLISION_BUCKET_DEG);
+      const key = `${bx}|${by}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(call);
     }
-    for (const [, calls] of buckets) {
-      if (calls.length < 2) continue;
-      calls.sort();
-      calls.forEach((call, i) => stackByCall.set(call, i));
+    const visited = new Set();
+    for (const [call, pos] of positionByCall) {
+      if (visited.has(call)) continue;
+      const bx = Math.round(pos.lat / COLLISION_BUCKET_DEG);
+      const by = Math.round(pos.lon / COLLISION_BUCKET_DEG);
+      const cluster = [];
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighbours = grid.get(`${bx + dx}|${by + dy}`);
+          if (!neighbours) continue;
+          for (const c of neighbours) if (!visited.has(c)) cluster.push(c);
+        }
+      }
+      cluster.forEach((c) => visited.add(c));
+      if (cluster.length < 2) continue;
+      cluster.sort();
+      cluster.forEach((c, i) => stackByCall.set(c, i));
     }
     this.#stackByCall = stackByCall;
 
