@@ -3718,22 +3718,30 @@ async function loadSettings() {
       }
     }
     if (data.aprs) {
-      if (aprsEnabledCheck) aprsEnabledCheck.checked = data.aprs.enabled === true;
+      const direwolfAvailable = Boolean(data.aprs.available);
+      if (aprsEnabledCheck) {
+        aprsEnabledCheck.checked = data.aprs.enabled === true;
+        // Always allow ticking the box; if Direwolf is missing the user
+        // will be prompted with the install modal on save / on tick.
+        aprsEnabledCheck.disabled = false;
+        aprsEnabledCheck.dataset.direwolfAvailable = direwolfAvailable ? "1" : "0";
+      }
       if (aprsAvailableBadge) {
-        if (data.aprs.available) {
+        if (direwolfAvailable) {
           aprsAvailableBadge.textContent = "Direwolf installed";
           aprsAvailableBadge.className = "badge bg-success ms-2";
-          if (aprsEnabledCheck) aprsEnabledCheck.disabled = false;
-          if (installAprsBtn) installAprsBtn.classList.add("d-none");
         } else {
           aprsAvailableBadge.textContent = "Direwolf not installed";
           aprsAvailableBadge.className = "badge bg-warning text-dark ms-2";
-          if (aprsEnabledCheck) { aprsEnabledCheck.checked = false; aprsEnabledCheck.disabled = true; }
-          if (installAprsBtn) installAprsBtn.classList.remove("d-none");
         }
       }
+      // Install button visible only when user wants APRS but Direwolf is missing
+      if (installAprsBtn) {
+        const wantsAprs = aprsEnabledCheck ? aprsEnabledCheck.checked : false;
+        installAprsBtn.classList.toggle("d-none", direwolfAvailable || !wantsAprs);
+      }
       // Show/hide 2m band + APRS mode buttons: available AND enabled
-      const aprsActive = Boolean(data.aprs.available) && Boolean(data.aprs.enabled);
+      const aprsActive = direwolfAvailable && Boolean(data.aprs.enabled);
       localStorage.setItem("4ham_aprs_active", aprsActive ? "1" : "0");
       const btn2m = document.querySelector('[data-quick-band="2m"]');
       const btnAprs = document.querySelector('[data-quick-mode="APRS"]');
@@ -4274,6 +4282,18 @@ if (saveAsrSettingsBtn) {
 if (saveAprsSettingsBtn) {
   saveAprsSettingsBtn.addEventListener("click", async () => {
     const enabled = aprsEnabledCheck ? aprsEnabledCheck.checked : false;
+    const direwolfAvailable = aprsEnabledCheck
+      ? aprsEnabledCheck.dataset.direwolfAvailable === "1"
+      : true;
+    // If user wants APRS but Direwolf is missing → open install modal,
+    // do not POST (the backend would refuse to start it anyway).
+    if (enabled && !direwolfAvailable) {
+      const modalEl = document.getElementById("installAprsModal");
+      if (modalEl && window.bootstrap) {
+        new bootstrap.Modal(modalEl).show();
+      }
+      return;
+    }
     try {
       const resp = await fetch("/api/settings", {
         method: "POST",
@@ -4294,6 +4314,24 @@ if (saveAprsSettingsBtn) {
       localStorage.setItem("4ham_aprs_active", enabled ? "1" : "0");
     } catch (err) {
       showToastError("Failed to save APRS setting");
+    }
+  });
+}
+
+// ── APRS checkbox toggle: show install button (and prompt) when needed ──
+if (aprsEnabledCheck) {
+  aprsEnabledCheck.addEventListener("change", () => {
+    const direwolfAvailable = aprsEnabledCheck.dataset.direwolfAvailable === "1";
+    const wantsAprs = aprsEnabledCheck.checked;
+    if (installAprsBtn) {
+      installAprsBtn.classList.toggle("d-none", direwolfAvailable || !wantsAprs);
+    }
+    // Auto-open the install modal when user ticks the box and Direwolf is missing
+    if (wantsAprs && !direwolfAvailable) {
+      const modalEl = document.getElementById("installAprsModal");
+      if (modalEl && window.bootstrap) {
+        new bootstrap.Modal(modalEl).show();
+      }
     }
   });
 }
