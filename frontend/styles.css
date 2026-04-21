@@ -1667,6 +1667,29 @@ h1,
   border: 1px solid #334155;
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
+/* Stacked-marker leader (collision spread): vertical line + dot at the
+   exact geographic point, label sits above. */
+.aprs-station-stack {
+  position: relative;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.aprs-station-leader {
+  width: 2px;
+  background: #38bdf8;
+  box-shadow: 0 0 2px rgba(0,0,0,.6);
+}
+.aprs-station-anchor {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 1.5px solid #0f172a;
+  margin-top: -1px;
+  box-shadow: 0 0 3px rgba(0,0,0,.6);
+}
 /* Popup */
 .aprs-popup {
   font-size: 12px;

@@ -1241,6 +1241,11 @@ Last update: 2026-04-03 UTC
         border: 1px solid #334155;
         box-shadow: 0 1px 4px rgba(0,0,0,.4);
       }
+      /* Stacked-marker leader (collision spread): vertical line + dot at the
+         exact geographic point, label sits above. */
+      .aprs-station-stack { position: relative; width: 120px; display: flex; flex-direction: column; align-items: center; }
+      .aprs-station-leader { width: 2px; background: #38bdf8; box-shadow: 0 0 2px rgba(0,0,0,.6); }
+      .aprs-station-anchor { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; border: 1.5px solid #0f172a; margin-top: -1px; box-shadow: 0 0 3px rgba(0,0,0,.6); }
       .aprs-popup { font-size: 12px; line-height: 1.5; min-width: 200px; }
       .aprs-popup__header { font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
       .aprs-popup__table { width: 100%; border-collapse: collapse; }
@@ -4884,21 +4889,37 @@ Last update: 2026-04-03 UTC
           const sourceClass = hasRf ? "aprs-marker-rf" : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is");
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
 
-          // Vertically stack overlapping labels: even indices stack upward,
-          // odd indices stack downward. Step = label height (28) + 4 px gap.
-          const stackIdx = stackByCall.get(call) || 0;
-          const stackStep = 32;
-          const yShift = stackIdx === 0
-            ? 0
-            : (stackIdx % 2 === 1 ? Math.ceil(stackIdx / 2) * stackStep : -(stackIdx / 2) * stackStep);
-          const marker = L.marker([e.lat, e.lon], {
-            icon: L.divIcon({
+          // Vertically stack overlapping labels: when this callsign is part
+          // of a collision bucket, render label + leader line + anchor dot
+          // so the geographic point is preserved and each label is readable.
+          const stackIdx = stackByCall.get(call);
+          let icon;
+          if (stackIdx === undefined) {
+            icon = L.divIcon({
               className: `aprs-station-icon ${sourceClass}`,
               html: `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>`,
               iconSize: [120, 28],
-              iconAnchor: [60, 14 + yShift]
-            })
-          });
+              iconAnchor: [60, 14]
+            });
+          } else {
+            const labelH = 22;
+            const dotH = 8;
+            const stepPx = 28;
+            const leaderH = 6 + stackIdx * stepPx;
+            const totalH = labelH + leaderH + dotH;
+            icon = L.divIcon({
+              className: `aprs-station-icon ${sourceClass}`,
+              html:
+                `<div class="aprs-station-stack">` +
+                  `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>` +
+                  `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
+                  `<span class="aprs-station-anchor"></span>` +
+                `</div>`,
+              iconSize: [120, totalH],
+              iconAnchor: [60, totalH - dotH / 2]
+            });
+          }
+          const marker = L.marker([e.lat, e.lon], { icon });
           marker._isAprsStation = true;
             marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, perSource, seenRangeByCall.get(call)));
         });

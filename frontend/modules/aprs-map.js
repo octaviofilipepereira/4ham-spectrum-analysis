@@ -211,12 +211,7 @@ export class APRSMapController {
       // If station gained RF source, rebuild icon so RF style prevails
       if (hasRF && !hadRF) {
         const emoji = aprsSymbolEmoji(existing.data.symbol_table, existing.data.symbol_code);
-        existing.marker.setIcon(L.divIcon({
-          className: "aprs-station-icon aprs-marker-rf",
-          html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
-          iconSize: [120, 28],
-          iconAnchor: [60, 14],
-        }));
+        existing.marker.setIcon(this.#buildStationIcon(callsign, "aprs-marker-rf", emoji));
       }
       existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.perSource));
       // Re-evaluate filter visibility (source may have changed)
@@ -236,20 +231,8 @@ export class APRSMapController {
     if (src === "aprs_is") sourceClass = "aprs-marker-is";
     else if (src === "lora_aprs") sourceClass = "aprs-marker-lora";
     else sourceClass = "aprs-marker-rf";
-    // Vertically stack overlapping labels: even indices stack upward,
-    // odd indices stack downward. Step = label height (28) + 4 px gap.
-    const stackIdx = this.#stackByCall.get(callsign) || 0;
-    const stackStep = 32;
-    const yShift = stackIdx === 0
-      ? 0
-      : (stackIdx % 2 === 1 ? Math.ceil(stackIdx / 2) * stackStep : -(stackIdx / 2) * stackStep);
     const marker = L.marker([lat, lon], {
-      icon: L.divIcon({
-        className: `aprs-station-icon ${sourceClass}`,
-        html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
-        iconSize: [120, 28],
-        iconAnchor: [60, 14 + yShift],
-      }),
+      icon: this.#buildStationIcon(callsign, sourceClass, emoji),
     });
 
     const perSource = new Map();
@@ -429,6 +412,42 @@ export class APRSMapController {
   }
 
   // ── Private ───────────────────────────────────────────────────────────
+
+  /** Build a station icon. When the callsign collides with others at the
+   *  same geographic point (per #stackByCall), the icon includes a vertical
+   *  leader line and a small dot marking the exact coordinate, with the
+   *  label sitting above it; each colliding station gets a taller leader so
+   *  every label is readable.
+   */
+  #buildStationIcon(callsign, sourceClass, emoji) {
+    const stackIdx = this.#stackByCall.get(callsign);
+    if (stackIdx === undefined) {
+      // Solitary marker — keep the original compact icon.
+      return L.divIcon({
+        className: `aprs-station-icon ${sourceClass}`,
+        html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
+        iconSize: [120, 28],
+        iconAnchor: [60, 14],
+      });
+    }
+    // Stacked marker — label + leader line + anchor dot.
+    const labelH = 22;
+    const dotH = 8;
+    const stepPx = 28; // gap between successive labels
+    const leaderH = 6 + stackIdx * stepPx; // bottom-most: 6 px, next: 34, 62, ...
+    const totalH = labelH + leaderH + dotH;
+    return L.divIcon({
+      className: `aprs-station-icon ${sourceClass}`,
+      html:
+        `<div class="aprs-station-stack">` +
+          `<span class="aprs-station-label">${emoji} ${callsign}</span>` +
+          `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
+          `<span class="aprs-station-anchor"></span>` +
+        `</div>`,
+      iconSize: [120, totalH],
+      iconAnchor: [60, totalH - dotH / 2],
+    });
+  }
 
   #buildPopup(data, perSource) {
     const callsign = data.callsign || "—";
