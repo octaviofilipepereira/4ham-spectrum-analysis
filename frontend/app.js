@@ -782,7 +782,9 @@ function _syncAprsMapContext() {
 
   // Mode-aware combined default (used when no user override is persisted, or
   // the persisted choice is incompatible with the current mode).
-  const combinedDefault = isLora ? "lora_tcp" : "rf_tcp";
+  // In LoRa mode show ONLY genuine LoRa-RF stations (433.775 MHz) — including
+  // APRS-IS would flood the map with VHF traffic gateed worldwide.
+  const combinedDefault = isLora ? "lora" : "rf_tcp";
 
   // Honour user-selected filter from previous session if compatible with mode.
   let saved = null;
