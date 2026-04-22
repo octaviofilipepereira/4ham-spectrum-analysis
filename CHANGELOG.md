@@ -13,7 +13,7 @@ Last update: 2026-04-18 UTC
 - **LoRa APRS hidden behind `FEATURE_LORA_APRS` feature flag** (default `false`). The full LoRa subsystem (UDP listener auto-start, settings exposure, admin UI section, map filter, *LoRa* and *70cm* quick buttons) stays dormant on the default install where no `gr-lora_sdr` flowgraph or hardware is present. Flip to `true` in `.env` (or run `scripts/enable_lora_aprs.sh`, which now persists the flag automatically) and restart the backend to restore the full LoRa surface. No DB migration, no destructive removal — fully reversible.
   - New `backend/app/core/features.py` (single source of truth for feature flags).
   - New public endpoint `GET /api/features` consumed once at frontend boot.
-  - `install.sh` writes `FEATURE_LORA_APRS=false` to `.env` only when the key is missing (existing installs keep their setting).
+  - The `install.sh` installer is intentionally LoRa-agnostic: it does **not** write `FEATURE_LORA_APRS` to `.env`. The backend defaults to `false` when the variable is missing, so the default install never exposes LoRa. Run `scripts/enable_lora_aprs.sh` to opt in (the script writes `FEATURE_LORA_APRS=true`).
 - **Removed `70cm` from the user-facing band lists**: dropped from `frontend/index.html` band/event-search/export selects, from `frontend/4ham_academic_analytics.html` BANDS array and APRS_BANDS set, and from `frontend/modules/constants.js` (`BAND_LIMITS`, `DEFAULT_BAND_OPTIONS`). The `70cm` quick-band button stays in the DOM (hidden) so it can be revealed when the LoRa feature is re-enabled. Backend band tuples (helpers, scan defaults) are intentionally preserved so re-enabling the feature restores full functionality without further changes.
 
 ---
