@@ -170,6 +170,26 @@ async def lifespan(app_instance: FastAPI):
     from app.core.ionospheric import ionospheric_refresh_loop
     asyncio.create_task(ionospheric_refresh_loop())
 
+    # Initialise external mirrors subsystem (push-mode replication).
+    try:
+        from app.external_mirrors import (
+            ExternalMirrorPusher,
+            ExternalMirrorRepository,
+            TokenCache,
+        )
+        from app.external_mirrors import registry as mirrors_registry
+        _mirror_repo = ExternalMirrorRepository(_state.db)
+        _mirror_token_cache = TokenCache()
+        _mirror_pusher = ExternalMirrorPusher(
+            repo=_mirror_repo,
+            token_cache=_mirror_token_cache,
+        )
+        mirrors_registry.init(_mirror_repo, _mirror_pusher, _mirror_token_cache)
+        await _mirror_pusher.start()
+        _log.info("External mirrors pusher started")
+    except Exception as exc:
+        _log.warning("External mirrors pusher failed to start: %s", exc)
+
     # Auto-start preset scheduler if there are enabled schedules
     try:
         enabled = [s for s in _state.db.get_preset_schedules() if s.get("enabled")]
@@ -192,6 +212,12 @@ async def lifespan(app_instance: FastAPI):
     yield
 
     # Graceful shutdown
+    try:
+        from app.external_mirrors import registry as mirrors_registry
+        if mirrors_registry.is_initialised():
+            await mirrors_registry.get_pusher().stop()
+    except Exception:
+        pass
     if _state.preset_scheduler and _state.preset_scheduler.running:
         try:
             await _state.preset_scheduler.stop()
