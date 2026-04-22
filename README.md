@@ -98,6 +98,12 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.13.2
+- **APRS map UX**: refined marker colours, leader-lines for stacked stations, vertically stacked labels for overlapping callsigns, collision detection across neighbouring buckets, adjustable initial zoom, mode-aware marker cleanup, persisted filters/preset, and a wider 24h position snapshot for marker anchoring.
+- **LoRa-mode filters renamed** to *LoRa RF* / *LoRa TCP*; *All* in LoRa mode no longer pulls the APRS-IS firehose.
+- **LoRa defaults** to 868 MHz (EU SRD).
+- **Repository hygiene**: `scripts/enable_lora_aprs.sh` untracked and gitignored (kept local-only).
+
 ### v0.13.1
 - **Live rotation countdown**: scan rotation status bar now updates every second client-side, eliminating the static countdown that only refreshed on page reload.
 - **Loading overlay on tab switch**: switching between HF and APRS views now shows a loading overlay, preventing the brief empty-map flash while the DOM paints.
