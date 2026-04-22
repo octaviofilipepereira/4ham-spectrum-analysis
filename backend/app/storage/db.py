@@ -118,6 +118,38 @@ CREATE TABLE IF NOT EXISTS preset_schedules (
   enabled    INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
+
+-- ── External Mirrors (push of dashboard data to remote read-only hosts) ──
+CREATE TABLE IF NOT EXISTS external_mirrors (
+  id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+  name                    TEXT    NOT NULL UNIQUE,
+  endpoint_url            TEXT    NOT NULL,
+  auth_token_hash         TEXT    NOT NULL,
+  enabled                 INTEGER NOT NULL DEFAULT 1,
+  push_interval_seconds   INTEGER NOT NULL DEFAULT 300,
+  data_scopes             TEXT    NOT NULL DEFAULT '[]',
+  retention_days          INTEGER,
+  last_push_at            TEXT,
+  last_push_status        TEXT,
+  last_push_watermark     INTEGER NOT NULL DEFAULT 0,
+  consecutive_failures    INTEGER NOT NULL DEFAULT 0,
+  auto_disabled_at        TEXT,
+  created_at              TEXT    NOT NULL,
+  created_by              TEXT    NOT NULL,
+  updated_at              TEXT
+);
+
+CREATE TABLE IF NOT EXISTS external_mirror_audit (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  mirror_id  INTEGER NOT NULL REFERENCES external_mirrors(id) ON DELETE CASCADE,
+  ts         TEXT    NOT NULL,
+  event      TEXT    NOT NULL,
+  actor      TEXT,
+  details    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ext_mirror_audit_mirror_ts
+  ON external_mirror_audit(mirror_id, ts DESC);
 """
 
 
