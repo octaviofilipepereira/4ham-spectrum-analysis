@@ -308,81 +308,6 @@ Indicativo: CT7BFV
 
 ---
 
-### 11. Protocolos LoRa & Mesh 📡
-
-> **Contexto**: LoRa opera nas bandas ISM (433 / 868 MHz), totalmente receptíveis com o RTL-SDR existente. Não é necessário hardware novo para recepção e análise. Quatro fases por ordem de complexidade e volume de tráfego local.
-
-#### 11.1 LoRa APRS 🟡 MÉDIA
-**Objetivo**: Receber e descodificar frames LoRa APRS em 433.775 MHz / 868.075 MHz e alimentar o pipeline APRS existente sem modificações nos parsers ou na UI.
-
-**Arquitectura**: Decoder `lora_aprs.py` seguindo o padrão `direwolf_kiss.py` — lança `gr-lora_sdr` (GNU Radio) como processo externo e lê frames descodificados via pipe/socket. Formato de payload APRS idêntico ao VHF; `parsers.py` reutilizado sem alterações. DB guarda frames com valor de fonte `"lora"`.
-
-**Tarefas**:
-- [ ] 11.1.1. Instalar e validar `gr-lora_sdr` com RTL-SDR em 433.775 MHz — confirmar recepção de frames
-- [ ] 11.1.2. Escrever `backend/app/decoders/lora_aprs.py` (modelo: `direwolf_kiss.py`)
-- [ ] 11.1.3. Adicionar 433.775 MHz e 868.075 MHz como entradas de banda/fonte na config
-- [ ] 11.1.4. Integrar em `launchers.py` e `watchers.py`
-- [ ] 11.1.5. Adicionar campo `source` ao schema APRS na DB (`"vhf"` / `"lora"`)
-- [ ] 11.1.6. Frontend: toggle de fonte na vista APRS (VHF / LoRa / Todos)
-- [ ] 11.1.7. Testes unitários para o decoder LoRa APRS
-- [ ] 11.1.8. Actualização da documentação (install.md, user_manual.md)
-
-**Benefício**: Zero alterações em parsers/UI — estações LoRa APRS aparecem no mapa existente com badge de fonte. Vista única de cobertura combinada VHF+LoRa.
-
----
-
-#### 11.2 Meshtastic 🟢 BAIXA
-**Objetivo**: Receber e descodificar tráfego mesh Meshtastic em 869.525 MHz (EU868), extraindo posições de nós, telemetria e mensagens de canais públicos.
-
-**Arquitectura**: `meshtastic_decoder.py` — `gr-lora_sdr` para camada física + lib Python oficial `meshtastic` (Protobuf) para parsing de frames. Canais públicos descodificados em claro; DMs privados (ECC+AES) mostram apenas metadados (NodeID, RSSI, SNR, hop count).
-
-**Tarefas**:
-- [ ] 11.2.1. Instalar lib Python `meshtastic` e validar parsing Protobuf contra IQ capturado
-- [ ] 11.2.2. Escrever `backend/app/decoders/meshtastic_decoder.py`
-- [ ] 11.2.3. Extrair: NodeID, posição GPS, telemetria de bateria, SNR, hop count, mensagens públicas
-- [ ] 11.2.4. Schema DB para nós e mensagens Meshtastic
-- [ ] 11.2.5. Frontend: nós Meshtastic no mapa APRS (ícone distinto) ou nova tab — decisão pendente
-- [ ] 11.2.6. Testes unitários
-- [ ] 11.2.7. Documentação
-
-**Benefício**: Meshtastic tem tráfego activo em toda a Europa; lib é oficial e bem documentada. Dados de posição + telemetria enriquecem a análise de cobertura.
-
----
-
-#### 11.3 MeshCore 🟢 BAIXA
-**Objetivo**: Receber e descodificar tráfego mesh MeshCore (mesmas bandas ISM que o Meshtastic).
-
-**Arquitectura**: `meshcore_decoder.py` — requer engenharia reversa do protocolo (spec limitada/parcial). Camada física via `gr-lora_sdr`. Adiado até a fase Meshtastic estar estável e a spec MeshCore amadurecer.
-
-**Tarefas**:
-- [ ] 11.3.1. Pesquisar spec do protocolo MeshCore e implementações open-source
-- [ ] 11.3.2. Avaliar descodificabilidade com documentação disponível
-- [ ] 11.3.3. Escrever `backend/app/decoders/meshcore_decoder.py` se a spec for suficiente
-- [ ] 11.3.4. Integração frontend (partilhada com tab/vista Meshtastic)
-- [ ] 11.3.5. Testes e documentação
-
-**Benefício**: Completa a cobertura de protocolos mesh. Prioridade mais baixa devido à comunidade mais pequena vs Meshtastic e documentação de protocolo limitada.
-
----
-
-#### 11.4 Desencriptação de Chaves de Sessão LoRaWAN 🟢 BAIXA
-**Objetivo**: Permitir que utilizadores com dispositivos LoRaWAN próprios configurem as suas chaves de sessão (NwkSKey + AppSKey) e desencriptem payloads capturados.
-
-**Arquitectura**: Chaves guardadas encriptadas em repouso (AES, derivada da password de admin — mesmo padrão que `hash_password.py`). Nunca expostas via API em claro. Desencriptação via lib `cryptography` (AES-128-CTR, construção do IV LoRaWAN a partir de DevAddr + FCnt).
-
-**Tarefas**:
-- [ ] 11.4.1. Armazenamento encriptado de chaves na DB (tabela `lorawan_keys`: DevEUI, DevAddr, NwkSKey_enc, AppSKey_enc)
-- [ ] 11.4.2. UI de gestão de chaves (adicionar/remover/mascarar — mostradas como `••••••••` com toggle de revelação)
-- [ ] 11.4.3. Pipeline de desencriptação: lookup DevAddr → recuperação de chave → AES-128-CTR decrypt
-- [ ] 11.4.4. Verificação MIC (NwkSKey)
-- [ ] 11.4.5. Endpoints API: `POST /api/lorawan/keys`, `DELETE /api/lorawan/keys/{dev_eui}`
-- [ ] 11.4.6. Testes unitários (vectores de teste conhecidos da spec LoRaWAN)
-- [ ] 11.4.7. Revisão de segurança e documentação
-
-**Benefício**: Proprietários de deployments LoRaWAN privados podem ver os seus próprios dados de payload no 4HAM. Apenas os seus dados, com as suas chaves.
-
----
-
 ## 🎯 MÉTRICAS DE SUCESSO
 
 | Categoria | Métrica | Objetivo |
@@ -405,4 +330,3 @@ Indicativo: CT7BFV
 4. **BW Cap SSB a 2800 Hz** — Filtro SSB standard 2400 Hz + wide 2700 Hz + 100 Hz margem FFT. Sinais acima de 2800 Hz são ruído/interferência.
 5. **Gate SNR SSB a 8 dB** — Calibrado para setups com boa antena. Será tornado configurável (ver item 1).
 6. **Autenticação Session-Cookie** — Substituiu Basic Auth em v0.6.0. Upgrade para JWT planeado (ver item 10.1).
-7. **Padrão de Decoder LoRa/Mesh** — Todos os decoders LoRa/Mesh seguem o padrão `direwolf_kiss.py`: processo GNU Radio externo, comunicação via pipe/socket, parsers existentes reutilizados onde o formato do payload corresponde. Meshtastic usa lib Protobuf oficial. MeshCore requer engenharia reversa da spec. Chaves LoRaWAN guardadas encriptadas em repouso, nunca expostas em claro via API.

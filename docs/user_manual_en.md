@@ -301,7 +301,7 @@ The active preset is remembered in the browser session. Time resolution (minute,
 
 ### Band and mode filters
 
-- **Band** — filter by individual band (160m … 70cm) or **All** to see everything
+- **Band** — filter by individual band (160m … 2m) or **All** to see everything
 - **Mode** — filter by mode (SSB, FT8, FT4, CW, WSPR) or **All** to see everything
 - Click **Apply Filters** after changing filters or the custom range
 
@@ -879,30 +879,6 @@ If you already have 4ham installed and did not enable Direwolf at install time, 
    ```
 
 4. Reload the browser, then click **Save APRS setting**. The badge turns green and APRS starts immediately (no backend restart).
-
-### Enabling LoRa APRS (433.775 MHz / 70 cm)
-
-4HAM also supports LoRa APRS — APRS packets transmitted via LoRa modulation on the 70 cm band (default 433.775 MHz, IARU Region 1). The pipeline mirrors the classic APRS one but uses `gr-lora_sdr` instead of Direwolf:
-
-```
-RTL-SDR → gr-lora_sdr flowgraph → UDP :5687 → 4HAM (lora_aprs_loop)
-```
-
-To enable on an existing install:
-
-1. Open **Admin Config** → **LoRa APRS Packet Decoding (gr-lora_sdr)**.
-2. Tick **Enable LoRa APRS packet decoding (UDP listener)** — the **Install gr-lora_sdr…** modal opens automatically if the module is missing.
-3. Run the displayed command in a terminal on the server (the build typically takes 5–15 minutes):
-
-   ```bash
-   cd ~/4ham-spectrum-analysis
-   sudo bash scripts/enable_lora_aprs.sh
-   ```
-
-4. Reload the browser, then click **Save LoRa APRS setting**. The backend starts a UDP listener on `127.0.0.1:5687`.
-5. Run a `gr-lora_sdr` flowgraph that forwards decoded payloads to that UDP port (example flowgraphs ship in `/opt/gr-lora_sdr/examples`). The recommended antenna is a dual-band VHF/UHF such as the **Diamond X50** (covers both 144.800 MHz APRS and 433.775 MHz LoRa APRS).
-
-LoRa-APRS frames are tagged in the database with `source=lora_aprs` and appear on the APRS map filterable via the **📡 LoRa** button in the map header (alongside **📻 RF** for VHF Direwolf and **🌐 TCP** for APRS-IS).
 
 ---
 
