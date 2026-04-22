@@ -1,0 +1,13 @@
+# Block direct web access to library code, configuration and SQL.
+<FilesMatch "\.(sql|md|example)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^config\.local\.php$">
+    Require all denied
+</FilesMatch>
+
+# Disable directory listings.
+Options -Indexes
+
+# Always send JSON content type for *.php (apps below override as needed).
+DirectoryIndex version.php
