@@ -7,6 +7,19 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.13.2 - 2026-04-22
+
+### Changed
+- **APRS map UX iteration** (cumulative result of multiple frontend tweaks merged from `unstable`): refined marker colours (RF orange, APRS-IS green, QTH blue, LoRa magenta), leader-lines for stacked stations sharing identical coordinates, vertically stacked overlapping callsign labels, collision detection across a 3×3 bucket neighbourhood, and adjustable initial map zoom (final value: 11). Mode switches now clear stale markers and only reload on actual mode change. Initial APRS view persists user filters/preset and uses a wider 24h position snapshot to anchor markers.
+- **LoRa-mode map filters renamed** to *LoRa RF* and *LoRa TCP*. In LoRa mode, the *All* filter now shows only LoRa stations (no APRS-IS firehose). VHF APRS events are hidden from the events panel while scanning LoRa.
+- **LoRa default frequency** set to 868 MHz (EU SRD band).
+- **Academic Analytics dashboard title** bumped to v0.13.2.
+
+### Repository hygiene
+- `scripts/enable_lora_aprs.sh` is now untracked and listed in `.gitignore`. The opt-in installer for the LoRa subsystem stays local-only and never reaches the public repository.
+
+---
+
 ## v0.13.1 - 2026-04-19
 
 ### Changed
