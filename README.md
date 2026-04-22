@@ -172,7 +172,7 @@ Default frontend routes:
 - **RTL-SDR hotplug**: Refresh Devices button applies correct gain and sample rate when an RTL-SDR is detected.
 
 ### v0.8.5
-- **Academic Analytics dashboard**: new page with activity timeline, band distribution, Heatmap Pro (hour × band), and propagation map. Accessible via the **Data Analysis** toolbar button or `/4ham_academic_analytics.html`. Backend endpoint `/api/analytics/academic`. Auto-refresh every 60 s.
+- **Academic Analytics dashboard**: new page with activity timeline, band distribution, Heatmap Pro (hour × band), and propagation map. Accessible via the **Data Analysis** toolbar button or `/4ham_academic_analytics.html`. Backend endpoint `/api/analytics/academic`. Auto-refresh every 5 min.
 - **Data Analysis toolbar button**: opens the analytics dashboard in a new tab (positioned before Help).
 - **Environment file moved to `.env`**: service env file now lives at `<project>/.env` instead of `/etc/default/4ham-spectrum-analysis` — no sudo required.
 - **html2canvas local**: replaced last CDN dependency with a local copy — zero external CDN calls.

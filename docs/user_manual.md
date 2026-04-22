@@ -280,7 +280,7 @@ Ao contrário do dashboard principal (que mostra dados em tempo real, evento a e
 - Botão **Data Analysis** na barra de ferramentas (abre num novo separador)
 - Ou diretamente em `http://localhost:8000/4ham_academic_analytics.html`
 
-Os dados vêm do servidor e são **atualizados automaticamente a cada 60 segundos**. O cabeçalho mostra o timestamp da última consulta e um contador regressivo para o próximo refresh.
+Os dados vêm do servidor e são **atualizados automaticamente a cada 5 minutos**. O cabeçalho mostra o timestamp da última consulta e um contador regressivo para o próximo refresh.
 
 Ao comutar entre os separadores **HF** e **APRS**, é mostrado um overlay de carregamento até a vista terminar de renderizar, evitando o breve flash de mapa vazio que existia em versões anteriores.
 
@@ -427,7 +427,7 @@ Quatro campos informativos no final da página:
 | Campo | Informação |
 |---|---|
 | **Data snapshot** | Timestamp UTC da última consulta ao servidor |
-| **Update frequency** | Frequência de atualização automática (cada 1 minuto) |
+| **Update frequency** | Frequência de atualização automática (cada 5 minutos) |
 | **Analyzed period** | Intervalo temporal completo da análise atual |
 | **Data quality** | Indicador de consistência dos dados |
 

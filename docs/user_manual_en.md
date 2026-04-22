@@ -280,7 +280,7 @@ It is especially useful for:
 - **Data Analysis** button in the toolbar (opens in a new tab)
 - Or directly at `http://localhost:8000/4ham_academic_analytics.html`
 
-Data is fetched from the server and **auto-refreshes every 60 seconds**. The header shows the timestamp of the last query and a countdown timer for the next refresh.
+Data is fetched from the server and **auto-refreshes every 5 minutes**. The header shows the timestamp of the last query and a countdown timer for the next refresh.
 
 When switching between the **HF** and **APRS** tabs, a brief loading overlay is displayed until the view finishes rendering, preventing the empty-map flash that occurred in earlier versions.
 
@@ -427,7 +427,7 @@ Four informational fields at the bottom of the page:
 | Field | Information |
 |---|---|
 | **Data snapshot** | UTC timestamp of the last server query |
-| **Update frequency** | Auto-refresh frequency (every 1 minute) |
+| **Update frequency** | Auto-refresh frequency (every 5 minutes) |
 | **Analysed period** | Full time range of the current analysis |
 | **Data quality** | Data consistency indicator |
 
