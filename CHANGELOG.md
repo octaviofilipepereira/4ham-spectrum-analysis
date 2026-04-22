@@ -7,6 +7,44 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.14.0 - 2026-04-22 (unstable)
+
+### Added — External Mirrors (push replication)
+- **New module `backend/app/external_mirrors/`** — push selected dashboard data
+  (callsign + occupancy events) to one or more remote PHP/MySQL hosts over
+  HTTPS, eliminating the need for inbound port-forwarding on the production
+  station. Includes:
+  - SQLite tables `external_mirrors` (configuration, bcrypt-hashed token) and
+    `external_mirror_audit` (per-event audit log).
+  - `MirrorHttpClient` with HMAC-SHA256 request signing
+    (`X-4HAM-Signature`, `X-4HAM-Timestamp`, `X-4HAM-Nonce`,
+    `X-4HAM-Mirror-Name`, `X-4HAM-Mirror-Version`), TLS-verify on by default,
+    30 s timeout, 3 retries on 5xx/network/timeout with exponential back-off
+    (no retry on 4xx).
+  - Watermark-based payload builder (`payload.py`) with `MAX_BATCH_SIZE=5000`.
+  - Background pusher loop (`pusher.py`, default tick = 15 s) integrated into
+    the FastAPI app lifespan; auto-disables a mirror after 5 consecutive
+    failures.
+- **Admin REST API** at `/api/admin/mirrors` (Basic-auth protected): list,
+  create, edit, enable/disable, rotate-token, test, delete and audit-log
+  endpoints. Plaintext tokens are returned ONLY at create / rotate-token
+  and are never persisted in clear.
+- **Admin Config UI** (inside the existing Admin Config modal): mirror table,
+  add/edit form, one-time token alert, per-row enable/disable, rotate-token,
+  test push and audit log viewer.
+- **PHP/MySQL receiver** in `external_academic_analytics_mirror/` for shared
+  hosting (PHP 7.4+, PDO_mysql only). Includes MySQL schema, idempotent
+  `INSERT IGNORE` ingest endpoint, HMAC + nonce + clock-skew verification,
+  IP allowlist, audit log and read-only `events.php` / `status.php` / `version.php`
+  helpers. See `external_academic_analytics_mirror/README.md` for deployment.
+- **Documentation**: new `docs/external_mirrors.md` covering architecture,
+  security model, admin UI walkthrough and receiver deployment.
+
+### Changed
+- **Version bump** to v0.14.0 across backend (`APP_VERSION`).
+
+---
+
 ## v0.13.3 - 2026-04-22
 
 ### Documentation
