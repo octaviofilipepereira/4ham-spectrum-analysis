@@ -4556,7 +4556,14 @@ Last update: 2026-04-03 UTC
           if (period) period.textContent = `${fmtDateUtc(start)} → ${fmtDateUtc(end)}`;
 
           aprsRenderAll();
-          aprsStartAutoRefresh();
+          // Only arm the APRS auto-refresh if the APRS view is actually visible.
+          // Without this guard, an in-flight aprsLoadAndRender() initiated while
+          // APRS was the active view can resolve after the user already switched
+          // to HF, rearming the timer in background and triggering a spurious
+          // refresh (with global loading overlay) ~5 min later on the HF view.
+          if (aprsView && aprsView.style.display !== "none") {
+            aprsStartAutoRefresh();
+          }
 
           // Wait for next paint so the overlay only clears after the DOM/map is ready.
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -4568,12 +4575,18 @@ Last update: 2026-04-03 UTC
         }
       }
 
-      // ── APRS auto-refresh (30 s) ─────────────────────────────────────
+      // ── APRS auto-refresh (5 min) ─────────────────────────────────────
       function aprsStartAutoRefresh() {
         aprsStopAutoRefresh();
         if (aprsCurrentPreset === "custom") return;
         aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
         aprsRefreshTimer = window.setInterval(async () => {
+          // Defence in depth: if the user switched away from APRS between ticks,
+          // tear down the timer instead of fetching in background.
+          if (!aprsView || aprsView.style.display === "none") {
+            aprsStopAutoRefresh();
+            return;
+          }
           aprsNextRefreshMs = Date.now() + APRS_REFRESH_INTERVAL_MS;
           await aprsLoadAndRender();
         }, APRS_REFRESH_INTERVAL_MS);
