@@ -849,6 +849,128 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-12">
                 <button class="btn btn-outline-info" id="saveAudioConfig">Save audio</button>
               </div>
+              <div class="col-12"><hr class="my-2" /></div>
+              <div class="col-12">
+                <h3 class="h6 mb-1">External Mirrors (push to remote PHP/MySQL)</h3>
+                <small class="d-block text-muted mb-2">
+                  Push selected dashboard data (callsign &amp; occupancy events) to one or more remote PHP/MySQL hosts.
+                  Tokens are bcrypt-hashed at rest and only shown once at creation/rotation. After 5 consecutive failures
+                  a mirror is auto-disabled. Re-enabling clears the failure counter.
+                </small>
+              </div>
+              <div class="col-12">
+                <div id="mirrorsList" class="table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-0" id="mirrorsTable">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Endpoint</th>
+                        <th>Interval</th>
+                        <th>Last push</th>
+                        <th>Status</th>
+                        <th>Watermark</th>
+                        <th>Failures</th>
+                        <th>Enabled</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <div id="mirrorsEmpty" class="text-muted small">No mirrors configured.</div>
+              </div>
+              <div class="col-12 d-flex gap-2 flex-wrap mt-2">
+                <button class="btn btn-outline-info btn-sm" id="mirrorsRefresh" type="button">Refresh</button>
+                <button class="btn btn-outline-success btn-sm" id="mirrorsAdd" type="button">+ Add mirror</button>
+              </div>
+              <div class="col-12">
+                <div id="mirrorsStatus" class="alert py-2 mb-0 d-none" role="status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mirror create/edit form modal -->
+    <div class="modal fade app-modal" id="mirrorFormModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="mirrorFormTitle">Add Mirror</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="mirrorFormId" value="" />
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Name</label>
+                <input type="text" id="mirrorFormName" class="form-control form-control-sm" placeholder="primary" required />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Push interval (s)</label>
+                <input type="number" id="mirrorFormInterval" class="form-control form-control-sm" value="300" min="10" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Endpoint URL</label>
+                <input type="url" id="mirrorFormEndpoint" class="form-control form-control-sm" placeholder="https://example.com/4ham/ingest.php" required />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Data scopes</label>
+                <div class="form-check form-check-inline">
+                  <input type="checkbox" class="form-check-input mirror-scope" id="mirrorScopeCallsign" value="callsign_events" checked />
+                  <label class="form-check-label" for="mirrorScopeCallsign">Callsign events</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input type="checkbox" class="form-check-input mirror-scope" id="mirrorScopeOccupancy" value="occupancy_events" checked />
+                  <label class="form-check-label" for="mirrorScopeOccupancy">Occupancy events</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Retention (days, optional)</label>
+                <input type="number" id="mirrorFormRetention" class="form-control form-control-sm" min="1" placeholder="(unset)" />
+              </div>
+              <div class="col-12 col-md-6 d-flex align-items-end">
+                <div class="form-check">
+                  <input type="checkbox" class="form-check-input" id="mirrorFormEnabled" checked />
+                  <label class="form-check-label" for="mirrorFormEnabled">Enabled</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div id="mirrorFormStatus" class="alert py-2 mb-0 d-none" role="status"></div>
+              </div>
+              <div class="col-12">
+                <div id="mirrorFormTokenBox" class="alert alert-warning py-2 mb-0 d-none">
+                  <strong>Plaintext token (shown ONCE — copy it now):</strong>
+                  <code id="mirrorFormTokenValue" class="d-block text-break mt-1"></code>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="mirrorFormSave">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mirror audit log modal -->
+    <div class="modal fade app-modal" id="mirrorAuditModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5">Mirror Audit Log — <span id="mirrorAuditName"></span></h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                  <tr><th>Timestamp</th><th>Event</th><th>Actor</th><th>Details</th></tr>
+                </thead>
+                <tbody id="mirrorAuditBody"></tbody>
+              </table>
             </div>
           </div>
         </div>
