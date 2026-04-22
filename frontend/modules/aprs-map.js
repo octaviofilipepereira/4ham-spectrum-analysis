@@ -13,6 +13,14 @@
 
 /* global L */
 
+// Local time in Portuguese format DD/MM/YYYY HH:MM (24h).
+function _fmtPtLocal(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export const APRS_MARKER_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const APRS_RANGE_KM = 50;
 const APRS_CLEANUP_INTERVAL_MS = 60 * 1000; // check every minute
@@ -43,11 +51,13 @@ export class APRSMapController {
   #qthMarker = null;
   #rangeCircle = null;
   #markers = new Map(); // callsign → { marker, data, lastSeenMs }
+  #stackByCall = new Map(); // callsign → vertical stack index (collision)
   #cleanupTimer = null;
   #qthLat = 39.5;
   #qthLon = -8.0;
   #stationCall = "";
-  #activeFilter = "all"; // "all" | "rf" | "tcp"
+  #activeFilter = "all"; // "all" | "rf" | "tcp" | "lora" | "rf_tcp" | "lora_tcp"
+  #contextMode = "APRS"; // "APRS" (VHF) | "LORA" (UHF) — affects what "all" means
 
   constructor(containerId) {
     this.#container = document.getElementById(containerId);
@@ -182,11 +192,18 @@ export class APRSMapController {
     if (existing) {
       // Update existing marker data
       existing.lastSeenMs = now;
-      // Track all sources this station was received from (RF + TCP)
+      // Track per-source last event (path/raw/msg/timestamp) — RF + LoRa + TCP
       const src = String(evt.source || "").toLowerCase();
-      const hadRF = [...existing.sources].some((s) => s !== "aprs_is");
-      if (src) existing.sources.add(src);
-      const hasRF = [...existing.sources].some((s) => s !== "aprs_is");
+      const hadRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+      if (src) {
+        existing.perSource.set(src, {
+          path: evt.path || "",
+          raw: evt.raw || "",
+          msg: evt.msg || "",
+          ts: evt.timestamp || new Date().toISOString(),
+        });
+      }
+      const hasRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
@@ -195,14 +212,9 @@ export class APRSMapController {
       // If station gained RF source, rebuild icon so RF style prevails
       if (hasRF && !hadRF) {
         const emoji = aprsSymbolEmoji(existing.data.symbol_table, existing.data.symbol_code);
-        existing.marker.setIcon(L.divIcon({
-          className: "aprs-station-icon aprs-marker-rf",
-          html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
-          iconSize: [120, 28],
-          iconAnchor: [60, 14],
-        }));
+        existing.marker.setIcon(this.#buildStationIcon(callsign, "aprs-marker-rf", emoji));
       }
-      existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.sources));
+      existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.perSource));
       // Re-evaluate filter visibility (source may have changed)
       const visible = this.#matchesFilter(existing);
       if (visible && !this.#map.hasLayer(existing.marker)) {
@@ -215,33 +227,142 @@ export class APRSMapController {
     if (!hasPosition) return;
 
     const emoji = aprsSymbolEmoji(evt.symbol_table, evt.symbol_code);
-    const isRF = String(evt.source || "").toLowerCase() !== "aprs_is";
-    const sourceClass = isRF ? "aprs-marker-rf" : "aprs-marker-is";
+    const src = String(evt.source || "").toLowerCase();
+    let sourceClass;
+    if (src === "aprs_is") sourceClass = "aprs-marker-is";
+    else if (src === "lora_aprs") sourceClass = "aprs-marker-lora";
+    else sourceClass = "aprs-marker-rf";
     const marker = L.marker([lat, lon], {
-      icon: L.divIcon({
-        className: `aprs-station-icon ${sourceClass}`,
-        html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
-        iconSize: [120, 28],
-        iconAnchor: [60, 14],
-      }),
+      icon: this.#buildStationIcon(callsign, sourceClass, emoji),
     });
 
-    const sources = new Set();
-    const src = String(evt.source || "").toLowerCase();
-    if (src) sources.add(src);
+    const perSource = new Map();
+    if (src) {
+      perSource.set(src, {
+        path: evt.path || "",
+        raw: evt.raw || "",
+        msg: evt.msg || "",
+        ts: evt.timestamp || new Date().toISOString(),
+      });
+    }
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
-    marker.bindPopup(this.#buildPopup(data, sources));
-    this.#markers.set(callsign, { marker, data, sources, lastSeenMs: now });
+    marker.bindPopup(this.#buildPopup(data, perSource));
+    this.#markers.set(callsign, { marker, data, perSource, lastSeenMs: now });
     // Only add to map if it passes the active filter
     if (this.#matchesFilter(this.#markers.get(callsign))) {
       marker.addTo(this.#map);
     }
   }
 
-  /** Load a batch of historical events (e.g. from DB on APRS mode entry). */
-  loadHistory(events) {
+  /**
+   * Load a batch of historical events (e.g. from DB on APRS mode entry).
+   *
+   * Pre-pass: for each callsign, find the most recent event carrying a
+   * valid position. Position-less events (digipeated status frames, MIC-E
+   * messages without coords, etc.) inherit that position so they still
+   * register as markers and contribute their per-source path/timestamp.
+   *
+   * @param {Array<object>} events - APRS events from the API
+   * @param {Map<string, {lat:number, lon:number, ts?:string}>} [positionSnapshot]
+   *        Optional callsign → last-known-position map (typically derived
+   *        from a wider time window) used as a fallback when no positioned
+   *        event exists in `events` for a given callsign.
+   */
+  loadHistory(events, positionSnapshot) {
     if (!Array.isArray(events)) return;
-    events.forEach((evt) => this.addEvent(evt));
+
+    // Build per-callsign latest known position from the batch itself.
+    const positionByCall = new Map();
+    for (const evt of events) {
+      const call = String(evt?.callsign || "").trim().toUpperCase();
+      if (!call) continue;
+      const lat = Number(evt.lat);
+      const lon = Number(evt.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      if (lat === 0 && lon === 0) continue;
+      const tsMs = evt.timestamp ? Date.parse(evt.timestamp) : 0;
+      const prev = positionByCall.get(call);
+      if (!prev || tsMs >= prev.tsMs) {
+        positionByCall.set(call, { lat, lon, tsMs });
+      }
+    }
+    // Fall back to the optional wider snapshot for callsigns not positioned
+    // in the current activity batch.
+    if (positionSnapshot instanceof Map) {
+      for (const [call, pos] of positionSnapshot) {
+        const key = String(call || "").trim().toUpperCase();
+        if (!key || positionByCall.has(key)) continue;
+        const lat = Number(pos?.lat);
+        const lon = Number(pos?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        positionByCall.set(key, { lat, lon, tsMs: 0 });
+      }
+    }
+
+    // Resolve marker collisions: when several callsigns share virtually the
+    // same coordinate (e.g. CQ0PCB and CQ0DCO-B at the Coimbra repeater
+    // site, ~40 m apart) their 120-px wide labels overlap and only the
+    // last-drawn marker is visible. A purely geographic offset is too
+    // small at typical APRS zoom levels, so we stack the labels vertically
+    // by adjusting iconAnchor Y. Compute per-callsign stack index here and
+    // store it on the controller so addEvent() can pick it up.
+    // Use a 3x3 neighborhood scan over a fine bucket grid so two stations
+    // 40 m apart that fall on opposite sides of a bucket boundary still
+    // collide. Bucket size = ~110 m, neighborhood reach = ~330 m.
+    const COLLISION_BUCKET_DEG = 0.001; // ~110 m at PT latitudes
+    const stackByCall = new Map();
+    const grid = new Map(); // "bx|by" -> [callsign, ...]
+    for (const [call, pos] of positionByCall) {
+      const bx = Math.round(pos.lat / COLLISION_BUCKET_DEG);
+      const by = Math.round(pos.lon / COLLISION_BUCKET_DEG);
+      const key = `${bx}|${by}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(call);
+    }
+    const visited = new Set();
+    for (const [call, pos] of positionByCall) {
+      if (visited.has(call)) continue;
+      const bx = Math.round(pos.lat / COLLISION_BUCKET_DEG);
+      const by = Math.round(pos.lon / COLLISION_BUCKET_DEG);
+      const cluster = [];
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighbours = grid.get(`${bx + dx}|${by + dy}`);
+          if (!neighbours) continue;
+          for (const c of neighbours) if (!visited.has(c)) cluster.push(c);
+        }
+      }
+      cluster.forEach((c) => visited.add(c));
+      if (cluster.length < 2) continue;
+      cluster.sort();
+      cluster.forEach((c, i) => stackByCall.set(c, i));
+    }
+    this.#stackByCall = stackByCall;
+
+    // Iterate oldest → newest so per-source timestamps reflect the most
+    // recent frame and the rendered marker icon picks the latest source.
+    const sorted = events.slice().sort((a, b) => {
+      const ta = a?.timestamp ? Date.parse(a.timestamp) : 0;
+      const tb = b?.timestamp ? Date.parse(b.timestamp) : 0;
+      return ta - tb;
+    });
+    for (const evt of sorted) {
+      const call = String(evt?.callsign || "").trim().toUpperCase();
+      const lat = Number(evt.lat);
+      const lon = Number(evt.lon);
+      const hasPos = Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0);
+      // Always honour the (possibly collision-resolved) per-callsign
+      // position so positioned beacons and digipeated frames render at
+      // the same offset coordinate and don't snap back over a neighbour.
+      if (call && positionByCall.has(call)) {
+        const p = positionByCall.get(call);
+        this.addEvent({ ...evt, lat: p.lat, lon: p.lon });
+      } else if (hasPos) {
+        this.addEvent(evt);
+      } else {
+        this.addEvent(evt);
+      }
+    }
   }
 
   /** Remove all station markers (not QTH). */
@@ -256,12 +377,25 @@ export class APRSMapController {
 
   /** Return the count of currently visible markers (respects active filter). */
   get filteredMarkerCount() {
-    if (this.#activeFilter === "all") return this.#markers.size;
+    if (this.#activeFilter === "all" && this.#contextMode !== "LORA") return this.#markers.size;
     let count = 0;
     for (const [, entry] of this.#markers) {
       if (this.#matchesFilter(entry)) count++;
     }
     return count;
+  }
+
+  /**
+   * Set the active context mode. "LORA" makes the "all" filter resolve to
+   * lora_aprs-only so VHF Direwolf/APRS-IS markers are hidden during a LoRa
+   * scan. Re-applies the current filter so visibility updates immediately.
+   * @param {string} mode "APRS" | "LORA"
+   */
+  setContextMode(mode) {
+    const next = String(mode || "").trim().toUpperCase() === "LORA" ? "LORA" : "APRS";
+    if (next === this.#contextMode) return;
+    this.#contextMode = next;
+    this.applyFilter(this.#activeFilter);
   }
 
   /**
@@ -280,42 +414,102 @@ export class APRSMapController {
     }
   }
 
-  /** Check if a marker entry matches the active filter (uses sources Set). */
+  /** Check if a marker entry matches the active filter (uses perSource Map keys). */
   #matchesFilter(entry) {
-    if (this.#activeFilter === "all") return true;
-    const sources = entry.sources || new Set();
+    const perSource = entry.perSource || new Map();
+    if (this.#activeFilter === "all") {
+      // In LoRa context, "All" means LoRa-RF + APRS-IS (LoRa·iGates re-inject
+      // their decoded frames into APRS-IS), but never VHF Direwolf — that
+      // would flood the 868 MHz map with unrelated 144.800 MHz traffic.
+      if (this.#contextMode === "LORA") {
+        for (const s of perSource.keys()) {
+          if (s === "lora_aprs" || s === "aprs_is") return true;
+        }
+        return false;
+      }
+      return true;
+    }
     if (this.#activeFilter === "rf") {
-      // Any non-aprs_is source counts as RF
-      for (const s of sources) {
-        if (s !== "aprs_is") return true;
+      // VHF RF only — Direwolf (anything not aprs_is and not lora_aprs).
+      for (const s of perSource.keys()) {
+        if (s !== "aprs_is" && s !== "lora_aprs") return true;
       }
       return false;
     }
+    if (this.#activeFilter === "lora") {
+      return perSource.has("lora_aprs");
+    }
+    if (this.#activeFilter === "rf_tcp") {
+      // RF + APRS-IS — excludes LoRa
+      for (const s of perSource.keys()) {
+        if (s !== "lora_aprs") return true;
+      }
+      return false;
+    }
+    if (this.#activeFilter === "lora_tcp") {
+      // LoRa + APRS-IS — excludes RF
+      return perSource.has("lora_aprs") || perSource.has("aprs_is");
+    }
     // tcp filter
-    return sources.has("aprs_is");
+    return perSource.has("aprs_is");
   }
 
   // ── Private ───────────────────────────────────────────────────────────
 
-  #buildPopup(data, sources) {
+  /** Build a station icon. When the callsign collides with others at the
+   *  same geographic point (per #stackByCall), the icon includes a vertical
+   *  leader line and a small dot marking the exact coordinate, with the
+   *  label sitting above it; each colliding station gets a taller leader so
+   *  every label is readable.
+   */
+  #buildStationIcon(callsign, sourceClass, emoji) {
+    const stackIdx = this.#stackByCall.get(callsign);
+    if (stackIdx === undefined) {
+      // Solitary marker — keep the original compact icon.
+      return L.divIcon({
+        className: `aprs-station-icon ${sourceClass}`,
+        html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
+        iconSize: [120, 28],
+        iconAnchor: [60, 14],
+      });
+    }
+    // Stacked marker — label + leader line + anchor dot.
+    const labelH = 22;
+    const dotH = 8;
+    const stepPx = 28; // gap between successive labels
+    const leaderH = 6 + stackIdx * stepPx; // bottom-most: 6 px, next: 34, 62, ...
+    const totalH = labelH + leaderH + dotH;
+    return L.divIcon({
+      className: `aprs-station-icon ${sourceClass}`,
+      html:
+        `<div class="aprs-station-stack">` +
+          `<span class="aprs-station-label">${emoji} ${callsign}</span>` +
+          `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
+          `<span class="aprs-station-anchor"></span>` +
+        `</div>`,
+      iconSize: [120, totalH],
+      iconAnchor: [60, totalH - dotH / 2],
+    });
+  }
+
+  #buildPopup(data, perSource) {
     const callsign = data.callsign || "—";
     const lat = Number(data.lat);
     const lon = Number(data.lon);
     const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
     const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-    const path = data.path || "—";
-    const msg = data.msg || "";
-    const raw = data.raw || "";
     const emoji = aprsSymbolEmoji(data.symbol_table, data.symbol_code);
-    const firstSeen = data.firstSeenMs ? new Date(data.firstSeenMs).toLocaleTimeString() : "—";
-    const lastSeen = data.lastSeenMs ? new Date(data.lastSeenMs).toLocaleTimeString() : "—";
+    const firstSeen = data.firstSeenMs ? _fmtPtLocal(new Date(data.firstSeenMs)) : "—";
+    const lastSeen = data.lastSeenMs ? _fmtPtLocal(new Date(data.lastSeenMs)) : "—";
 
-    // Source badges — show all sources this station was received from
-    const srcSet = sources || new Set();
-    const hasRF = [...srcSet].some((s) => s !== "aprs_is");
-    const hasTCP = srcSet.has("aprs_is");
+    // Per-source tracking (path/raw/msg/ts for each source this station was heard on)
+    const ps = perSource instanceof Map ? perSource : new Map();
+    const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+    const hasLoRa = ps.has("lora_aprs");
+    const hasTCP = ps.has("aprs_is");
     let sourceBadge = "";
     if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+    if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
     if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
     // Distance from QTH
@@ -325,13 +519,46 @@ export class APRSMapController {
       distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
     }
 
+    // Build per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+    const srcLabels = {
+      direwolf: { icon: "📻", name: "RF" },
+      lora_aprs: { icon: "📡", name: "LoRa" },
+      aprs_is: { icon: "🌐", name: "APRS-IS" },
+    };
+    const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+    let perSourceRows = "";
+    for (const key of orderedKeys) {
+      if (!ps.has(key)) continue;
+      const info = ps.get(key) || {};
+      const label = srcLabels[key] || { icon: "❓", name: key };
+      const path = info.path || "—";
+      const tsStr = info.ts ? _fmtPtLocal(new Date(info.ts)) : "—";
+      perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
+        + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
+        + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+    }
+    // Also handle unknown sources (shouldn't happen normally)
+    for (const key of ps.keys()) {
+      if (orderedKeys.includes(key)) continue;
+      const info = ps.get(key) || {};
+      const path = info.path || "—";
+      const tsStr = info.ts ? _fmtPtLocal(new Date(info.ts)) : "—";
+      perSourceRows += `<tr><td><strong>${this.#escapeHtml(key)}</strong></td>`
+        + `<td><code style="font-size:11px">${this.#escapeHtml(path)}</code>`
+        + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+    }
+
+    // Latest message/raw (from most recent event across any source)
+    const msg = data.msg || "";
+    const raw = data.raw || "";
+
     return `
       <div class="aprs-popup">
         <div class="aprs-popup__header">${emoji} <strong>${callsign}</strong> ${sourceBadge}</div>
         <table class="aprs-popup__table">
           <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
           ${distText}
-          <tr><td><strong>Path</strong></td><td>${this.#escapeHtml(path)}</td></tr>
+          ${perSourceRows}
           ${msg ? `<tr><td><strong>Comment</strong></td><td>${this.#escapeHtml(msg)}</td></tr>` : ""}
           ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${this.#escapeHtml(raw)}</td></tr>` : ""}
           <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>

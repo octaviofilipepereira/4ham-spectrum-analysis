@@ -12,6 +12,7 @@ Application settings management endpoints.
 from typing import Dict
 
 import os
+import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -20,6 +21,7 @@ from app.dependencies import state
 from app.dependencies.auth import verify_basic_auth
 from app.dependencies.utils import command_exists
 from app.decoders.ssb_asr import is_ssb_asr_available, set_asr_enabled
+from app.core import features as _features
 
 
 router = APIRouter()
@@ -88,6 +90,79 @@ def _ensure_aprs_config():
     kiss_st["autostart"] = True
 
 
+# ---------------------------------------------------------------------------
+# LoRa APRS auto-configuration helpers
+# ---------------------------------------------------------------------------
+
+def _gr_lora_sdr_available() -> bool:
+    """Probe whether the gr-lora_sdr host install is available.
+
+    The backend runs inside ``.venv``, while GNU Radio OOT modules are
+    commonly installed into the system Python used by
+    ``gnuradio-companion`` / external flowgraphs.  Check both
+    interpreters so the Admin badge reflects the real host capability,
+    not only the backend virtualenv.
+    """
+    try:
+        import importlib.util
+        if importlib.util.find_spec("gnuradio.lora_sdr") is not None:
+            return True
+    except Exception:
+        pass
+
+    try:
+        probe = subprocess.run(
+            [
+                "python3",
+                "-c",
+                "import importlib.util, sys; "
+                "sys.exit(0 if importlib.util.find_spec('gnuradio.lora_sdr') else 1)",
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+        return probe.returncode == 0
+    except Exception:
+        return False
+
+
+def _ensure_lora_aprs_config():
+    """Set runtime + persisted env vars so the LoRa-APRS UDP listener can start.
+
+    Called when the user enables LoRa APRS from Admin Config.  Ensures:
+    1. ``LORA_APRS_ENABLE``, ``LORA_APRS_HOST`` and ``LORA_APRS_PORT`` are
+       set in ``os.environ`` so the current process can start the loop
+       without a restart.
+    2. The same values are persisted to the ``.env`` file so they survive
+       a backend restart.
+    3. ``state.decoder_status["lora_aprs"]`` flags are updated.
+
+    No external config file is needed: gr-lora_sdr ships its own
+    flowgraphs and the backend just listens on a UDP socket.
+    """
+    root = _project_root()
+
+    # 1. Set runtime env vars
+    os.environ["LORA_APRS_ENABLE"] = "1"
+    if not os.environ.get("LORA_APRS_HOST"):
+        os.environ["LORA_APRS_HOST"] = "127.0.0.1"
+    if not os.environ.get("LORA_APRS_PORT"):
+        os.environ["LORA_APRS_PORT"] = "5687"
+
+    # 2. Persist to .env file
+    _persist_env_vars(root / ".env", {
+        "LORA_APRS_ENABLE": "1",
+        "LORA_APRS_HOST": os.environ["LORA_APRS_HOST"],
+        "LORA_APRS_PORT": os.environ["LORA_APRS_PORT"],
+    })
+
+    # 3. Update runtime state
+    lora_st = state.decoder_status["lora_aprs"]
+    lora_st["enabled"] = True
+
+
 def _persist_env_vars(env_path: Path, env_vars: dict):
     """Add or update key=value pairs in a .env file."""
     lines = []
@@ -144,6 +219,18 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "autostart": bool(kiss_st.get("autostart", False)),
         "address": kiss_st.get("address"),
     }
+    lora_st = state.decoder_status.get("lora_aprs") or {}
+    if _features.lora_aprs_enabled():
+        settings["lora_aprs"] = {
+            "enabled": bool(lora_st.get("enabled", False)),
+            "available": _gr_lora_sdr_available(),
+            "connected": bool(lora_st.get("connected", False)),
+            "address": lora_st.get("address"),
+        }
+    else:
+        # Feature off — strip any persisted lora_aprs key so the frontend
+        # cannot accidentally render LoRa controls from cached settings.
+        settings.pop("lora_aprs", None)
     settings["auth"] = {
         "enabled": bool(state.auth_required),
         "user": state.auth_user if state.auth_required else "",
@@ -227,6 +314,21 @@ async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> 
             asyncio.create_task(_stop_kiss_loop())
             state.decoder_status["direwolf_kiss"]["enabled"] = False
         existing["aprs"] = {"enabled": aprs_enabled}
+
+    if "lora_aprs" in payload and _features.lora_aprs_enabled():
+        from app.api.decoders import _start_lora_aprs_loop, _stop_lora_aprs_loop
+        import asyncio
+        lora = payload.get("lora_aprs") or {}
+        lora_enabled = bool(lora.get("enabled", False))
+        lora_st = state.decoder_status.get("lora_aprs") or {}
+        currently_enabled = bool(lora_st.get("enabled", False))
+        if lora_enabled and not currently_enabled:
+            _ensure_lora_aprs_config()
+            asyncio.create_task(_start_lora_aprs_loop(force=True))
+        elif not lora_enabled and currently_enabled:
+            asyncio.create_task(_stop_lora_aprs_loop())
+            state.decoder_status["lora_aprs"]["enabled"] = False
+        existing["lora_aprs"] = {"enabled": lora_enabled}
 
     state.db.save_settings(existing)
     return {"status": "ok"}

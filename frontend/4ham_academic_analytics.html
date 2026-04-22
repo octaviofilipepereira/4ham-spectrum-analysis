@@ -1219,7 +1219,7 @@ Last update: 2026-04-03 UTC
       .aprs-qth-icon { background: none !important; border: none !important; }
       .aprs-qth-label {
         display: inline-block;
-        background: #1e40af;
+        background: #3b82f6;
         color: #fff;
         padding: 2px 8px;
         border-radius: 4px;
@@ -1241,6 +1241,11 @@ Last update: 2026-04-03 UTC
         border: 1px solid #334155;
         box-shadow: 0 1px 4px rgba(0,0,0,.4);
       }
+      /* Stacked-marker leader (collision spread): vertical line + dot at the
+         exact geographic point, label sits above. */
+      .aprs-station-stack { position: relative; width: 120px; display: flex; flex-direction: column; align-items: center; }
+      .aprs-station-leader { width: 2px; background: #38bdf8; box-shadow: 0 0 2px rgba(0,0,0,.6); }
+      .aprs-station-anchor { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; border: 1.5px solid #0f172a; margin-top: -1px; box-shadow: 0 0 3px rgba(0,0,0,.6); }
       .aprs-popup { font-size: 12px; line-height: 1.5; min-width: 200px; }
       .aprs-popup__header { font-size: 14px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
       .aprs-popup__table { width: 100%; border-collapse: collapse; }
@@ -1249,8 +1254,16 @@ Last update: 2026-04-03 UTC
       .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
       .aprs-source-rf { background: #dcfce7; color: #166534; }
       .aprs-source-is { background: #dbeafe; color: #1e40af; }
-      .aprs-marker-rf { filter: hue-rotate(90deg) saturate(1.3); }
-      .aprs-marker-is { filter: hue-rotate(200deg) saturate(1.1); }
+      /* Marker source colours — must match the legend swatches below */
+      .aprs-marker-rf   .aprs-station-label   { color: #f97316; border-color: #f97316; }
+      .aprs-marker-rf   .aprs-station-leader,
+      .aprs-marker-rf   .aprs-station-anchor  { background: #f97316; }
+      .aprs-marker-is   .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
+      .aprs-marker-is   .aprs-station-leader,
+      .aprs-marker-is   .aprs-station-anchor  { background: #22c55e; }
+      .aprs-marker-lora .aprs-station-label   { color: #ec4899; border-color: #ec4899; }
+      .aprs-marker-lora .aprs-station-leader,
+      .aprs-marker-lora .aprs-station-anchor  { background: #ec4899; }
 
       .aprs-source-legend {
         display: flex;
@@ -1373,7 +1386,6 @@ Last update: 2026-04-03 UTC
               <option>12m</option>
               <option>10m</option>
               <option>2m</option>
-              <option>70cm</option>
             </select>
           </div>
 
@@ -1609,13 +1621,14 @@ Last update: 2026-04-03 UTC
           <article class="chart-panel span-12">
             <div class="chart-header">
               <h3 data-i18n="aprs_chart_map">APRS Station Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: blue for RF (direwolf), green for TCP (APRS-IS). The yellow marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
+              <button type="button" class="helper-icon" aria-label="Explain APRS Station Map" data-help-title="APRS Station Map" data-help-text="Leaflet map showing all APRS stations with known positions in the selected period. Markers are coloured by source: orange for RF (Direwolf, 144.800 MHz), green for APRS-IS (TCP/internet), magenta for LoRa APRS (433.775 MHz). The blue marker is your station QTH. Circle shows 50 km range. Click a marker to see callsign, distance, path and timestamps." data-i18n-help-text="help_aprs_map" data-i18n-help-title="aprs_chart_map">i</button>
             </div>
-            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (blue) and APRS-IS (green).</p>
+            <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (orange), APRS-IS (green) and LoRa APRS (magenta).</p>
             <div class="aprs-source-legend">
-              <span><span class="swatch" style="background:#3b82f6;"></span> RF (Direwolf)</span>
-              <span><span class="swatch" style="background:#22c55e;"></span> APRS-IS (TCP)</span>
-              <span><span class="swatch" style="background:#facc15;"></span> QTH</span>
+              <span><span class="swatch" style="background:#f97316;"></span> 📻 RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#22c55e;"></span> 🌐 APRS-IS (TCP)</span>
+              <span><span class="swatch" style="background:#ec4899;"></span> 📡 LoRa APRS</span>
+              <span><span class="swatch" style="background:#3b82f6;"></span> QTH</span>
             </div>
             <div class="aprs-map-wrapper" id="aprsMapWrapper">
               <button class="aprs-map-fullscreen-btn" id="aprsFullscreenBtn" title="Fullscreen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Fullscreen</button>
@@ -1719,7 +1732,7 @@ Last update: 2026-04-03 UTC
     <script src="lib/xlsx.mini.min.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>
     <script>
-      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m", "70cm"];
+      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
       const MODE_COLORS = {
         SSB: getCssVar("--mode-ssb"),
@@ -2422,9 +2435,35 @@ Last update: 2026-04-03 UTC
         const goBtn = document.getElementById("hfStaleGoBtn");
         if (!banner || !bannerText || !goBtn) return;
 
-        // Hide if data exists in the requested period
+        // Detect whether the live scanner is currently pointed at a non-HF band
+        // (APRS / 2m / 70cm / VHF / UHF). In that case the HF data shown in the
+        // dashboard is not "real time" — it's historical — so we must always warn
+        // the user, even if there is HF data in the selected window.
+        const HF_BANDS = new Set(["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"]);
+        const scanSnap = lastScanRuntimeSnapshot;
+        let scanIsNonHf = false;
+        let currentScanBand = "";
+        let currentScanMode = "";
+        if (scanSnap && scanSnap.kind === "payload" && scanSnap.payload) {
+          const p = scanSnap.payload;
+          const state = String(p.state || "").toLowerCase();
+          const rot = p.rotation && p.rotation.running ? p.rotation : null;
+          const slot = rot && rot.current_slot ? rot.current_slot : null;
+          currentScanBand = String(slot?.band || p.scan?.band || "").trim();
+          currentScanMode = String(slot?.mode || p.decoder_mode || "").trim();
+          const isActive = state === "running" || state === "preview" || Boolean(rot);
+          if (isActive && currentScanBand && !HF_BANDS.has(currentScanBand)) {
+            scanIsNonHf = true;
+          }
+          // An APRS rotation slot always counts as non-HF even if band label is missing
+          if (isActive && String(currentScanMode).toUpperCase() === "APRS") {
+            scanIsNonHf = true;
+          }
+        }
+
+        // Hide only if HF data is present AND the live scanner is currently on HF
         const hasHfData = synthetic && synthetic.series && synthetic.series.length > 0;
-        if (hasHfData) {
+        if (hasHfData && !scanIsNonHf) {
           banner.classList.remove("visible");
           return;
         }
@@ -2448,10 +2487,27 @@ Last update: 2026-04-03 UTC
 
           const lastTs = new Date(lastHf.timestamp);
           const lastTsStr = lastTs.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }) + " UTC";
+          const ageMs = Date.now() - lastTs.getTime();
+          const ageMinutes = Math.floor(ageMs / 60000);
+          let ageStr;
+          if (ageMinutes < 1) ageStr = "há menos de 1 minuto";
+          else if (ageMinutes < 60) ageStr = `há ${ageMinutes} min`;
+          else if (ageMinutes < 1440) ageStr = `há ${Math.floor(ageMinutes / 60)} h`;
+          else ageStr = `há ${Math.floor(ageMinutes / 1440)} dias`;
           const _presetLabels = { "1h": "na última hora", "6h": "nas últimas 6 horas", "24h": "nas últimas 24 horas", "7d": "nos últimos 7 dias", "30d": "nos últimos 30 dias" };
           const periodStr = currentPreset === "custom" ? "no período selecionado" : (_presetLabels[currentPreset] || `nas últimas ${currentPreset}`);
 
-          bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong>`;
+          if (scanIsNonHf) {
+            // Live scanner is on a non-HF band — data shown is historical, not real-time
+            const scanLabel = [currentScanMode, currentScanBand].filter(Boolean).join(" · ") || "não-HF";
+            bannerText.innerHTML = `<strong>Dados HF não estão em tempo real.</strong> O scanner está actualmente em <strong>${scanLabel}</strong> (não-HF). &nbsp;Último registo HF: <strong>${lastTsStr}</strong> (${ageStr}).`;
+          } else if (hasHfData) {
+            // Shouldn't reach here (hasHfData && !scanIsNonHf returned earlier), but guard
+            banner.classList.remove("visible");
+            return;
+          } else {
+            bannerText.innerHTML = `<strong>Scanner HF inativo neste período.</strong> Não existem dados HF ${periodStr}. &nbsp;Último registo HF: <strong>${lastTsStr}</strong> (${ageStr}).`;
+          }
           goBtn.textContent = "→ Ver os últimos dados de propagação HF";
           goBtn.style.display = "inline-block";
           goBtn.onclick = () => {
@@ -3281,8 +3337,8 @@ Last update: 2026-04-03 UTC
           };
 
           // Use server-computed propagation data (accurate, uses real per-event data)
-          // Exclude APRS-dominated bands (2m, 70cm) from HF propagation analysis
-          const APRS_BANDS = new Set(["2m", "70cm"]);
+          // Exclude APRS-dominated VHF bands from HF propagation analysis
+          const APRS_BANDS = new Set(["2m"]);
           const kpis = payload.kpis || {};
           const propBands = (Array.isArray(payload.data.propagation_by_band) ? payload.data.propagation_by_band : [])
             .filter(r => !APRS_BANDS.has(r.band));
@@ -4193,6 +4249,14 @@ Last update: 2026-04-03 UTC
         return d3.utcFormat("%Y-%m-%d %H:%M UTC")(date);
       }
 
+      // Local time in Portuguese format DD/MM/YYYY HH:MM (24h).
+      function fmtLocalPt(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} `
+          + `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
       function toLocalDateTimeValue(date) {
         const pad = (n) => String(n).padStart(2, "0");
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -4218,10 +4282,10 @@ Last update: 2026-04-03 UTC
 
       let aprsMap = null;
       let aprsEvents = [];
-      let aprsSourceFilter = "all"; // "all" | "rf" | "tcp"
-      let aprsCurrentPreset = "24h";
+      let aprsSourceFilter = localStorage.getItem("4ham_aprs_filter") || "all"; // "all" | "rf" | "tcp"
+      let aprsCurrentPreset = localStorage.getItem("4ham_aprs_preset") || "24h";
       let aprsDataLoaded = false;
-      const APRS_REFRESH_INTERVAL_MS = 30 * 1000;
+      const APRS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
       let aprsRefreshTimer = null;
       let aprsNextRefreshMs = null;
       let aprsCountdownTimer = null;
@@ -4318,7 +4382,9 @@ Last update: 2026-04-03 UTC
               aprsLoadAndRender();
             } else {
               if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
-              aprsStartAutoRefresh();
+              // Only (re)start the auto-refresh if not already armed — avoids
+              // resetting the 5-min countdown each time the user toggles tabs.
+              if (!aprsRefreshTimer) aprsStartAutoRefresh();
               requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
             }
           } else {
@@ -4349,12 +4415,20 @@ Last update: 2026-04-03 UTC
       const aprsApplyBtn = document.getElementById("aprsApplyBtn");
 
       if (aprsPresetRow) {
+        // Reflect persisted preset in the active button state on load
+        aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.preset === aprsCurrentPreset);
+        });
+        const _customRangeInit = document.getElementById("aprsCustomRange");
+        if (_customRangeInit) _customRangeInit.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
+
         aprsPresetRow.addEventListener("click", (e) => {
           const btn = e.target.closest(".preset-btn");
           if (!btn) return;
           aprsPresetRow.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           aprsCurrentPreset = btn.dataset.preset;
+          try { localStorage.setItem("4ham_aprs_preset", aprsCurrentPreset); } catch (_) {}
           const customRange = document.getElementById("aprsCustomRange");
           if (customRange) customRange.style.display = aprsCurrentPreset === "custom" ? "flex" : "none";
           if (aprsCurrentPreset === "custom") {
@@ -4369,11 +4443,16 @@ Last update: 2026-04-03 UTC
       }
 
       // ── APRS source filter ────────────────────────────────────────────
+      // Reflect persisted filter in the active button state on load
+      document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.filter === aprsSourceFilter);
+      });
       document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(btn => {
         btn.addEventListener("click", () => {
           document.querySelectorAll("#aprsView .aprs-filter-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           aprsSourceFilter = btn.dataset.filter;
+          try { localStorage.setItem("4ham_aprs_filter", aprsSourceFilter); } catch (_) {}
           aprsRenderAll();
         });
       });
@@ -4417,6 +4496,31 @@ Last update: 2026-04-03 UTC
         }
       }
 
+      // Last-known-position snapshot (callsign → {lat, lon}) computed from a
+      // wider 24h window. Used as fallback when the user-selected period only
+      // contains digipeated/status frames (no lat/lon) for a given callsign.
+      let aprsPositionSnapshot = new Map();
+      async function aprsRefreshPositionSnapshot(now) {
+        const newSnap = new Map();
+        try {
+          const start = new Date(now.getTime() - 24 * 3600 * 1000);
+          const list = await aprsFetchEvents(start, now);
+          for (const e of list) {
+            if (!e || !e.callsign) continue;
+            const lat = Number(e.lat);
+            const lon = Number(e.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (lat === 0 && lon === 0) continue;
+            const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+            const prev = newSnap.get(e.callsign);
+            if (!prev || tsMs >= prev.tsMs) {
+              newSnap.set(e.callsign, { lat, lon, tsMs });
+            }
+          }
+          aprsPositionSnapshot = newSnap;
+        } catch (_) { /* keep previous snapshot on failure */ }
+      }
+
       // ── Filter by source ──────────────────────────────────────────────
       function aprsFilteredEvents() {
         if (aprsSourceFilter === "all") return aprsEvents;
@@ -4435,7 +4539,14 @@ Last update: 2026-04-03 UTC
         try {
           await aprsEnsureStationQth();
           const { start, end } = aprsResolvePeriod();
-          aprsEvents = await aprsFetchEvents(start, end);
+          // Fetch the activity events for the user-selected period and a
+          // 24h position snapshot in parallel — the snapshot anchors markers
+          // for callsigns whose positioned beacons fall outside the period.
+          const [evs] = await Promise.all([
+            aprsFetchEvents(start, end),
+            aprsRefreshPositionSnapshot(end),
+          ]);
+          aprsEvents = evs;
           aprsDataLoaded = true;
 
           // Update meta
@@ -4484,8 +4595,11 @@ Last update: 2026-04-03 UTC
         const el = document.getElementById("aprsNextRefreshInfo");
         if (!el || !aprsNextRefreshMs) return;
         const rem = Math.max(0, aprsNextRefreshMs - Date.now());
-        const s = Math.ceil(rem / 1000);
-        el.textContent = s > 0 ? `${s}s` : "a atualizar…";
+        const total = Math.ceil(rem / 1000);
+        if (total <= 0) { el.textContent = "a atualizar…"; return; }
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        el.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
       }
 
       function aprsRenderAll() {
@@ -4553,37 +4667,74 @@ Last update: 2026-04-03 UTC
         return map[c] || "📍";
       }
 
-      // ── Build rich popup (matches main interface) ─────────────────────
-      function aprsBuildPopup(e, sources) {
+      // ── Build rich popup (matches main interface exactly) ────────────
+      function aprsBuildPopup(e, perSource, seenRange) {
         const call = e.callsign || "—";
         const lat = Number(e.lat);
         const lon = Number(e.lon);
         const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
         const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-        const path = e.path || e.via || "—";
-        const msg = e.msg || e.comment || "";
         const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
-        const srcSet = sources || new Set();
-        const hasRf = [...srcSet].some(s => s !== "aprs_is");
-        const hasTcp = srcSet.has("aprs_is");
+        const ps = perSource instanceof Map ? perSource : new Map();
+
+        const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+        const hasLoRa = ps.has("lora_aprs");
+        const hasTCP = ps.has("aprs_is");
         let sourceBadge = "";
-        if (hasRf) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
-        if (hasTcp) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+        if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
+        if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
+
         let distText = "";
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
           const d = haversineKm(aprsQthLat, aprsQthLon, lat, lon);
           distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
         }
-        const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+
+        // Per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+        const srcLabels = {
+          direwolf: { icon: "📻", name: "RF" },
+          lora_aprs: { icon: "📡", name: "LoRa" },
+          aprs_is: { icon: "🌐", name: "APRS-IS" },
+        };
+        const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+        let perSourceRows = "";
+        for (const key of orderedKeys) {
+          if (!ps.has(key)) continue;
+          const info = ps.get(key) || {};
+          const label = srcLabels[key] || { icon: "❓", name: key };
+          const path = info.path || "—";
+          const tsStr = info.ts ? fmtLocalPt(new Date(info.ts)) : "—";
+          perSourceRows += `<tr><td><strong>${label.icon} ${label.name}</strong></td>`
+            + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
+            + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+        }
+        for (const key of ps.keys()) {
+          if (orderedKeys.includes(key)) continue;
+          const info = ps.get(key) || {};
+          const path = info.path || "—";
+          const tsStr = info.ts ? fmtLocalPt(new Date(info.ts)) : "—";
+          perSourceRows += `<tr><td><strong>${aprsEscapeHtml(key)}</strong></td>`
+            + `<td><code style="font-size:11px">${aprsEscapeHtml(path)}</code>`
+            + ` <span style="color:#888;font-size:10px">(${tsStr})</span></td></tr>`;
+        }
+
+        const msg = e.msg || e.comment || "";
+        const raw = e.raw || "";
+        const firstSeen = seenRange && seenRange.firstMs ? fmtLocalPt(new Date(seenRange.firstMs)) : "—";
+        const lastSeen = seenRange && seenRange.lastMs ? fmtLocalPt(new Date(seenRange.lastMs)) : "—";
+
         return `
           <div class="aprs-popup">
             <div class="aprs-popup__header">${emoji} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
             <table class="aprs-popup__table">
               <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
               ${distText}
-              <tr><td><strong>Path</strong></td><td>${aprsEscapeHtml(path)}</td></tr>
+              ${perSourceRows}
               ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
-              <tr><td><strong>Last seen</strong></td><td>${ts}</td></tr>
+              ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${aprsEscapeHtml(raw)}</td></tr>` : ""}
+              <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
+              <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>
             </table>
           </div>`;
       }
@@ -4594,7 +4745,7 @@ Last update: 2026-04-03 UTC
         if (!aprsMap) {
           aprsMap = L.map("aprsLeafletMap", {
             center: [aprsQthLat, aprsQthLon],
-            zoom: 9,
+            zoom: 11,
             zoomControl: true,
             attributionControl: true,
             scrollWheelZoom: false
@@ -4639,15 +4790,114 @@ Last update: 2026-04-03 UTC
           if (layer._isAprsStation) aprsMap.removeLayer(layer);
         });
 
-        // De-duplicate by callsign — track all sources, prefer RF event
+        // De-duplicate by callsign — track per-source (path+ts), prefer RF event for marker position
         const byCall = new Map();
-        const sourcesByCall = new Map();
+        const perSourceByCall = new Map();
+        const seenRangeByCall = new Map(); // callsign -> { firstMs, lastMs }
+
+        // Pre-pass: latest known position per callsign (any source) so that
+        // digipeated/status frames without lat/lon still anchor a marker.
+        // Falls back to the wider 24h `aprsPositionSnapshot` for callsigns
+        // whose positioned beacons fall outside the user-selected period.
+        const positionByCall = new Map();
         events.forEach(e => {
-          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
           if (!e.callsign) return;
+          if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
+          if (e.lat === 0 && e.lon === 0) return;
+          const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+          const prev = positionByCall.get(e.callsign);
+          if (!prev || tsMs >= prev.tsMs) {
+            positionByCall.set(e.callsign, { lat: e.lat, lon: e.lon, tsMs });
+          }
+        });
+        if (aprsPositionSnapshot instanceof Map) {
+          for (const [call, pos] of aprsPositionSnapshot) {
+            if (!call || positionByCall.has(call)) continue;
+            positionByCall.set(call, { lat: pos.lat, lon: pos.lon, tsMs: 0 });
+          }
+        }
+
+        // Resolve marker collisions: when several callsigns share virtually
+        // the same coordinate (e.g. CQ0PCB and CQ0DCO-B at the Coimbra
+        // repeater site, ~40 m apart) their 120-px wide labels overlap and
+        // only the last-drawn marker is visible. A geographic offset is too
+        // small at typical zoom levels, so we stack the labels vertically
+        // by adjusting iconAnchor Y. Compute per-callsign stack index here.
+        // Use a 3x3 neighborhood scan over a fine bucket grid so two
+        // stations 40 m apart that fall on opposite sides of a bucket
+        // boundary still collide. Bucket = ~110 m, reach = ~330 m.
+        const stackByCall = new Map();
+        {
+          const BUCKET_DEG = 0.001;
+          const grid = new Map();
+          for (const [call, pos] of positionByCall) {
+            const bx = Math.round(pos.lat / BUCKET_DEG);
+            const by = Math.round(pos.lon / BUCKET_DEG);
+            const key = `${bx}|${by}`;
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(call);
+          }
+          const visited = new Set();
+          for (const [call, pos] of positionByCall) {
+            if (visited.has(call)) continue;
+            const bx = Math.round(pos.lat / BUCKET_DEG);
+            const by = Math.round(pos.lon / BUCKET_DEG);
+            const cluster = [];
+            for (let dx = -1; dx <= 1; dx++) {
+              for (let dy = -1; dy <= 1; dy++) {
+                const neighbours = grid.get(`${bx + dx}|${by + dy}`);
+                if (!neighbours) continue;
+                for (const c of neighbours) if (!visited.has(c)) cluster.push(c);
+              }
+            }
+            cluster.forEach((c) => visited.add(c));
+            if (cluster.length < 2) continue;
+            cluster.sort();
+            cluster.forEach((c, i) => stackByCall.set(c, i));
+          }
+        }
+
+        events.forEach(e => {
+          if (!e.callsign) return;
+          // Inherit last-known position when this frame doesn't carry one.
+          const hasOwnPos = Number.isFinite(e.lat) && Number.isFinite(e.lon)
+            && !(e.lat === 0 && e.lon === 0);
+          if (!hasOwnPos) {
+            const inherited = positionByCall.get(e.callsign);
+            if (!inherited) return; // truly no position known anywhere
+            e = { ...e, lat: inherited.lat, lon: inherited.lon };
+          } else {
+            // Always honour the (possibly collision-resolved) per-callsign
+            // position so positioned beacons render on the same offset
+            // coordinate as their digipeated frames.
+            const resolved = positionByCall.get(e.callsign);
+            if (resolved) e = { ...e, lat: resolved.lat, lon: resolved.lon };
+          }
           const src = (e.source || "").toLowerCase();
-          if (!sourcesByCall.has(e.callsign)) sourcesByCall.set(e.callsign, new Set());
-          if (src) sourcesByCall.get(e.callsign).add(src);
+          if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
+          if (src) {
+            const ps = perSourceByCall.get(e.callsign);
+            const prev = ps.get(src);
+            // keep the most recent event for this source
+            if (!prev || (e.timestamp && new Date(e.timestamp) > new Date(prev.ts || 0))) {
+              ps.set(src, {
+                path: e.path || e.via || "",
+                raw: e.raw || "",
+                msg: e.msg || e.comment || "",
+                ts: e.timestamp || "",
+              });
+            }
+          }
+          // Track first/last seen timestamps across all events for this callsign
+          const tsMs = e.timestamp ? new Date(e.timestamp).getTime() : NaN;
+          if (Number.isFinite(tsMs)) {
+            const r = seenRangeByCall.get(e.callsign);
+            if (!r) seenRangeByCall.set(e.callsign, { firstMs: tsMs, lastMs: tsMs });
+            else {
+              if (tsMs < r.firstMs) r.firstMs = tsMs;
+              if (tsMs > r.lastMs) r.lastMs = tsMs;
+            }
+          }
           const existing = byCall.get(e.callsign);
           const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
           const isRf = src === "direwolf" || src === "rf";
@@ -4659,21 +4909,45 @@ Last update: 2026-04-03 UTC
         });
 
         byCall.forEach((e, call) => {
-          const sources = sourcesByCall.get(call) || new Set();
-          const hasRf = [...sources].some(s => s !== "aprs_is");
-          const sourceClass = hasRf ? "aprs-marker-rf" : "aprs-marker-is";
+          const perSource = perSourceByCall.get(call) || new Map();
+          const hasRf = [...perSource.keys()].some(s => s !== "aprs_is" && s !== "lora_aprs");
+          const hasLoRa = perSource.has("lora_aprs");
+          const sourceClass = hasRf ? "aprs-marker-rf" : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is");
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
 
-          const marker = L.marker([e.lat, e.lon], {
-            icon: L.divIcon({
+          // Vertically stack overlapping labels: when this callsign is part
+          // of a collision bucket, render label + leader line + anchor dot
+          // so the geographic point is preserved and each label is readable.
+          const stackIdx = stackByCall.get(call);
+          let icon;
+          if (stackIdx === undefined) {
+            icon = L.divIcon({
               className: `aprs-station-icon ${sourceClass}`,
               html: `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>`,
               iconSize: [120, 28],
               iconAnchor: [60, 14]
-            })
-          });
+            });
+          } else {
+            const labelH = 22;
+            const dotH = 8;
+            const stepPx = 28;
+            const leaderH = 6 + stackIdx * stepPx;
+            const totalH = labelH + leaderH + dotH;
+            icon = L.divIcon({
+              className: `aprs-station-icon ${sourceClass}`,
+              html:
+                `<div class="aprs-station-stack">` +
+                  `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>` +
+                  `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
+                  `<span class="aprs-station-anchor"></span>` +
+                `</div>`,
+              iconSize: [120, totalH],
+              iconAnchor: [60, totalH - dotH / 2]
+            });
+          }
+          const marker = L.marker([e.lat, e.lon], { icon });
           marker._isAprsStation = true;
-          marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, sources));
+            marker.addTo(aprsMap).bindPopup(aprsBuildPopup(e, perSource, seenRangeByCall.get(call)));
         });
 
         // Invalidate size (in case tab was hidden)

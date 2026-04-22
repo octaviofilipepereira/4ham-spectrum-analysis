@@ -44,6 +44,11 @@ from app.decoders.aprs_is import (
     check_internet,
     parse_aprs_is_line,
 )
+from app.decoders.lora_aprs import (
+    lora_aprs_loop,
+    get_lora_config,
+    describe_lora,
+)
 from app.decoders.launchers import resolve_command, start_process, stop_process
 from app.decoders.ssb_asr import (
     feed_iq_ssb,
@@ -819,6 +824,86 @@ async def _stop_aprs_is_loop() -> Dict:
     return {"stopped": True, "reason": None}
 
 
+# ── LoRa APRS (gr-lora_sdr → UDP) ──────────────────────────────────
+
+def _lora_aprs_on_event(event: Dict):
+    """Callback invoked by lora_aprs_loop for each decoded LoRa-APRS frame."""
+    if not event or not isinstance(event, dict):
+        return
+    now_iso = datetime.now(timezone.utc).isoformat()
+    state.decoder_status["lora_aprs"]["last_packet_at"] = now_iso
+    # Enrich with LoRa-APRS frequency (868.000 MHz EU SRD band, IARU Region 1).
+    if not event.get("frequency_hz"):
+        event["frequency_hz"] = 868_000_000
+    result = _ingest_callsign_payloads([event], {})
+    if result and result.get("saved", 0) > 0:
+        try:
+            from app.websocket.events import broadcast_event
+            broadcast_event(event)
+        except Exception:
+            pass
+
+
+def _lora_aprs_status_cb(status: str, detail: str):
+    """Callback invoked by lora_aprs_loop for socket state changes."""
+    lora_st = state.decoder_status["lora_aprs"]
+    if status == "connected":
+        lora_st["connected"] = True
+        lora_st["address"] = detail
+        lora_st["last_error"] = None
+    elif status == "disconnected":
+        lora_st["connected"] = False
+    elif status == "error":
+        lora_st["connected"] = False
+        lora_st["last_error"] = detail
+
+
+async def _start_lora_aprs_loop(force: bool = False) -> Dict:
+    """Start the LoRa-APRS UDP listener loop."""
+    config = get_lora_config()
+    if not config:
+        return {"started": False, "reason": "lora_aprs_not_configured"}
+
+    if state.lora_aprs_task is not None and not state.lora_aprs_task.done():
+        return {"started": False, "reason": "lora_aprs_already_running"}
+
+    state.lora_aprs_stop.clear()
+    state.lora_aprs_task = asyncio.create_task(
+        lora_aprs_loop(
+            on_event=_lora_aprs_on_event,
+            stop_event=state.lora_aprs_stop,
+            logger=lambda msg: log(msg),
+            reconnect_delay=3.0,
+            status_cb=_lora_aprs_status_cb,
+        )
+    )
+    state.decoder_status["lora_aprs"]["enabled"] = True
+    state.decoder_status["lora_aprs"]["address"] = describe_lora()
+    log(f"lora_aprs_loop_started:{describe_lora()}")
+    return {"started": True, "reason": None}
+
+
+async def _stop_lora_aprs_loop() -> Dict:
+    """Stop the LoRa-APRS UDP listener loop."""
+    if state.lora_aprs_task is None:
+        return {"stopped": False, "reason": "lora_aprs_not_running"}
+
+    state.lora_aprs_stop.set()
+    if not state.lora_aprs_task.done():
+        state.lora_aprs_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(state.lora_aprs_task), timeout=3.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+
+    state.lora_aprs_task = None
+    state.decoder_status["lora_aprs"]["connected"] = False
+    state.decoder_status["lora_aprs"]["enabled"] = False
+    log("lora_aprs_loop_stopped")
+    return {"stopped": True, "reason": None}
+
+
+
 async def _start_ssb_detector(force: bool = False) -> Dict:
     global _ssb_iq_queue, _ssb_detector_task
 
@@ -884,6 +969,7 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
     """
     saved = 0
     errors = []
+    background_aprs_sources = {"direwolf", "aprs_is", "lora_aprs"}
     
     for idx, item in enumerate(items):
         if not isinstance(item, dict):
@@ -907,9 +993,13 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
             errors.append({"index": idx, "error": "invalid_event"})
             record_decoder_event_invalid()
             continue
+
+        is_background_aprs = str(event.get("source") or "").strip().lower() in background_aprs_sources
         
-        # Only save events during active scan (not in preview or stopped mode)
-        if state.scan_state.get("state") != "running":
+        # Background APRS sources (Direwolf / APRS-IS / LoRa APRS) are
+        # independent feeders and must be ingested even when the main scan
+        # engine is stopped, in preview, or focused on another mode.
+        if state.scan_state.get("state") != "running" and not is_background_aprs:
             continue
         
         # Filter events by selected decoder mode (case-insensitive).
@@ -918,7 +1008,7 @@ def _ingest_callsign_payloads(items: List[Dict], defaults: Dict) -> Dict:
         _FT_FAMILY = {"FT8", "FT4"}
         event_mode = str(event.get("mode", "")).strip().upper()
         selected_mode = str(state.scan_state.get("decoder_mode", "")).strip().upper()
-        if selected_mode and event_mode != selected_mode:
+        if selected_mode and event_mode != selected_mode and not is_background_aprs:
             if not (event_mode in _FT_FAMILY and selected_mode in _FT_FAMILY):
                 continue  # Ignore events from different decoder modes
         

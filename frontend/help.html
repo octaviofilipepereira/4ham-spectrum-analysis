@@ -74,7 +74,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#propmap">QTH-Centric Propagation Map</a></li>
       <li><a href="#ionobadge">Ionospheric Space Weather panel</a></li>
       <li><a href="#launcher">Desktop launcher</a></li>
-      <li><a href="#aprs-pipeline">APRS decoding &mdash; VHF pipeline</a></li>
+      <li><a href="#aprs-pipeline">APRS decoding &mdash; VHF &amp; LoRa pipelines</a></li>
       <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
     </ol>
   </nav>
@@ -501,6 +501,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><strong>SSB / Voice ASR</strong> — voice occupancy detector + Whisper ASR pipeline (queue depth shown)</li>
       <li><strong>PSK decoder</strong> — PSK31/63 (not yet implemented)</li>
       <li><strong>Direwolf KISS (APRS)</strong> — APRS packet ingest via Direwolf TCP KISS</li>
+      <li><strong>LoRa APRS</strong> — LoRa-modulated APRS frames via gr-lora_sdr UDP (433.775 MHz)</li>
       <li><strong>Last decoder event</strong> — timestamp of the most recent event from any source</li>
       <li><strong>AGC</strong> — automatic gain control state</li>
     </ul>
@@ -1021,6 +1022,53 @@ sudo bash scripts/enable_aprs.sh</pre>
       <code>config/direwolf.conf</code> (KISS TCP on port 8001) if missing, and is idempotent
       (safe to re-run). No backend restart is needed afterwards.
     </p>
+
+    <h3 class="sub-title">LoRa APRS — 433.775 MHz / 70 cm pipeline</h3>
+    <p>
+      4ham also supports <strong>LoRa APRS</strong>: APRS packets transmitted with LoRa modulation
+      on the 70 cm band (default <strong>433.775&nbsp;MHz</strong>, IARU Region 1). The pipeline
+      mirrors the classic VHF one but uses <code>gr-lora_sdr</code> instead of Direwolf:
+    </p>
+<pre>RTL-SDR → gr-lora_sdr flowgraph → UDP :5687 → 4ham (lora_aprs_loop)</pre>
+    <ul>
+      <li>The backend exposes a UDP listener (default <code>127.0.0.1:5687</code>) that accepts
+          decoded payloads from any external <code>gr-lora_sdr</code> flowgraph. The
+          OE5BPA <code>&lt;\xff\x01</code> LoRa-APRS header is stripped automatically.</li>
+      <li>Frames are tagged in the database with <code>source=lora_aprs</code>,
+          <code>mode=APRS</code>, <code>frequency_hz=433_775_000</code>.</li>
+      <li>On the APRS map, use the <strong>📡 LoRa</strong> filter button (next to <strong>📻 RF</strong>
+          for VHF Direwolf and <strong>🌐 TCP</strong> for APRS-IS) to show only LoRa stations.
+          Markers carry a distinct magenta tint.</li>
+    </ul>
+    <p><strong>Enabling LoRa APRS on an existing install</strong></p>
+    <ol>
+      <li>Open <strong>Admin Config</strong> → section <strong>LoRa APRS Packet Decoding (gr-lora_sdr)</strong>.</li>
+      <li>The badge will show <em>“gr-lora_sdr not installed”</em>.</li>
+      <li>Tick <strong>“Enable LoRa APRS packet decoding (UDP listener)”</strong>. A button
+          <strong>Install gr-lora_sdr…</strong> appears and an instruction modal opens automatically.</li>
+      <li>Open a terminal on the server and run (build typically takes 5–15 minutes):
+        <pre>cd ~/4ham-spectrum-analysis
+sudo bash scripts/enable_lora_aprs.sh</pre>
+      </li>
+      <li>Reload the browser, save the LoRa APRS setting, then start a <code>gr-lora_sdr</code>
+          flowgraph that forwards decoded payloads to UDP <code>127.0.0.1:5687</code>
+          (examples ship in <code>/opt/gr-lora_sdr/examples</code>).</li>
+    </ol>
+    <p>
+      Recommended antenna: a dual-band VHF/UHF such as the <strong>Diamond X50</strong> — covers
+      both 144.800 MHz APRS and 433.775 MHz LoRa APRS without retuning.
+      The two pipelines (Direwolf VHF and gr-lora_sdr 70 cm) can run simultaneously, since each
+      uses its own SDR resource (Direwolf via <code>rtl_fm</code>, gr-lora_sdr via its own
+      flowgraph) — typically on two separate RTL-SDR dongles.
+    </p>
+    <p>
+      <strong>Tip — validate without hardware:</strong> the repository ships a developer tool
+      <code>scripts/lora_aprs_udp_sender.py</code> that sends synthetic LoRa-APRS frames (with the
+      proper <code>&lt;\xff\x01</code> OE5BPA header) to the local UDP listener. Use it to verify
+      the backend, parser, DB and the <strong>📡 LoRa</strong> map filter end-to-end, before
+      hooking up a real <code>gr-lora_sdr</code> flowgraph:
+    </p>
+<pre>python3 scripts/lora_aprs_udp_sender.py --count 3 --interval 1</pre>
   </section>
 
   <!-- 18. FAQ -->

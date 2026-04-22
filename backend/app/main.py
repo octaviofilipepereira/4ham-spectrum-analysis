@@ -34,8 +34,9 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
+from app.core import features as _features
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -116,6 +117,17 @@ async def lifespan(app_instance: FastAPI):
         except Exception as exc:
             _log.warning("KISS loop startup failed: %s", exc)
 
+    # Auto-start LoRa-APRS UDP listener — gated by FEATURE_LORA_APRS feature
+    # flag (default off). When the feature is disabled, the entire LoRa
+    # subsystem stays dormant: no UDP listener, no settings exposure, no UI.
+    if _features.lora_aprs_enabled() and _state.decoder_status["lora_aprs"]["enabled"]:
+        try:
+            from app.api.decoders import _start_lora_aprs_loop
+            result = await _start_lora_aprs_loop(force=False)
+            _log.info("LoRa APRS loop startup: %s", result)
+        except Exception as exc:
+            _log.warning("LoRa APRS loop startup failed: %s", exc)
+
     # Auto-open preview if a real SDR device is available
     try:
         sdr_devices = [
@@ -161,7 +173,8 @@ async def lifespan(app_instance: FastAPI):
     # Auto-start preset scheduler if there are enabled schedules
     try:
         enabled = [s for s in _state.db.get_preset_schedules() if s.get("enabled")]
-        if enabled:
+        _sched_kv = _state.db.get_kv("preset_scheduler_enabled")
+        if enabled and _sched_kv != "0":
             from app.scan.preset_scheduler import PresetScheduler
             from app.api.scan import _apply_preset_by_id, _stop_active_rotation
             scheduler = PresetScheduler(
@@ -281,6 +294,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
+app.include_router(features_api.router, prefix="/api/features", tags=["Features"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers

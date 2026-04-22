@@ -7,6 +7,37 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.13.1 - 2026-04-19
+
+### Changed
+- **LoRa APRS hidden behind `FEATURE_LORA_APRS` feature flag** (default `false`). The full LoRa subsystem (UDP listener auto-start, settings exposure, admin UI section, map filter, *LoRa* and *70cm* quick buttons) stays dormant on the default install where no `gr-lora_sdr` flowgraph or hardware is present. Set `FEATURE_LORA_APRS=true` in `.env` and restart the backend to restore the full LoRa surface. No DB migration, no destructive removal — fully reversible.
+  - New `backend/app/core/features.py` (single source of truth for feature flags).
+  - New public endpoint `GET /api/features` consumed once at frontend boot.
+  - The `install.sh` installer is intentionally LoRa-agnostic: it does **not** write `FEATURE_LORA_APRS` to `.env`. The backend defaults to `false` when the variable is missing, so the default install never exposes LoRa.
+- **Removed `70cm` from the user-facing band lists**: dropped from `frontend/index.html` band/event-search/export selects, from `frontend/4ham_academic_analytics.html` BANDS array and APRS_BANDS set, and from `frontend/modules/constants.js` (`BAND_LIMITS`, `DEFAULT_BAND_OPTIONS`). The `70cm` quick-band button stays in the DOM (hidden) so it can be revealed when the LoRa feature is re-enabled. Backend band tuples (helpers, scan defaults) are intentionally preserved so re-enabling the feature restores full functionality without further changes.
+
+---
+
+## v0.13.0 - 2026-04-19
+
+### Added (ROADMAP 11.1 — LoRa APRS)
+- **LoRa APRS decoder**: new module `backend/app/decoders/lora_aprs.py` mirroring the Direwolf/KISS architecture. Listens on UDP `127.0.0.1:5687` (configurable) for frames forwarded by an external `gr-lora_sdr` flowgraph on 433.775 MHz (IARU Region 1, 70 cm). Strips OE5BPA `<\xff\x01` LoRa-APRS header, delegates parsing to the existing `parse_aprs_is_line()` and tags each event with `source="lora_aprs"` / `mode="APRS"` / `frequency_hz=433_775_000`.
+- **Decoder lifecycle integration**: `_start_lora_aprs_loop()` / `_stop_lora_aprs_loop()` in `backend/app/api/decoders.py`, autostart in `main.py` lifespan when `LORA_APRS_ENABLE=1`, status surfaced in `state.decoder_status["lora_aprs"]` (enabled / address / connected / last_packet_at / last_error).
+- **Admin Config toggle**: new section *LoRa APRS Packet Decoding (gr-lora_sdr)* with availability badge (uses `importlib.util.find_spec("gnuradio.lora_sdr")`), enable checkbox, and *Install gr-lora_sdr…* modal that auto-opens when the user ticks the box on a host where the module is missing.
+- **Install helper script**: `scripts/enable_lora_aprs.sh` (idempotent) installs GNU Radio + build deps via `apt`, clones `tapparelj/gr-lora_sdr` into `/opt/gr-lora_sdr`, builds and installs via CMake, refreshes `ldconfig`, and verifies the Python import. ENV overrides: `GR_LORA_SDR_SRC`, `GR_LORA_SDR_REPO`.
+- **Frontend APRS map filter**: extended map header from 3 to 4 buttons — *All / 📻 RF / 📡 LoRa / 🌐 TCP*. The RF filter now means *VHF Direwolf only* (excludes both `aprs_is` and `lora_aprs`); the new LoRa filter shows only `source=lora_aprs` stations. Popup source badges and Leaflet marker tints (`.aprs-marker-lora`, magenta hue) updated accordingly.
+- **Tests**: new `backend/tests/test_lora_aprs.py` with 9 cases covering header stripping, plain/compressed/garbage/empty payloads, ENV-driven config, and an end-to-end UDP loopback through `lora_aprs_loop()`. Additional `backend/tests/test_lora_aprs_e2e.py` adds 5 integration tests for the API callback layer (frequency_hz enrichment, status flag transitions, invalid-input handling) and a subprocess-driven sender test.
+- **Developer / E2E tool**: `scripts/lora_aprs_udp_sender.py` — sends synthetic LoRa-APRS frames (with the OE5BPA `<\xff\x01` header) to the local UDP listener so the full pipeline can be validated **without any SDR hardware or gr-lora_sdr install** (parser, DB ingest, frontend 📡 LoRa map filter).
+
+### Documentation
+- Added *Enabling LoRa APRS* sections to `docs/user_manual_en.md`, `docs/user_manual.md` (PT) and `docs/installation_manual.md` (build script, ENV vars, antenna recommendation: Diamond X50 dual-band).
+
+### Fixed
+- **LoRa APRS install badge false-negative**: the Admin Config availability probe now checks both the backend interpreter and the host `python3`, avoiding a misleading *"gr-lora_sdr not installed"* status when the GNU Radio module is correctly installed system-wide but the 4ham backend runs inside an isolated `.venv`.
+- **Background APRS ingest gating**: `direwolf`, `aprs_is`, and `lora_aprs` events are no longer discarded when the main scan engine is stopped, in preview, or focused on another decoder mode. This fixes LoRa APRS frames being received on UDP `5687` but silently skipped unless a matching active scan was running.
+
+---
+
 ## v0.12.4 - 2026-04-18
 
 ### Added

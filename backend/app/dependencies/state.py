@@ -272,6 +272,13 @@ decoder_status = {
         "last_error": None,
         "internet_available": None,
     },
+    "lora_aprs": {
+        "enabled": _env_bool("LORA_APRS_ENABLE", False),
+        "address": None,
+        "connected": False,
+        "last_packet_at": None,
+        "last_error": None,
+    },
     "files": {
         "aprs": None,
         "cw": None,
@@ -330,6 +337,8 @@ kiss_stop = asyncio.Event()
 kiss_task = None
 aprs_is_stop = asyncio.Event()
 aprs_is_task = None
+lora_aprs_stop = asyncio.Event()
+lora_aprs_task = None
 direwolf_process = None
 rtl_fm_process = None
 ft_internal_decoder = None

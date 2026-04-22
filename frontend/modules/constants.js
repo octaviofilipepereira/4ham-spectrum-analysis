@@ -106,7 +106,6 @@ export const BAND_PRESETS = {
   "12m":  { start_hz: 24890000,  end_hz: 24990000 },
   "10m":  { start_hz: 28000000,  end_hz: 29700000 },
   "2m":   { start_hz: 144000000, end_hz: 146000000 },
-  "70cm": { start_hz: 430000000, end_hz: 440000000 },
 };
 
 export const DEFAULT_BAND_OPTIONS = [
@@ -119,7 +118,6 @@ export const DEFAULT_BAND_OPTIONS = [
   { name: "12m",  label: "12 m" },
   { name: "10m",  label: "10 m" },
   { name: "2m",   label: "2 m" },
-  { name: "70cm", label: "70 cm" },
 ];
 
 export const CW_DECODER_SUBBANDS = {
