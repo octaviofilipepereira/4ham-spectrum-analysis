@@ -301,7 +301,7 @@ O preset ativo é memorizado na sessão do browser. A resolução temporal (minu
 
 ### Filtros de banda e modo
 
-- **Band** — filtrar por banda individual (160m … 70cm) ou **All** para ver todas
+- **Band** — filtrar por banda individual (160m … 2m) ou **All** para ver todas
 - **Mode** — filtrar por modo (SSB, FT8, FT4, CW, WSPR) ou **All** para ver todos
 - Clicar em **Apply Filters** após alterar filtros ou o período personalizado
 
@@ -879,30 +879,6 @@ Se já tem o 4ham instalado e não ativou Direwolf na altura do `install.sh`, po
    ```
 
 4. Recarregue a página do browser e clique em **Save APRS setting**. O badge fica verde e o APRS inicia de imediato (sem restart do backend).
-
-### Activar LoRa APRS (433.775 MHz / 70 cm)
-
-O 4HAM também suporta LoRa APRS — pacotes APRS transmitidos com modulação LoRa na banda de 70 cm (por defeito 433.775 MHz, IARU Região 1). O pipeline espelha o do APRS clássico mas usa `gr-lora_sdr` em vez do Direwolf:
-
-```
-RTL-SDR → flowgraph gr-lora_sdr → UDP :5687 → 4HAM (lora_aprs_loop)
-```
-
-Para activar numa instalação existente:
-
-1. Abra **Admin Config** → **LoRa APRS Packet Decoding (gr-lora_sdr)**.
-2. Marque **Enable LoRa APRS packet decoding (UDP listener)** — o modal **Install gr-lora_sdr…** abre automaticamente caso o módulo não esteja instalado.
-3. Execute o comando indicado num terminal do servidor (a build demora tipicamente 5–15 minutos):
-
-   ```bash
-   cd ~/4ham-spectrum-analysis
-   sudo bash scripts/enable_lora_aprs.sh
-   ```
-
-4. Recarregue a página do browser e clique em **Save LoRa APRS setting**. O backend abre um listener UDP em `127.0.0.1:5687`.
-5. Ponha a correr um flowgraph `gr-lora_sdr` que reencaminhe os payloads descodificados para essa porta UDP (há exemplos em `/opt/gr-lora_sdr/examples`). A antena recomendada é uma dual-band VHF/UHF como a **Diamond X50** (cobre 144.800 MHz APRS e 433.775 MHz LoRa APRS).
-
-As tramas LoRa-APRS ficam marcadas na base de dados com `source=lora_aprs` e aparecem no mapa APRS, filtráveis pelo botão **📡 LoRa** no cabeçalho do mapa (a par dos botões **📻 RF** para Direwolf VHF e **🌐 TCP** para APRS-IS).
 
 ---
 

@@ -98,16 +98,16 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.13.3
+- **Documentation overhaul**: simplified user manuals (EN/PT), installation manual, README, ROADMAP (EN/PT), CHANGELOG and in-app help to focus exclusively on the supported APRS pipeline (Direwolf VHF + APRS-IS).
+- **Version bump** to v0.13.3 across backend, help badge, and Academic Analytics dashboard title.
+
 ### v0.13.2
 - **APRS map UX**: refined marker colours, leader-lines for stacked stations, vertically stacked labels for overlapping callsigns, collision detection across neighbouring buckets, adjustable initial zoom, mode-aware marker cleanup, persisted filters/preset, and a wider 24h position snapshot for marker anchoring.
-- **LoRa-mode filters renamed** to *LoRa RF* / *LoRa TCP*; *All* in LoRa mode no longer pulls the APRS-IS firehose.
-- **LoRa defaults** to 868 MHz (EU SRD).
-- **Repository hygiene**: `scripts/enable_lora_aprs.sh` untracked and gitignored (kept local-only).
 
 ### v0.13.1
 - **Live rotation countdown**: scan rotation status bar now updates every second client-side, eliminating the static countdown that only refreshed on page reload.
 - **Loading overlay on tab switch**: switching between HF and APRS views now shows a loading overlay, preventing the brief empty-map flash while the DOM paints.
-- **LoRa & Mesh Protocols roadmap**: documented integration plan for LoRa APRS, Meshtastic, MeshCore, and LoRaWAN session key decryption (implementation pending).
 
 ### v0.12.4
 - **Academic Analytics export enrichment**: the "All Events" sheet (XLSX) and CSV export now include 13 additional fields per event — DXCC entity name, continent, DXCC code, latitude, longitude, power (dBm), confidence, crest (dB), Doppler shift (Hz), source, grid locator, derived band, and normalised mode.
@@ -268,7 +268,6 @@ Releases: [v0.2.1](https://github.com/octaviofilipepereira/4ham-spectrum-analysi
 
 ## Target bands
 - 2 m
-- 70 cm
 - 10 m
 - 12 m
 - 15 m
@@ -288,7 +287,6 @@ Releases: [v0.2.1](https://github.com/octaviofilipepereira/4ham-spectrum-analysi
 - 12 m: 24.890 - 24.990 MHz
 - 10 m: 28.000 - 29.700 MHz
 - 2 m: 144 - 146 MHz
-- 70 cm: 430 - 440 MHz
 
 Note: limits may vary by national regulation; the plan supports per-country profiles.
 Regional profile example: see [config/region_profile_example.yaml](config/region_profile_example.yaml).
