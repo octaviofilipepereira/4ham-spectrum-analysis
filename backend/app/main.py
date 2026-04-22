@@ -34,7 +34,7 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
 from app.core import features as _features
 
@@ -317,6 +317,7 @@ app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(logs.router, prefix="/api", tags=["Logs"])
 app.include_router(exports.router, prefix="/api", tags=["Exports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(external_mirrors_api.router, prefix="/api/admin/mirrors", tags=["External Mirrors"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
