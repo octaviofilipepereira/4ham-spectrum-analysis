@@ -56,9 +56,6 @@ backend/app/main_legacy.py
 # Private benchmark experiments (never publish)
 benchmarks/
 
-# External academic analytics deployment (never commit)
-external_academic_analytics/
-
 # LoRa-APRS opt-in helper — kept local only, never published.
 # The script is provided for personal/manual use to enable the LoRa subsystem
 # (compiles gr-lora_sdr and flips FEATURE_LORA_APRS=true in .env). Excluded

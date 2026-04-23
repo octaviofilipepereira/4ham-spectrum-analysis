@@ -99,7 +99,7 @@ Default frontend routes:
 ## Changelog (cumulative)
 
 ### v0.14.0
-- **External Mirrors (push replication)**: new `external_mirrors` backend module + Admin Config UI + companion PHP/MySQL receiver in `external_academic_analytics_mirror/`. Lets the production station push selected dashboard data (callsign and occupancy events) to one or more remote PHP hosts over HTTPS without inbound port-forwarding. Per-mirror bcrypt-hashed tokens, HMAC-SHA256 request signing, replay protection, automatic disable after 5 consecutive failures. See `docs/external_mirrors.md`.
+- **External Mirrors (push replication)**: new `external_mirrors` backend module + Admin Config UI + companion PHP/MySQL receiver in `external_academic_analytics/`. Lets the production station push selected dashboard data (callsign and occupancy events) to one or more remote PHP hosts over HTTPS without inbound port-forwarding. Per-mirror bcrypt-hashed tokens, HMAC-SHA256 request signing, replay protection, automatic disable after 5 consecutive failures. See `docs/external_mirrors.md`.
 - **Version bump** to v0.14.0 across backend (`APP_VERSION`), help badge, and Academic Analytics dashboard title.
 
 ### v0.13.3

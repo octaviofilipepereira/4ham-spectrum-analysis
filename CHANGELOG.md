@@ -32,11 +32,11 @@ Last update: 2026-04-18 UTC
 - **Admin Config UI** (inside the existing Admin Config modal): mirror table,
   add/edit form, one-time token alert, per-row enable/disable, rotate-token,
   test push and audit log viewer.
-- **PHP/MySQL receiver** in `external_academic_analytics_mirror/` for shared
+- **PHP/MySQL receiver** in `external_academic_analytics/` for shared
   hosting (PHP 7.4+, PDO_mysql only). Includes MySQL schema, idempotent
   `INSERT IGNORE` ingest endpoint, HMAC + nonce + clock-skew verification,
   IP allowlist, audit log and read-only `events.php` / `status.php` / `version.php`
-  helpers. See `external_academic_analytics_mirror/README.md` for deployment.
+  helpers. See `external_academic_analytics/README.md` for deployment.
 - **Documentation**: new `docs/external_mirrors.md` covering architecture,
   security model, admin UI walkthrough and receiver deployment.
 

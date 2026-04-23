@@ -130,7 +130,7 @@ the bottom lists every mirror.
 
 ## Receiver deployment
 
-See `external_academic_analytics_mirror/README.md` for the full
+See `external_academic_analytics/README.md` for the full
 deployment guide. Summary:
 
 ```bash
