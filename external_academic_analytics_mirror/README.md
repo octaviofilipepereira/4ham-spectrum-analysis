@@ -50,7 +50,7 @@ front them with HTTP Basic auth at the web-server level.
      `name` field configured upstream (it is sent as `X-4HAM-Mirror-Name`).
    * `max_clock_skew_seconds` — default 300; must cover the worst-case
      clock drift between sender and receiver.
-   * `allowed_source_ips` — optional IP allowlist (exact-match only).
+   * `allowed_source_ips` — optional source allowlist. Accepts exact IPv4/IPv6, CIDR blocks, or hostnames/FQDNs (resolved per-request, supports DDNS).
 
 4. **Test** the upstream side: from the Admin Config modal of the
    sender, open the mirror row and click **Test**. You should see HTTP
@@ -67,7 +67,7 @@ front them with HTTP Basic auth at the web-server level.
 * Each `(mirror_name, nonce)` is recorded in `mirror_seen_nonces`;
   duplicates return HTTP 409 (`outcome=replay`). Old nonces are GC'd
   on every request via `seen_at < NOW() - INTERVAL nonce_ttl SECOND`.
-* Optional IP allowlist via `allowed_source_ips`.
+* Optional source allowlist via `allowed_source_ips` (IPs, CIDRs, or hostnames).
 * Inserts use `INSERT IGNORE` keyed by `(mirror_name, source_id)` so
   retries are idempotent.
 

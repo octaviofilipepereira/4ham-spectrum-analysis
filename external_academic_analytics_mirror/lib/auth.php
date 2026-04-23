@@ -78,10 +78,55 @@ function fourham_check_ip_allowlist(array $cfg): bool {
     $allow = $cfg['allowed_source_ips'] ?? [];
     if (!is_array($allow) || empty($allow)) return true;
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '') return false;
     foreach ($allow as $entry) {
+        $entry = trim((string)$entry);
+        if ($entry === '') continue;
+        // Exact IP match (IPv4 or IPv6)
         if ($ip === $entry) return true;
+        // CIDR (e.g. 203.0.113.0/24, 2001:db8::/32)
+        if (strpos($entry, '/') !== false && fourham_ip_in_cidr($ip, $entry)) return true;
+        // Hostname (DDNS, FQDN) — resolve A/AAAA at request time
+        if (filter_var($entry, FILTER_VALIDATE_IP) === false) {
+            foreach (fourham_resolve_host($entry) as $resolved) {
+                if ($ip === $resolved) return true;
+            }
+        }
     }
     return false;
+}
+
+function fourham_ip_in_cidr(string $ip, string $cidr): bool {
+    [$subnet, $maskRaw] = array_pad(explode('/', $cidr, 2), 2, null);
+    if ($maskRaw === null || !is_numeric($maskRaw)) return false;
+    $mask = (int)$maskRaw;
+    $ipBin = @inet_pton($ip);
+    $subBin = @inet_pton($subnet);
+    if ($ipBin === false || $subBin === false || strlen($ipBin) !== strlen($subBin)) return false;
+    $bytes = (int)($mask / 8);
+    $bits  = $mask % 8;
+    if ($bytes > 0 && substr($ipBin, 0, $bytes) !== substr($subBin, 0, $bytes)) return false;
+    if ($bits === 0) return true;
+    if ($bytes >= strlen($ipBin)) return true;
+    $maskByte = ~((1 << (8 - $bits)) - 1) & 0xFF;
+    return (ord($ipBin[$bytes]) & $maskByte) === (ord($subBin[$bytes]) & $maskByte);
+}
+
+function fourham_resolve_host(string $host): array {
+    static $cache = [];
+    if (isset($cache[$host])) return $cache[$host];
+    $ips = [];
+    $v4 = @gethostbynamel($host);
+    if (is_array($v4)) $ips = array_merge($ips, $v4);
+    if (function_exists('dns_get_record')) {
+        $records = @dns_get_record($host, DNS_AAAA);
+        if (is_array($records)) {
+            foreach ($records as $r) {
+                if (!empty($r['ipv6'])) $ips[] = $r['ipv6'];
+            }
+        }
+    }
+    return $cache[$host] = array_values(array_unique($ips));
 }
 
 /**
