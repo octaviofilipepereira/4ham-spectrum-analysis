@@ -2553,16 +2553,30 @@ Last update: 2026-04-03 UTC
           else if (kp >= 4) condClass = "iono-active";
           else if (kp >= 2) condClass = "iono-unsettled";
 
-          // Band status summary with color coding
+          // Band status summary with color coding.
+          // Object.entries() keeps JSON insertion order, which the
+          // backend doesn't guarantee — sort by canonical wavelength
+          // (longest → shortest) so the widget always reads top-down
+          // 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m.
+          const _BAND_ORDER = [
+            "160m","80m","60m","40m","30m","20m","17m",
+            "15m","12m","10m","6m","2m","70cm",
+          ];
+          const _bandRank = (b) => {
+            const i = _BAND_ORDER.indexOf(String(b).toLowerCase());
+            return i === -1 ? 999 : i;
+          };
           const bands = d.bands || {};
-          const bandTags = Object.entries(bands).map(([b, v]) => {
-            const st = v.status || (v.open ? "Open" : "Closed");
-            let cls = "iono-band-closed";
-            if (st === "Open") cls = "iono-band-open";
-            else if (st === "Marginal") cls = "iono-band-marginal";
-            else if (st === "Absorbed") cls = "iono-band-absorbed";
-            return `<span class="iono-band ${cls}" title="${st} — MUF ${v.muf_at_3000km || '?'} MHz">${b}</span>`;
-          }).join("");
+          const bandTags = Object.entries(bands)
+            .sort(([a], [b]) => _bandRank(a) - _bandRank(b))
+            .map(([b, v]) => {
+              const st = v.status || (v.open ? "Open" : "Closed");
+              let cls = "iono-band-closed";
+              if (st === "Open") cls = "iono-band-open";
+              else if (st === "Marginal") cls = "iono-band-marginal";
+              else if (st === "Absorbed") cls = "iono-band-absorbed";
+              return `<span class="iono-band ${cls}" title="${st} — MUF ${v.muf_at_3000km || '?'} MHz">${b}</span>`;
+            }).join("");
 
           el.innerHTML = [
             `<div style="display:flex;align-items:center;justify-content:space-between">`,
