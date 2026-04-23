@@ -1,4 +1,5 @@
 {
+  "$comment": "© 2026 Octávio Filipe Gonçalves (CT7BFV) — License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.local/4ham/region_profile.schema.json",
   "title": "Region Profile",
