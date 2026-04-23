@@ -1,5 +1,12 @@
 <?php
-// Read-only paginated query over mirrored events.
+// © 2026 Octávio Filipe Gonçalves
+// Callsign: CT7BFV
+// License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+
+// ─────────────────────────────────────────────────────
+//  4ham Spectrum Analysis — External Mirror Receiver
+//  events.php — read-only paginated query over mirrored events
+// ─────────────────────────────────────────────────────
 //
 // Query string:
 //   kind=callsign|occupancy   (default: callsign)

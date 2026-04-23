@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # Frontend Modules
 
 Esta pasta contém os módulos JavaScript que compõem o frontend do 4ham Spectrum Analysis.

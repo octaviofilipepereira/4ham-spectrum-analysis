@@ -1,3 +1,7 @@
+# ────────────────────────────────────────────────────
+#  4ham Spectrum Analysis — External Mirror Receiver
+#  lib/.htaccess — deny direct access to internal library files
+# ────────────────────────────────────────────────────
 # Block direct access to library files.
 <FilesMatch "\.php$">
     Require all denied

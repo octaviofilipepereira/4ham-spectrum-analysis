@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+
 # © 2026 Octavio Filipe Goncalves
 # Callsign: CT7BFV
 # License: GNU AGPL-3.0

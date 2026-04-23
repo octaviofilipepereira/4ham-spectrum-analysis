@@ -1,3 +1,7 @@
+-- © 2026 Octávio Filipe Gonçalves
+-- Callsign: CT7BFV
+-- License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+
 -- ─────────────────────────────────────────────────────
 -- 4ham Spectrum Analysis — External Mirror receiver schema (MySQL 5.7+/8.x)
 --

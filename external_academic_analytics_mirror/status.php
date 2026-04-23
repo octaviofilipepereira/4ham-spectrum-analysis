@@ -1,5 +1,13 @@
 <?php
-// Read-only summary of mirrored data and recent push outcomes.
+// © 2026 Octávio Filipe Gonçalves
+// Callsign: CT7BFV
+// License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+
+// ─────────────────────────────────────────────────────
+//  4ham Spectrum Analysis — External Mirror Receiver
+//  status.php — read-only health/summary endpoint
+//  Returns per-mirror stats + last 50 push outcomes (public).
+// ─────────────────────────────────────────────────────
 declare(strict_types=1);
 
 require_once __DIR__ . '/lib/db.php';

@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # Validação do Instalador - 4ham-spectrum-analysis
 **Data:** 2 de abril de 2026  
 **Autor:** Análise técnica completa

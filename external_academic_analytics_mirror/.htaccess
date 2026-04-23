@@ -1,3 +1,7 @@
+# ────────────────────────────────────────────────────
+#  4ham Spectrum Analysis — External Mirror Receiver
+#  .htaccess — Apache web-root protections
+# ────────────────────────────────────────────────────
 # Block direct web access to library code, configuration and SQL.
 <FilesMatch "\.(sql|md|example)$">
     Require all denied

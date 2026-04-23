@@ -1,3 +1,9 @@
+<!--
+© 2026 Octávio Filipe Gonçalves
+Callsign: CT7BFV
+License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+
 # 4ham Spectrum Analysis — External Mirror Receiver
 
 PHP/MySQL receiver counterpart to the in-app **External Mirrors** push
