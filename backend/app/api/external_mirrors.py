@@ -23,6 +23,7 @@ from app.external_mirrors import (
 )
 from app.external_mirrors import registry as mirrors_registry
 from app.external_mirrors.http_client import MirrorHttpClient
+from app.external_mirrors.payload import DEFAULT_BATCH_SIZE
 
 
 router = APIRouter()
@@ -49,6 +50,73 @@ def list_mirrors(
     repo = mirrors_registry.get_repository()
     mirrors = repo.list(include_disabled=include_disabled)
     return {"mirrors": [_serialise(m) for m in mirrors]}
+
+
+@router.get("/health")
+def mirrors_health(
+    _: None = Depends(verify_basic_auth),
+) -> Dict[str, Any]:
+    """
+    Replication health snapshot for every mirror.
+
+    For each mirror, reports:
+      * last_push_watermark: shared cursor stored in DB
+      * source_max_id: per-table MAX(id) on the local SQLite store
+      * lag_ids: source_max_id - last_push_watermark (how many rows still
+        to push for that table; 0 means caught up)
+      * consecutive_failures, last_push_at, last_push_status
+      * status: "ok" | "lagging" | "stalled" | "disabled"
+
+    A mirror is considered:
+      * "disabled"  if enabled=False
+      * "stalled"   if consecutive_failures >= 3
+      * "lagging"   if any table lag_ids > batch_size (i.e. > 1 push worth
+                    of backlog)
+      * "ok"        otherwise
+    """
+    _ensure_initialised()
+    repo = mirrors_registry.get_repository()
+    db = repo._db  # internal Database handle (same package)
+    with db._lock:
+        cs_max = int(
+            (db.conn.execute("SELECT MAX(id) AS m FROM callsign_events").fetchone() or {"m": 0})["m"] or 0
+        )
+        oc_max = int(
+            (db.conn.execute("SELECT MAX(id) AS m FROM occupancy_events").fetchone() or {"m": 0})["m"] or 0
+        )
+
+    mirrors = repo.list(include_disabled=True)
+    out: List[Dict[str, Any]] = []
+    for m in mirrors:
+        wm = int(m.last_push_watermark or 0)
+        cs_lag = max(0, cs_max - wm)
+        oc_lag = max(0, oc_max - wm)
+        worst_lag = max(cs_lag, oc_lag)
+        if not m.enabled:
+            mstatus = "disabled"
+        elif int(m.consecutive_failures or 0) >= 3:
+            mstatus = "stalled"
+        elif worst_lag > DEFAULT_BATCH_SIZE:
+            mstatus = "lagging"
+        else:
+            mstatus = "ok"
+        out.append(
+            {
+                "id": m.id,
+                "name": m.name,
+                "enabled": m.enabled,
+                "status": mstatus,
+                "last_push_watermark": wm,
+                "source_max_id": {"callsign_events": cs_max, "occupancy_events": oc_max},
+                "lag_ids": {"callsign_events": cs_lag, "occupancy_events": oc_lag},
+                "push_interval_seconds": m.push_interval_seconds,
+                "batch_size": DEFAULT_BATCH_SIZE,
+                "consecutive_failures": m.consecutive_failures,
+                "last_push_at": m.last_push_at,
+                "last_push_status": m.last_push_status,
+            }
+        )
+    return {"mirrors": out}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
