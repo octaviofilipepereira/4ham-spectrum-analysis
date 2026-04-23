@@ -23,7 +23,7 @@ the home backend to the internet (push-only architecture is preserved).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,13 @@ ENDPOINT_SETTINGS = "settings"
 ENDPOINT_MAP_IONOSPHERIC = "map/ionospheric"
 ENDPOINT_MAP_CONTACTS = "map/contacts"
 ENDPOINT_ANALYTICS_ACADEMIC = "analytics/academic"
+# Per-window pre-computed academic snapshots so the dashboard period
+# selector (1h / 24h / 7d / 30d) sees the correct bucketing instead of
+# always slicing the 7d hourly snapshot.
+ENDPOINT_ANALYTICS_ACADEMIC_1H = "analytics/academic/1h"
+ENDPOINT_ANALYTICS_ACADEMIC_24H = "analytics/academic/24h"
+ENDPOINT_ANALYTICS_ACADEMIC_7D = "analytics/academic/7d"
+ENDPOINT_ANALYTICS_ACADEMIC_30D = "analytics/academic/30d"
 
 
 def _now_iso() -> str:
@@ -219,47 +226,81 @@ def _snapshot_map_contacts() -> Dict[str, Any]:
     }
 
 
-def _snapshot_analytics_academic() -> Dict[str, Any]:
-    """Invoke the live academic_analytics() with default params (last 7d / hour).
+def _build_academic_window(
+    *, window: timedelta, bucket: str, raw_cap: int
+) -> Dict[str, Any]:
+    """Invoke the live academic_analytics() for a specific rolling window.
 
     Re-uses the heavy aggregation code path verbatim by calling the route
     function with stub Request and bypassed auth dep.  This guarantees the
     snapshot is byte-equivalent to what the live endpoint would return for
-    the dashboard's default page-load query.
+    the requested ``[now-window, now]`` query.
 
-    To keep the push payload bounded the embedded ``raw_events`` list is
-    capped to the most recent ``RAW_EVENTS_CAP`` rows — the dashboard only
-    renders a sliding window of recent decodes from this list, so older
-    rows are not visually used.
+    The embedded ``raw_events`` list is capped to ``raw_cap`` to keep the
+    overall push payload under shared-hosting POST limits.
     """
     from types import SimpleNamespace
 
     from ..api.analytics import academic_analytics
     from ..version import APP_VERSION
 
+    end_dt = datetime.now(timezone.utc)
+    start_dt = end_dt - window
     fake_request = SimpleNamespace(app=SimpleNamespace(version=APP_VERSION))
     result = academic_analytics(
         request=fake_request,  # type: ignore[arg-type]
-        start=None,
-        end=None,
+        start=start_dt.isoformat(),
+        end=end_dt.isoformat(),
         band=None,
         mode=None,
-        bucket="hour",
+        bucket=bucket,
         _=False,
     )
     data = result.get("data") or {}
     raw = data.get("raw_events")
-    if isinstance(raw, list) and len(raw) > RAW_EVENTS_CAP:
-        # Sort by timestamp desc, keep the most recent N.
+    if isinstance(raw, list) and len(raw) > raw_cap:
         raw_sorted = sorted(
             raw,
             key=lambda r: str(r.get("timestamp") or ""),
             reverse=True,
         )
-        data["raw_events"] = raw_sorted[:RAW_EVENTS_CAP]
+        data["raw_events"] = raw_sorted[:raw_cap]
         data["raw_events_truncated"] = True
         data["raw_events_total"] = len(raw)
     return result
+
+
+def _snapshot_analytics_academic() -> Dict[str, Any]:
+    """Default 7-day / hour snapshot (back-compat for old PHP shim)."""
+    return _build_academic_window(
+        window=timedelta(days=7), bucket="hour", raw_cap=RAW_EVENTS_CAP
+    )
+
+
+def _snapshot_analytics_academic_1h() -> Dict[str, Any]:
+    return _build_academic_window(
+        window=timedelta(hours=1), bucket="minute", raw_cap=RAW_EVENTS_CAP
+    )
+
+
+def _snapshot_analytics_academic_24h() -> Dict[str, Any]:
+    return _build_academic_window(
+        window=timedelta(hours=24), bucket="hour", raw_cap=RAW_EVENTS_CAP
+    )
+
+
+def _snapshot_analytics_academic_7d() -> Dict[str, Any]:
+    return _build_academic_window(
+        window=timedelta(days=7), bucket="hour", raw_cap=RAW_EVENTS_CAP
+    )
+
+
+def _snapshot_analytics_academic_30d() -> Dict[str, Any]:
+    # 30d uses ``day`` bucket so the series stays small; raw events are
+    # capped to the most recent rows like the other windows.
+    return _build_academic_window(
+        window=timedelta(days=30), bucket="day", raw_cap=RAW_EVENTS_CAP
+    )
 
 
 # Hard cap on raw_events embedded in the analytics snapshot.  Keeps push
@@ -283,6 +324,10 @@ def build_snapshot_bundle() -> Dict[str, Dict[str, Any]]:
         (ENDPOINT_MAP_IONOSPHERIC, _snapshot_map_ionospheric),
         (ENDPOINT_MAP_CONTACTS, _snapshot_map_contacts),
         (ENDPOINT_ANALYTICS_ACADEMIC, _snapshot_analytics_academic),
+        (ENDPOINT_ANALYTICS_ACADEMIC_1H, _snapshot_analytics_academic_1h),
+        (ENDPOINT_ANALYTICS_ACADEMIC_24H, _snapshot_analytics_academic_24h),
+        (ENDPOINT_ANALYTICS_ACADEMIC_7D, _snapshot_analytics_academic_7d),
+        (ENDPOINT_ANALYTICS_ACADEMIC_30D, _snapshot_analytics_academic_30d),
     )
     captured_at = _now_iso()
     for key, fn in builders:
@@ -300,5 +345,9 @@ __all__ = [
     "ENDPOINT_MAP_IONOSPHERIC",
     "ENDPOINT_MAP_CONTACTS",
     "ENDPOINT_ANALYTICS_ACADEMIC",
+    "ENDPOINT_ANALYTICS_ACADEMIC_1H",
+    "ENDPOINT_ANALYTICS_ACADEMIC_24H",
+    "ENDPOINT_ANALYTICS_ACADEMIC_7D",
+    "ENDPOINT_ANALYTICS_ACADEMIC_30D",
     "build_snapshot_bundle",
 ]

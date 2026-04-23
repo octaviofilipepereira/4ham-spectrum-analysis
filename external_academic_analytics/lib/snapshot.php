@@ -13,7 +13,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 
-function fourham_snapshot_serve(string $endpointKey): void {
+/**
+ * Try a list of endpoint keys in order and serve the first one that has
+ * a stored snapshot. Used by the academic shim which prefers a
+ * window-specific snapshot (e.g. ``analytics/academic/1h``) but falls
+ * back to the legacy generic key when older home backends only push
+ * the single 7d snapshot.
+ */
+function fourham_snapshot_serve_keys(array $endpointKeys): void {
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
     header('Cache-Control: no-store');
@@ -31,50 +38,62 @@ function fourham_snapshot_serve(string $endpointKey): void {
         return;
     }
 
-    // If a single mirror is the canonical source, allow override via config.
     $mirror = isset($_GET['mirror']) ? trim((string)$_GET['mirror']) : '';
-    $sql = 'SELECT payload_json, captured_at, mirror_name
-              FROM mirror_endpoint_snapshots
-             WHERE endpoint = :e';
-    $params = [':e' => $endpointKey];
-    if ($mirror !== '') {
-        $sql .= ' AND mirror_name = :m';
-        $params[':m'] = $mirror;
+    $row = null;
+    $usedKey = '';
+    foreach ($endpointKeys as $endpointKey) {
+        $sql = 'SELECT payload_json, captured_at, mirror_name
+                  FROM mirror_endpoint_snapshots
+                 WHERE endpoint = :e';
+        $params = [':e' => $endpointKey];
+        if ($mirror !== '') {
+            $sql .= ' AND mirror_name = :m';
+            $params[':m'] = $mirror;
+        }
+        $sql .= ' ORDER BY captured_at DESC, mirror_name ASC LIMIT 1';
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $candidate = $stmt->fetch();
+        } catch (Throwable $e) {
+            http_response_code(503);
+            echo json_encode([
+                'status' => 'error',
+                'error' => 'db_query',
+                'detail' => $e->getMessage(),
+            ]);
+            return;
+        }
+        if ($candidate && isset($candidate['payload_json'])) {
+            $row = $candidate;
+            $usedKey = $endpointKey;
+            break;
+        }
     }
-    $sql .= ' ORDER BY captured_at DESC, mirror_name ASC LIMIT 1';
 
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $row = $stmt->fetch();
-    } catch (Throwable $e) {
-        http_response_code(503);
-        echo json_encode([
-            'status' => 'error',
-            'error' => 'db_query',
-            'detail' => $e->getMessage(),
-        ]);
-        return;
-    }
-
-    if (!$row || !isset($row['payload_json'])) {
+    if (!$row) {
         http_response_code(404);
         echo json_encode([
             'status' => 'error',
             'error' => 'snapshot_unavailable',
-            'endpoint' => $endpointKey,
+            'endpoint' => $endpointKeys[0] ?? '',
         ]);
         return;
     }
 
-    // Forward upstream snapshot age as a debug header.
     if (!empty($row['captured_at'])) {
         header('X-4HAM-Snapshot-Captured-At: ' . $row['captured_at']);
     }
     if (!empty($row['mirror_name'])) {
         header('X-4HAM-Snapshot-Mirror: ' . $row['mirror_name']);
     }
+    if ($usedKey !== '') {
+        header('X-4HAM-Snapshot-Endpoint: ' . $usedKey);
+    }
 
-    // Payload is already valid JSON produced by the backend — emit it raw.
     echo $row['payload_json'];
+}
+
+function fourham_snapshot_serve(string $endpointKey): void {
+    fourham_snapshot_serve_keys([$endpointKey]);
 }
