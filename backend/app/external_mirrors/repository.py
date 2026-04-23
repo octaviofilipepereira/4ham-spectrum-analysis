@@ -49,6 +49,14 @@ def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _row_field(row: sqlite3.Row, key: str) -> Optional[Any]:
+    """Return ``row[key]`` if the column exists, else ``None`` (defensive)."""
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return None
+
+
 class MirrorNotFoundError(LookupError):
     """Raised when a mirror id/name does not exist."""
 
@@ -75,6 +83,7 @@ class ExternalMirror:
     created_at: str
     created_by: str
     updated_at: Optional[str]
+    display_name: Optional[str] = None
 
     def to_public_dict(self) -> Dict[str, Any]:
         """Serialise excluding the auth token hash."""
@@ -107,6 +116,7 @@ def _row_to_mirror(row: sqlite3.Row) -> ExternalMirror:
         created_at=row["created_at"],
         created_by=row["created_by"],
         updated_at=row["updated_at"],
+        display_name=_row_field(row, "display_name"),
     )
 
 
@@ -208,6 +218,7 @@ class ExternalMirrorRepository:
         data_scopes: Optional[Iterable[str]] = None,
         retention_days: Optional[int] = None,
         enabled: bool = True,
+        display_name: Optional[str] = None,
     ) -> CreateMirrorResult:
         name = (name or "").strip()
         endpoint_url = (endpoint_url or "").strip()
@@ -218,6 +229,10 @@ class ExternalMirrorRepository:
             raise ValueError("endpoint_url is required")
         if push_interval_seconds < 10:
             raise ValueError("push_interval_seconds must be >= 10")
+
+        display_name = (display_name or "").strip() or None
+        if display_name is not None and len(display_name) > 200:
+            raise ValueError("display_name must be <= 200 chars")
 
         scopes_list = list(data_scopes) if data_scopes else []
         scopes_json = json.dumps(scopes_list)
@@ -233,8 +248,8 @@ class ExternalMirrorRepository:
                         name, endpoint_url, auth_token_hash, enabled,
                         push_interval_seconds, data_scopes, retention_days,
                         last_push_watermark, consecutive_failures,
-                        created_at, created_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+                        created_at, created_by, display_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
                     """,
                     (
                         name,
@@ -246,6 +261,7 @@ class ExternalMirrorRepository:
                         int(retention_days) if retention_days is not None else None,
                         now,
                         created_by,
+                        display_name,
                     ),
                 )
                 self._conn.commit()
@@ -314,6 +330,7 @@ class ExternalMirrorRepository:
         "data_scopes",
         "retention_days",
         "enabled",
+        "display_name",
     }
 
     def update(
@@ -387,6 +404,15 @@ class ExternalMirrorRepository:
                         assignments.append("endpoint_url = ?")
                         params.append(new_value)
                         diff[key] = {"from": current.endpoint_url, "to": new_value}
+                elif key == "display_name":
+                    new_value = (new_value or "").strip() or None
+                    if new_value is not None and len(new_value) > 200:
+                        raise ValueError("display_name must be <= 200 chars")
+                    old_value = current.display_name
+                    if old_value != new_value:
+                        assignments.append("display_name = ?")
+                        params.append(new_value)
+                        diff[key] = {"from": old_value, "to": new_value}
 
             if not assignments:
                 return current

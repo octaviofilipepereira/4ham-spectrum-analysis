@@ -904,12 +904,22 @@ Last update: 2026-02-22 16:27:19 UTC
             <input type="hidden" id="mirrorFormId" value="" />
             <div class="row g-2">
               <div class="col-12 col-md-6">
-                <label class="form-label">Name</label>
-                <input type="text" id="mirrorFormName" class="form-control form-control-sm" placeholder="primary" required />
+                <label class="form-label">Display name</label>
+                <input type="text" id="mirrorFormDisplayName" class="form-control form-control-sm" placeholder="ARC \u2014 Associa\u00e7\u00e3o de R\u00e1dioamadores de Coimbra" maxlength="200" />
+                <small class="form-text text-muted">Friendly label shown in the UI. Any text accepted.</small>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Identifier (slug)</label>
+                <input type="text" id="mirrorFormName" class="form-control form-control-sm" placeholder="arc-coimbra" pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}" required />
+                <small class="form-text text-muted">Auto-filled from display name. ASCII letters, digits, <code>_ . -</code>. Used in HTTP headers; cannot be changed later.</small>
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label">Push interval (s)</label>
                 <input type="number" id="mirrorFormInterval" class="form-control form-control-sm" value="300" min="10" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Retention (days, optional)</label>
+                <input type="number" id="mirrorFormRetention" class="form-control form-control-sm" min="1" placeholder="(unset)" />
               </div>
               <div class="col-12">
                 <label class="form-label">Endpoint URL</label>
@@ -925,10 +935,6 @@ Last update: 2026-02-22 16:27:19 UTC
                   <input type="checkbox" class="form-check-input mirror-scope" id="mirrorScopeOccupancy" value="occupancy_events" checked />
                   <label class="form-check-label" for="mirrorScopeOccupancy">Occupancy events</label>
                 </div>
-              </div>
-              <div class="col-12 col-md-6">
-                <label class="form-label">Retention (days, optional)</label>
-                <input type="number" id="mirrorFormRetention" class="form-control form-control-sm" min="1" placeholder="(unset)" />
               </div>
               <div class="col-12 col-md-6 d-flex align-items-end">
                 <div class="form-check">

@@ -184,6 +184,9 @@ class Database:
         self._add_column("callsign_events", "crest_db REAL")
         # Encrypted-at-rest plaintext mirror token (for restart-safe pusher).
         self._add_column("external_mirrors", "auth_token_ciphertext TEXT")
+        # Free-form Unicode label for the Admin UI (the slug-style ``name`` stays
+        # as the technical identifier sent in headers and used in config files).
+        self._add_column("external_mirrors", "display_name TEXT")
 
     def _add_column(self, table, column_def):
         try:

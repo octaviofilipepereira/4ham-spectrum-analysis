@@ -77,6 +77,7 @@ def create_mirror(
             data_scopes=payload.get("data_scopes") or [],
             retention_days=payload.get("retention_days"),
             enabled=bool(payload.get("enabled", True)),
+            display_name=payload.get("display_name"),
         )
     except MirrorNameConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

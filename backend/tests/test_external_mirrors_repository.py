@@ -106,6 +106,43 @@ def test_unique_name_constraint(repo):
         _make(repo, name="dup")
 
 
+def test_display_name_create_update_and_default(repo):
+    # Default: no display_name → None.
+    plain = _make(repo, name="plain")
+    assert plain.mirror.display_name is None
+
+    # Create with Unicode display_name.
+    pretty = repo.create(
+        name="arc-coimbra",
+        endpoint_url="https://example.com/i.php",
+        created_by="admin",
+        display_name="ARC — Associação de Rádioamadores de Coimbra",
+    )
+    assert pretty.mirror.display_name == "ARC — Associação de Rádioamadores de Coimbra"
+
+    # Update to a new label.
+    upd = repo.update(
+        pretty.mirror.id,
+        actor="admin",
+        display_name="ARC Coimbra (CT1ABC)",
+    )
+    assert upd.display_name == "ARC Coimbra (CT1ABC)"
+
+    # Clear with empty string → stored as None.
+    cleared = repo.update(pretty.mirror.id, actor="admin", display_name="")
+    assert cleared.display_name is None
+
+
+def test_display_name_length_limit(repo):
+    with pytest.raises(ValueError):
+        repo.create(
+            name="too-long",
+            endpoint_url="https://example.com/i.php",
+            created_by="admin",
+            display_name="x" * 201,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Read
 # ---------------------------------------------------------------------------

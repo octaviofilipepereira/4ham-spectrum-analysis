@@ -74,6 +74,22 @@ export function initExternalMirrorsUI(deps = {}) {
   if (saveBtn) {
     saveBtn.addEventListener("click", () => submitForm());
   }
+
+  // Auto-fill the slug from the friendly display name. The user can still
+  // override it manually; once they edit the slug field directly we stop
+  // mirroring (tracked via data-user-edited).
+  const displayEl = document.getElementById("mirrorFormDisplayName");
+  const nameEl = document.getElementById("mirrorFormName");
+  if (displayEl && nameEl) {
+    displayEl.addEventListener("input", () => {
+      if (nameEl.disabled) return; // edit mode: name is immutable
+      if (nameEl.dataset.userEdited === "1") return;
+      nameEl.value = slugify(displayEl.value);
+    });
+    nameEl.addEventListener("input", () => {
+      nameEl.dataset.userEdited = "1";
+    });
+  }
 }
 
 async function apiCall(path, options = {}) {
@@ -225,8 +241,9 @@ function renderRow(m) {
       </div>
     </td>`;
   const cells = tr.children;
-  cells[0].querySelector("strong").textContent = m.name;
-  cells[0].querySelector("small").textContent = fmtScopes(m.data_scopes);
+  cells[0].querySelector("strong").textContent = m.display_name || m.name;
+  cells[0].querySelector("small").textContent =
+    (m.display_name ? m.name + " \u00b7 " : "") + fmtScopes(m.data_scopes);
   cells[1].querySelector("code").textContent = m.endpoint_url;
   cells[2].querySelector("span").textContent = `${m.push_interval_seconds}s`;
   cells[3].querySelector("span").textContent = fmtDate(m.last_push_at);
@@ -303,10 +320,27 @@ async function handleRowAction(mirror, action) {
   }
 }
 
+function slugify(value) {
+  if (!value) return "";
+  let s;
+  try {
+    s = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  } catch (_) {
+    s = value;
+  }
+  s = s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!s) return "";
+  if (!/^[a-z0-9]/.test(s)) s = "m-" + s;
+  return s.slice(0, 64);
+}
+
 function resetForm() {
   document.getElementById("mirrorFormId").value = "";
+  const displayEl = document.getElementById("mirrorFormDisplayName");
+  if (displayEl) displayEl.value = "";
   document.getElementById("mirrorFormName").value = "";
   document.getElementById("mirrorFormName").disabled = false;
+  document.getElementById("mirrorFormName").dataset.userEdited = "";
   document.getElementById("mirrorFormEndpoint").value = "";
   document.getElementById("mirrorFormInterval").value = "300";
   document.getElementById("mirrorFormRetention").value = "";
@@ -326,10 +360,14 @@ function openCreateForm() {
 
 function openEditForm(mirror) {
   resetForm();
-  document.getElementById("mirrorFormTitle").textContent = `Edit Mirror — ${mirror.name}`;
+  const label = mirror.display_name || mirror.name;
+  document.getElementById("mirrorFormTitle").textContent = `Edit Mirror \u2014 ${label}`;
   document.getElementById("mirrorFormId").value = String(mirror.id);
+  const displayEl = document.getElementById("mirrorFormDisplayName");
+  if (displayEl) displayEl.value = mirror.display_name || "";
   document.getElementById("mirrorFormName").value = mirror.name;
   document.getElementById("mirrorFormName").disabled = true; // name immutable post-create
+  document.getElementById("mirrorFormName").dataset.userEdited = "1";
   document.getElementById("mirrorFormEndpoint").value = mirror.endpoint_url;
   document.getElementById("mirrorFormInterval").value = String(mirror.push_interval_seconds);
   document.getElementById("mirrorFormRetention").value = mirror.retention_days ?? "";
@@ -351,6 +389,8 @@ function collectScopes() {
 
 async function submitForm() {
   const id = document.getElementById("mirrorFormId").value.trim();
+  const displayEl = document.getElementById("mirrorFormDisplayName");
+  const displayName = displayEl ? displayEl.value.trim() : "";
   const name = document.getElementById("mirrorFormName").value.trim();
   const endpoint = document.getElementById("mirrorFormEndpoint").value.trim();
   const interval = parseInt(document.getElementById("mirrorFormInterval").value, 10);
@@ -376,6 +416,7 @@ async function submitForm() {
     push_interval_seconds: interval,
     data_scopes: scopes,
     enabled,
+    display_name: displayName || null,
   };
   if (retentionRaw) {
     const r = parseInt(retentionRaw, 10);
@@ -416,7 +457,7 @@ async function submitForm() {
 async function openAudit(mirror) {
   const nameEl = document.getElementById("mirrorAuditName");
   const body = document.getElementById("mirrorAuditBody");
-  if (nameEl) nameEl.textContent = mirror.name;
+  if (nameEl) nameEl.textContent = mirror.display_name || mirror.name;
   if (body) body.innerHTML = '<tr><td colspan="4" class="text-muted">Loading…</td></tr>';
   if (mirrorAuditModal) mirrorAuditModal.show();
   try {
