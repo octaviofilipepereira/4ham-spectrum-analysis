@@ -271,9 +271,14 @@ def _build_academic_window(
 
 
 def _snapshot_analytics_academic() -> Dict[str, Any]:
-    """Default 7-day / hour snapshot (back-compat for old PHP shim)."""
+    """Default 7-day / hour snapshot (back-compat for old PHP shim).
+
+    Capped tighter than the per-window builders so we don't ship the same
+    raw events twice in a single push (the per-window 7d builder already
+    contains them).
+    """
     return _build_academic_window(
-        window=timedelta(days=7), bucket="hour", raw_cap=RAW_EVENTS_CAP
+        window=timedelta(days=7), bucket="hour", raw_cap=200
     )
 
 
@@ -285,21 +290,23 @@ def _snapshot_analytics_academic_1h() -> Dict[str, Any]:
 
 def _snapshot_analytics_academic_24h() -> Dict[str, Any]:
     return _build_academic_window(
-        window=timedelta(hours=24), bucket="hour", raw_cap=RAW_EVENTS_CAP
+        window=timedelta(hours=24), bucket="hour", raw_cap=800
     )
 
 
 def _snapshot_analytics_academic_7d() -> Dict[str, Any]:
     return _build_academic_window(
-        window=timedelta(days=7), bucket="hour", raw_cap=RAW_EVENTS_CAP
+        window=timedelta(days=7), bucket="hour", raw_cap=500
     )
 
 
 def _snapshot_analytics_academic_30d() -> Dict[str, Any]:
     # 30d uses ``day`` bucket so the series stays small; raw events are
-    # capped to the most recent rows like the other windows.
+    # heavily capped because this view is only used for the long-term
+    # macro chart and we must keep the push payload under the receiver's
+    # PHP ``post_max_size``.
     return _build_academic_window(
-        window=timedelta(days=30), bucket="day", raw_cap=RAW_EVENTS_CAP
+        window=timedelta(days=30), bucket="day", raw_cap=300
     )
 
 
