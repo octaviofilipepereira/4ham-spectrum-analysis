@@ -495,6 +495,30 @@ class ExternalMirrorRepository:
         return verify_password(plaintext_token or "", row["auth_token_hash"])
 
     # ------------------------------------------------------------------
+    # Encrypted plaintext-token persistence (used by TokenCache + vault)
+    # ------------------------------------------------------------------
+    def set_token_ciphertext(
+        self, mirror_id: int, ciphertext: Optional[str]
+    ) -> None:
+        """Persist (or clear) the Fernet ciphertext of the plaintext token."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE external_mirrors SET auth_token_ciphertext = ? WHERE id = ?",
+                (ciphertext, int(mirror_id)),
+            )
+            self._conn.commit()
+
+    def iter_token_ciphertexts(self) -> List[tuple]:
+        """Return [(mirror_id, ciphertext), ...] for every mirror with a stored ciphertext."""
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT id, auth_token_ciphertext FROM external_mirrors "
+                "WHERE auth_token_ciphertext IS NOT NULL AND auth_token_ciphertext <> ''"
+            )
+            rows = cur.fetchall()
+        return [(int(r["id"]), r["auth_token_ciphertext"]) for r in rows]
+
+    # ------------------------------------------------------------------
     # Push bookkeeping
     # ------------------------------------------------------------------
     def update_after_push(

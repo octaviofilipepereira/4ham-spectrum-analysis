@@ -177,9 +177,31 @@ async def lifespan(app_instance: FastAPI):
             ExternalMirrorRepository,
             TokenCache,
         )
+        from app.external_mirrors.token_vault import TokenVault
         from app.external_mirrors import registry as mirrors_registry
         _mirror_repo = ExternalMirrorRepository(_state.db)
-        _mirror_token_cache = TokenCache()
+        _mirror_vault = TokenVault.from_env()
+        _vault_source = "MIRRORS_MASTER_KEY env"
+        if _mirror_vault is None:
+            from pathlib import Path as _Path
+            _data_dir = _Path(_state.db.path).parent
+            _mirror_vault = TokenVault.from_data_dir(_data_dir)
+            _vault_source = f"{_data_dir}/.mirrors_master.key"
+        _mirror_token_cache = TokenCache(
+            repository=_mirror_repo, vault=_mirror_vault
+        )
+        if _mirror_vault is not None:
+            n_loaded = _mirror_token_cache.load_persisted()
+            _log.info(
+                "External mirrors token vault enabled (%s); %d persisted token(s) loaded.",
+                _vault_source,
+                n_loaded,
+            )
+        else:
+            _log.warning(
+                "External mirrors token vault unavailable; tokens are memory-only "
+                "(rotate-token required after each restart)."
+            )
         _mirror_pusher = ExternalMirrorPusher(
             repo=_mirror_repo,
             token_cache=_mirror_token_cache,

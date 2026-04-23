@@ -34,6 +34,7 @@ from typing import Dict, Optional
 from .http_client import MirrorHttpClient, PushResult
 from .payload import build_payload, has_new_data
 from .repository import ExternalMirror, ExternalMirrorRepository
+from .token_vault import TokenVault
 
 logger = logging.getLogger(__name__)
 
@@ -41,27 +42,75 @@ DEFAULT_TICK_SECONDS = 15.0
 
 
 class TokenCache:
-    """In-memory mapping mirror_id -> plaintext token."""
+    """In-memory mapping mirror_id -> plaintext token.
 
-    def __init__(self) -> None:
+    When constructed with both ``repository`` and ``vault``, the cache also
+    persists the encrypted plaintext alongside each mirror so that the pusher
+    survives backend restarts without operator intervention. With either
+    missing it degrades to memory-only (legacy behaviour).
+    """
+
+    def __init__(
+        self,
+        *,
+        repository: Optional[ExternalMirrorRepository] = None,
+        vault: Optional[TokenVault] = None,
+    ) -> None:
         self._tokens: Dict[int, str] = {}
         self._lock = threading.Lock()
+        self._repo = repository
+        self._vault = vault
 
     def set(self, mirror_id: int, token: str) -> None:
+        mid = int(mirror_id)
         with self._lock:
-            self._tokens[int(mirror_id)] = token
+            self._tokens[mid] = token
+        if self._repo is not None and self._vault is not None:
+            try:
+                self._repo.set_token_ciphertext(mid, self._vault.encrypt(token))
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(
+                    "Failed to persist encrypted token for mirror %d: %s", mid, exc
+                )
 
     def get(self, mirror_id: int) -> Optional[str]:
         with self._lock:
             return self._tokens.get(int(mirror_id))
 
     def drop(self, mirror_id: int) -> None:
+        mid = int(mirror_id)
         with self._lock:
-            self._tokens.pop(int(mirror_id), None)
+            self._tokens.pop(mid, None)
+        if self._repo is not None:
+            try:
+                self._repo.set_token_ciphertext(mid, None)
+            except Exception:  # pragma: no cover - defensive
+                pass
 
     def known_ids(self) -> set:
         with self._lock:
             return set(self._tokens.keys())
+
+    def load_persisted(self) -> int:
+        """Decrypt and load any persisted plaintext tokens. Returns count loaded."""
+        if self._repo is None or self._vault is None:
+            return 0
+        loaded = 0
+        for mirror_id, ciphertext in self._repo.iter_token_ciphertexts():
+            try:
+                plaintext = self._vault.decrypt(ciphertext)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to decrypt persisted token for mirror %d (%s) \u2014 "
+                    "rotate from Admin to re-arm.",
+                    mirror_id,
+                    exc.__class__.__name__,
+                )
+                continue
+            with self._lock:
+                self._tokens[int(mirror_id)] = plaintext
+            loaded += 1
+        return loaded
 
 
 class ExternalMirrorPusher:

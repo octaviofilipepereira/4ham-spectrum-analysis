@@ -182,6 +182,8 @@ class Database:
         self._add_column("callsign_events", "power_dbm REAL")
         self._add_column("occupancy_events", "crest_db REAL")
         self._add_column("callsign_events", "crest_db REAL")
+        # Encrypted-at-rest plaintext mirror token (for restart-safe pusher).
+        self._add_column("external_mirrors", "auth_token_ciphertext TEXT")
 
     def _add_column(self, table, column_def):
         try:
