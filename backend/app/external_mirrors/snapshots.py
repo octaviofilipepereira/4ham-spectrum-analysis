@@ -329,12 +329,11 @@ def build_snapshot_bundle() -> Dict[str, Dict[str, Any]]:
         (ENDPOINT_SCAN_STATUS, _snapshot_scan_status),
         (ENDPOINT_SETTINGS, _snapshot_settings),
         (ENDPOINT_MAP_IONOSPHERIC, _snapshot_map_ionospheric),
-        (ENDPOINT_MAP_CONTACTS, _snapshot_map_contacts),
-        (ENDPOINT_ANALYTICS_ACADEMIC, _snapshot_analytics_academic),
-        (ENDPOINT_ANALYTICS_ACADEMIC_1H, _snapshot_analytics_academic_1h),
-        (ENDPOINT_ANALYTICS_ACADEMIC_24H, _snapshot_analytics_academic_24h),
-        (ENDPOINT_ANALYTICS_ACADEMIC_7D, _snapshot_analytics_academic_7d),
-        (ENDPOINT_ANALYTICS_ACADEMIC_30D, _snapshot_analytics_academic_30d),
+        # NOTE: map/contacts and analytics/academic* are NOT pre-computed
+        # anymore. The receiver PHP shims now query mirror_callsign_events
+        # directly so the dashboard period selector returns real-time
+        # results. This keeps the per-push payload tiny (only kbytes of
+        # version/scan/settings/ionospheric snapshots + delta events).
     )
     captured_at = _now_iso()
     for key, fn in builders:
