@@ -7,9 +7,9 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
-## v0.14.0 - 2026-04-22 (unstable)
+## v0.14.0 - 2026-04-23 (unstable)
 
-### Added — External Mirrors (push replication)
+### Added — External Mirrors (push replication) + Public Dashboard mirror
 - **New module `backend/app/external_mirrors/`** — push selected dashboard data
   (callsign + occupancy events) to one or more remote PHP/MySQL hosts over
   HTTPS, eliminating the need for inbound port-forwarding on the production
@@ -25,6 +25,18 @@ Last update: 2026-04-18 UTC
   - Background pusher loop (`pusher.py`, default tick = 15 s) integrated into
     the FastAPI app lifespan; auto-disables a mirror after 5 consecutive
     failures.
+- **Snapshot bundler** (`backend/app/external_mirrors/snapshots.py`) — every
+  push payload now embeds pre-computed JSON bodies for the read-only API
+  endpoints used by the public dashboard (`version`, `scan/status`,
+  `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`).
+  Builders invoke the live FastAPI route functions in-process, so the JSON
+  is byte-equivalent to what the home backend would serve. Builders that
+  fail are silently skipped; failure of any builder never breaks the push.
+  - `settings` snapshot uses a public projection (strips
+    `auth/aprs/lora_aprs/asr/device_config/audio_config`).
+  - `analytics/academic` snapshot caps embedded `raw_events` at 1500 rows
+    to keep push payload under 8 MB shared-hosting limits; the dashboard
+    only renders a sliding window so older rows are not user-visible.
 - **Admin REST API** at `/api/admin/mirrors` (Basic-auth protected): list,
   create, edit, enable/disable, rotate-token, test, delete and audit-log
   endpoints. Plaintext tokens are returned ONLY at create / rotate-token
@@ -33,15 +45,30 @@ Last update: 2026-04-18 UTC
   add/edit form, one-time token alert, per-row enable/disable, rotate-token,
   test push and audit log viewer.
 - **PHP/MySQL receiver** in `external_academic_analytics/` for shared
-  hosting (PHP 7.4+, PDO_mysql only). Includes MySQL schema, idempotent
-  `INSERT IGNORE` ingest endpoint, HMAC + nonce + clock-skew verification,
-  IP allowlist, audit log and read-only `events.php` / `status.php` / `version.php`
-  helpers. See `external_academic_analytics/README.md` for deployment.
+  hosting (PHP 7.4+, PDO_mysql only). Includes:
+  - MySQL schema with `mirror_callsign_events`, `mirror_occupancy_events`,
+    `mirror_endpoint_snapshots`, `mirror_push_audit`, `mirror_seen_nonces`.
+  - Idempotent `INSERT IGNORE` ingest endpoint with HMAC + nonce +
+    clock-skew verification, IP allowlist and audit log.
+  - 7 read-only API shims under `api/` (`version`, `scan/status`,
+    `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`,
+    `events`) — 6 serve verbatim snapshot JSON, `events` reads live SQL
+    over the mirrored event tables.
+  - `index.html` = verbatim copy of `frontend/4ham_academic_analytics.html`
+    + vendored Leaflet/D3/TopoJSON/XLSX assets and i18n JSON, providing a
+    fully public, read-only replica of the Academic Analytics dashboard
+    (max 5 min staleness, no WebSocket, no admin surface).
+  - `api/.htaccess` extension-less routing; `Header` directive guarded by
+    `<IfModule mod_headers.c>` for hosts without `mod_headers`.
+  See `external_academic_analytics/README.md` for deployment.
 - **Documentation**: new `docs/external_mirrors.md` covering architecture,
-  security model, admin UI walkthrough and receiver deployment.
+  snapshot bundle, security model, admin UI walkthrough, receiver
+  deployment and the public dashboard mirror.
 
 ### Changed
 - **Version bump** to v0.14.0 across backend (`APP_VERSION`).
+- Receiver folder renamed from `external_academic_analytics_mirror/` to
+  `external_academic_analytics/` to match the production deployment path.
 
 ---
 

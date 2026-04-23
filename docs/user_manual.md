@@ -724,102 +724,90 @@ A retenção corre no máximo uma vez por dia e pode ser acionada manualmente no
 
 ## Incorporar o Dashboard Académico num Website Externo
 
-O dashboard Academic Analytics (`4ham_academic_analytics.html`) pode ser incorporado num website externo para que os visitantes possam visualizar dados de propagação sem aceder directamente ao servidor 4HAM. Isto é feito através de um **reverse proxy** que encaminha os pedidos API do website público para o backend 4HAM privado.
+Desde a v0.14.0, o 4HAM inclui um mecanismo de **espelho push** que publica
+uma réplica totalmente read-only do dashboard Academic Analytics em
+qualquer alojamento partilhado PHP+MySQL, sem expor o backend doméstico à
+Internet e sem necessidade de reverse proxy.
 
-### Arquitectura
+### Arquitectura (modo push)
 
 ```
 Browser do visitante
     │
     ▼
-Servidor web externo (ex. exemplo.pt)
-    ├── index.html / index.php    ← serve a página do dashboard
-    └── /api/*                    ← reverse proxy para o backend 4HAM
-            │
-            ▼
-    Backend 4HAM (ex. 192.168.1.x:8000)
+Servidor partilhado externo (ex. https://cs5arc.pt/external_academic_analytics/)
+    ├── index.html                ← o dashboard Academic Analytics
+    ├── api/version|scan/status|settings|map/*|analytics/academic
+    │                              ← devolvem JSON snapshot lido do MySQL
+    ├── api/events                ← SQL ao vivo sobre tabelas de eventos espelhadas
+    └── ingest.php                ← recebe pushes assinados do backend doméstico
+                                       ▲
+                                       │  HTTPS POST a cada push_interval_seconds
+                                       │  (default 300 s = 5 minutos)
+                                       │  HMAC-SHA256 + nonce + janela de skew
+Backend 4HAM doméstico (LAN privada, SEM portas abertas para fora)
+    └── pusher loop em external_mirrors
 ```
 
-O servidor externo necessita de:
-1. Uma página que carregue o dashboard Academic Analytics
-2. Uma regra de reverse proxy que encaminhe pedidos `/api/` para o backend 4HAM
+A cada 5 minutos (default) o backend doméstico envia, por POST assinado,
+um bundle JSON com novos eventos **e** com o JSON pré-calculado de cada
+endpoint read-only que o dashboard consome. O receptor faz UPSERT de
+cada snapshot na tabela `mirror_endpoint_snapshots` e o shim PHP
+correspondente devolve-o tal e qual. Latência fim-a-fim: **no máximo um
+intervalo de push**.
 
-### Opção A — Apache + PHP
+### Setup
 
-**1. Criar `config.php`** com o URL do backend 4HAM:
+1. **Configurar o receptor** no alojamento partilhado:
+   - Carregar a pasta `external_academic_analytics/` para um webroot
+     (ex. `https://exemplo.pt/external_academic_analytics/`) usando
+     `rsync` ou cliente FTP.
+   - Aplicar o schema SQL: `mysql -u admin -p mydb < schema.sql`.
+   - Copiar `config.local.php.example` → `config.local.php`, definir
+     credenciais MySQL e deixar `mirrors[<name>]` em branco para já.
+   - Detalhes em `external_academic_analytics/README.md`.
 
-```php
-<?php
-$BACKEND_URL = "http://192.168.1.x:8000";  // IP e porta do servidor 4HAM
-```
+2. **Adicionar o espelho** na UI **Admin Config → External Mirrors**:
+   - *Nome*: slug ASCII curto (ex. `primary`).
+   - *Endpoint URL*: `https://exemplo.pt/external_academic_analytics/ingest.php`.
+   - *Push interval*: 300 s (default; mínimo 10 s).
+   - *Data scopes*: marcar `callsign_events` e `occupancy_events`.
+   - Ao gravar, **copiar o token plaintext** que aparece (apenas mostrado uma vez).
 
-**2. Criar `.htaccess`** com as regras de reverse proxy:
+3. **Colar o token** no `config.local.php` do receptor:
+   `'mirrors' => [ 'primary' => 'COLAR_TOKEN_AQUI' ]`.
 
-```apache
-RewriteEngine On
+4. **Clicar em "Test push"** na linha do espelho. Esperar HTTP 200.
 
-# Proxy dos pedidos API para o backend 4HAM
-RewriteRule ^api/(.*)$ http://192.168.1.x:8000/api/$1 [P,L]
+5. Após um ciclo de push (≤ 5 min) o dashboard em
+   `https://exemplo.pt/external_academic_analytics/` mostra exactamente
+   o mesmo que o dashboard local, com no máximo 5 minutos de atraso.
 
-# Proxy dos assets i18n e lib
-RewriteRule ^i18n/(.*)$ http://192.168.1.x:8000/i18n/$1 [P,L]
-RewriteRule ^lib/(.*)$ http://192.168.1.x:8000/lib/$1 [P,L]
-```
+### Modelo de segurança
 
-Requer módulos Apache: `mod_rewrite`, `mod_proxy`, `mod_proxy_http`.
+- O backend doméstico nunca aceita ligações de fora; só faz POSTs de saída.
+- Todos os pedidos vão assinados com HMAC-SHA256 sobre `timestamp + "\n" + nonce + "\n" + body`.
+- O receptor exige skew de relógio ±300 s e mantém uma cache de nonces
+  por espelho (protecção contra replay).
+- O snapshot `settings` usa uma **projecção pública** que remove
+  `auth/aprs/lora_aprs/asr/device_config/audio_config` — segredos e
+  configuração privada do operador nunca são publicados.
+- O receptor **não tem endpoints admin, não tem WebSocket, não tem
+  controlo do SDR**; é read-only por construção.
+- Tokens são bcrypt-hashed em repouso no backend doméstico; o plaintext
+  é mostrado UMA vez (criação / rotate-token).
 
-**3. Criar `index.php`** que obtém e serve o dashboard:
-
-```php
-<?php
-require_once 'config.php';
-$html = file_get_contents("$BACKEND_URL/4ham_academic_analytics.html");
-if ($html === false) {
-    http_response_code(502);
-    echo "Backend indisponível";
-    exit;
-}
-echo $html;
-```
-
-### Opção B — Nginx
-
-```nginx
-location /monitor/ {
-    # Servir a página do dashboard
-    location = /monitor/ {
-        proxy_pass http://192.168.1.x:8000/4ham_academic_analytics.html;
-    }
-
-    # Proxy para API, i18n e lib
-    location /monitor/api/ {
-        proxy_pass http://192.168.1.x:8000/api/;
-    }
-    location /monitor/i18n/ {
-        proxy_pass http://192.168.1.x:8000/i18n/;
-    }
-    location /monitor/lib/ {
-        proxy_pass http://192.168.1.x:8000/lib/;
-    }
-}
-```
-
-### Considerações de segurança
-
-- O reverse proxy expõe apenas os endpoints `/api/analytics/` e assets estáticos — o painel admin, controlos de scan e streams WebSocket **não** são proxied.
-- **Não** fazer proxy de `/api/auth/`, `/api/admin/`, `/api/scan/`, ou `/ws/`.
-- Considere adicionar rate limiting no servidor externo para prevenir abuso.
-- O backend 4HAM deve permanecer numa rede privada; apenas o servidor web externo necessita de acesso.
+Para o protocolo completo ver [`docs/external_mirrors.md`](external_mirrors.md).
 
 ### Resolução de problemas
 
 | Sintoma | Causa | Solução |
 |---|---|---|
-| Dashboard carrega mas não mostra dados | Proxy da API não funciona | Verificar que `/api/analytics/academic` retorna JSON a partir do URL externo |
-| 502 Bad Gateway | Backend 4HAM inacessível | Verificar que o backend está em execução e o URL/IP do proxy está correcto |
-| Aviso de conteúdo misto | Site externo usa HTTPS, backend usa HTTP | Garantir que o proxy trata a transição HTTP→HTTPS (o browser só vê o URL HTTPS externo) |
-| Erros CORS na consola | Pedidos directos browser→backend | Verificar que todos os pedidos API passam pelo proxy, não directamente para o IP do backend |
-| i18n / traduções não carregam | Regra de proxy para `/i18n/` em falta | Adicionar a regra de rewrite/proxy para i18n |
+| Endpoints `api/*` devolvem 404 `snapshot_unavailable` | Primeiro push ainda não chegou | Aguardar um intervalo (default 5 min) e refrescar |
+| Endpoints `api/*` devolvem HTTP 500 | Apache rejeitou directiva do `.htaccess` | Verificar `error_log` — confirmar que `mod_rewrite` está activo. `mod_headers` é opcional |
+| Espelho auto-desactivado após 5 falhas | Receptor inacessível / token errado | Confirmar URL do endpoint, colar o token correctamente, clicar "Enable" para resetar contador |
+| Payload de push excede `post_max_size` | Janela de 7 dias muito ocupada | Aumentar `post_max_size` no receptor, ou baixar `RAW_EVENTS_CAP` no `snapshots.py` |
+| Replay 409 no primeiro push após restart | Backend foi reiniciado a meio de um push | Inofensivo; o próximo push (em ≤ 15 s) terá sucesso |
 
 ---
 

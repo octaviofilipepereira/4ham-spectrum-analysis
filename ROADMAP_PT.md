@@ -64,6 +64,8 @@ Indicativo: CT7BFV
 | v0.12.3 | 2026-04-17 | Preset Scheduler (auto-rotação por hora do dia), validação de sobreposição, auto-start no boot |
 | v0.12.2 | 2026-04-12 | Split SNR KPI (Digital vs CW/SSB), limpeza dashboard, docs embedding externo |
 | v0.12.1 | 2026-04-12 | Redesenho Mapa Propagação QTH-Cêtrico, modelo ionosférico NOAA SWPC, painel clima espacial |
+| v0.13.3 | 2026-04-22 | Revisão completa da documentação (foco exclusivo no pipeline APRS suportado) |
+| v0.14.0 | 2026-04-23 | Replicação push External Mirrors + espelho público do dashboard (snapshot bundler, receptor PHP/MySQL, réplica read-only totalmente pública) |
 
 ---
 

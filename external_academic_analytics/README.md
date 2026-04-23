@@ -12,17 +12,51 @@ hosting where only `PDO_mysql` is available (e.g. cs5arc.pt, PHP 7.4+).
 
 ## Endpoints
 
+### Ingest + admin
+
 | Path          | Method | Auth                                  | Purpose                                     |
 | ------------- | ------ | ------------------------------------- | ------------------------------------------- |
-| `ingest.php`  | POST   | HMAC-SHA256 (`X-4HAM-Signature` etc.) | Receive a signed batch of events            |
+| `ingest.php`  | POST   | HMAC-SHA256 (`X-4HAM-Signature` etc.) | Receive a signed batch of events + snapshot bundle |
 | `status.php`  | GET    | none (public read-only summary)       | Per-mirror stats + last 50 push outcomes    |
 | `events.php`  | GET    | none (public read-only)               | Paginated query over mirrored event tables  |
 | `version.php` | GET    | none                                  | Receiver build/PHP/PDO info                 |
 
-`status.php` and `events.php` are read-only; if you want them private,
-front them with HTTP Basic auth at the web-server level.
+### Public dashboard (snapshot replicas of the home backend)
+
+The receiver also exposes the read-only API surface used by the home
+station's Academic Analytics dashboard, served from the
+`mirror_endpoint_snapshots` table that `ingest.php` UPSERTs on every
+push. The shims live under `api/` and respond with JSON that is
+byte-equivalent to what the home backend would serve, with at most
+one push interval (default 5 min) of staleness.
+
+| Path                            | Source                                                  |
+| ------------------------------- | ------------------------------------------------------- |
+| `api/version`                   | snapshot                                                |
+| `api/scan/status`               | snapshot                                                |
+| `api/settings`                  | snapshot (public projection — no auth/aprs/asr/device)  |
+| `api/map/ionospheric`           | snapshot                                                |
+| `api/map/contacts`              | snapshot                                                |
+| `api/analytics/academic`        | snapshot (raw_events capped @ 1500)                     |
+| `api/events`                    | live SQL over `mirror_*_events`                         |
+| `index.html`                    | dashboard (copy of `frontend/4ham_academic_analytics.html`) |
+| `i18n/academic_analytics.json`  | static                                                  |
+| `lib/*.{js,json}`               | static (D3, TopoJSON, XLSX, countries-110m)             |
+| `vendor/leaflet/*`              | static (Leaflet 1.x)                                    |
+
+Each shim is a 5-line PHP file that calls
+`fourham_snapshot_serve(<endpoint_key>)` from `lib/snapshot.php`.
+Optional `?mirror=<name>` query parameter selects a specific mirror when
+multiple home stations push to the same receiver.
+
+`status.php`, `events.php` and the `api/*` shims are all read-only; if
+you want them private, front them with HTTP Basic auth at the web-server
+level.
 
 ## Deployment
+
+The receiver bundle is the entire contents of this folder. Deploy it to
+a shared-hosting webroot via `rsync` or your FTP client of choice.
 
 1. **Database** — create a MySQL database and user, then load the schema:
 
@@ -30,8 +64,25 @@ front them with HTTP Basic auth at the web-server level.
    mysql -u admin -p fourham_mirror < schema.sql
    ```
 
+   Re-running the schema is idempotent (`CREATE TABLE IF NOT EXISTS`),
+   so it is safe to re-apply after upgrades that add new tables (e.g.
+   `mirror_endpoint_snapshots`).
+
 2. **Upload** the contents of this folder to the public web root, e.g.
-   `https://cs5arc.pt/4ham-mirror/`. Make sure `lib/` and
+   `https://cs5arc.pt/external_academic_analytics/`. Recommended:
+
+   ```bash
+   rsync -avz \
+     --exclude=config.local.php \
+     --exclude=logs/ \
+     --exclude=.gitignore \
+     --exclude=config.local.php.example \
+     external_academic_analytics/ \
+     youruser@yourhost:public_html/external_academic_analytics/
+   ```
+
+   The `--exclude=config.local.php` is critical: it preserves the
+   credentials file you wrote in step 3. Make sure `lib/` and
    `config.local.php` are NOT directly fetchable (the bundled
    `.htaccess` files take care of that on Apache).
 
@@ -79,3 +130,14 @@ front them with HTTP Basic auth at the web-server level.
   intentionally NOT enforced server-side here.
 * The receiver is **append-only** for events; it never updates or
   deletes mirrored rows.
+* `mirror_endpoint_snapshots` is **upsert-on-key** (`(mirror_name, endpoint)`):
+  every push overwrites the previous snapshot for that endpoint, so the
+  table never grows beyond `N_mirrors × N_endpoints` rows.
+* Apache's `mod_headers` is **not** required by the bundled `.htaccess`
+  files; if missing, the `Header set X-Content-Type-Options` directive
+  is silently skipped (it is wrapped in `<IfModule mod_headers.c>`).
+* PHP's `post_max_size` must accommodate the snapshot bundle. With the
+  built-in 1500-row cap on `analytics/academic.raw_events`, payloads
+  stay well under the conservative 8 MB shared-hosting default; if you
+  raise the snapshot raw_events cap upstream, raise `post_max_size`
+  accordingly.
