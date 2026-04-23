@@ -27,6 +27,8 @@
 
 # Always send JSON for our shim endpoints (each shim sets its own header
 # explicitly anyway, but this is the safe default).
-<FilesMatch "\.php$">
-    Header set X-Content-Type-Options "nosniff"
-</FilesMatch>
+<IfModule mod_headers.c>
+    <FilesMatch "\.php$">
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>

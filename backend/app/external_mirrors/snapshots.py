@@ -226,15 +226,19 @@ def _snapshot_analytics_academic() -> Dict[str, Any]:
     function with stub Request and bypassed auth dep.  This guarantees the
     snapshot is byte-equivalent to what the live endpoint would return for
     the dashboard's default page-load query.
+
+    To keep the push payload bounded the embedded ``raw_events`` list is
+    capped to the most recent ``RAW_EVENTS_CAP`` rows — the dashboard only
+    renders a sliding window of recent decodes from this list, so older
+    rows are not visually used.
     """
     from types import SimpleNamespace
 
     from ..api.analytics import academic_analytics
     from ..version import APP_VERSION
 
-    # academic_analytics only reads request.app.version
     fake_request = SimpleNamespace(app=SimpleNamespace(version=APP_VERSION))
-    return academic_analytics(
+    result = academic_analytics(
         request=fake_request,  # type: ignore[arg-type]
         start=None,
         end=None,
@@ -243,6 +247,26 @@ def _snapshot_analytics_academic() -> Dict[str, Any]:
         bucket="hour",
         _=False,
     )
+    data = result.get("data") or {}
+    raw = data.get("raw_events")
+    if isinstance(raw, list) and len(raw) > RAW_EVENTS_CAP:
+        # Sort by timestamp desc, keep the most recent N.
+        raw_sorted = sorted(
+            raw,
+            key=lambda r: str(r.get("timestamp") or ""),
+            reverse=True,
+        )
+        data["raw_events"] = raw_sorted[:RAW_EVENTS_CAP]
+        data["raw_events_truncated"] = True
+        data["raw_events_total"] = len(raw)
+    return result
+
+
+# Hard cap on raw_events embedded in the analytics snapshot.  Keeps push
+# payload size under shared-hosting POST limits (default 8 MB) even with
+# week-long busy periods.  The dashboard renders a sliding view, so older
+# rows past this cap are not visible anyway.
+RAW_EVENTS_CAP = 1500
 
 
 def build_snapshot_bundle() -> Dict[str, Dict[str, Any]]:
