@@ -168,6 +168,24 @@ class MirrorHttpClient:
         nonce = _new_nonce()
         signature = sign_payload(secret_token, body, timestamp, nonce)
 
+        # Defensive: HTTP/1.1 headers are ASCII-only. Reject up-front rather
+        # than failing deep inside httpx with a cryptic UnicodeEncodeError.
+        if mirror_name is not None:
+            try:
+                mirror_name.encode("ascii")
+            except UnicodeEncodeError as exc:
+                return PushResult(
+                    success=False,
+                    status_code=None,
+                    attempts=0,
+                    error=(
+                        f"mirror_name contains non-ASCII characters "
+                        f"({exc.reason}); rename mirror to an ASCII slug"
+                    ),
+                    response_body=None,
+                    elapsed_ms=0,
+                )
+
         headers: Dict[str, str] = {
             "Content-Type": "application/json; charset=utf-8",
             "User-Agent": f"4ham-mirror/{APP_VERSION}",

@@ -12,6 +12,7 @@ returned in plaintext once on creation/rotation.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -28,6 +29,20 @@ from ..storage.db import Database
 
 AUTO_DISABLE_THRESHOLD = 5
 DEFAULT_TOKEN_BYTES = 32
+
+# Mirror names are sent verbatim in HTTP headers (X-4HAM-Mirror-Name) and used
+# as dict keys in the receiver's config.local.php. They must be ASCII-only,
+# short, and use a restricted alphabet to avoid encoding issues and ambiguity.
+_MIRROR_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+
+
+def _validate_mirror_name(name: str) -> None:
+    """Raise ValueError if *name* is not a valid mirror identifier."""
+    if not _MIRROR_NAME_RE.match(name):
+        raise ValueError(
+            "name must be ASCII, 1\u201364 chars, start with [A-Za-z0-9] "
+            "and contain only [A-Za-z0-9_.-]"
+        )
 
 
 def _utcnow_iso() -> str:
@@ -198,6 +213,7 @@ class ExternalMirrorRepository:
         endpoint_url = (endpoint_url or "").strip()
         if not name:
             raise ValueError("name is required")
+        _validate_mirror_name(name)
         if not endpoint_url:
             raise ValueError("endpoint_url is required")
         if push_interval_seconds < 10:
@@ -358,6 +374,7 @@ class ExternalMirrorRepository:
                     new_value = (new_value or "").strip()
                     if not new_value:
                         raise ValueError("name cannot be empty")
+                    _validate_mirror_name(new_value)
                     if new_value != current.name:
                         assignments.append("name = ?")
                         params.append(new_value)
