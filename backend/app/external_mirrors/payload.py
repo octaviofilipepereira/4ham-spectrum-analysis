@@ -65,6 +65,37 @@ def _max_id(events: Sequence[Dict[str, Any]]) -> int:
     return max(int(e.get("id") or 0) for e in events)
 
 
+def _table_max_id(db: Database, table: str) -> int:
+    with db._lock:
+        row = db.conn.execute(f"SELECT MAX(id) AS m FROM {table}").fetchone()
+    if not row:
+        return 0
+    return int(row["m"] or 0)
+
+
+def _table_frontier(
+    events: Sequence[Dict[str, Any]],
+    db_max_id: int,
+    batch_size: int,
+    scope_active: bool,
+) -> int:
+    """
+    Highest id this table is "safe through" after this batch.
+
+    - If scope is not active for this push: the table places no
+      constraint on the watermark — return db_max_id (or 0 if empty),
+      which acts as +∞ when combined with min().
+    - If we got fewer rows than batch_size: we drained everything up to
+      the current db MAX, so frontier = db_max_id.
+    - Otherwise: only safe through the last id we fetched.
+    """
+    if not scope_active:
+        return db_max_id
+    if len(events) < batch_size:
+        return db_max_id
+    return _max_id(events)
+
+
 def build_payload(
     db: Database,
     *,
@@ -76,10 +107,12 @@ def build_payload(
     """
     Build the push payload for a mirror.
 
-    The shared watermark is a single integer applied across both event
-    tables: each table fetches rows with id > watermark, and the new
-    watermark returned is max(id) seen in this batch (or unchanged if
-    nothing new).
+    Watermark semantics: a single integer used for *both* event tables
+    (callsign + occupancy share the cursor).  Each table fetches rows
+    with id > watermark up to batch_size.  The new watermark advances
+    only as far as is safe for *both* tables — i.e.  ``min`` of each
+    table's frontier — so that a fast-moving table (occupancy) cannot
+    cause a slow-moving one (callsign) to be skipped over.
     """
     batch_size = max(1, min(int(batch_size), MAX_BATCH_SIZE))
     scopes_set = {s.strip().lower() for s in scopes if s and isinstance(s, str)}
@@ -87,22 +120,38 @@ def build_payload(
         # Default scopes when none configured.
         scopes_set = {"callsign_events", "occupancy_events"}
 
+    callsign_active = "callsign_events" in scopes_set
+    occupancy_active = "occupancy_events" in scopes_set
+
     callsign_events: List[Dict[str, Any]] = []
     occupancy_events: List[Dict[str, Any]] = []
-    if "callsign_events" in scopes_set:
+    if callsign_active:
         callsign_events = _fetch_events_since(
             db, "callsign_events", last_watermark, batch_size
         )
-    if "occupancy_events" in scopes_set:
+    if occupancy_active:
         occupancy_events = _fetch_events_since(
             db, "occupancy_events", last_watermark, batch_size
         )
 
-    new_watermark = max(
-        int(last_watermark),
-        _max_id(callsign_events),
-        _max_id(occupancy_events),
-    )
+    cs_db_max = _table_max_id(db, "callsign_events") if callsign_active else 0
+    oc_db_max = _table_max_id(db, "occupancy_events") if occupancy_active else 0
+    cs_frontier = _table_frontier(callsign_events, cs_db_max, batch_size, callsign_active)
+    oc_frontier = _table_frontier(occupancy_events, oc_db_max, batch_size, occupancy_active)
+
+    # Take the smaller of the two table frontiers so neither side is
+    # skipped.  Disabled scopes return the other table's db_max so they
+    # impose no constraint (min collapses to the active scope).
+    if callsign_active and occupancy_active:
+        candidate = min(cs_frontier, oc_frontier)
+    elif callsign_active:
+        candidate = cs_frontier
+    elif occupancy_active:
+        candidate = oc_frontier
+    else:
+        candidate = int(last_watermark)
+
+    new_watermark = max(int(last_watermark), candidate)
 
     # Endpoint snapshot bundle: pre-computed JSON bodies for the live
     # endpoints the public dashboard needs (analytics, ionospheric, …).
