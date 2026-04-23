@@ -24,7 +24,13 @@ from ..version import APP_VERSION
 from .snapshots import build_snapshot_bundle
 
 
-DEFAULT_BATCH_SIZE = 500
+# Batched event push.  Default raised to 5000 because the snapshot
+# bundle is now tiny (only version/scan/settings/ionospheric — analytics
+# and map/contacts are queried on the receiver side from MySQL), so we
+# can ship far more events per HTTP POST without exceeding the typical
+# 8 MB shared-host post_max_size.  At 5000 evt/tick × 60 s tick this
+# clears a 200 k backlog in well under an hour.
+DEFAULT_BATCH_SIZE = 5000
 MAX_BATCH_SIZE = 5000
 
 
