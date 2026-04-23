@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..storage.db import Database
 from ..version import APP_VERSION
+from .snapshots import build_snapshot_bundle
 
 
 DEFAULT_BATCH_SIZE = 500
@@ -97,6 +98,16 @@ def build_payload(
         _max_id(occupancy_events),
     )
 
+    # Endpoint snapshot bundle: pre-computed JSON bodies for the live
+    # endpoints the public dashboard needs (analytics, ionospheric, …).
+    # The receiver UPSERTs each entry into mirror_endpoint_snapshots and
+    # PHP shims serve them verbatim.  Wrapped defensively: a snapshot
+    # failure must NEVER break event replication.
+    try:
+        snapshots = build_snapshot_bundle()
+    except Exception:  # pragma: no cover - defensive
+        snapshots = {}
+
     payload: Dict[str, Any] = {
         "meta": {
             "ts": _now_iso(),
@@ -115,6 +126,7 @@ def build_payload(
             "callsign": len(callsign_events),
             "occupancy": len(occupancy_events),
         },
+        "snapshots": snapshots,
     }
     return payload
 

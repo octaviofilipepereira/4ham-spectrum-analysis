@@ -1,0 +1,32 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+#
+# ────────────────────────────────────────────────────
+#  4ham Spectrum Analysis — External Mirror Receiver
+#  api/.htaccess — extension-less PHP routing
+# ────────────────────────────────────────────────────
+#
+# The dashboard fetches /api/scan/status, /api/events, etc. WITHOUT a
+# .php extension.  This rewrite maps any non-existent api/* request to
+# its .php counterpart.
+#
+# Existing files (e.g. /api/static/foo.json) are served as-is.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Don't rewrite real files or directories.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # If the corresponding .php file exists, route there.
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+)$ $1.php [QSA,L]
+</IfModule>
+
+# Always send JSON for our shim endpoints (each shim sets its own header
+# explicitly anyway, but this is the safe default).
+<FilesMatch "\.php$">
+    Header set X-Content-Type-Options "nosniff"
+</FilesMatch>

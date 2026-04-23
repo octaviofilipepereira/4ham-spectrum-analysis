@@ -199,6 +199,49 @@ try {
     fourham_respond(500, ['error' => 'db_error']);
 }
 
+// ── Endpoint snapshots: UPSERT the pre-computed JSON bodies ─────────
+// Failures here are non-fatal — events were already committed and the
+// dashboard simply keeps serving the previous snapshot.
+$snapshots = is_array($payload['snapshots'] ?? null) ? $payload['snapshots'] : [];
+$snapshotCount = 0;
+if (!empty($snapshots)) {
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO mirror_endpoint_snapshots
+              (mirror_name, endpoint, captured_at, received_at, payload_json)
+             VALUES (:m, :e, :c, NOW(), :p)
+             ON DUPLICATE KEY UPDATE
+              captured_at = VALUES(captured_at),
+              received_at = VALUES(received_at),
+              payload_json = VALUES(payload_json)'
+        );
+        foreach ($snapshots as $endpointKey => $entry) {
+            if (!is_string($endpointKey) || !is_array($entry)) continue;
+            if (!array_key_exists('payload', $entry)) continue;
+            $captured = isset($entry['captured_at']) ? (string)$entry['captured_at'] : gmdate('Y-m-d H:i:s');
+            // Normalise ISO 8601 (e.g. 2026-04-23T18:30:00Z) to MySQL DATETIME.
+            $capturedTs = strtotime($captured);
+            $capturedSql = $capturedTs !== false
+                ? gmdate('Y-m-d H:i:s', $capturedTs)
+                : gmdate('Y-m-d H:i:s');
+            $payloadJson = json_encode(
+                $entry['payload'],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR
+            );
+            if ($payloadJson === false) continue;
+            $stmt->execute([
+                ':m' => $mirrorName,
+                ':e' => $endpointKey,
+                ':c' => $capturedSql,
+                ':p' => $payloadJson,
+            ]);
+            $snapshotCount++;
+        }
+    } catch (Throwable $e) {
+        error_log('[4ham-mirror] snapshot upsert failed: ' . $e->getMessage());
+    }
+}
+
 fourham_audit_row($pdo, [
     'mirror_name'         => $mirrorName,
     'outcome'             => 'ok',
@@ -223,5 +266,6 @@ fourham_respond(200, [
         'callsign'  => $insertedCallsign,
         'occupancy' => $insertedOccupancy,
     ],
+    'snapshots' => $snapshotCount,
     'new_watermark' => $meta['new_watermark'] ?? null,
 ]);

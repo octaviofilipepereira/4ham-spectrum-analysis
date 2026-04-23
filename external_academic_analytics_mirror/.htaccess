@@ -17,5 +17,12 @@
 # Disable directory listings.
 Options -Indexes
 
-# Always send JSON content type for *.php (apps below override as needed).
-DirectoryIndex version.php
+# Public dashboard takes precedence over the legacy version.php landing.
+DirectoryIndex index.html version.php
+
+# Block direct fetch of PHP includes (lib/db.php etc.) — they only define
+# functions, but returning an empty 200 is misleading.  Static assets
+# (lib/*.js, lib/*.json) remain accessible.
+<FilesMatch "^(db|auth|snapshot)\.php$">
+    Require all denied
+</FilesMatch>

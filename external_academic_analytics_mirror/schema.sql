@@ -101,3 +101,18 @@ CREATE TABLE IF NOT EXISTS mirror_seen_nonces (
   PRIMARY KEY (mirror_name, nonce),
   KEY idx_seen_at (seen_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Endpoint snapshot store: pre-computed JSON bodies pushed by the
+-- backend's snapshot bundler (one row per (mirror_name, endpoint),
+-- UPSERTed on every push).  PHP shims under api/ read the latest row
+-- and return ``payload_json`` verbatim, so the public dashboard sees
+-- the exact JSON the live backend would have produced.
+CREATE TABLE IF NOT EXISTS mirror_endpoint_snapshots (
+  mirror_name  VARCHAR(64)  NOT NULL,
+  endpoint     VARCHAR(128) NOT NULL,
+  captured_at  DATETIME     NOT NULL,
+  received_at  DATETIME     NOT NULL,
+  payload_json LONGTEXT     NOT NULL,
+  PRIMARY KEY (mirror_name, endpoint),
+  KEY idx_captured (captured_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
