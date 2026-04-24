@@ -11,6 +11,7 @@ Last update: 2026-04-03 UTC
     <meta name="google" content="notranslate" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>4ham Academic Analytics</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
     <style>
       :root {
@@ -1732,7 +1733,7 @@ Last update: 2026-04-03 UTC
     <script src="lib/xlsx.mini.min.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>
     <script>
-      const BANDS = ["160m", "80m", "40m", "20m", "17m", "15m", "12m", "10m", "2m"];
+      const BANDS = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m"];
       const MODES = ["SSB", "FT8", "FT4", "CW", "WSPR"];
       const MODE_COLORS = {
         SSB: getCssVar("--mode-ssb"),
@@ -3144,7 +3145,9 @@ Last update: 2026-04-03 UTC
         // ── Band filter pills ──────────────────────────────────────────
         const filterDiv = document.createElement("div");
         filterDiv.className = "propmap-band-filter";
-        for (const band of Object.keys(iono.bands || {})) {
+        // Use BANDS constant to enforce correct frequency order
+        const availableBands = BANDS.filter(b => iono.bands && iono.bands[b]);
+        for (const band of availableBands) {
           const btn = document.createElement("button");
           const isOn = !!_pmBandVis[band];
           btn.className = "propmap-band-btn" + (isOn ? "" : " off");
@@ -4642,11 +4645,15 @@ Last update: 2026-04-03 UTC
       // ── KPIs ──────────────────────────────────────────────────────────
       function aprsUpdateKpis(events) {
         const callsigns = new Set(events.map(e => e.callsign).filter(Boolean));
-        const rfCount = events.filter(e => {
+        // Count UNIQUE stations per source (not packets)
+        const rfStations = new Set();
+        const tcpStations = new Set();
+        events.forEach(e => {
+          if (!e.callsign) return;
           const s = (e.source || "").toLowerCase();
-          return s === "direwolf" || s === "rf";
-        }).length;
-        const tcpCount = events.length - rfCount;
+          if (s === "direwolf" || s === "rf") rfStations.add(e.callsign);
+          else tcpStations.add(e.callsign);
+        });
 
         let maxDist = 0;
         const digipeaters = new Set();
@@ -4668,7 +4675,7 @@ Last update: 2026-04-03 UTC
         const el = (id) => document.getElementById(id);
         el("aprsKpiStations").textContent = formatInt(callsigns.size);
         el("aprsKpiEvents").textContent = formatInt(events.length);
-        el("aprsKpiRfTcp").textContent = `${formatInt(rfCount)} / ${formatInt(tcpCount)}`;
+        el("aprsKpiRfTcp").textContent = `${formatInt(rfStations.size)} / ${formatInt(tcpStations.size)}`;
         el("aprsKpiMaxDist").textContent = maxDist > 0 ? `${Math.round(maxDist)} km` : "--";
         el("aprsKpiDigipeaters").textContent = formatInt(digipeaters.size);
       }
