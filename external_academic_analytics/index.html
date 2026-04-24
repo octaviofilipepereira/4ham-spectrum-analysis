@@ -4645,11 +4645,15 @@ Last update: 2026-04-03 UTC
       // ── KPIs ──────────────────────────────────────────────────────────
       function aprsUpdateKpis(events) {
         const callsigns = new Set(events.map(e => e.callsign).filter(Boolean));
-        const rfCount = events.filter(e => {
+        // Count UNIQUE stations per source (not packets)
+        const rfStations = new Set();
+        const tcpStations = new Set();
+        events.forEach(e => {
+          if (!e.callsign) return;
           const s = (e.source || "").toLowerCase();
-          return s === "direwolf" || s === "rf";
-        }).length;
-        const tcpCount = events.length - rfCount;
+          if (s === "direwolf" || s === "rf") rfStations.add(e.callsign);
+          else tcpStations.add(e.callsign);
+        });
 
         let maxDist = 0;
         const digipeaters = new Set();
@@ -4671,7 +4675,7 @@ Last update: 2026-04-03 UTC
         const el = (id) => document.getElementById(id);
         el("aprsKpiStations").textContent = formatInt(callsigns.size);
         el("aprsKpiEvents").textContent = formatInt(events.length);
-        el("aprsKpiRfTcp").textContent = `${formatInt(rfCount)} / ${formatInt(tcpCount)}`;
+        el("aprsKpiRfTcp").textContent = `${formatInt(rfStations.size)} / ${formatInt(tcpStations.size)}`;
         el("aprsKpiMaxDist").textContent = maxDist > 0 ? `${Math.round(maxDist)} km` : "--";
         el("aprsKpiDigipeaters").textContent = formatInt(digipeaters.size);
       }
