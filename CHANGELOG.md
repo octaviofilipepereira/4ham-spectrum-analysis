@@ -7,6 +7,102 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.14.0 - 2026-04-23 (unstable)
+
+### Added — External Mirrors (push replication) + Public Dashboard mirror
+- **New module `backend/app/external_mirrors/`** — push selected dashboard data
+  (callsign + occupancy events) to one or more remote PHP/MySQL hosts over
+  HTTPS, eliminating the need for inbound port-forwarding on the production
+  station. Includes:
+  - SQLite tables `external_mirrors` (configuration, bcrypt-hashed token) and
+    `external_mirror_audit` (per-event audit log).
+  - `MirrorHttpClient` with HMAC-SHA256 request signing
+    (`X-4HAM-Signature`, `X-4HAM-Timestamp`, `X-4HAM-Nonce`,
+    `X-4HAM-Mirror-Name`, `X-4HAM-Mirror-Version`), TLS-verify on by default,
+    30 s timeout, 3 retries on 5xx/network/timeout with exponential back-off
+    (no retry on 4xx).
+  - Watermark-based payload builder (`payload.py`) with `MAX_BATCH_SIZE=5000`.
+  - Background pusher loop (`pusher.py`, default tick = 15 s) integrated into
+    the FastAPI app lifespan; auto-disables a mirror after 5 consecutive
+    failures.
+- **Snapshot bundler** (`backend/app/external_mirrors/snapshots.py`) — every
+  push payload now embeds pre-computed JSON bodies for the read-only API
+  endpoints used by the public dashboard (`version`, `scan/status`,
+  `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`).
+  Builders invoke the live FastAPI route functions in-process, so the JSON
+  is byte-equivalent to what the home backend would serve. Builders that
+  fail are silently skipped; failure of any builder never breaks the push.
+  - `settings` snapshot uses a public projection (strips
+    `auth/aprs/lora_aprs/asr/device_config/audio_config`).
+  - `analytics/academic` snapshot caps embedded `raw_events` at 1500 rows
+    to keep push payload under 8 MB shared-hosting limits; the dashboard
+    only renders a sliding window so older rows are not user-visible.
+- **Admin REST API** at `/api/admin/mirrors` (Basic-auth protected): list,
+  create, edit, enable/disable, rotate-token, test, delete and audit-log
+  endpoints. Plaintext tokens are returned ONLY at create / rotate-token
+  and are never persisted in clear.
+- **Admin Config UI** (inside the existing Admin Config modal): mirror table,
+  add/edit form, one-time token alert, per-row enable/disable, rotate-token,
+  test push and audit log viewer.
+- **PHP/MySQL receiver** in `external_academic_analytics/` for shared
+  hosting (PHP 7.4+, PDO_mysql only). Includes:
+  - MySQL schema with `mirror_callsign_events`, `mirror_occupancy_events`,
+    `mirror_endpoint_snapshots`, `mirror_push_audit`, `mirror_seen_nonces`.
+  - Idempotent `INSERT IGNORE` ingest endpoint with HMAC + nonce +
+    clock-skew verification, IP allowlist and audit log.
+  - 7 read-only API shims under `api/` (`version`, `scan/status`,
+    `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`,
+    `events`) — 6 serve verbatim snapshot JSON, `events` reads live SQL
+    over the mirrored event tables.
+  - `index.html` = verbatim copy of `frontend/4ham_academic_analytics.html`
+    + vendored Leaflet/D3/TopoJSON/XLSX assets and i18n JSON, providing a
+    fully public, read-only replica of the Academic Analytics dashboard
+    (max 5 min staleness, no WebSocket, no admin surface).
+  - `api/.htaccess` extension-less routing; `Header` directive guarded by
+    `<IfModule mod_headers.c>` for hosts without `mod_headers`.
+  See `external_academic_analytics/README.md` for deployment.
+- **Documentation**: new `docs/external_mirrors.md` covering architecture,
+  snapshot bundle, security model, admin UI walkthrough, receiver
+  deployment and the public dashboard mirror.
+
+### Changed
+- **Version bump** to v0.14.0 across backend (`APP_VERSION`).
+- Receiver folder renamed from `external_academic_analytics_mirror/` to
+  `external_academic_analytics/` to match the production deployment path.
+
+### Fixed (post-release patches on `unstable`)
+- **Per-table frontier watermark** (`payload.py`, ee22274): the shared
+  watermark now advances to `min(callsign_frontier, occupancy_frontier)`
+  instead of `max(...)`, so the faster table can no longer skip events of
+  the slower one. Each table's frontier is the DB MAX(id) when the scope is
+  inactive or fully drained, otherwise the MAX(id) of the events actually
+  included in the current batch.
+- **Mirror replication health endpoint** (`GET /api/admin/mirrors/health`,
+  2ed7e1b): per-mirror snapshot of `last_push_watermark`, source MAX(id),
+  per-table lag in ids, status (`ok` / `lagging` / `stalled` / `disabled`)
+  and consecutive failure count. Basic-auth protected, same as the rest of
+  the admin API.
+- **Admin UI surfacing of replication health** (`external-mirrors.js`,
+  14ab632): per-row badge in the watermark cell plus an aggregated
+  replication summary above the mirrors table.
+- **Installer hardening for fresh Mint 22.3 installs** (`install.sh`,
+  14ab632):
+  - detect & disable `SoapySDRServer` (soapyremote-server) before installing
+    SDR packages, otherwise it hijacks the local RTL device;
+  - resolve the user's localized desktop folder via `xdg-user-dir DESKTOP`
+    instead of hard-coding `$HOME/Desktop`, fixing the missing launcher on
+    Portuguese Cinnamon ("Área de Trabalho");
+  - also expose the kernel-module blacklist under the documented filename
+    `/etc/modprobe.d/blacklist-rtlsdr.conf` (symlink to the existing
+    `blacklist-rtl.conf`).
+- **`scripts/hash_password.py`** (14ab632): auto re-execs under
+  `.venv/bin/python` when invoked from outside the venv, so it works
+  immediately after install without `pip install bcrypt`.
+- **`frontend/favicon.ico`** (14ab632): bundled minimal 16×16 ICO so the
+  browser stops returning 404 for `/favicon.ico`.
+
+---
+
 ## v0.13.3 - 2026-04-22
 
 ### Documentation

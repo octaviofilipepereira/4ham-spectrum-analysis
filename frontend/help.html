@@ -52,7 +52,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
   <a class="back-link" href="index.html">← Back to application</a>
 
   <h1 class="manual-title">4ham Spectrum Analysis</h1>
-  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; <span id="helpVersionBadge">v0.13.3</span> &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
+  <p class="manual-subtitle">User Manual &nbsp;·&nbsp; <span id="helpVersionBadge">v0.14.0</span> &nbsp;·&nbsp; CT7BFV / Octávio Filipe Gonçalves</p>
 
   <!-- TABLE OF CONTENTS -->
   <nav class="toc" aria-label="Table of contents">
@@ -628,6 +628,18 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       Accessible via the <strong>Data Analysis</strong> button in the toolbar (opens in a new tab), or directly at
       <code>http://&lt;host&gt;:8000/4ham_academic_analytics.html</code>.
       Data auto-refreshes every 60 seconds. The header shows the last query timestamp and a countdown to the next refresh.
+    </p>
+
+    <h3 class="sub-title">Public mirror (optional)</h3>
+    <p>
+      Since v0.14.0 the dashboard can be republished on any shared-hosting PHP+MySQL server via a built-in
+      <strong>push mirror</strong> (<code>External Mirrors</code> in the Admin Config). The home backend POSTs a signed
+      JSON bundle every 5 minutes (default) containing new event rows and pre-computed snapshots of every read-only
+      endpoint the dashboard fetches. The receiver UPSERTs each snapshot into a MySQL table and serves it verbatim, so
+      visitors see a JSON response that is byte-equivalent to the home backend with at most one push interval
+      (≤ 5 min) of staleness. The public mirror has <strong>no WebSocket, no admin surface, no SDR control</strong>
+      — it is read-only by construction. See <code>docs/external_mirrors.md</code> and
+      <code>external_academic_analytics/README.md</code> for setup.
     </p>
 
     <h3 class="sub-title">Period selector</h3>

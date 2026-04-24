@@ -13,14 +13,31 @@ Usage:
 If no password is provided, you will be prompted securely.
 """
 
+import os
 import sys
 import getpass
 from pathlib import Path
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+# Re-exec under the project venv if not already running there. This makes the
+# script work without manual `pip install bcrypt` or venv activation, as long
+# as install.sh has provisioned `.venv` next to this script's parent.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_VENV_PYTHON = _REPO_ROOT / ".venv" / "bin" / "python"
+if (
+    _VENV_PYTHON.is_file()
+    and os.path.realpath(sys.executable) != os.path.realpath(str(_VENV_PYTHON))
+):
+    os.execv(str(_VENV_PYTHON), [str(_VENV_PYTHON), __file__, *sys.argv[1:]])
 
-from app.core.auth import hash_password  # type: ignore[import]
+# Add backend to path
+sys.path.insert(0, str(_REPO_ROOT / "backend"))
+
+try:
+    from app.core.auth import hash_password  # type: ignore[import]
+except ModuleNotFoundError as exc:
+    print(f"ERROR: missing dependency ({exc.name}). Run install.sh first, or", file=sys.stderr)
+    print("       inside the project venv: pip install -r backend/requirements.txt", file=sys.stderr)
+    sys.exit(2)
 
 
 def main():

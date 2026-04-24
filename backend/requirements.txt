@@ -25,6 +25,9 @@ python-dotenv
 bcrypt
 slowapi
 
+# Symmetric encryption for persisted mirror plaintext tokens (Fernet)
+cryptography
+
 # HTTP client (ionospheric data fetch)
 httpx
 

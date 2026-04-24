@@ -6,8 +6,23 @@ Last update: 2026-04-02
 
 # 📊 QUICK STATUS - Trabalhos Pendentes
 
-**Atualização**: 2026-04-02  
-**Versão**: v0.8.3
+**Atualização**: 2026-04-23
+**Versão**: v0.14.0 (unstable)
+
+---
+
+## 🆕 ÚLTIMA ENTREGA
+
+### External Mirrors + Public Dashboard ✅ (v0.14.0)
+```
+Concluído em v0.14.0 (2026-04-23)
+- Módulo backend external_mirrors/ (pusher, repository, http_client, snapshots)
+- Receptor PHP/MySQL em external_academic_analytics/
+- Snapshot bundler in-process (6 endpoints replicados verbatim)
+- Dashboard público em https://cs5arc.pt/external_academic_analytics/
+- 8 testes adicionais; 374/374 testes passam
+- Latência push default: 5 min; sem WebSocket; sem superfície admin
+```
 
 ---
 

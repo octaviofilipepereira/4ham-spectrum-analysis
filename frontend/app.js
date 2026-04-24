@@ -32,6 +32,7 @@ import {
 } from "./modules/utils.js";
 import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
+import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -3172,8 +3173,15 @@ if (adminModalEl) {
   adminModalEl.addEventListener("show.bs.modal", () => {
     loadSettings();
     refreshAdminAuthFields();
+    loadMirrors().catch((err) => console.warn("loadMirrors failed", err));
   });
 }
+
+initExternalMirrorsUI({
+  getAuthHeader,
+  showToast: typeof showToast === "function" ? showToast : undefined,
+  showToastError: typeof showToastError === "function" ? showToastError : undefined,
+});
 
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });

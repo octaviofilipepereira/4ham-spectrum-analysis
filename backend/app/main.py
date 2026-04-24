@@ -34,7 +34,7 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api
 from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
 from app.core import features as _features
 
@@ -170,6 +170,48 @@ async def lifespan(app_instance: FastAPI):
     from app.core.ionospheric import ionospheric_refresh_loop
     asyncio.create_task(ionospheric_refresh_loop())
 
+    # Initialise external mirrors subsystem (push-mode replication).
+    try:
+        from app.external_mirrors import (
+            ExternalMirrorPusher,
+            ExternalMirrorRepository,
+            TokenCache,
+        )
+        from app.external_mirrors.token_vault import TokenVault
+        from app.external_mirrors import registry as mirrors_registry
+        _mirror_repo = ExternalMirrorRepository(_state.db)
+        _mirror_vault = TokenVault.from_env()
+        _vault_source = "MIRRORS_MASTER_KEY env"
+        if _mirror_vault is None:
+            from pathlib import Path as _Path
+            _data_dir = _Path(_state.db.path).parent
+            _mirror_vault = TokenVault.from_data_dir(_data_dir)
+            _vault_source = f"{_data_dir}/.mirrors_master.key"
+        _mirror_token_cache = TokenCache(
+            repository=_mirror_repo, vault=_mirror_vault
+        )
+        if _mirror_vault is not None:
+            n_loaded = _mirror_token_cache.load_persisted()
+            _log.info(
+                "External mirrors token vault enabled (%s); %d persisted token(s) loaded.",
+                _vault_source,
+                n_loaded,
+            )
+        else:
+            _log.warning(
+                "External mirrors token vault unavailable; tokens are memory-only "
+                "(rotate-token required after each restart)."
+            )
+        _mirror_pusher = ExternalMirrorPusher(
+            repo=_mirror_repo,
+            token_cache=_mirror_token_cache,
+        )
+        mirrors_registry.init(_mirror_repo, _mirror_pusher, _mirror_token_cache)
+        await _mirror_pusher.start()
+        _log.info("External mirrors pusher started")
+    except Exception as exc:
+        _log.warning("External mirrors pusher failed to start: %s", exc)
+
     # Auto-start preset scheduler if there are enabled schedules
     try:
         enabled = [s for s in _state.db.get_preset_schedules() if s.get("enabled")]
@@ -192,6 +234,12 @@ async def lifespan(app_instance: FastAPI):
     yield
 
     # Graceful shutdown
+    try:
+        from app.external_mirrors import registry as mirrors_registry
+        if mirrors_registry.is_initialised():
+            await mirrors_registry.get_pusher().stop()
+    except Exception:
+        pass
     if _state.preset_scheduler and _state.preset_scheduler.running:
         try:
             await _state.preset_scheduler.stop()
@@ -291,6 +339,7 @@ app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(logs.router, prefix="/api", tags=["Logs"])
 app.include_router(exports.router, prefix="/api", tags=["Exports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(external_mirrors_api.router, prefix="/api/admin/mirrors", tags=["External Mirrors"])
 app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])

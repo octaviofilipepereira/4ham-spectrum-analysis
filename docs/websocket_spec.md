@@ -16,6 +16,13 @@ This document defines WebSocket channels, message envelopes, and payloads for re
 - `/ws/status`: scan and system status
 - `/ws/logs`: application log streaming
 
+> **Public mirror note:** the public dashboard mirror published by the
+> External Mirrors push pipeline (v0.14.0+) does **not** expose any
+> WebSocket endpoint. The receiver is a stateless PHP+MySQL host that
+> serves snapshot JSON over HTTPS only. Public visitors see new data
+> after the next push cycle (default 5 minutes); WebSocket streaming
+> remains available exclusively on the home backend.
+
 ## Message Envelope
 All messages use a single root object with one top-level key:
 - `spectrum_frame`

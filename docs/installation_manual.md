@@ -402,6 +402,18 @@ python backend/cli.py --stop
 - If the RTL-SDR v4 is not detected after building from source, confirm the kernel blacklist is in place (`cat /etc/modprobe.d/blacklist-rtl.conf`) and reboot.
 - If scan is running and RF is visible but no callsigns appear, confirm WSJT-X `Reporting` is set to `127.0.0.1:2237` and that `/api/decoders/status` updates `wsjtx_udp.last_packet_at`.
 
+## Optional: Public Dashboard Mirror
+
+Since v0.14.0 the Academic Analytics dashboard can be republished, fully read-only, on any shared-hosting PHP+MySQL server through the built-in External Mirrors push pipeline. The home backend stays on the LAN and posts a signed JSON bundle every 5 minutes (default) containing new event rows and pre-computed snapshots for every read-only endpoint the dashboard fetches.
+
+The receiver is a one-off deployment (rsync + apply MySQL schema + paste the per-mirror token) and is documented in:
+
+- [`external_academic_analytics/README.md`](../external_academic_analytics/README.md) — receiver layout, schema, configuration
+- [`docs/external_mirrors.md`](external_mirrors.md) — push protocol, snapshot bundle contract
+- [`docs/security.md`](security.md) — public projection, HMAC, replay protection
+
+`install.sh` does **not** touch the receiver — it only installs the local backend / venv / systemd service. Receiver deployment is intentionally manual because shared-hosting credentials, MySQL passwords, and webroot paths are operator-specific.
+
 ## Uninstall
 
 Recommended:

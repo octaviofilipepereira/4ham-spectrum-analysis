@@ -98,6 +98,10 @@ Default frontend routes:
 
 ## Changelog (cumulative)
 
+### v0.14.0
+- **External Mirrors (push replication) + Public Dashboard mirror**: new `external_mirrors` backend module + Admin Config UI + companion PHP/MySQL receiver in `external_academic_analytics/`. Lets the production station push selected dashboard data (callsign and occupancy events) **and a snapshot bundle of the read-only API surface** (`version`, `scan/status`, `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`) to one or more remote PHP hosts over HTTPS without inbound port-forwarding. The receiver also serves a fully public, read-only replica of the Academic Analytics dashboard (max 5 min staleness, no WebSocket, no admin surface) e.g. https://cs5arc.pt/external_academic_analytics/. Per-mirror bcrypt-hashed tokens, HMAC-SHA256 request signing, replay protection, automatic disable after 5 consecutive failures. See `docs/external_mirrors.md`.
+- **Version bump** to v0.14.0 across backend (`APP_VERSION`), help badge, and Academic Analytics dashboard title.
+
 ### v0.13.3
 - **Documentation overhaul**: simplified user manuals (EN/PT), installation manual, README, ROADMAP (EN/PT), CHANGELOG and in-app help to focus exclusively on the supported APRS pipeline (Direwolf VHF + APRS-IS).
 - **Version bump** to v0.13.3 across backend, help badge, and Academic Analytics dashboard title.

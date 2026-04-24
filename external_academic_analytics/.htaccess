@@ -1,0 +1,28 @@
+# © 2026 Octávio Filipe Gonçalves
+# Callsign: CT7BFV
+# License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
+#
+# ────────────────────────────────────────────────────
+#  4ham Spectrum Analysis — External Mirror Receiver
+#  .htaccess — Apache web-root protections
+# ────────────────────────────────────────────────────
+# Block direct web access to library code, configuration and SQL.
+<FilesMatch "\.(sql|md|example)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^config\.local\.php$">
+    Require all denied
+</FilesMatch>
+
+# Disable directory listings.
+Options -Indexes
+
+# Public dashboard takes precedence over the legacy version.php landing.
+DirectoryIndex index.html version.php
+
+# Block direct fetch of PHP includes (lib/db.php etc.) — they only define
+# functions, but returning an empty 200 is misleading.  Static assets
+# (lib/*.js, lib/*.json) remain accessible.
+<FilesMatch "^(db|auth|snapshot)\.php$">
+    Require all denied
+</FilesMatch>

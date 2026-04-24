@@ -145,6 +145,7 @@ Notes:
 - For APRS, run Direwolf with KISS TCP enabled.
 - Optional: enable external FT decoder with `FT_EXTERNAL_ENABLE=1`.
 - Optional: enable Direwolf KISS TCP ingest with `DIREWOLF_KISS_ENABLE=1`.
+- Optional: republish the read-only Academic Analytics dashboard on a public PHP+MySQL host via the built-in push mirror — see [`external_academic_analytics/README.md`](../external_academic_analytics/README.md) and [`docs/external_mirrors.md`](external_mirrors.md). The home backend stays on the LAN; deployment of the receiver is a one-off `rsync` + MySQL schema apply.
 - To auto-start Direwolf at backend startup, install the binary and set:
 	- `DIREWOLF_AUTOSTART=1`, `DIREWOLF_CMD="direwolf -t 0 -p"`
 - **Adding APRS to an existing install:** if you skipped Direwolf during the original installer run, open the web UI → **Admin Config** → tick *Enable APRS packet decoding via Direwolf KISS TCP*. A modal will instruct you to run `sudo bash scripts/enable_aprs.sh` on the server. The helper script is idempotent and does not touch the rest of the installation.

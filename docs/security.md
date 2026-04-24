@@ -4,6 +4,20 @@
 
 # Security Best Practices Guide
 
+## External Mirrors / Public Dashboard (v0.14.0+)
+
+The optional public dashboard mirror is **outbound-only** by design — the home backend never opens an inbound port for the receiver. Push deliveries are signed and use a strict public projection so the public replica cannot leak operator-private state.
+
+- **Transport**: HTTPS POST from home backend → receiver `ingest.php`. The home backend remains on the LAN; the receiver lives on shared hosting.
+- **Authentication**: `Authorization: Bearer <plaintext-token>` plus an HMAC-SHA256 signature over `timestamp + "\n" + nonce + "\n" + raw_body`. Tokens are stored bcrypt-hashed at rest in the home backend; plaintext is shown only once at create / rotate.
+- **Replay protection**: ±300 s clock skew window enforced by the receiver, plus a per-mirror nonce cache (`mirror_seen_nonces`) — replays return HTTP 409.
+- **Public projection of `settings` snapshot**: the bundler strips `auth`, `aprs`, `lora_aprs`, `asr`, `device_config`, and `audio_config` before publishing. Operator credentials, private hardware identifiers, ASR model paths, and device configuration are **never** part of the public payload.
+- **Raw event cap**: each push carries at most `RAW_EVENTS_CAP = 1500` events to keep payloads under typical shared-hosting `post_max_size`.
+- **Surface limits**: the receiver exposes only read-only endpoints (`api/version`, `api/scan/status`, `api/settings`, `api/map/*`, `api/analytics/academic`, `api/events`). It has **no** WebSocket, **no** admin surface, **no** SDR control, and **no** auth/login endpoints.
+- **Failure isolation**: a mirror that fails 5 consecutive pushes is auto-disabled until an admin re-enables it.
+
+For the full protocol specification see [`docs/external_mirrors.md`](external_mirrors.md).
+
 ## Authentication
 
 ### Password Security

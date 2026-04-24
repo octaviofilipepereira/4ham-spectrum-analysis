@@ -8,8 +8,8 @@ Last update: 2026-04-21
 
 > **Also available in:** [Português](ROADMAP_PT.md)
 
-**Current Version**: v0.12.4  
-**Last Update**: 2026-04-21  
+**Current Version**: v0.14.0 (unstable)  
+**Last Update**: 2026-04-24  
 **Status**: 🟢 Production-Ready (main branch)
 
 ---
@@ -64,6 +64,8 @@ Last update: 2026-04-21
 | v0.12.3 | 2026-04-17 | Preset Scheduler (time-of-day auto-rotation), overlap validation, auto-start on boot |
 | v0.12.2 | 2026-04-12 | SNR KPI split (Digital vs CW/SSB), dashboard cleanup, external embedding docs |
 | v0.12.1 | 2026-04-12 | QTH-Centric Propagation Map redesign, NOAA SWPC ionospheric model, ionospheric sidebar |
+| v0.13.3 | 2026-04-22 | Documentation overhaul (APRS-only pipeline focus across manuals/help/changelog) |
+| v0.14.0 | 2026-04-23 | External Mirrors push replication + public dashboard mirror (snapshot bundler, PHP/MySQL receiver, fully read-only public replica). Post-release patches on `unstable` (2026-04-24): per-table frontier watermark, `GET /api/admin/mirrors/health`, admin UI health badge, installer hardening (Mint 22.3), favicon. |
 
 ---
 
