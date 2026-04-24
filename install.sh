@@ -24,6 +24,23 @@ FIFO=""
 GAUGE_PID=""
 declare -a _TMPFILES=()
 
+
+disable_soapysdr_server_if_running() {
+  # SoapySDRServer (apt: soapyremote-server) hijacks local SDR devices when
+  # it is running on the host, so the local rtlsdr Soapy module never sees
+  # them. Detected on Mint 22.3 Zena fresh installs. We stop and disable it
+  # if present; the user can re-enable later if they actually want remote
+  # SDR sharing.
+  if systemctl list-unit-files 2>/dev/null | grep -q '^SoapySDRServer\.service'; then
+    if systemctl is-active --quiet SoapySDRServer 2>/dev/null \
+       || systemctl is-enabled --quiet SoapySDRServer 2>/dev/null; then
+      echo "[INFO] Disabling SoapySDRServer (would hijack local SDR)" >> "$LOG_FILE"
+      run_sudo systemctl stop SoapySDRServer    >> "$LOG_FILE" 2>&1 || true
+      run_sudo systemctl disable SoapySDRServer >> "$LOG_FILE" 2>&1 || true
+    fi
+  fi
+}
+
 run_sudo() { [[ "${EUID}" -eq 0 ]] && "$@" || sudo "$@"; }
 
 version_ge() {
@@ -398,6 +415,8 @@ gauge_step 3 "Updating package lists..."
 run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
   || abort "apt-get update failed"
 
+disable_soapysdr_server_if_running
+
 gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, decoders, build tools)..."
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
@@ -476,6 +495,12 @@ blacklist rtl2832
 blacklist rtl2832_sdr
 blacklist rtl2830
 BLACKLIST
+fi
+# Also expose the file under the documented name `blacklist-rtlsdr.conf` so
+# operators searching for that name (per docs/install.md) find it.
+if [[ ! -e /etc/modprobe.d/blacklist-rtlsdr.conf ]]; then
+  run_sudo ln -sf blacklist-rtl.conf /etc/modprobe.d/blacklist-rtlsdr.conf \
+    >> "$LOG_FILE" 2>&1 || true
 fi
 run_sudo modprobe -r dvb_usb_rtl28xxu rtl2832_sdr rtl2832 >> "$LOG_FILE" 2>&1 || true
 
@@ -730,7 +755,15 @@ close_gauge
 # ── desktop shortcut (optional — only when a graphical session is detected) ────
 _desktop_created=0
 if [[ -n "${XDG_CURRENT_DESKTOP:-}" || -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-  _desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+  # Resolve the user's localized desktop folder (e.g. "Área de Trabalho" on
+  # Portuguese Mint/Cinnamon). xdg-user-dir is part of xdg-user-dirs and is
+  # present on all supported distros; fall back to the environment override
+  # then to ~/Desktop.
+  if command -v xdg-user-dir >/dev/null 2>&1; then
+    _desktop_dir="${XDG_DESKTOP_DIR:-$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")}"
+  else
+    _desktop_dir="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+  fi
   _app_dir="$HOME/.local/share/applications"
   _desktop_file="4ham-spectrum-analysis.desktop"
   _launcher="$ROOT_DIR/scripts/4ham_launcher.sh"

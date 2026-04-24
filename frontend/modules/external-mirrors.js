@@ -194,22 +194,51 @@ export async function loadMirrors() {
   setListStatus("");
   tbody.innerHTML = "";
   try {
-    const data = await apiCall("?include_disabled=true");
+    // Fetch list and per-mirror replication health in parallel. Health is
+    // best-effort: if the endpoint is unavailable (older backend) we still
+    // render the list without lag annotations.
+    const [data, healthData] = await Promise.all([
+      apiCall("?include_disabled=true"),
+      apiCall("/health").catch(() => null),
+    ]);
     const mirrors = Array.isArray(data?.mirrors) ? data.mirrors : [];
+    const healthByName = new Map();
+    const healthList = Array.isArray(healthData?.mirrors) ? healthData.mirrors : [];
+    for (const h of healthList) {
+      if (h?.name) healthByName.set(h.name, h);
+    }
     if (!mirrors.length) {
       if (empty) empty.classList.remove("d-none");
       return;
     }
     if (empty) empty.classList.add("d-none");
     for (const m of mirrors) {
-      tbody.appendChild(renderRow(m));
+      tbody.appendChild(renderRow(m, healthByName.get(m.name)));
     }
+    renderHealthSummary(healthList);
   } catch (err) {
     setListStatus(`Failed to load mirrors: ${err.message}`, "danger");
   }
 }
 
-function renderRow(m) {
+function renderHealthSummary(healthList) {
+  if (!Array.isArray(healthList) || !healthList.length) return;
+  const worst = healthList.reduce((acc, h) => {
+    const order = { ok: 0, disabled: 0, lagging: 1, stalled: 2 };
+    return (order[h.status] ?? 0) > (order[acc.status] ?? 0) ? h : acc;
+  }, healthList[0]);
+  const level = worst.status === "stalled"
+    ? "danger"
+    : worst.status === "lagging"
+    ? "warning"
+    : "success";
+  const counts = healthList.map(
+    (h) => `${h.name}: ${h.status} (cs lag ${h.lag_ids?.callsign_events ?? "?"}, oc lag ${h.lag_ids?.occupancy_events ?? "?"})`,
+  ).join(" | ");
+  setListStatus(`Replication: ${counts}`, level);
+}
+
+function renderRow(m, health) {
   const tr = document.createElement("tr");
   tr.dataset.mirrorId = m.id;
   const enabledBadge = m.enabled
@@ -221,6 +250,19 @@ function renderRow(m) {
   const autoDisabledNote = m.auto_disabled_at
     ? ` <span class="text-danger small" title="Auto-disabled at ${fmtDate(m.auto_disabled_at)}">⛔</span>`
     : "";
+  let healthBadge = "";
+  if (health && health.status) {
+    const cls = {
+      ok: "bg-success",
+      lagging: "bg-warning text-dark",
+      stalled: "bg-danger",
+      disabled: "bg-secondary",
+    }[health.status] || "bg-secondary";
+    const csLag = health.lag_ids?.callsign_events;
+    const ocLag = health.lag_ids?.occupancy_events;
+    healthBadge =
+      ` <span class="badge ${cls}" title="cs lag ${csLag} ids, oc lag ${ocLag} ids">${health.status}</span>`;
+  }
   tr.innerHTML = `
     <td><strong></strong><br><small class="text-muted"></small></td>
     <td><code class="small text-break"></code></td>
@@ -248,6 +290,7 @@ function renderRow(m) {
   cells[2].querySelector("span").textContent = `${m.push_interval_seconds}s`;
   cells[3].querySelector("span").textContent = fmtDate(m.last_push_at);
   cells[5].querySelector("span").textContent = m.last_push_watermark ?? "—";
+  if (healthBadge) cells[5].insertAdjacentHTML("beforeend", healthBadge);
   cells[6].querySelector("span").textContent = String(m.consecutive_failures ?? 0);
 
   tr.querySelectorAll("button[data-action]").forEach((btn) => {
