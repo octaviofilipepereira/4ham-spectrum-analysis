@@ -70,6 +70,37 @@ Last update: 2026-04-18 UTC
 - Receiver folder renamed from `external_academic_analytics_mirror/` to
   `external_academic_analytics/` to match the production deployment path.
 
+### Fixed (post-release patches on `unstable`)
+- **Per-table frontier watermark** (`payload.py`, ee22274): the shared
+  watermark now advances to `min(callsign_frontier, occupancy_frontier)`
+  instead of `max(...)`, so the faster table can no longer skip events of
+  the slower one. Each table's frontier is the DB MAX(id) when the scope is
+  inactive or fully drained, otherwise the MAX(id) of the events actually
+  included in the current batch.
+- **Mirror replication health endpoint** (`GET /api/admin/mirrors/health`,
+  2ed7e1b): per-mirror snapshot of `last_push_watermark`, source MAX(id),
+  per-table lag in ids, status (`ok` / `lagging` / `stalled` / `disabled`)
+  and consecutive failure count. Basic-auth protected, same as the rest of
+  the admin API.
+- **Admin UI surfacing of replication health** (`external-mirrors.js`,
+  14ab632): per-row badge in the watermark cell plus an aggregated
+  replication summary above the mirrors table.
+- **Installer hardening for fresh Mint 22.3 installs** (`install.sh`,
+  14ab632):
+  - detect & disable `SoapySDRServer` (soapyremote-server) before installing
+    SDR packages, otherwise it hijacks the local RTL device;
+  - resolve the user's localized desktop folder via `xdg-user-dir DESKTOP`
+    instead of hard-coding `$HOME/Desktop`, fixing the missing launcher on
+    Portuguese Cinnamon ("Área de Trabalho");
+  - also expose the kernel-module blacklist under the documented filename
+    `/etc/modprobe.d/blacklist-rtlsdr.conf` (symlink to the existing
+    `blacklist-rtl.conf`).
+- **`scripts/hash_password.py`** (14ab632): auto re-execs under
+  `.venv/bin/python` when invoked from outside the venv, so it works
+  immediately after install without `pip install bcrypt`.
+- **`frontend/favicon.ico`** (14ab632): bundled minimal 16×16 ICO so the
+  browser stops returning 404 for `/favicon.ico`.
+
 ---
 
 ## v0.13.3 - 2026-04-22

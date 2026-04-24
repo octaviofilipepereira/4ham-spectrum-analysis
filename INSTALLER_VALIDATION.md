@@ -34,6 +34,17 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 - ✅ Compila com cmake e instala
 - ✅ Adiciona blacklist dos módulos do kernel conflitantes
 
+**Robustez (v0.14.0 — patches 2026-04-24):**
+- ✅ `disable_soapysdr_server_if_running()` para e desabilita
+  `SoapySDRServer` antes de instalar pacotes SDR (evita hijack do RTL
+  local em sistemas com soapyremote-server activo, observado em
+  Mint 22.3 Zena).
+- ✅ Atalho `.desktop` colocado na pasta resolvida via `xdg-user-dir
+  DESKTOP` em vez de `$HOME/Desktop` hard-coded — corrige a ausência do
+  atalho em ambientes localizados (ex.: "Área de Trabalho" no Mint PT).
+- ✅ Cria também `/etc/modprobe.d/blacklist-rtlsdr.conf` como symlink
+  para `blacklist-rtl.conf`, satisfazendo o nome documentado.
+
 #### ✅ Decoders Externos
 | Decoder | Pacote | Instalado | Função |
 |---------|--------|-----------|--------|

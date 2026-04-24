@@ -8,8 +8,8 @@ Indicativo: CT7BFV
 
 > **Also available in:** [English](ROADMAP.md)
 
-**Versão Atual**: v0.12.4  
-**Última Atualização**: 2026-04-21  
+**Versão Atual**: v0.14.0 (unstable)  
+**Última Atualização**: 2026-04-24  
 **Estado**: 🟢 Produção-Ready (branch main)
 
 ---
@@ -65,7 +65,7 @@ Indicativo: CT7BFV
 | v0.12.2 | 2026-04-12 | Split SNR KPI (Digital vs CW/SSB), limpeza dashboard, docs embedding externo |
 | v0.12.1 | 2026-04-12 | Redesenho Mapa Propagação QTH-Cêtrico, modelo ionosférico NOAA SWPC, painel clima espacial |
 | v0.13.3 | 2026-04-22 | Revisão completa da documentação (foco exclusivo no pipeline APRS suportado) |
-| v0.14.0 | 2026-04-23 | Replicação push External Mirrors + espelho público do dashboard (snapshot bundler, receptor PHP/MySQL, réplica read-only totalmente pública) |
+| v0.14.0 | 2026-04-23 | Replicação push External Mirrors + espelho público do dashboard (snapshot bundler, receptor PHP/MySQL, réplica read-only totalmente pública). Patches pós-release em `unstable` (2026-04-24): frontier watermark por tabela, `GET /api/admin/mirrors/health`, badge de saúde na UI admin, robustez do instalador (Mint 22.3), favicon. |
 
 ---
 
