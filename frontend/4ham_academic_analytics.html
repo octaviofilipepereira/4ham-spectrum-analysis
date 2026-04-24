@@ -3130,7 +3130,9 @@ Last update: 2026-04-03 UTC
         // ── Band filter pills ──────────────────────────────────────────
         const filterDiv = document.createElement("div");
         filterDiv.className = "propmap-band-filter";
-        for (const band of Object.keys(iono.bands || {})) {
+        // Use BANDS constant to enforce correct frequency order
+        const availableBands = BANDS.filter(b => iono.bands && iono.bands[b]);
+        for (const band of availableBands) {
           const btn = document.createElement("button");
           const isOn = !!_pmBandVis[band];
           btn.className = "propmap-band-btn" + (isOn ? "" : " off");
