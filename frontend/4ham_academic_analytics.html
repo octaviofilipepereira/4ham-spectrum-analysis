@@ -3324,6 +3324,7 @@ Last update: 2026-04-03 UTC
                 mode: row.mode,
                 count: Number(row.count || 0),
                 snr: Number(row.snr || 0),
+                snrCount: Number(row.snr_count != null ? row.snr_count : row.count || 0),
               }))
               .filter((row) => !Number.isNaN(row.ts.getTime())),
             callsigns: callsigns
@@ -3422,14 +3423,22 @@ Last update: 2026-04-03 UTC
 
       function updateKpis(seriesRows, callsignRows, start, end) {
         const DIGITAL_KPI = new Set(["FT8", "FT4", "WSPR", "JT65", "JT9", "FST4", "FST4W", "Q65"]);
+        // Strict CW/SSB set — excludes RTTY/PSK31/BURST/etc which would skew the analog SNR
+        const ANALOG_KPI = new Set([
+          "CW", "CW_CANDIDATE", "CW_TRAFFIC",
+          "SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION",
+        ]);
         const totalEvents = d3.sum(seriesRows, (d) => d.count);
 
         const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
-        const anaRows = seriesRows.filter((d) => !DIGITAL_KPI.has(d.mode));
-        const digEvents = d3.sum(digRows, (d) => d.count);
-        const anaEvents = d3.sum(anaRows, (d) => d.count);
-        const snrDigital = digEvents > 0 ? d3.sum(digRows, (d) => d.count * d.snr) / digEvents : null;
-        const snrAnalog = anaEvents > 0 ? d3.sum(anaRows, (d) => d.count * d.snr) / anaEvents : null;
+        const anaRows = seriesRows.filter((d) => ANALOG_KPI.has(d.mode));
+        // Weight by snrCount (events that actually carry an SNR sample), not total
+        // count — otherwise buckets with many no-SNR events bias the average toward 0.
+        const _w = (d) => Number.isFinite(d.snrCount) ? d.snrCount : d.count;
+        const digSnrW = d3.sum(digRows, _w);
+        const anaSnrW = d3.sum(anaRows, _w);
+        const snrDigital = digSnrW > 0 ? d3.sum(digRows, (d) => _w(d) * d.snr) / digSnrW : null;
+        const snrAnalog = anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null;
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 

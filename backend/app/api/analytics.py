@@ -418,6 +418,7 @@ def academic_analytics(
                 "mode": row["mode"],
                 "count": int(row["count"]),
                 "snr": round(float(snr_avg), 3),
+                "snr_count": int(row["snr_count"]),
             }
         )
 
