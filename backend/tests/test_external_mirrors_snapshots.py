@@ -39,13 +39,16 @@ def test_build_snapshot_bundle_skips_failed_builders():
 
 
 def test_build_snapshot_bundle_keys_are_endpoint_paths():
-    """Successful builders produce entries keyed by the endpoint path."""
+    """Successful builders produce entries keyed by the endpoint path.
+
+    The bundle was slimmed down in the v0.14.0 receiver-side analytics
+    refactor: map/contacts and analytics/academic are now queried by the
+    receiver directly from MySQL instead of being shipped as snapshots.
+    """
     with patch.object(snapshots, "_snapshot_version", return_value={"version": "0.0.0", "app_version": "0.0.0"}), \
          patch.object(snapshots, "_snapshot_scan_status", return_value={"state": "stopped"}), \
          patch.object(snapshots, "_snapshot_settings", return_value={"station": {}}), \
-         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}), \
-         patch.object(snapshots, "_snapshot_map_contacts", return_value={"contacts": []}), \
-         patch.object(snapshots, "_snapshot_analytics_academic", return_value={"data": {}}):
+         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}):
         bundle = snapshots.build_snapshot_bundle()
 
     assert set(bundle.keys()) == {
@@ -53,8 +56,6 @@ def test_build_snapshot_bundle_keys_are_endpoint_paths():
         "scan/status",
         "settings",
         "map/ionospheric",
-        "map/contacts",
-        "analytics/academic",
     }
     for key, entry in bundle.items():
         assert "captured_at" in entry
@@ -67,9 +68,7 @@ def test_build_snapshot_bundle_partial_failure_omits_only_failed():
     with patch.object(snapshots, "_snapshot_version", return_value={"version": "x", "app_version": "x"}), \
          patch.object(snapshots, "_snapshot_scan_status", side_effect=RuntimeError("nope")), \
          patch.object(snapshots, "_snapshot_settings", return_value={"station": {}}), \
-         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}), \
-         patch.object(snapshots, "_snapshot_map_contacts", return_value={"contacts": []}), \
-         patch.object(snapshots, "_snapshot_analytics_academic", return_value={"data": {}}):
+         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}):
         bundle = snapshots.build_snapshot_bundle()
 
     assert "scan/status" not in bundle

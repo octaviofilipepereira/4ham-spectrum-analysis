@@ -82,7 +82,9 @@ def test_build_payload_returns_events_above_watermark(db):
     )
     assert payload["counts"]["callsign"] == 5
     assert payload["counts"]["occupancy"] == 3
-    assert payload["meta"]["new_watermark"] == 5
+    # Per-table frontier: new_watermark = min(callsign_max, occupancy_max)
+    # so the slower table (occupancy=3) is never skipped.
+    assert payload["meta"]["new_watermark"] == 3
     cs = payload["events"]["callsign"]
     assert [e["id"] for e in cs] == [1, 2, 3, 4, 5]
 
