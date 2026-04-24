@@ -31,6 +31,10 @@ cryptography
 # HTTP client (ionospheric data fetch)
 httpx
 
+# APRS packet parsing (Mic-E + all standard formats)
+# Used by direwolf_kiss.py, aprs_is.py and parsers.py
+aprslib
+
 # System utilities
 psutil
 
