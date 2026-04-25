@@ -176,4 +176,6 @@ def build_callsign_event(payload, scan_state):
         "power_dbm": payload.get("power_dbm"),
         "rf_gated": payload.get("rf_gated"),
         "weather": payload.get("weather"),
+        "symbol_table": payload.get("symbol_table"),
+        "symbol_code": payload.get("symbol_code"),
     }

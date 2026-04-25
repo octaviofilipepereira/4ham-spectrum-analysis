@@ -308,6 +308,13 @@ def academic_analytics(
                     raw_ev["weather"] = json.loads(weather_json)
                 except (ValueError, TypeError):
                     pass
+            # APRS symbol (table + code) — used by frontend to render icon
+            sym_table = event.get("symbol_table")
+            sym_code = event.get("symbol_code")
+            if sym_table:
+                raw_ev["symbol_table"] = sym_table
+            if sym_code:
+                raw_ev["symbol_code"] = sym_code
             # DXCC enrichment
             dxcc = callsign_to_dxcc(cs_val) if cs_val else None
             raw_ev["country"] = dxcc.get("country") if dxcc else None
