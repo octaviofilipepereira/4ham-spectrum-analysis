@@ -4914,7 +4914,20 @@ Last update: 2026-04-03 UTC
           // the inner callsign did NOT transmit on RF — it was injected via
           // internet and a local iGate re-broadcast it. Treat as a separate
           // logical source so the badge does not falsely credit RF.
-          const logicalSrc = (src === "direwolf" && e.rf_gated) ? "direwolf_gated" : src;
+          // Backwards-compat: events stored before the rf_gated migration
+          // have e.rf_gated === null; fall back to inferring from path/raw.
+          const inferRfGated = (ev) => {
+            if (ev.rf_gated === true || ev.rf_gated === 1) return true;
+            if (ev.rf_gated === false || ev.rf_gated === 0) return false;
+            const p = String(ev.path || ev.via || "").toUpperCase();
+            if (/(^|,)\s*TCP(IP|XX)\b/.test(p)) return true;
+            const raw = String(ev.raw || "");
+            // 3rd-party DTI: a colon followed by '}' marks encapsulation
+            if (/:\}/.test(raw)) return true;
+            return false;
+          };
+          const evRfGated = inferRfGated(e);
+          const logicalSrc = (src === "direwolf" && evRfGated) ? "direwolf_gated" : src;
           if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
           if (logicalSrc) {
             const ps = perSourceByCall.get(e.callsign);
@@ -4942,8 +4955,8 @@ Last update: 2026-04-03 UTC
           const existing = byCall.get(e.callsign);
           const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
           // Direct RF wins over RF-gated wins over APRS-IS for marker selection
-          const isDirectRf = src === "direwolf" && !e.rf_gated;
-          const existingIsDirectRf = existingSrc === "direwolf" && !existing?.rf_gated;
+          const isDirectRf = src === "direwolf" && !evRfGated;
+          const existingIsDirectRf = existingSrc === "direwolf" && existing && !inferRfGated(existing);
           const isRf = src === "direwolf" || src === "rf";
           const existingIsRf = existingSrc === "direwolf" || existingSrc === "rf";
           // Direct RF wins; among same type, keep latest
