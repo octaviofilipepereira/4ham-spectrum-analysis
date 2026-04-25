@@ -4731,6 +4731,23 @@ Last update: 2026-04-03 UTC
           `</span>`;
       }
 
+      // ── Format APRS weather fields for popup row ──────────────────────
+      // aprslib returns temperature in °F — convert to °C for display.
+      function aprsWxRow(w) {
+        if (!w || typeof w !== "object") return "";
+        const parts = [];
+        if (w.temperature != null) parts.push("🌡️ " + ((Number(w.temperature) - 32) * 5 / 9).toFixed(1) + "°C");
+        if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
+        if (w.wind_gust != null) parts.push("🌬️ " + Number(w.wind_gust).toFixed(1) + " m/s");
+        if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
+        if (w.humidity != null) parts.push("💧 " + w.humidity + "%");
+        if (w.pressure != null) parts.push("🔵 " + Number(w.pressure).toFixed(1) + " hPa");
+        if (w.rain_1h != null) parts.push("🌧️ " + Number(w.rain_1h).toFixed(2) + " mm/h");
+        if (w.rain_24h != null) parts.push("☔ " + Number(w.rain_24h).toFixed(2) + " mm/24h");
+        if (w.luminosity != null) parts.push("☀️ " + w.luminosity + " W/m²");
+        return parts.join("&nbsp;&nbsp;");
+      }
+
       // ── Build rich popup (matches main interface exactly) ────────────
       function aprsBuildPopup(e, perSource, seenRange) {
         const call = e.callsign || "—";

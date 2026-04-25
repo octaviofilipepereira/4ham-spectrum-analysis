@@ -100,6 +100,23 @@ function aprsSymbolHtml(table, code) {
   return html;
 }
 
+// Format APRS weather block (from aprslib `weather` dict) as a popup row.
+// aprslib emits temperature in °F, wind in m/s, pressure in hPa, rain mm/h.
+function aprsWxRow(w) {
+  if (!w || typeof w !== "object") return "";
+  const parts = [];
+  if (w.temperature != null) parts.push("🌡️ " + ((Number(w.temperature) - 32) * 5 / 9).toFixed(1) + "°C");
+  if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
+  if (w.wind_gust != null) parts.push("🌬️ " + Number(w.wind_gust).toFixed(1) + " m/s");
+  if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
+  if (w.humidity != null) parts.push("💧 " + w.humidity + "%");
+  if (w.pressure != null) parts.push("🔵 " + Number(w.pressure).toFixed(1) + " hPa");
+  if (w.rain_1h != null) parts.push("🌧️ " + Number(w.rain_1h).toFixed(2) + " mm/h");
+  if (w.rain_24h != null) parts.push("☔ " + Number(w.rain_24h).toFixed(2) + " mm/24h");
+  if (w.luminosity != null) parts.push("☀️ " + w.luminosity + " W/m²");
+  return parts.join("&nbsp;&nbsp;");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Decide whether an event represents an RF-gated transmission (3rd-party
@@ -661,6 +678,7 @@ export class APRSMapController {
           ${distText}
           ${perSourceRows}
           ${msg ? `<tr><td><strong>Comment</strong></td><td>${this.#escapeHtml(msg)}</td></tr>` : ""}
+          ${data.weather ? `<tr><td><strong>🌤️ WX</strong></td><td>${aprsWxRow(data.weather)}</td></tr>` : ""}
           ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${this.#escapeHtml(raw)}</td></tr>` : ""}
           <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
           <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>
