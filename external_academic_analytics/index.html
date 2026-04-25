@@ -1332,7 +1332,7 @@ Last update: 2026-04-03 UTC
     <div class="wrap">
       <section class="hero">
         <div class="hero-head">
-          <h1 id="dashboardTitle">4ham Spectrum Analysis v0.14.1 - Academic Analytics</h1>
+          <h1 id="dashboardTitle">4ham Spectrum Analysis v0.14.2 - Academic Analytics</h1>
           <div class="hero-side">
             <div class="lang-toggle">
               <button type="button" class="lang-btn" data-lang="en" onclick="setLang('en')" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text);cursor:pointer;">EN</button>
@@ -4991,10 +4991,13 @@ Last update: 2026-04-03 UTC
           const hasRf = perSource.has("direwolf");
           const hasRfGated = perSource.has("direwolf_gated");
           const hasLoRa = perSource.has("lora_aprs");
+          const hasIs = perSource.has("aprs_is");
+          // Marker priority: direct RF > APRS-IS > RF-gated.
           const sourceClass = hasRf
             ? "aprs-marker-rf"
-            : (hasRfGated ? "aprs-marker-rfgated"
-              : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is"));
+            : (hasIs ? "aprs-marker-is"
+              : (hasRfGated ? "aprs-marker-rfgated"
+                : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is")));
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
 
           // Vertically stack overlapping labels: when this callsign is part

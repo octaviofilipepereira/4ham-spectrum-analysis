@@ -7,6 +7,24 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.14.2 - 2026-04-25
+
+### Fixed
+- **APRS-IS frames no longer marked `rf_gated`.** Frames received over
+  TCP from APRS-IS always carry `TCPIP` in the path — that is the
+  *transport*, not an indication of an RF re-broadcast. The `rf_gated`
+  flag is now only meaningful for RF receivers (Direwolf KISS); the
+  APRS-IS adapter forces it to `NULL` ([backend/app/decoders/aprs_is.py](backend/app/decoders/aprs_is.py)).
+- **Marker priority on the map** is now `direct RF > APRS-IS > RF-gated`
+  instead of `direct RF > RF-gated > APRS-IS`. Stations that only beacon
+  on the internet (e.g. `CQ0DCO-S`) no longer appear as RF-gated
+  (mostarda) markers when a local iGate happens to re-broadcast their
+  frame on RF — they now correctly show as APRS-IS (verde) markers.
+  Mirrored to the cs5arc external dashboard.
+- One-shot SQL migration on production
+  (`UPDATE callsign_events SET rf_gated=NULL WHERE source='aprs_is'`)
+  to clear ~250 historical false positives.
+
 ## v0.14.1 - 2026-04-25
 
 ### Added — APRS RF-gated distinction
