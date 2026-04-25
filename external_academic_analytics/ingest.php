@@ -134,6 +134,7 @@ $callsignCols = [
     'snr_db', 'crest_db', 'df_hz', 'confidence', 'raw', 'grid', 'report',
     'time_s', 'dt_s', 'is_new', 'path', 'payload', 'lat', 'lon', 'msg',
     'source', 'device',
+    'symbol_table', 'symbol_code', 'weather_json',
 ];
 $occupancyCols = [
     'scan_id', 'timestamp', 'band', 'frequency_hz', 'bandwidth_hz',
