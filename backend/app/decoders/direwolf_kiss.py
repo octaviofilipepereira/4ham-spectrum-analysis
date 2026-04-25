@@ -246,6 +246,9 @@ def parse_kiss_frame(frame):
     # Fallback: legacy hand-rolled parser for the rare cases where aprslib
     # rejects the line (corrupt frames, non-APRS AX.25 traffic, etc.).
     extras, payload = _parse_aprs_payload(payload_text)
+    path_list = parsed.get("path") or []
+    path_tokens = [str(p).upper().rstrip("*") for p in path_list if p]
+    rf_gated = any(tok in ("TCPIP", "TCPXX") for tok in path_tokens)
     return {
         "callsign": parsed.get("src"),
         "raw": payload or (payload_text or ax25.hex()),
@@ -257,6 +260,7 @@ def parse_kiss_frame(frame):
         "msg": extras.get("msg"),
         "symbol_table": extras.get("symbol_table"),
         "symbol_code": extras.get("symbol_code"),
+        "rf_gated": rf_gated,
     }
 
 

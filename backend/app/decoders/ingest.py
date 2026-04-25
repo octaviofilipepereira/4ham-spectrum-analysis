@@ -174,4 +174,5 @@ def build_callsign_event(payload, scan_state):
         "device": payload.get("device") or scan_state.get("device"),
         "scan_id": payload.get("scan_id") or scan_state.get("scan_id"),
         "power_dbm": payload.get("power_dbm"),
+        "rf_gated": payload.get("rf_gated"),
     }

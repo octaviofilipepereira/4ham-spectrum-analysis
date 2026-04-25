@@ -1253,11 +1253,15 @@ Last update: 2026-04-03 UTC
       .aprs-popup__table td:first-child { white-space: nowrap; color: #475569; width: 85px; }
       .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
       .aprs-source-rf { background: #dcfce7; color: #166534; }
+      .aprs-source-rfgated { background: #fef3c7; color: #92400e; }
       .aprs-source-is { background: #dbeafe; color: #1e40af; }
       /* Marker source colours — must match the legend swatches below */
       .aprs-marker-rf   .aprs-station-label   { color: #f97316; border-color: #f97316; }
       .aprs-marker-rf   .aprs-station-leader,
       .aprs-marker-rf   .aprs-station-anchor  { background: #f97316; }
+      .aprs-marker-rfgated .aprs-station-label   { color: #a16207; border-color: #a16207; }
+      .aprs-marker-rfgated .aprs-station-leader,
+      .aprs-marker-rfgated .aprs-station-anchor  { background: #a16207; }
       .aprs-marker-is   .aprs-station-label   { color: #22c55e; border-color: #22c55e; }
       .aprs-marker-is   .aprs-station-leader,
       .aprs-marker-is   .aprs-station-anchor  { background: #22c55e; }
@@ -1626,6 +1630,7 @@ Last update: 2026-04-03 UTC
             <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (orange), APRS-IS (green) and LoRa APRS (magenta).</p>
             <div class="aprs-source-legend">
               <span><span class="swatch" style="background:#f97316;"></span> 📻 RF (Direwolf)</span>
+              <span><span class="swatch" style="background:#a16207;"></span> 🔁 RF-gated (3rd-party / TCPIP)</span>
               <span><span class="swatch" style="background:#22c55e;"></span> 🌐 APRS-IS (TCP)</span>
               <span><span class="swatch" style="background:#ec4899;"></span> 📡 LoRa APRS</span>
               <span><span class="swatch" style="background:#3b82f6;"></span> QTH</span>
@@ -4705,11 +4710,13 @@ Last update: 2026-04-03 UTC
         const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
         const ps = perSource instanceof Map ? perSource : new Map();
 
-        const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+        const hasRF = ps.has("direwolf");
+        const hasRFGated = ps.has("direwolf_gated");
         const hasLoRa = ps.has("lora_aprs");
         const hasTCP = ps.has("aprs_is");
         let sourceBadge = "";
-        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf" title="Heard directly on RF (144.800 MHz)">📻 RF</span>';
+        if (hasRFGated) sourceBadge += '<span class="aprs-source-badge aprs-source-rfgated" title="Originated on internet (TCPIP); a local iGate re-broadcast it on RF. The station did NOT transmit on RF.">🔁 RF-gated</span>';
         if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
         if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
@@ -4719,13 +4726,14 @@ Last update: 2026-04-03 UTC
           distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
         }
 
-        // Per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+        // Per-source rows (RF / RF-gated / LoRa / APRS-IS) — each with its own path/time
         const srcLabels = {
           direwolf: { icon: "📻", name: "RF" },
+          direwolf_gated: { icon: "🔁", name: "RF-gated" },
           lora_aprs: { icon: "📡", name: "LoRa" },
           aprs_is: { icon: "🌐", name: "APRS-IS" },
         };
-        const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+        const orderedKeys = ["direwolf", "direwolf_gated", "lora_aprs", "aprs_is"];
         let perSourceRows = "";
         for (const key of orderedKeys) {
           if (!ps.has(key)) continue;
@@ -4902,13 +4910,18 @@ Last update: 2026-04-03 UTC
             if (resolved) e = { ...e, lat: resolved.lat, lon: resolved.lon };
           }
           const src = (e.source || "").toLowerCase();
+          // RF-gated traffic (3rd-party `}` encapsulation or TCPIP path):
+          // the inner callsign did NOT transmit on RF — it was injected via
+          // internet and a local iGate re-broadcast it. Treat as a separate
+          // logical source so the badge does not falsely credit RF.
+          const logicalSrc = (src === "direwolf" && e.rf_gated) ? "direwolf_gated" : src;
           if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
-          if (src) {
+          if (logicalSrc) {
             const ps = perSourceByCall.get(e.callsign);
-            const prev = ps.get(src);
+            const prev = ps.get(logicalSrc);
             // keep the most recent event for this source
             if (!prev || (e.timestamp && new Date(e.timestamp) > new Date(prev.ts || 0))) {
-              ps.set(src, {
+              ps.set(logicalSrc, {
                 path: e.path || e.via || "",
                 raw: e.raw || "",
                 msg: e.msg || e.comment || "",
@@ -4928,19 +4941,29 @@ Last update: 2026-04-03 UTC
           }
           const existing = byCall.get(e.callsign);
           const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
+          // Direct RF wins over RF-gated wins over APRS-IS for marker selection
+          const isDirectRf = src === "direwolf" && !e.rf_gated;
+          const existingIsDirectRf = existingSrc === "direwolf" && !existing?.rf_gated;
           const isRf = src === "direwolf" || src === "rf";
           const existingIsRf = existingSrc === "direwolf" || existingSrc === "rf";
-          // RF always wins; among same type, keep latest
-          if (!existing || (isRf && !existingIsRf) || (isRf === existingIsRf && new Date(e.timestamp) > new Date(existing.timestamp))) {
+          // Direct RF wins; among same type, keep latest
+          if (!existing
+              || (isDirectRf && !existingIsDirectRf)
+              || (isRf && !existingIsRf)
+              || (isRf === existingIsRf && new Date(e.timestamp) > new Date(existing.timestamp))) {
             byCall.set(e.callsign, e);
           }
         });
 
         byCall.forEach((e, call) => {
           const perSource = perSourceByCall.get(call) || new Map();
-          const hasRf = [...perSource.keys()].some(s => s !== "aprs_is" && s !== "lora_aprs");
+          const hasRf = perSource.has("direwolf");
+          const hasRfGated = perSource.has("direwolf_gated");
           const hasLoRa = perSource.has("lora_aprs");
-          const sourceClass = hasRf ? "aprs-marker-rf" : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is");
+          const sourceClass = hasRf
+            ? "aprs-marker-rf"
+            : (hasRfGated ? "aprs-marker-rfgated"
+              : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is"));
           const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
 
           // Vertically stack overlapping labels: when this callsign is part

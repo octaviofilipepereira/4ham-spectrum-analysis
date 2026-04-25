@@ -50,6 +50,9 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
             "symbol_table": str | None,
             "symbol_code":  str | None,
             "format":       str,           # 'mic-e' / 'uncompressed' / ...
+            "rf_gated":     bool,          # True when the inner callsign
+                                           # did NOT transmit on RF (3rd-party
+                                           # encapsulation or TCPIP path).
         }
 
     Position-less packets (status, message, telemetry, weather without
@@ -75,15 +78,32 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
     # from other stations encapsulated in their own frame. The real
     # callsign + position lives in 'subpacket'. Unwrap (up to a few levels
     # in case of nested 3rd-party traffic, which is legal but rare).
+    was_thirdparty = False
     for _ in range(4):
         if parsed.get("format") == "thirdparty" and isinstance(parsed.get("subpacket"), dict):
             parsed = parsed["subpacket"]
+            was_thirdparty = True
         else:
             break
 
     src = parsed.get("from")
     if not src:
         return None
+
+    # Detect RF-gated traffic: the inner packet's path contains TCPIP/TCPXX,
+    # meaning the original station injected via internet — they did NOT
+    # transmit on RF. The outer (RF) station merely re-broadcast the
+    # internet packet. ``rf_gated=True`` tells the rest of the stack not to
+    # credit the inner callsign with a direct RF transmission.
+    inner_path = parsed.get("path") or []
+    if isinstance(inner_path, list):
+        path_tokens = [str(p).upper() for p in inner_path if p]
+    else:
+        path_tokens = [t.strip().upper() for t in str(inner_path).split(",") if t.strip()]
+    path_via_tcpip = any(
+        tok.rstrip("*") in ("TCPIP", "TCPXX") for tok in path_tokens
+    )
+    rf_gated = was_thirdparty or path_via_tcpip
 
     lat = parsed.get("latitude")
     lon = parsed.get("longitude")
@@ -122,6 +142,7 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
         "symbol_table": parsed.get("symbol_table"),
         "symbol_code":  parsed.get("symbol"),
         "format":       parsed.get("format"),
+        "rf_gated":     rf_gated,
     }
 
 

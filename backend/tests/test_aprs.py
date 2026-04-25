@@ -1127,3 +1127,73 @@ class TestMicE:
         assert ev["callsign"] == "CT1ABC"
         assert abs(ev["lat"] - 38.725) < 0.01
         assert abs(ev["lon"] - (-9.137)) < 0.01
+
+
+class TestRfGated:
+    """rf_gated detection: 3rd-party encapsulation and TCPIP-origin packets."""
+
+    def test_thirdparty_with_tcpip_inner_is_rf_gated(self):
+        """CQ0PCB re-broadcasts an internet packet on RF.
+        Inner callsign did NOT transmit on RF — must be flagged rf_gated=True.
+        """
+        from app.decoders.aprs_parser import parse_aprs_packet
+        line = (
+            "CQ0PCB>APU25N,WIDE2-2:"
+            "}CU6AR-8>APBM1D,TCPIP,CQ0PCB*:"
+            "@004416h3823.82N/02815.28WY326/000Princess I  Sailboat"
+        )
+        ev = parse_aprs_packet(line)
+        assert ev is not None
+        assert ev["callsign"] == "CU6AR-8"
+        assert ev["lat"] is not None
+        assert ev["lon"] is not None
+        assert ev["rf_gated"] is True
+
+    def test_thirdparty_without_tcpip_is_still_rf_gated(self):
+        """A 3rd-party wrapper alone (no TCPIP in inner path) still means
+        the inner station did not transmit *this* RF frame — the outer
+        gateway did.  Flag as rf_gated for safety.
+        """
+        from app.decoders.aprs_parser import parse_aprs_packet
+        line = (
+            "CQ0PCB>APU25N,WIDE2-2:"
+            "}CT1ABC>APRS,WIDE1-1,CQ0PCB*:"
+            "!3843.50N/00908.20W>Test"
+        )
+        ev = parse_aprs_packet(line)
+        assert ev is not None
+        assert ev["callsign"] == "CT1ABC"
+        assert ev["rf_gated"] is True
+
+    def test_direct_rf_packet_is_not_rf_gated(self):
+        """A normal RF beacon (no TCPIP, no 3rd-party) must NOT be flagged."""
+        from app.decoders.aprs_parser import parse_aprs_packet
+        line = "CT1ABC>APRS,WIDE1-1:!3843.50N/00908.20W>Direct RF beacon"
+        ev = parse_aprs_packet(line)
+        assert ev is not None
+        assert ev["callsign"] == "CT1ABC"
+        assert ev["rf_gated"] is False
+
+    def test_aprs_is_qar_packet_is_not_rf_gated(self):
+        """A packet seen on APRS-IS that was originally heard on RF by an
+        iGate (qAR construct, no TCPIP in path) must NOT be flagged rf_gated.
+        """
+        from app.decoders.aprs_parser import parse_aprs_packet
+        line = (
+            "CT4TX-9>T0QRYX,WIDE1-1,WIDE2-1,qAR,CQ0PCB:"
+            "`~5;l \x1cK\\>TH-D7e+GPSmap76"
+        )
+        ev = parse_aprs_packet(line)
+        assert ev is not None
+        assert ev["callsign"] == "CT4TX-9"
+        assert ev["rf_gated"] is False
+
+    def test_tcpip_path_without_thirdparty_is_rf_gated(self):
+        """Packet whose own path contains TCPIP* (origin = internet) must
+        be flagged rf_gated even without a 3rd-party wrapper."""
+        from app.decoders.aprs_parser import parse_aprs_packet
+        line = "CT4TX-4>APRS,TCPIP*,qAC,T2SYDNEY:!4013.02N/00825.22W% Test"
+        ev = parse_aprs_packet(line)
+        assert ev is not None
+        assert ev["callsign"] == "CT4TX-4"
+        assert ev["rf_gated"] is True
