@@ -71,6 +71,16 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
         # Defensive: never let a malformed packet take down the loop.
         return None
 
+    # Third-party traffic ('}' DTI): digipeaters/iGates re-transmit packets
+    # from other stations encapsulated in their own frame. The real
+    # callsign + position lives in 'subpacket'. Unwrap (up to a few levels
+    # in case of nested 3rd-party traffic, which is legal but rare).
+    for _ in range(4):
+        if parsed.get("format") == "thirdparty" and isinstance(parsed.get("subpacket"), dict):
+            parsed = parsed["subpacket"]
+        else:
+            break
+
     src = parsed.get("from")
     if not src:
         return None
