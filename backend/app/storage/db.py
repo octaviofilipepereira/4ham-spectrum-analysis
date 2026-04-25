@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS callsign_events (
     lon REAL,
     msg TEXT,
   source TEXT,
-  device TEXT
+  device TEXT,
+  rf_gated INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_occ_time ON occupancy_events(timestamp);
@@ -182,6 +183,11 @@ class Database:
         self._add_column("callsign_events", "power_dbm REAL")
         self._add_column("occupancy_events", "crest_db REAL")
         self._add_column("callsign_events", "crest_db REAL")
+        # APRS RF-gated flag: True when the inner callsign did NOT transmit
+        # on RF — its packet was carried over the air by a 3rd-party
+        # encapsulation (`}`) or originally injected via TCPIP. Stored as
+        # 0/1 INTEGER for SQLite compatibility.
+        self._add_column("callsign_events", "rf_gated INTEGER")
         # Encrypted-at-rest plaintext mirror token (for restart-safe pusher).
         self._add_column("external_mirrors", "auth_token_ciphertext TEXT")
         # Free-form Unicode label for the Admin UI (the slug-style ``name`` stays
@@ -538,8 +544,8 @@ class Database:
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
                 crest_db, df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
-                payload, lat, lon, msg, source, device, power_dbm
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                payload, lat, lon, msg, source, device, power_dbm, rf_gated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -565,7 +571,8 @@ class Database:
                 event.get("msg"),
                 event.get("source"),
                 event.get("device"),
-                event.get("power_dbm")
+                event.get("power_dbm"),
+                1 if event.get("rf_gated") else 0 if event.get("rf_gated") is not None else None,
             )
         )
         self.conn.commit()
@@ -644,7 +651,7 @@ class Database:
                 """
                  SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                      mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
-                     time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
+                     time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated
                 FROM callsign_events
                 WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
                 ORDER BY timestamp DESC
@@ -686,7 +693,7 @@ class Database:
                 """
                 SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                        mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
-                       time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm
+                       time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated
                 FROM callsign_events
                 WHERE 1=1 {filters}
                 ORDER BY timestamp DESC

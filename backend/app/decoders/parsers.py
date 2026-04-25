@@ -152,15 +152,27 @@ def extract_callsign(text):
 def parse_aprs_line(line):
     if not line:
         return None
-    line = str(line).strip()
-    if ">" not in line:
+    text = str(line).strip()
+    if not text or ">" not in text:
         return None
-    callsign = line.split(">", 1)[0].strip().upper()
+
+    # Try aprslib first — supports Mic-E, compressed, uncompressed, objects.
+    try:
+        from app.decoders.aprs_parser import parse_aprs_packet
+        event = parse_aprs_packet(text)
+        if event:
+            return event
+    except Exception:
+        pass
+
+    # Minimal fallback: at least preserve the source callsign so the line
+    # is still recorded as an APRS event (no position).
+    callsign = text.split(">", 1)[0].strip().upper()
     if not callsign:
         return None
     return {
         "callsign": callsign,
-        "raw": line,
+        "raw": text,
         "mode": "APRS"
     }
 

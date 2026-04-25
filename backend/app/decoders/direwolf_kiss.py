@@ -6,6 +6,8 @@
 import asyncio
 import os
 
+from app.decoders.aprs_parser import parse_aprs_packet, build_tnc2_line
+
 
 _FRAME_END = 0xC0
 _FRAME_ESC = 0xDB
@@ -225,10 +227,28 @@ def parse_kiss_frame(frame):
     if not parsed or not parsed.get("src"):
         return None
     info_bytes = parsed.get("info")
-    payload_text = None
-    if info_bytes:
-        payload_text = info_bytes.decode("utf-8", errors="ignore")
+    payload_text = info_bytes.decode("utf-8", errors="ignore") if info_bytes else ""
+
+    # Primary path: rebuild a TNC2 monitor line and feed aprslib so we get
+    # full APRS support including Mic-E (where lat/lon live in the AX.25
+    # destination field, not the payload).
+    tnc2 = build_tnc2_line(
+        parsed.get("src"),
+        parsed.get("dest"),
+        parsed.get("path"),
+        info_bytes,
+    )
+    event = parse_aprs_packet(tnc2) if tnc2 else None
+    if event:
+        event["payload"] = payload_text
+        return event
+
+    # Fallback: legacy hand-rolled parser for the rare cases where aprslib
+    # rejects the line (corrupt frames, non-APRS AX.25 traffic, etc.).
     extras, payload = _parse_aprs_payload(payload_text)
+    path_list = parsed.get("path") or []
+    path_tokens = [str(p).upper().rstrip("*") for p in path_list if p]
+    rf_gated = any(tok in ("TCPIP", "TCPXX") for tok in path_tokens)
     return {
         "callsign": parsed.get("src"),
         "raw": payload or (payload_text or ax25.hex()),
@@ -240,6 +260,7 @@ def parse_kiss_frame(frame):
         "msg": extras.get("msg"),
         "symbol_table": extras.get("symbol_table"),
         "symbol_code": extras.get("symbol_code"),
+        "rf_gated": rf_gated,
     }
 
 

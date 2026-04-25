@@ -327,9 +327,14 @@ que descodifica pacotes AX.25/APRS na frequência 144.800 MHz
 O backend liga-se ao Direwolf via KISS TCP (porta 8001)
 para receber pacotes APRS em tempo real.
 
+O parser APRS do backend usa a biblioteca 'aprslib'
+(instalada automaticamente via requirements.txt) e suporta
+todos os formatos: Mic-E (Kenwood TH-D7e/TM-D710, etc.),
+posição comprimida, descomprimida, objects e weather.
+
   SIM  ->  Instalar Direwolf e criar configuração KISS.
   NÃO  ->  Não instalar (pode adicionar manualmente depois)." \
-  18 70; then
+  22 72; then
   _install_direwolf=1
   _direwolf_label="Sim (Direwolf + KISS TCP na porta 8001)"
 fi
@@ -549,10 +554,15 @@ WHISPER_MODEL_SIZE=${_whisper_model_size:-tiny}
 EOF
 fi
 
-gauge_step 84 "Installing Python dependencies..."
+gauge_step 84 "Installing Python dependencies (fastapi, numpy, scipy, aprslib, ...)..."
 "$PYTHON_BIN" -m pip install --quiet --upgrade pip >> "$LOG_FILE" 2>&1
 "$PYTHON_BIN" -m pip install --quiet -r "$ROOT_DIR/backend/requirements.txt" \
   >> "$LOG_FILE" 2>&1 || abort "pip install failed"
+
+# Verify aprslib is importable — critical for APRS Mic-E decoding.
+if ! "$PYTHON_BIN" -c "import aprslib" >> "$LOG_FILE" 2>&1; then
+  abort "aprslib import failed after pip install (APRS decoding would be broken)"
+fi
 
 gauge_step 88 "Installing frontend JavaScript dependencies (npm)..."
 npm --prefix "$ROOT_DIR/frontend" install --no-fund --no-audit \

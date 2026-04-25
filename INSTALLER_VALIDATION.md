@@ -112,6 +112,11 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 | `bcrypt` | latest | ✅ Sim | Hash de passwords no SQLite |
 | `slowapi` | latest | ✅ Sim | Rate limiting |
 
+#### ✅ Decoders Externos
+| Pacote | Versão | Instalado | Função |
+|--------|--------|-----------|--------|
+| `aprslib` | latest | ✅ Sim | Parser APRS (Mic-E, comprimido, descomprimido, objects) — usado por `direwolf_kiss.py`, `aprs_is.py` e `parsers.py` |
+
 #### ✅ Utilities
 | Pacote | Versão | Instalado | Função |
 |--------|--------|-----------|--------|

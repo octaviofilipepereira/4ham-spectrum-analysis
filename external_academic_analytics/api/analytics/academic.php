@@ -83,7 +83,8 @@ try {
                 band       AS band,
                 $modeNorm  AS mode,
                 COUNT(*)   AS cnt,
-                AVG(snr_db) AS avg_snr
+                AVG(snr_db) AS avg_snr,
+                SUM(CASE WHEN snr_db IS NOT NULL THEN 1 ELSE 0 END) AS snr_cnt
             FROM mirror_callsign_events
            WHERE $whereSql
            GROUP BY ts, band, mode
@@ -92,11 +93,12 @@ try {
     $stmt->execute($params);
     foreach ($stmt->fetchAll() as $r) {
         $series[] = [
-            'ts'    => (string)$r['ts'],
-            'band'  => (string)($r['band'] ?? ''),
-            'mode'  => (string)$r['mode'],
-            'count' => (int)$r['cnt'],
-            'snr'   => $r['avg_snr'] !== null ? round((float)$r['avg_snr'], 2) : 0,
+            'ts'        => (string)$r['ts'],
+            'band'      => (string)($r['band'] ?? ''),
+            'mode'      => (string)$r['mode'],
+            'count'     => (int)$r['cnt'],
+            'snr'       => $r['avg_snr'] !== null ? round((float)$r['avg_snr'], 2) : 0,
+            'snr_count' => (int)($r['snr_cnt'] ?? 0),
         ];
     }
 } catch (Throwable $e) {

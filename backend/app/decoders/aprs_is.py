@@ -17,6 +17,8 @@ import os
 import re
 import socket
 
+from app.decoders.aprs_parser import parse_aprs_packet
+
 
 # ── Configuration ────────────────────────────────────────────────────
 
@@ -111,12 +113,23 @@ def _decode_compressed_lon(chars: str) -> float:
 def parse_aprs_is_line(line: str) -> dict | None:
     """
     Parse a single APRS-IS text line into an event dict.
-    Returns None for server comments, malformed lines, or lines without position.
+    Returns None for server comments, malformed lines, or packets without
+    a recognised position.
+
+    Delegates to aprslib via :mod:`app.decoders.aprs_parser`, which
+    supports the full APRS spec including Mic-E.  Falls back to the
+    legacy hand-rolled regexes for the few packets aprslib rejects.
     """
     if not line or line.startswith("#"):
         return None
 
-    # Try uncompressed position (! = / @)
+    event = parse_aprs_packet(line)
+    if event and event.get("lat") is not None and event.get("lon") is not None:
+        event["source"] = "aprs_is"
+        return event
+
+    # Legacy fallback (uncompressed / compressed / object) for packets
+    # aprslib could not handle.
     m = _POS_RE.match(line)
     if m:
         src, path_str, _dtype, lat_raw, sym_table, lon_raw, sym_code, comment = m.groups()
@@ -137,7 +150,6 @@ def parse_aprs_is_line(line: str) -> dict | None:
             "symbol_code": sym_code,
         }
 
-    # Try compressed position
     m = _COMPRESSED_RE.match(line)
     if m:
         src, path_str, _dtype, sym_table, lat_chars, lon_chars, sym_code, _csT, comment = m.groups()
@@ -160,7 +172,6 @@ def parse_aprs_is_line(line: str) -> dict | None:
         except (ValueError, IndexError):
             pass
 
-    # Try object/item
     m = _OBJECT_RE.match(line)
     if m:
         src, path_str, obj_name, lat_raw, sym_table, lon_raw, sym_code, comment = m.groups()
@@ -181,7 +192,6 @@ def parse_aprs_is_line(line: str) -> dict | None:
             "symbol_code": sym_code,
         }
 
-    # Lines without recognised position data — skip
     return None
 
 
