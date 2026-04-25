@@ -126,6 +126,11 @@ def parse_aprs_is_line(line: str) -> dict | None:
     event = parse_aprs_packet(line)
     if event and event.get("lat") is not None and event.get("lon") is not None:
         event["source"] = "aprs_is"
+        # Frames received over TCP from APRS-IS always carry TCPIP in the
+        # path – that is the *transport*, not an indication that a local
+        # iGate re-broadcast the frame on RF. The rf_gated flag is only
+        # meaningful for RF receivers (Direwolf KISS); force it off here.
+        event["rf_gated"] = None
         return event
 
     # Legacy fallback (uncompressed / compressed / object) for packets
