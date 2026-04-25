@@ -133,7 +133,7 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
 
     # Weather data: aprslib populates parsed["weather"] for WX packets
     # (symbol '_' or positionless WX). Keep only numeric fields; units as
-    # returned by aprslib (temperature °F, wind_speed m/s, pressure hPa,
+    # returned by aprslib (temperature °C, wind_speed m/s, pressure hPa,
     # humidity %, rain mm, luminosity W/m²).
     _wx = parsed.get("weather")
     if isinstance(_wx, dict) and _wx:

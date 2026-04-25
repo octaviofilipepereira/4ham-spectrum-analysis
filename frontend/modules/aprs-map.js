@@ -101,11 +101,11 @@ function aprsSymbolHtml(table, code) {
 }
 
 // Format APRS weather block (from aprslib `weather` dict) as a popup row.
-// aprslib emits temperature in °F, wind in m/s, pressure in hPa, rain mm/h.
+// aprslib emits temperature in °C, wind in m/s, pressure in hPa, rain mm/h.
 function aprsWxRow(w) {
   if (!w || typeof w !== "object") return "";
   const parts = [];
-  if (w.temperature != null) parts.push("🌡️ " + ((Number(w.temperature) - 32) * 5 / 9).toFixed(1) + "°C");
+  if (w.temperature != null) parts.push("🌡️ " + Number(w.temperature).toFixed(1) + "°C");
   if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
   if (w.wind_gust != null) parts.push("🌬️ " + Number(w.wind_gust).toFixed(1) + " m/s");
   if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
