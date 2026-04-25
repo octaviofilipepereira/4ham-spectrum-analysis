@@ -7,6 +7,43 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.14.1 - 2026-04-25
+
+### Added — APRS RF-gated distinction
+- **Backend** — new `rf_gated` flag on the unified APRS parser
+  (`backend/app/decoders/aprs_parser.py`): set to `True` when a packet is
+  carried in a 3rd-party `}` encapsulation OR when the inner path contains
+  `TCPIP` / `TCPXX`. Such packets reach RF only because a local iGate
+  (e.g. CQ0PCB) re-broadcast an internet-injected frame; the inner station
+  did NOT actually transmit on RF.
+- **Storage** — new column `rf_gated INTEGER NULL` on `callsign_events`,
+  added via idempotent migration. Persisted by `insert_callsign` and
+  returned by both `get_events` and `get_callsign_events` SELECT statements.
+- **Direwolf KISS legacy fallback** also detects `TCPIP` / `TCPXX` in the
+  path tokens.
+- **API** — `/api/analytics/academic` `raw_events` now expose the
+  `rf_gated` flag (bool / None).
+- **Internal Academic Analytics dashboard** (`frontend/4ham_academic_analytics.html`):
+  - New logical source `direwolf_gated` bucketed separately from direct
+    `direwolf` in the per-source map.
+  - New popup badge **🔁 RF-gated** (#a16207) with explanatory tooltip.
+  - New marker class `aprs-marker-rfgated` and a matching legend swatch.
+  - Marker selection priority: direct RF > RF-gated > APRS-IS.
+  - Client-side `inferRfGated()` fallback so legacy events with
+    `rf_gated=null` (stored before the migration) are still classified
+    correctly via path / raw inspection.
+- **External cs5arc mirror dashboard** (`external_academic_analytics/index.html`):
+  the same RF-gated semantics, badge, marker class, legend entry and
+  `inferRfGated()` fallback ported across.
+- **Tests** — new `TestRfGated` class with 5 cases in
+  `backend/tests/test_aprs.py` (97 tests in that file, 391 in the full
+  backend suite).
+
+### Fixed
+- `📻 RF` badge in the academic analytics popup no longer falsely credits
+  RF transmissions to stations whose packets were merely re-broadcast
+  on-air by a 3rd-party iGate (e.g. CQ0DFF-S relayed by CQ0PCB).
+
 ## v0.14.0 - 2026-04-23 (unstable)
 
 ### Added — External Mirrors (push replication) + Public Dashboard mirror
