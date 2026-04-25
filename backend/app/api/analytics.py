@@ -9,6 +9,7 @@ Academic Analytics API
 Aggregated analytics endpoints for academic dashboards.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from math import ceil, log1p
 from statistics import median, pstdev
@@ -300,6 +301,13 @@ def academic_analytics(
             # Stored as 0/1/NULL in DB; expose as bool/None for the frontend.
             rf_gated_val = event.get("rf_gated")
             raw_ev["rf_gated"] = bool(rf_gated_val) if rf_gated_val is not None else None
+            # Weather data (APRS WX stations)
+            weather_json = event.get("weather_json")
+            if weather_json:
+                try:
+                    raw_ev["weather"] = json.loads(weather_json)
+                except (ValueError, TypeError):
+                    pass
             # DXCC enrichment
             dxcc = callsign_to_dxcc(cs_val) if cs_val else None
             raw_ev["country"] = dxcc.get("country") if dxcc else None

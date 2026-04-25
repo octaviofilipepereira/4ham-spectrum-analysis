@@ -4716,6 +4716,20 @@ Last update: 2026-04-03 UTC
         return map[c] || "📍";
       }
 
+      // ── Format APRS weather fields for popup row ──────────────────────
+      function aprsWxRow(w) {
+        if (!w) return "";
+        const parts = [];
+        // aprslib returns temperature in °F — convert to °C
+        if (w.temperature != null) parts.push("🌡️ " + ((w.temperature - 32) * 5 / 9).toFixed(1) + "°C");
+        if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
+        if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
+        if (w.humidity != null) parts.push("💧 " + w.humidity + "%");
+        if (w.pressure != null) parts.push("🔵 " + Number(w.pressure).toFixed(1) + " hPa");
+        if (w.rain_1h != null) parts.push("🌧️ " + Number(w.rain_1h).toFixed(1) + " mm/h");
+        return parts.join("&nbsp;&nbsp;");
+      }
+
       // ── RF-gated detection (mirrors backend rule) ─────────────────────
       // Backend marks rf_gated=True when (a) the outer was a 3rd-party '}'
       // wrapper or (b) the inner path contains TCPIP / TCPXX. Legacy events
@@ -4800,6 +4814,7 @@ Last update: 2026-04-03 UTC
               ${distText}
               ${perSourceRows}
               ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
+              ${e.weather ? `<tr><td><strong>🌤️ WX</strong></td><td>${aprsWxRow(e.weather)}</td></tr>` : ""}
               ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${aprsEscapeHtml(raw)}</td></tr>` : ""}
               <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
               <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>

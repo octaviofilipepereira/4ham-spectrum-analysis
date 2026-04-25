@@ -4768,6 +4768,7 @@ Last update: 2026-04-03 UTC
               ${distText}
               ${perSourceRows}
               ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
+              ${e.weather ? `<tr><td><strong>🌤️ WX</strong></td><td>${aprsWxRow(e.weather)}</td></tr>` : ""}
               ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${aprsEscapeHtml(raw)}</td></tr>` : ""}
               <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
               <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>
