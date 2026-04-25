@@ -295,6 +295,11 @@ def academic_analytics(
             df = event.get("df_hz")
             raw_ev["df_hz"] = int(df) if df is not None else None
             raw_ev["source"] = str(event.get("source") or "").strip() or None
+            # rf_gated: True when the inner station did NOT actually transmit
+            # on RF on this leg (3rd-party encapsulation or TCPIP path token).
+            # Stored as 0/1/NULL in DB; expose as bool/None for the frontend.
+            rf_gated_val = event.get("rf_gated")
+            raw_ev["rf_gated"] = bool(rf_gated_val) if rf_gated_val is not None else None
             # DXCC enrichment
             dxcc = callsign_to_dxcc(cs_val) if cs_val else None
             raw_ev["country"] = dxcc.get("country") if dxcc else None
