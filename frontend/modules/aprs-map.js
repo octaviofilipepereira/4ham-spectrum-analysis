@@ -51,6 +51,30 @@ function aprsSymbolEmoji(table, code) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Decide whether an event represents an RF-gated transmission (3rd-party
+// frame originating on APRS-IS, retransmitted on RF by a local iGate).
+// The inner station did NOT actually transmit on RF.
+//   • direwolf  events: rf_gated reflects 3rd-party `}` encapsulation or
+//     TCPIP/TCPXX in the stored path (computed by aprs_parser.py).
+//   • aprs_is   events: rf_gated is forced to null by aprs_is.py because
+//     TCPIP in the path is the *transport* for IS, not RF re-broadcast.
+//   • Backwards-compat: events stored before the rf_gated migration may
+//     have rf_gated === null on direwolf rows; fall back to inspecting
+//     path/raw so legacy markers still classify correctly.
+function _inferRfGated(ev) {
+  if (!ev) return false;
+  if (ev.rf_gated === true || ev.rf_gated === 1) return true;
+  if (ev.rf_gated === false || ev.rf_gated === 0) return false;
+  const src = String(ev.source || "").toLowerCase();
+  if (src === "aprs_is" || src === "lora_aprs") return false;
+  const path = String(ev.path || "").toUpperCase();
+  if (path.includes("TCPIP") || path.includes("TCPXX")) return true;
+  const raw = String(ev.raw || "");
+  // 3rd-party DTI (`}`) immediately after `:` — e.g. `:}CT4TX-1>...`.
+  if (raw.includes(":}")) return true;
+  return false;
+}
+
 export class APRSMapController {
   #container;
   #map = null;
@@ -198,9 +222,13 @@ export class APRSMapController {
     if (existing) {
       // Update existing marker data
       existing.lastSeenMs = now;
-      // Track per-source last event (path/raw/msg/timestamp) — RF + LoRa + TCP
-      const src = String(evt.source || "").toLowerCase();
-      const hadRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+      // Track per-source last event (path/raw/msg/timestamp). A direwolf
+      // frame whose origin is APRS-IS (3rd-party / TCPIP) is bucketed as
+      // "direwolf_gated" so the popup and marker reflect that the inner
+      // station did NOT transmit on RF.
+      const rawSrc = String(evt.source || "").toLowerCase();
+      const src = (rawSrc === "direwolf" && _inferRfGated(evt)) ? "direwolf_gated" : rawSrc;
+      const prevClass = this.#pickSourceClass(existing.perSource);
       if (src) {
         existing.perSource.set(src, {
           path: evt.path || "",
@@ -209,16 +237,17 @@ export class APRSMapController {
           ts: evt.timestamp || new Date().toISOString(),
         });
       }
-      const hasRF = [...existing.perSource.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
       existing.data = { ...existing.data, ...evt, lastSeenMs: now };
       if (!existing.data.firstSeenMs) existing.data.firstSeenMs = now;
       if (hasPosition) {
         existing.marker.setLatLng([lat, lon]);
       }
-      // If station gained RF source, rebuild icon so RF style prevails
-      if (hasRF && !hadRF) {
+      // If marker priority changed (e.g. station was IS-only and is now
+      // also heard on direct RF), rebuild the icon so the colour matches.
+      const newClass = this.#pickSourceClass(existing.perSource);
+      if (newClass !== prevClass) {
         const emoji = aprsSymbolEmoji(existing.data.symbol_table, existing.data.symbol_code);
-        existing.marker.setIcon(this.#buildStationIcon(callsign, "aprs-marker-rf", emoji));
+        existing.marker.setIcon(this.#buildStationIcon(callsign, newClass, emoji));
       }
       existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.perSource));
       // Re-evaluate filter visibility (source may have changed)
@@ -233,15 +262,8 @@ export class APRSMapController {
     if (!hasPosition) return;
 
     const emoji = aprsSymbolEmoji(evt.symbol_table, evt.symbol_code);
-    const src = String(evt.source || "").toLowerCase();
-    let sourceClass;
-    if (src === "aprs_is") sourceClass = "aprs-marker-is";
-    else if (src === "lora_aprs") sourceClass = "aprs-marker-lora";
-    else sourceClass = "aprs-marker-rf";
-    const marker = L.marker([lat, lon], {
-      icon: this.#buildStationIcon(callsign, sourceClass, emoji),
-    });
-
+    const rawSrc = String(evt.source || "").toLowerCase();
+    const src = (rawSrc === "direwolf" && _inferRfGated(evt)) ? "direwolf_gated" : rawSrc;
     const perSource = new Map();
     if (src) {
       perSource.set(src, {
@@ -251,6 +273,10 @@ export class APRSMapController {
         ts: evt.timestamp || new Date().toISOString(),
       });
     }
+    const sourceClass = this.#pickSourceClass(perSource);
+    const marker = L.marker([lat, lon], {
+      icon: this.#buildStationIcon(callsign, sourceClass, emoji),
+    });
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
     marker.bindPopup(this.#buildPopup(data, perSource));
     this.#markers.set(callsign, { marker, data, perSource, lastSeenMs: now });
@@ -462,6 +488,21 @@ export class APRSMapController {
 
   // ── Private ───────────────────────────────────────────────────────────
 
+  /** Pick the marker CSS class for a station based on the sources it has
+   *  been heard on. Priority mirrors the Academic Analytics map:
+   *    direct RF (Direwolf)  >  APRS-IS (the station's real origin when
+   *    not heard directly on RF)  >  RF-gated (3rd-party re-broadcast,
+   *    inner station did NOT transmit)  >  LoRa.
+   */
+  #pickSourceClass(perSource) {
+    const ps = perSource instanceof Map ? perSource : new Map();
+    if (ps.has("direwolf"))        return "aprs-marker-rf";
+    if (ps.has("aprs_is"))         return "aprs-marker-is";
+    if (ps.has("direwolf_gated"))  return "aprs-marker-rfgated";
+    if (ps.has("lora_aprs"))       return "aprs-marker-lora";
+    return "aprs-marker-rf";
+  }
+
   /** Build a station icon. When the callsign collides with others at the
    *  same geographic point (per #stackByCall), the icon includes a vertical
    *  leader line and a small dot marking the exact coordinate, with the
@@ -510,11 +551,13 @@ export class APRSMapController {
 
     // Per-source tracking (path/raw/msg/ts for each source this station was heard on)
     const ps = perSource instanceof Map ? perSource : new Map();
-    const hasRF = [...ps.keys()].some((s) => s !== "aprs_is" && s !== "lora_aprs");
+    const hasRF = ps.has("direwolf");
+    const hasRFGated = ps.has("direwolf_gated");
     const hasLoRa = ps.has("lora_aprs");
     const hasTCP = ps.has("aprs_is");
     let sourceBadge = "";
     if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf">📻 RF</span>';
+    if (hasRFGated) sourceBadge += '<span class="aprs-source-badge aprs-source-rfgated" title="Originated on internet (TCPIP); a local iGate re-broadcast it on RF. The station did NOT transmit on RF.">🔁 RF-gated</span>';
     if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
     if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
@@ -525,13 +568,14 @@ export class APRSMapController {
       distText = `<tr><td><strong>Distance</strong></td><td>${d.toFixed(1)} km</td></tr>`;
     }
 
-    // Build per-source rows (RF / LoRa / APRS-IS) — each with its own path/time
+    // Build per-source rows (RF / RF-gated / LoRa / APRS-IS) — each with its own path/time
     const srcLabels = {
       direwolf: { icon: "📻", name: "RF" },
+      direwolf_gated: { icon: "🔁", name: "RF-gated" },
       lora_aprs: { icon: "📡", name: "LoRa" },
       aprs_is: { icon: "🌐", name: "APRS-IS" },
     };
-    const orderedKeys = ["direwolf", "lora_aprs", "aprs_is"];
+    const orderedKeys = ["direwolf", "direwolf_gated", "lora_aprs", "aprs_is"];
     let perSourceRows = "";
     for (const key of orderedKeys) {
       if (!ps.has(key)) continue;

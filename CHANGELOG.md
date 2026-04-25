@@ -7,6 +7,28 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.14.3 - 2026-04-25
+
+### Added — RF-gated 3-rule classification on the live APRS map
+- **Live APRS map** (`frontend/modules/aprs-map.js`) now mirrors the same
+  3-rule source classification already shipped on the Academic Analytics
+  dashboard: `direct RF` (verde) > `APRS-IS` (azul) > `RF-gated` (mostarda).
+- New private helper `_inferRfGated(event)` consolidates the legacy
+  `path` / `via` / `igate` heuristics with the authoritative `rf_gated`
+  flag from the backend (v0.14.1+), so older events without the flag
+  still classify correctly.
+- New `#pickSourceClass()` method centralises priority logic; used by
+  both marker styling and per-source bucketing in `addEvent()`.
+- Popup now shows a dedicated "🛰️ RF→IS" mostarda badge plus a per-source
+  row when a station has been heard via multiple paths.
+- New CSS classes `.aprs-source-rfgated` and `.aprs-marker-rfgated`
+  (mostarda `#fef3c7` / `#a16207`) in `frontend/styles.css`.
+
+### Changed
+- Academic Analytics dashboard title bumped to `v0.14.3` for consistency
+  (`frontend/4ham_academic_analytics.html`,
+   `external_academic_analytics/index.html`).
+
 ## v0.14.2 - 2026-04-25
 
 ### Fixed
