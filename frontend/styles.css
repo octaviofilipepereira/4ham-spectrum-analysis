@@ -1656,7 +1656,9 @@ h1,
   border: none !important;
 }
 .aprs-station-label {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: #0f172a;
   color: #38bdf8;
   padding: 2px 8px;
@@ -1667,11 +1669,24 @@ h1,
   border: 1px solid #334155;
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
+/* Official APRS sprite icon (24×24). Used inside the station label and
+   inside popups. The sprite sheets ship under frontend/vendor/aprs-symbols/.
+   Overlay glyphs (e.g. "D" over the alternate symbol "&" for D-STAR
+   gateways) are rendered by .aprs-symbol-stack with two stacked layers. */
+.aprs-symbol,
+.aprs-symbol-stack {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+  flex: 0 0 24px;
+  image-rendering: pixelated;
+}
 /* Stacked-marker leader (collision spread): vertical line + dot at the
    exact geographic point, label sits above. */
 .aprs-station-stack {
   position: relative;
-  width: 120px;
+  width: 140px;
   display: flex;
   flex-direction: column;
   align-items: center;
