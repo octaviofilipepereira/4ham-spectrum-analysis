@@ -1230,7 +1230,9 @@ Last update: 2026-04-03 UTC
       }
       .aprs-station-icon { background: none !important; border: none !important; }
       .aprs-station-label {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         background: #0f172a;
         color: #38bdf8;
         padding: 2px 8px;
@@ -1241,9 +1243,14 @@ Last update: 2026-04-03 UTC
         border: 1px solid #334155;
         box-shadow: 0 1px 4px rgba(0,0,0,.4);
       }
+      /* Official APRS sprite icon (24×24) — ships under vendor/aprs-symbols/. */
+      .aprs-symbol, .aprs-symbol-stack {
+        display: inline-block; width: 24px; height: 24px;
+        vertical-align: middle; flex: 0 0 24px; image-rendering: pixelated;
+      }
       /* Stacked-marker leader (collision spread): vertical line + dot at the
          exact geographic point, label sits above. */
-      .aprs-station-stack { position: relative; width: 120px; display: flex; flex-direction: column; align-items: center; }
+      .aprs-station-stack { position: relative; width: 140px; display: flex; flex-direction: column; align-items: center; }
       .aprs-station-leader { width: 2px; background: #38bdf8; box-shadow: 0 0 2px rgba(0,0,0,.6); }
       .aprs-station-anchor { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; border: 1.5px solid #0f172a; margin-top: -1px; box-shadow: 0 0 3px rgba(0,0,0,.6); }
       .aprs-popup { font-size: 12px; line-height: 1.5; min-width: 200px; }
@@ -4686,18 +4693,59 @@ Last update: 2026-04-03 UTC
         return d.innerHTML;
       }
 
-      // ── APRS symbol → emoji (matches main interface) ──────────────────
-      function aprsSymbolEmoji(table, code) {
-        if (!code) return "📡";
-        const c = code.charCodeAt ? code : String.fromCharCode(code);
-        const map = {
-          ">": "🚗", k: "🚚", b: "🚲", R: "🚐", Y: "⛵",
-          f: "🚒", a: "🚑", U: "🚌", v: "🚐", j: "🏍️",
-          "[": "🏃", O: "🎈", "^": "✈️", X: "🚁", "'": "✈️",
-          "-": "🏠", "#": "📡", "&": "⛽", n: "📶", r: "📻",
-          I: "📻", "/": "⚡", "\\": "⚡", _: "🌤️", W: "🌊",
-        };
-        return map[c] || "📍";
+      // ── APRS symbol → official sprite icon (hessu/aprs-symbols, same as aprs.fi)
+      // 16×6 grid of 24 px icons; index = code - 0x21. Three sheets:
+      //   sheet 0 = primary table "/", sheet 1 = alternate "\\",
+      //   sheet 2 = overlay glyphs (drawn on top of sheet 1).
+      const APRS_SPRITE_BASE = "vendor/aprs-symbols";
+      function aprsSymbolHtml(table, code) {
+        const sz = 24, cols = 16;
+        function cell(c) {
+          const ch = typeof c === "string" && c.length ? c.charCodeAt(0) : 0;
+          if (ch < 0x21 || ch > 0x7e) return null;
+          const i = ch - 0x21;
+          return { col: i % cols, row: Math.floor(i / cols) };
+        }
+        const cc = cell(code);
+        if (!cc) return "";
+        const t = typeof table === "string" ? table : "";
+        const isPrimary = t === "/" || t === "";
+        const isAlt = t === "\\";
+        const sheet = isPrimary ? 0 : 1;
+        const baseUrl = `${APRS_SPRITE_BASE}/aprs-symbols-24-${sheet}.png`;
+        const baseStyle =
+          `width:${sz}px;height:${sz}px;background-image:url('${baseUrl}');` +
+          `background-position:-${cc.col * sz}px -${cc.row * sz}px;` +
+          `background-repeat:no-repeat;background-size:${cols * sz}px auto;`;
+        if (isPrimary || isAlt) return `<span class="aprs-symbol" style="${baseStyle}"></span>`;
+        const oc = cell(t);
+        if (!oc) return `<span class="aprs-symbol" style="${baseStyle}"></span>`;
+        const overlayUrl = `${APRS_SPRITE_BASE}/aprs-symbols-24-2.png`;
+        const overlayStyle =
+          `width:${sz}px;height:${sz}px;position:absolute;top:0;left:0;background-image:url('${overlayUrl}');` +
+          `background-position:-${oc.col * sz}px -${oc.row * sz}px;` +
+          `background-repeat:no-repeat;background-size:${cols * sz}px auto;`;
+        return `<span class="aprs-symbol-stack" style="display:inline-block;position:relative;width:${sz}px;height:${sz}px;vertical-align:middle">` +
+          `<span class="aprs-symbol" style="${baseStyle}position:absolute;top:0;left:0"></span>` +
+          `<span class="aprs-symbol-overlay" style="${overlayStyle}"></span>` +
+          `</span>`;
+      }
+
+      // ── Format APRS weather fields for popup row ──────────────────────
+      // aprslib returns temperature in °F — convert to °C for display.
+      function aprsWxRow(w) {
+        if (!w || typeof w !== "object") return "";
+        const parts = [];
+        if (w.temperature != null) parts.push("🌡️ " + Number(w.temperature).toFixed(1) + "°C");
+        if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
+        if (w.wind_gust != null) parts.push("🌬️ " + Number(w.wind_gust).toFixed(1) + " m/s");
+        if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
+        if (w.humidity != null) parts.push("💧 " + w.humidity + "%");
+        if (w.pressure != null) parts.push("🔵 " + Number(w.pressure).toFixed(1) + " hPa");
+        if (w.rain_1h != null) parts.push("🌧️ " + Number(w.rain_1h).toFixed(2) + " mm/h");
+        if (w.rain_24h != null) parts.push("☔ " + Number(w.rain_24h).toFixed(2) + " mm/24h");
+        if (w.luminosity != null) parts.push("☀️ " + w.luminosity + " W/m²");
+        return parts.join("&nbsp;&nbsp;");
       }
 
       // ── Build rich popup (matches main interface exactly) ────────────
@@ -4707,7 +4755,7 @@ Last update: 2026-04-03 UTC
         const lon = Number(e.lon);
         const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
         const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-        const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+        const iconHtml = aprsSymbolHtml(e.symbol_table, e.symbol_code);
         const ps = perSource instanceof Map ? perSource : new Map();
 
         const hasRF = ps.has("direwolf");
@@ -4762,12 +4810,13 @@ Last update: 2026-04-03 UTC
 
         return `
           <div class="aprs-popup">
-            <div class="aprs-popup__header">${emoji} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
+            <div class="aprs-popup__header">${iconHtml} <strong>${aprsEscapeHtml(call)}</strong> ${sourceBadge}</div>
             <table class="aprs-popup__table">
               <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
               ${distText}
               ${perSourceRows}
               ${msg ? `<tr><td><strong>Comment</strong></td><td>${aprsEscapeHtml(msg)}</td></tr>` : ""}
+              ${e.weather ? `<tr><td><strong>🌤️ WX</strong></td><td>${aprsWxRow(e.weather)}</td></tr>` : ""}
               ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${aprsEscapeHtml(raw)}</td></tr>` : ""}
               <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
               <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>
@@ -4983,7 +5032,7 @@ Last update: 2026-04-03 UTC
             : (hasIs ? "aprs-marker-is"
               : (hasRfGated ? "aprs-marker-rfgated"
                 : (hasLoRa ? "aprs-marker-lora" : "aprs-marker-is")));
-          const emoji = aprsSymbolEmoji(e.symbol_table, e.symbol_code);
+          const iconHtml = aprsSymbolHtml(e.symbol_table, e.symbol_code);
 
           // Vertically stack overlapping labels: when this callsign is part
           // of a collision bucket, render label + leader line + anchor dot
@@ -4993,26 +5042,26 @@ Last update: 2026-04-03 UTC
           if (stackIdx === undefined) {
             icon = L.divIcon({
               className: `aprs-station-icon ${sourceClass}`,
-              html: `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>`,
-              iconSize: [120, 28],
-              iconAnchor: [60, 14]
+              html: `<span class="aprs-station-label">${iconHtml} ${aprsEscapeHtml(call)}</span>`,
+              iconSize: [140, 32],
+              iconAnchor: [70, 16]
             });
           } else {
-            const labelH = 22;
+            const labelH = 30;
             const dotH = 8;
-            const stepPx = 28;
+            const stepPx = 32;
             const leaderH = 6 + stackIdx * stepPx;
             const totalH = labelH + leaderH + dotH;
             icon = L.divIcon({
               className: `aprs-station-icon ${sourceClass}`,
               html:
                 `<div class="aprs-station-stack">` +
-                  `<span class="aprs-station-label">${emoji} ${aprsEscapeHtml(call)}</span>` +
+                  `<span class="aprs-station-label">${iconHtml} ${aprsEscapeHtml(call)}</span>` +
                   `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
                   `<span class="aprs-station-anchor"></span>` +
                 `</div>`,
-              iconSize: [120, totalH],
-              iconAnchor: [60, totalH - dotH / 2]
+              iconSize: [140, totalH],
+              iconAnchor: [70, totalH - dotH / 2]
             });
           }
           const marker = L.marker([e.lat, e.lon], { icon });

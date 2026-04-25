@@ -234,6 +234,16 @@ def sanitize_events_for_api(items: List[Dict]) -> List[Dict]:
     for item in items or []:
         row = dict(item)
 
+        # Deserialize APRS weather_json (TEXT column) into a `weather` dict so
+        # frontends can render the WX row without re-parsing JSON themselves.
+        if row.get("weather") in (None, "") and row.get("weather_json"):
+            wj = row.get("weather_json")
+            if isinstance(wj, str) and wj.strip():
+                try:
+                    row["weather"] = json.loads(wj)
+                except Exception:
+                    pass
+
         # Backward compatibility: older callsign rows may carry CW metrics
         # only inside payload JSON; expose crest_db at top-level for the UI.
         if row.get("crest_db") is None and str(row.get("type") or "") == "callsign":

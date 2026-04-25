@@ -188,6 +188,12 @@ class Database:
         # encapsulation (`}`) or originally injected via TCPIP. Stored as
         # 0/1 INTEGER for SQLite compatibility.
         self._add_column("callsign_events", "rf_gated INTEGER")
+        # APRS weather payload (JSON): populated for WX stations (symbol '_').
+        self._add_column("callsign_events", "weather_json TEXT")
+        # APRS symbol identifier: table ('/' primary, '\' alternate, or overlay
+        # letter) + code (1 char). Used by the frontend to render station icons.
+        self._add_column("callsign_events", "symbol_table TEXT")
+        self._add_column("callsign_events", "symbol_code TEXT")
         # Encrypted-at-rest plaintext mirror token (for restart-safe pusher).
         self._add_column("external_mirrors", "auth_token_ciphertext TEXT")
         # Free-form Unicode label for the Admin UI (the slug-style ``name`` stays
@@ -544,8 +550,9 @@ class Database:
             INSERT INTO callsign_events(
                 scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
                 crest_db, df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
-                payload, lat, lon, msg, source, device, power_dbm, rf_gated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                payload, lat, lon, msg, source, device, power_dbm, rf_gated, weather_json,
+                symbol_table, symbol_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event.get("scan_id"),
@@ -573,6 +580,9 @@ class Database:
                 event.get("device"),
                 event.get("power_dbm"),
                 1 if event.get("rf_gated") else 0 if event.get("rf_gated") is not None else None,
+                json.dumps(event["weather"]) if event.get("weather") else None,
+                event.get("symbol_table"),
+                event.get("symbol_code"),
             )
         )
         self.conn.commit()
@@ -651,7 +661,8 @@ class Database:
                 """
                  SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                      mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
-                     time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated
+                     time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated, weather_json,
+                     symbol_table, symbol_code
                 FROM callsign_events
                 WHERE 1=1 {band_filter} {mode_filter} {callsign_filter} {snr_filter} {time_filter}
                 ORDER BY timestamp DESC
@@ -693,7 +704,8 @@ class Database:
                 """
                 SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz,
                        mode, callsign, snr_db, crest_db, df_hz, confidence, raw, grid, report,
-                       time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated
+                       time_s, dt_s, is_new, path, payload, lat, lon, msg, source, device, power_dbm, rf_gated, weather_json,
+                       symbol_table, symbol_code
                 FROM callsign_events
                 WHERE 1=1 {filters}
                 ORDER BY timestamp DESC

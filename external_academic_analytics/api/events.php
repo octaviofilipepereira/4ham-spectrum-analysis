@@ -103,7 +103,8 @@ $cap = $limit + $offset + 100;
 
 $selectCallsign = "SELECT 'callsign' AS type, scan_id, timestamp, band, frequency_hz, mode,
                           callsign, snr_db, crest_db, df_hz, confidence, payload, grid,
-                          report, time_s, dt_s, is_new, path, lat, lon, msg, source, device
+                          report, time_s, dt_s, is_new, path, lat, lon, msg, source, device,
+                          symbol_table, symbol_code, weather_json
                      FROM mirror_callsign_events" . $callWhere
                 . " ORDER BY timestamp DESC LIMIT " . (int)$cap;
 
@@ -112,6 +113,7 @@ $selectOccupancy = "SELECT 'occupancy' AS type, scan_id, timestamp, band, freque
                            NULL AS payload, NULL AS grid, NULL AS report, NULL AS time_s,
                            NULL AS dt_s, NULL AS is_new, NULL AS path, NULL AS lat, NULL AS lon,
                            NULL AS msg, NULL AS source, device,
+                           NULL AS symbol_table, NULL AS symbol_code, NULL AS weather_json,
                            bandwidth_hz, power_dbm, threshold_dbm, occupied
                       FROM mirror_occupancy_events" . $occWhere
                  . " ORDER BY timestamp DESC LIMIT " . (int)$cap;
@@ -172,6 +174,11 @@ foreach ($callsignRows as $row) {
     }
     if (empty($row['band'])) {
         $row['band'] = fourham_infer_band(isset($row['frequency_hz']) ? (int)$row['frequency_hz'] : null);
+    }
+    // Deserialize APRS weather_json -> weather dict for the frontend.
+    if (!empty($row['weather_json']) && empty($row['weather'])) {
+        $w = json_decode((string)$row['weather_json'], true);
+        if (is_array($w)) $row['weather'] = $w;
     }
     $merged[] = $row;
 }

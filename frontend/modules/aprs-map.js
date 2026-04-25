@@ -34,19 +34,87 @@ const APRS_RECENT_WINDOW_MIN = 30; // load events from last 30 min on init
 
 import { maidenheadToLatLon } from "./utils.js";
 
-// ── APRS symbol → emoji (best-effort) ───────────────────────────────────
-function aprsSymbolEmoji(table, code) {
-  if (!code) return "📡";
-  const c = code.charCodeAt ? code : String.fromCharCode(code);
-  // Primary table symbols
-  const map = {
-    ">": "🚗", "k": "🚚", "b": "🚲", "R": "🚐", "Y": "⛵",
-    "f": "🚒", "a": "🚑", "U": "🚌", "v": "🚐", "j": "🏍️",
-    "[": "🏃", "O": "🎈", "^": "✈️", "X": "🚁", "'": "✈️",
-    "-": "🏠", "#": "📡", "&": "⛽", "n": "📶", "r": "📻",
-    "I": "📻", "/": "⚡", "\\": "⚡", "_": "🌤️", "W": "🌊",
-  };
-  return map[c] || "📍";
+// ── APRS symbol → official sprite icon ──────────────────────────────────
+// Uses the hessu/aprs-symbols sprite sheets (24 px, the same icons used by
+// aprs.fi). The sheet is a 16×6 grid: index = code - 0x21 (33), so cell
+// (col,row) = (index % 16, index / 16). Three sheets are vendored under
+// frontend/vendor/aprs-symbols/:
+//   • aprs-symbols-24-0.png  — primary table  "/"
+//   • aprs-symbols-24-1.png  — alternate table "\\"
+//   • aprs-symbols-24-2.png  — overlay glyphs (drawn on top of alt sheet)
+// For an overlayed station (table is a letter/digit, not '/' nor '\\'), we
+// stack the overlay glyph on top of the alternate-table icon — exactly the
+// same convention as the official APRS spec.
+const APRS_SPRITE_BASE = "vendor/aprs-symbols";
+const APRS_SPRITE_SIZE = 24; // pixels per icon
+const APRS_SPRITE_COLS = 16;
+function aprsSymbolSprite(table, code) {
+  // Resolve the (col,row) for a given printable APRS symbol code.
+  function cellFor(c) {
+    const ch = typeof c === "string" && c.length > 0 ? c.charCodeAt(0) : 0;
+    if (ch < 0x21 || ch > 0x7e) return null;
+    const idx = ch - 0x21;
+    return { col: idx % APRS_SPRITE_COLS, row: Math.floor(idx / APRS_SPRITE_COLS) };
+  }
+  const codeCell = cellFor(code);
+  if (!codeCell) return null;
+  const t = typeof table === "string" ? table : "";
+  const isPrimary = t === "/" || t === "";
+  const isAlt = t === "\\";
+  const sheet = isPrimary ? 0 : 1; // both alt and overlay use sheet 1 for the base icon
+  // Overlay glyph: only when table is neither "/" nor "\\".
+  let overlayCell = null;
+  if (!isPrimary && !isAlt) {
+    overlayCell = cellFor(t);
+  }
+  return { sheet, codeCell, overlayCell };
+}
+
+// Build inline HTML for a single 24×24 APRS symbol icon (with optional
+// overlay glyph on top). Returns "" when the symbol cannot be resolved so
+// callers can fall back gracefully.
+function aprsSymbolHtml(table, code) {
+  const sym = aprsSymbolSprite(table, code);
+  if (!sym) return "";
+  const sz = APRS_SPRITE_SIZE;
+  const baseUrl = `${APRS_SPRITE_BASE}/aprs-symbols-24-${sym.sheet}.png`;
+  const baseStyle =
+    `width:${sz}px;height:${sz}px;` +
+    `background-image:url('${baseUrl}');` +
+    `background-position:-${sym.codeCell.col * sz}px -${sym.codeCell.row * sz}px;` +
+    `background-repeat:no-repeat;background-size:${APRS_SPRITE_COLS * sz}px auto;`;
+  let html = `<span class="aprs-symbol" style="${baseStyle}"></span>`;
+  if (sym.overlayCell) {
+    const overlayUrl = `${APRS_SPRITE_BASE}/aprs-symbols-24-2.png`;
+    const overlayStyle =
+      `width:${sz}px;height:${sz}px;position:absolute;top:0;left:0;` +
+      `background-image:url('${overlayUrl}');` +
+      `background-position:-${sym.overlayCell.col * sz}px -${sym.overlayCell.row * sz}px;` +
+      `background-repeat:no-repeat;background-size:${APRS_SPRITE_COLS * sz}px auto;`;
+    html =
+      `<span class="aprs-symbol-stack" style="display:inline-block;position:relative;width:${sz}px;height:${sz}px;vertical-align:middle">` +
+        `<span class="aprs-symbol" style="${baseStyle}position:absolute;top:0;left:0"></span>` +
+        `<span class="aprs-symbol-overlay" style="${overlayStyle}"></span>` +
+      `</span>`;
+  }
+  return html;
+}
+
+// Format APRS weather block (from aprslib `weather` dict) as a popup row.
+// aprslib emits temperature in °C, wind in m/s, pressure in hPa, rain mm/h.
+function aprsWxRow(w) {
+  if (!w || typeof w !== "object") return "";
+  const parts = [];
+  if (w.temperature != null) parts.push("🌡️ " + Number(w.temperature).toFixed(1) + "°C");
+  if (w.wind_speed != null) parts.push("💨 " + Number(w.wind_speed).toFixed(1) + " m/s");
+  if (w.wind_gust != null) parts.push("🌬️ " + Number(w.wind_gust).toFixed(1) + " m/s");
+  if (w.wind_direction != null) parts.push("@ " + w.wind_direction + "°");
+  if (w.humidity != null) parts.push("💧 " + w.humidity + "%");
+  if (w.pressure != null) parts.push("🔵 " + Number(w.pressure).toFixed(1) + " hPa");
+  if (w.rain_1h != null) parts.push("🌧️ " + Number(w.rain_1h).toFixed(2) + " mm/h");
+  if (w.rain_24h != null) parts.push("☔ " + Number(w.rain_24h).toFixed(2) + " mm/24h");
+  if (w.luminosity != null) parts.push("☀️ " + w.luminosity + " W/m²");
+  return parts.join("&nbsp;&nbsp;");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -246,8 +314,8 @@ export class APRSMapController {
       // also heard on direct RF), rebuild the icon so the colour matches.
       const newClass = this.#pickSourceClass(existing.perSource);
       if (newClass !== prevClass) {
-        const emoji = aprsSymbolEmoji(existing.data.symbol_table, existing.data.symbol_code);
-        existing.marker.setIcon(this.#buildStationIcon(callsign, newClass, emoji));
+        const iconHtml = aprsSymbolHtml(existing.data.symbol_table, existing.data.symbol_code);
+        existing.marker.setIcon(this.#buildStationIcon(callsign, newClass, iconHtml));
       }
       existing.marker.setPopupContent(this.#buildPopup(existing.data, existing.perSource));
       // Re-evaluate filter visibility (source may have changed)
@@ -261,7 +329,7 @@ export class APRSMapController {
     // New station — only add if we have position
     if (!hasPosition) return;
 
-    const emoji = aprsSymbolEmoji(evt.symbol_table, evt.symbol_code);
+    const iconHtml = aprsSymbolHtml(evt.symbol_table, evt.symbol_code);
     const rawSrc = String(evt.source || "").toLowerCase();
     const src = (rawSrc === "direwolf" && _inferRfGated(evt)) ? "direwolf_gated" : rawSrc;
     const perSource = new Map();
@@ -275,7 +343,7 @@ export class APRSMapController {
     }
     const sourceClass = this.#pickSourceClass(perSource);
     const marker = L.marker([lat, lon], {
-      icon: this.#buildStationIcon(callsign, sourceClass, emoji),
+      icon: this.#buildStationIcon(callsign, sourceClass, iconHtml),
     });
     const data = { ...evt, firstSeenMs: now, lastSeenMs: now };
     marker.bindPopup(this.#buildPopup(data, perSource));
@@ -509,33 +577,33 @@ export class APRSMapController {
    *  label sitting above it; each colliding station gets a taller leader so
    *  every label is readable.
    */
-  #buildStationIcon(callsign, sourceClass, emoji) {
+  #buildStationIcon(callsign, sourceClass, iconHtml) {
     const stackIdx = this.#stackByCall.get(callsign);
     if (stackIdx === undefined) {
       // Solitary marker — keep the original compact icon.
       return L.divIcon({
         className: `aprs-station-icon ${sourceClass}`,
-        html: `<span class="aprs-station-label">${emoji} ${callsign}</span>`,
-        iconSize: [120, 28],
-        iconAnchor: [60, 14],
+        html: `<span class="aprs-station-label">${iconHtml} ${callsign}</span>`,
+        iconSize: [140, 32],
+        iconAnchor: [70, 16],
       });
     }
     // Stacked marker — label + leader line + anchor dot.
-    const labelH = 22;
+    const labelH = 30;
     const dotH = 8;
-    const stepPx = 28; // gap between successive labels
-    const leaderH = 6 + stackIdx * stepPx; // bottom-most: 6 px, next: 34, 62, ...
+    const stepPx = 32; // gap between successive labels
+    const leaderH = 6 + stackIdx * stepPx; // bottom-most: 6 px, next: 38, 70, ...
     const totalH = labelH + leaderH + dotH;
     return L.divIcon({
       className: `aprs-station-icon ${sourceClass}`,
       html:
         `<div class="aprs-station-stack">` +
-          `<span class="aprs-station-label">${emoji} ${callsign}</span>` +
+          `<span class="aprs-station-label">${iconHtml} ${callsign}</span>` +
           `<span class="aprs-station-leader" style="height:${leaderH}px"></span>` +
           `<span class="aprs-station-anchor"></span>` +
         `</div>`,
-      iconSize: [120, totalH],
-      iconAnchor: [60, totalH - dotH / 2],
+      iconSize: [140, totalH],
+      iconAnchor: [70, totalH - dotH / 2],
     });
   }
 
@@ -545,7 +613,7 @@ export class APRSMapController {
     const lon = Number(data.lon);
     const latStr = Number.isFinite(lat) ? lat.toFixed(4) + "°" : "—";
     const lonStr = Number.isFinite(lon) ? lon.toFixed(4) + "°" : "—";
-    const emoji = aprsSymbolEmoji(data.symbol_table, data.symbol_code);
+    const iconHtml = aprsSymbolHtml(data.symbol_table, data.symbol_code);
     const firstSeen = data.firstSeenMs ? _fmtPtLocal(new Date(data.firstSeenMs)) : "—";
     const lastSeen = data.lastSeenMs ? _fmtPtLocal(new Date(data.lastSeenMs)) : "—";
 
@@ -604,12 +672,13 @@ export class APRSMapController {
 
     return `
       <div class="aprs-popup">
-        <div class="aprs-popup__header">${emoji} <strong>${callsign}</strong> ${sourceBadge}</div>
+        <div class="aprs-popup__header">${iconHtml} <strong>${callsign}</strong> ${sourceBadge}</div>
         <table class="aprs-popup__table">
           <tr><td><strong>Position</strong></td><td>${latStr} N &nbsp; ${lonStr} E</td></tr>
           ${distText}
           ${perSourceRows}
           ${msg ? `<tr><td><strong>Comment</strong></td><td>${this.#escapeHtml(msg)}</td></tr>` : ""}
+          ${data.weather ? `<tr><td><strong>🌤️ WX</strong></td><td>${aprsWxRow(data.weather)}</td></tr>` : ""}
           ${raw && raw !== msg ? `<tr><td><strong>Raw</strong></td><td style="font-size:10px;word-break:break-all">${this.#escapeHtml(raw)}</td></tr>` : ""}
           <tr><td><strong>First seen</strong></td><td>${firstSeen}</td></tr>
           <tr><td><strong>Last seen</strong></td><td>${lastSeen}</td></tr>

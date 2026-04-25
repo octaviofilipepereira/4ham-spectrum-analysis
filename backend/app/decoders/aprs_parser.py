@@ -131,6 +131,23 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
     else:
         comment = None
 
+    # Weather data: aprslib populates parsed["weather"] for WX packets
+    # (symbol '_' or positionless WX). Keep only numeric fields; units as
+    # returned by aprslib (temperature °C, wind_speed m/s, pressure hPa,
+    # humidity %, rain mm, luminosity W/m²).
+    _wx = parsed.get("weather")
+    if isinstance(_wx, dict) and _wx:
+        _wx_keys = (
+            "temperature", "wind_speed", "wind_direction", "wind_gust",
+            "humidity", "pressure", "rain_1h", "rain_24h",
+            "rain_midnight", "luminosity", "snow",
+        )
+        weather = {k: _wx[k] for k in _wx_keys if _wx.get(k) is not None}
+        if not weather:
+            weather = None
+    else:
+        weather = None
+
     return {
         "callsign":     str(src).upper(),
         "path":         path_str,
@@ -143,6 +160,7 @@ def parse_aprs_packet(line: str) -> Optional[dict]:
         "symbol_code":  parsed.get("symbol"),
         "format":       parsed.get("format"),
         "rf_gated":     rf_gated,
+        "weather":      weather,
     }
 
 

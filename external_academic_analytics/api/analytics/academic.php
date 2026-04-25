@@ -148,7 +148,8 @@ try {
 $rawEvents = [];
 try {
     $sql = "SELECT timestamp, band, $modeNorm AS mode, snr_db,
-                   frequency_hz, callsign, grid, lat, lon
+                   frequency_hz, callsign, grid, lat, lon,
+                   symbol_table, symbol_code, weather_json
               FROM mirror_callsign_events
              WHERE $whereSql
              ORDER BY timestamp DESC
@@ -156,6 +157,11 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     foreach ($stmt->fetchAll() as $r) {
+        $weather = null;
+        if (!empty($r['weather_json'])) {
+            $w = json_decode((string)$r['weather_json'], true);
+            if (is_array($w)) $weather = $w;
+        }
         $rawEvents[] = [
             'timestamp'    => (string)$r['timestamp'],
             'type'         => 'callsign',
@@ -167,6 +173,9 @@ try {
             'grid'         => (string)($r['grid'] ?? '') ?: null,
             'lat'          => $r['lat'] !== null ? (float)$r['lat'] : null,
             'lon'          => $r['lon'] !== null ? (float)$r['lon'] : null,
+            'symbol_table' => (string)($r['symbol_table'] ?? '') ?: null,
+            'symbol_code'  => (string)($r['symbol_code'] ?? '')  ?: null,
+            'weather'      => $weather,
         ];
     }
 } catch (Throwable $_e) {
