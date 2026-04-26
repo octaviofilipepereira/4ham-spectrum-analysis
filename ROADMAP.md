@@ -285,6 +285,19 @@ Last update: 2026-04-21
 - [ ] Goal: open, modern, headless, multi-user replacement for Faros/BeaconSee — datasets accessible via REST/WebSocket and pushable to cs5arc mirror
 - [ ] Reuses existing primitives: `scan_park`, `estimate_snr`, CW decoder, propagation map, mirror push pipeline (~700 lines new code, no new dependencies)
 
+#### 8.7. FT2 Mode — Experimental Tracking 🧪
+- [ ] **Observer-only** — track upstream maturity before any decoder investment
+- [ ] Source: WSJT-X Improved fork by Uwe Risse (DG2YCB), v3.1.0 (2026-04-18); **NOT** present in stock WSJT-X (K1JT)
+- [ ] Specs: 77-bit payload (FT8/FT4 family), 4-GFSK modulation, T/R period **3.75 s** (= ½ × FT4), bandwidth ~166 Hz
+- [ ] Compatible with IU8LMC's earlier FT2 experiment (parameters), but DG2YCB implementation is fully open-source (GPLv3, no IU8LMC code reused)
+- [ ] Maturity gate before promotion to active module:
+  - [ ] Persists in WSJT-X Improved beyond v3.1.x (not reverted)
+  - [ ] Measurable on-air traffic in identifiable sub-band(s) — currently no convention, likely shares FT4 segments
+  - [ ] Formal technical documentation published (QEX article or equivalent)
+  - [ ] Adoption by at least one other implementation (JTDX, MSHV, or similar)
+- [ ] If promoted: dwell ≥ 4–5 s per centre frequency to capture ≥ 1 T/R window; reuse FT4 LDPC(174,91) decoder kernel with adjusted symbol rate (~41.7 baud vs FT4's 20.83 baud)
+- [ ] Risk: released 2026-04-18 — minimal field deployment, fragmented amateur ecosystem may not converge on it
+
 ---
 
 ### 9. Infrastructure Optimisations 🏗️
