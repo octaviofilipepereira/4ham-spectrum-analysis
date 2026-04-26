@@ -3966,6 +3966,14 @@ async function loadSettings() {
       if (aprsIsHostInput) aprsIsHostInput.value = data.aprs_is.host || "";
       if (aprsIsPortInput) aprsIsPortInput.value = data.aprs_is.port || "";
     }
+    // APRS-IS Internet Server section visible only when Direwolf is
+    // installed AND APRS packet decoding is enabled.
+    const aprsIsAdminSection = document.getElementById("aprsIsAdminSection");
+    if (aprsIsAdminSection) {
+      const direwolfAvailable = Boolean(data.aprs && data.aprs.available);
+      const aprsEnabled = Boolean(data.aprs && data.aprs.enabled);
+      aprsIsAdminSection.classList.toggle("d-none", !(direwolfAvailable && aprsEnabled));
+    }
     if (data.lora_aprs) {
       // Defensive: if backend doesn't report 'available' (older build pre-restart),
       // trust 'enabled' so the UI doesn't hide LoRa-related buttons unjustly.
@@ -4612,6 +4620,12 @@ if (aprsEnabledCheck) {
       if (modalEl && window.bootstrap) {
         new bootstrap.Modal(modalEl).show();
       }
+    }
+    // APRS-IS section visible only when Direwolf is installed AND the
+    // APRS checkbox is on. Reflect immediately on toggle (don't wait for save).
+    const aprsIsAdminSection = document.getElementById("aprsIsAdminSection");
+    if (aprsIsAdminSection) {
+      aprsIsAdminSection.classList.toggle("d-none", !(direwolfAvailable && wantsAprs));
     }
   });
 }

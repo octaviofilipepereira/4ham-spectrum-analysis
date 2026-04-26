@@ -726,6 +726,11 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="btn btn-outline-info btn-sm" id="saveAprsSettings">Save APRS setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
+              <!-- APRS-IS Internet Server settings: only shown when Direwolf is
+                   installed AND APRS packet decoding is enabled. Toggled by
+                   frontend/app.js based on /api/settings -> aprs.{available,enabled}. -->
+              <div id="aprsIsAdminSection" class="col-12 d-none">
+                <div class="row g-2">
               <div class="col-12">
                 <h3 class="h6 mb-1">APRS-IS Internet Server</h3>
                 <small class="d-block text-white mb-2">
@@ -758,6 +763,8 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="btn btn-outline-info btn-sm" id="saveAprsIsSettings">Save APRS-IS server</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
+                </div>
+              </div>
               <!-- LoRa-APRS admin section: hidden by default; revealed by
                    frontend/app.js applyFeatureVisibility() only when the
                    backend reports FEATURE_LORA_APRS=true (see /api/features). -->
