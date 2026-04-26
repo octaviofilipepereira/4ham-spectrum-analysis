@@ -60,7 +60,6 @@ $sql = "
           FROM mirror_callsign_events
          WHERE timestamp BETWEEN :start AND :end
            AND callsign <> ''
-           AND lat IS NOT NULL AND lon IS NOT NULL
            AND UPPER(mode) <> 'APRS'
       ) t
      WHERE t.rn = 1
@@ -86,15 +85,41 @@ try {
 
 $contacts = [];
 foreach ($rows as $r) {
-    $lat = (float)$r['lat'];
-    $lon = (float)$r['lon'];
+    $callsign = (string)$r['callsign'];
+    $lat = $r['lat'] !== null ? (float)$r['lat'] : null;
+    $lon = $r['lon'] !== null ? (float)$r['lon'] : null;
+    $country = '';
+    $continent = '';
+    $cqZone = null;
+    // The home backend does not persist lat/lon on callsign_events rows,
+    // so the mirror receives NULLs. Replicate the home backend's
+    // query-time DXCC enrichment (longest-prefix match against
+    // prefixes/dxcc_coords.json) so the public dashboard plots the
+    // same contacts the Pi shows.
+    $dxcc = fourham_callsign_to_dxcc($callsign);
+    if ($dxcc !== null) {
+        if ($lat === null && isset($dxcc['lat'])) {
+            $lat = (float)$dxcc['lat'];
+        }
+        if ($lon === null && isset($dxcc['lon'])) {
+            $lon = (float)$dxcc['lon'];
+        }
+        $country   = (string)($dxcc['country'] ?? '');
+        $continent = (string)($dxcc['continent'] ?? '');
+        if (isset($dxcc['cq_zone'])) {
+            $cqZone = (int)$dxcc['cq_zone'];
+        }
+    }
+    if ($lat === null || $lon === null) {
+        continue;
+    }
     $contacts[] = [
-        'callsign'    => (string)$r['callsign'],
+        'callsign'    => $callsign,
         'lat'         => $lat,
         'lon'         => $lon,
-        'country'     => '',     // DXCC enrichment lives on the home backend
-        'continent'   => '',
-        'cq_zone'     => null,
+        'country'     => $country,
+        'continent'   => $continent,
+        'cq_zone'     => $cqZone,
         'band'        => (string)($r['band'] ?? ''),
         'mode'        => (string)($r['mode'] ?? ''),
         'snr_db'      => $r['snr_db'] !== null ? (float)$r['snr_db'] : null,
