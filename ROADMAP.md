@@ -274,6 +274,17 @@ Last update: 2026-04-21
 - [ ] Smartphone touch-friendly controls
 - [ ] Progressive Web App (PWA) support
 
+#### 8.6. NCDXF/IARU Beacon Monitor (optional module) 📡
+- [ ] Optional module — installed only if user opts-in (TUI installer toggle, like APRS/Direwolf and LoRa-APRS)
+- [ ] Monitor the 18 NCDXF/IARU IBP beacons on 14.100 / 18.110 / 21.150 / 24.930 / 28.200 MHz
+- [ ] Time-slot driven (deterministic 3-min cycle, no blind sweep) — requires `chrony`/`ntpd` synced clock
+- [ ] Per-slot SNR + presence detection; optional CW callsign confirmation via existing decoder
+- [ ] New table `beacon_observations` (beacon, frequency_hz, slot_start_utc, snr_db, detected, decoded_text, qrb_km, azimuth_deg)
+- [ ] Modes: single-frequency park, multi-frequency rotation (via existing scan rotation/preset scheduler), passive (FFT-only when other modes active)
+- [ ] Frontend: real-time beacon panel + time-of-day heatmap by beacon×band
+- [ ] Goal: open, modern, headless, multi-user replacement for Faros/BeaconSee — datasets accessible via REST/WebSocket and pushable to cs5arc mirror
+- [ ] Reuses existing primitives: `scan_park`, `estimate_snr`, CW decoder, propagation map, mirror push pipeline (~700 lines new code, no new dependencies)
+
 ---
 
 ### 9. Infrastructure Optimisations 🏗️
@@ -332,3 +343,35 @@ Last update: 2026-04-21
 4. **SSB BW Cap at 2800 Hz** — Standard SSB filter 2400 Hz + wide 2700 Hz + 100 Hz FFT margin. Signals above 2800 Hz are noise/interference.
 5. **SSB SNR Gate at 8 dB** — Calibrated for good antenna setups. Will become configurable (see item 1).
 6. **Session-Cookie Auth** — Replaced Basic Auth in v0.6.0. JWT upgrade planned (see item 10.1).
+
+---
+
+## 🛰️ FUTURE FEATURES (Research / Long-Term)
+
+### 11. Satellite Tracking & Telemetry Module 🛰️
+**Goal**: Automated SDR satellite pass detection, Doppler correction, telemetry decoding, and pass prediction — integrated natively into 4ham.
+
+**Context**: Reuses existing infrastructure (direwolf, KISS TCP client, APRS parser, FastAPI background tasks). New dependencies: `skyfield` (pip, MIT) for orbital mechanics; `gr_satellites` CLI for satellite decoders; TLE data from Celestrak.
+
+**Tasks**:
+- [ ] 11.1. **Phase 1 – Orbital Engine**: `tle_manager.py` (Celestrak fetch, 6 h cache), `propagator.py` (skyfield pass prediction + Doppler), REST endpoints `/api/satellites/catalog`, `/api/satellites/passes`, DB tables `satellite_catalog`, `satellite_passes`, `satellite_events`
+- [ ] 11.2. **Phase 2 – SDR Integration**: `satellite_scheduler.py` background task (preempts scan engine via `satellite_mode_active` flag), `doppler_tracker.py` (real-time RTL-SDR Doppler correction), `/api/satellites/active-pass` WebSocket feed
+- [ ] 11.3. **Phase 3 – Decoder Pipeline**: `gr_satellites` CLI → KISS TCP → reuse `direwolf_kiss.py` → `satellite_telemetry_parser.py`, telemetry DB storage, frontend pass timeline panel. *Requires GNU Radio 3.10 on server — verify before starting.*
+- [ ] 11.4. **Phase 4 – Rotator Control**: `rotctld` Hamlib driver (same approach as planned CAT transceiver), azimuth/elevation tracking, rotator status in UI
+
+**Benefit**: Full satellite ground-station capability without leaving 4ham. ISS APRS, weather satellite images, CubeSat telemetry.
+
+---
+
+### 12. Dependency Health Monitor 🔧
+**Goal**: Proactive alerting when pip/apt/external dependencies are outdated or missing, without automatic updates.
+
+**Context**: Three dependency classes: pip (pypi), apt (system packages), external data (TLE files, prefix DB). Never auto-update. Admin UI shows exact copy-paste commands.
+
+**Tasks**:
+- [ ] 12.1. `dependency_checker.py` background task (hourly check, no auto-update)
+- [ ] 12.2. REST endpoint `/api/admin/dependency-status` (JSON: package, installed, latest, severity)
+- [ ] 12.3. Admin UI alert banner with copy-paste update commands
+- [ ] 12.4. Floor-pin all pip packages in `requirements.txt` (e.g., `skyfield>=1.48.0`)
+
+**Benefit**: Operational safety without surprise breakage from automatic updates.
