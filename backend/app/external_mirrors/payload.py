@@ -42,35 +42,52 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return {k: row[k] for k in row.keys()}
 
 
-def _fetch_events_since(
+_VALID_EVENT_TABLES = {"callsign_events", "occupancy_events"}
+
+
+def _fetch_events_and_max(
     db: Database,
     table: str,
     watermark: int,
     limit: int,
-) -> List[Dict[str, Any]]:
-    if table not in {"callsign_events", "occupancy_events"}:
+) -> tuple[List[Dict[str, Any]], int]:
+    """
+    Atomically fetch the next page of events and the table's MAX(id),
+    so they share a single snapshot.
+
+    This is critical for watermark correctness: if the SELECT and the
+    MAX(id) ran in separate snapshots, a writer committing between
+    them could insert a row whose id > max(events) but ≤ MAX(id) —
+    and the caller would advance the watermark past it without ever
+    shipping it.  See `_table_frontier`.
+    """
+    if table not in _VALID_EVENT_TABLES:
         raise ValueError(f"unsupported table: {table}")
     with db._lock:
-        cur = db.conn.execute(
-            f"SELECT * FROM {table} WHERE id > ? ORDER BY id ASC LIMIT ?",
-            (int(watermark), int(limit)),
-        )
-        rows = cur.fetchall()
-    return [_row_to_dict(r) for r in rows]
+        # Open an explicit read transaction so both statements observe
+        # the same SQLite snapshot.  ``BEGIN`` (deferred) is fine: the
+        # first SELECT promotes it to a read transaction and snapshot
+        # isolation holds until COMMIT.
+        db.conn.execute("BEGIN")
+        try:
+            rows = db.conn.execute(
+                f"SELECT * FROM {table} WHERE id > ? ORDER BY id ASC LIMIT ?",
+                (int(watermark), int(limit)),
+            ).fetchall()
+            max_row = db.conn.execute(
+                f"SELECT MAX(id) AS m FROM {table}"
+            ).fetchone()
+        finally:
+            db.conn.execute("COMMIT")
+    events = [_row_to_dict(r) for r in rows]
+    db_max = int(max_row["m"] or 0) if max_row else 0
+    return events, db_max
 
 
 def _max_id(events: Sequence[Dict[str, Any]]) -> int:
     if not events:
         return 0
     return max(int(e.get("id") or 0) for e in events)
-
-
-def _table_max_id(db: Database, table: str) -> int:
-    with db._lock:
-        row = db.conn.execute(f"SELECT MAX(id) AS m FROM {table}").fetchone()
-    if not row:
-        return 0
-    return int(row["m"] or 0)
 
 
 def _table_frontier(
@@ -125,17 +142,17 @@ def build_payload(
 
     callsign_events: List[Dict[str, Any]] = []
     occupancy_events: List[Dict[str, Any]] = []
+    cs_db_max = 0
+    oc_db_max = 0
     if callsign_active:
-        callsign_events = _fetch_events_since(
+        callsign_events, cs_db_max = _fetch_events_and_max(
             db, "callsign_events", last_watermark, batch_size
         )
     if occupancy_active:
-        occupancy_events = _fetch_events_since(
+        occupancy_events, oc_db_max = _fetch_events_and_max(
             db, "occupancy_events", last_watermark, batch_size
         )
 
-    cs_db_max = _table_max_id(db, "callsign_events") if callsign_active else 0
-    oc_db_max = _table_max_id(db, "occupancy_events") if occupancy_active else 0
     cs_frontier = _table_frontier(callsign_events, cs_db_max, batch_size, callsign_active)
     oc_frontier = _table_frontier(occupancy_events, oc_db_max, batch_size, occupancy_active)
 
