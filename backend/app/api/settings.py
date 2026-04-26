@@ -219,6 +219,16 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "autostart": bool(kiss_st.get("autostart", False)),
         "address": kiss_st.get("address"),
     }
+    # APRS-IS server (host/port) — exposed so Admin Config can show/edit
+    # the values; defaults match backend/app/decoders/aprs_is.py.
+    aprs_is_st = state.decoder_status.get("aprs_is") or {}
+    settings["aprs_is"] = {
+        "host": os.environ.get("APRS_IS_HOST", "rotate.aprs2.net"),
+        "port": int(os.environ.get("APRS_IS_PORT", "14580") or 14580),
+        "enabled": bool(aprs_is_st.get("enabled", False)),
+        "connected": bool(aprs_is_st.get("connected", False)),
+        "address": aprs_is_st.get("address"),
+    }
     lora_st = state.decoder_status.get("lora_aprs") or {}
     if _features.lora_aprs_enabled():
         settings["lora_aprs"] = {
@@ -314,6 +324,44 @@ async def save_settings(payload: dict, _: None = Depends(verify_basic_auth)) -> 
             asyncio.create_task(_stop_kiss_loop())
             state.decoder_status["direwolf_kiss"]["enabled"] = False
         existing["aprs"] = {"enabled": aprs_enabled}
+
+    if "aprs_is" in payload:
+        # User-configurable APRS-IS server (host + port). We update the
+        # process env so the next connect attempt uses the new values
+        # (aprs_is decoder reads them lazily on each iteration), persist
+        # them to .env so they survive restarts, and bounce the running
+        # loop so the change takes effect immediately.
+        aprs_is = payload.get("aprs_is") or {}
+        host = (aprs_is.get("host") or "").strip() or "rotate.aprs2.net"
+        try:
+            port = int(aprs_is.get("port") or 14580)
+        except (TypeError, ValueError):
+            port = 14580
+        if not (1 <= port <= 65535):
+            port = 14580
+
+        prev_host = os.environ.get("APRS_IS_HOST")
+        prev_port = os.environ.get("APRS_IS_PORT")
+        os.environ["APRS_IS_HOST"] = host
+        os.environ["APRS_IS_PORT"] = str(port)
+        _persist_env_vars(_project_root() / ".env", {
+            "APRS_IS_HOST": host,
+            "APRS_IS_PORT": str(port),
+        })
+
+        # If the loop is running and host/port changed, restart so the
+        # new server is picked up without waiting for the next reconnect.
+        if (prev_host != host or prev_port != str(port)):
+            from app.api.decoders import _start_aprs_is_loop, _stop_aprs_is_loop
+            import asyncio
+            aprs_is_st = state.decoder_status.get("aprs_is") or {}
+            if aprs_is_st.get("enabled"):
+                async def _bounce():
+                    await _stop_aprs_is_loop()
+                    await _start_aprs_is_loop()
+                asyncio.create_task(_bounce())
+
+        existing["aprs_is"] = {"host": host, "port": port}
 
     if "lora_aprs" in payload and _features.lora_aprs_enabled():
         from app.api.decoders import _start_lora_aprs_loop, _stop_lora_aprs_loop

@@ -726,6 +726,45 @@ Last update: 2026-02-22 16:27:19 UTC
                 <button class="btn btn-outline-info btn-sm" id="saveAprsSettings">Save APRS setting</button>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
+              <!-- APRS-IS Internet Server settings: only shown when Direwolf is
+                   installed AND APRS packet decoding is enabled. Toggled by
+                   frontend/app.js based on /api/settings -> aprs.{available,enabled}. -->
+              <div id="aprsIsAdminSection" class="col-12 d-none">
+                <div class="row g-2">
+              <div class="col-12">
+                <h3 class="h6 mb-1">APRS-IS Internet Server</h3>
+                <small class="d-block text-white mb-2">
+                  TCP server used for the APRS-IS Internet feed. Default
+                  <code>rotate.aprs2.net:14580</code> is the official DNS rotator
+                  (auto-picks the closest healthy server). Use a regional
+                  hostname (e.g. <code>euro.aprs2.net</code>, <code>noam.aprs2.net</code>,
+                  <code>asia.aprs2.net</code>) to force a specific continent.
+                </small>
+              </div>
+              <div class="col-8">
+                <label class="form-label small mb-0" for="aprsIsHost">Host</label>
+                <input type="text" class="form-control form-control-sm" id="aprsIsHost"
+                       list="aprsIsHostPresets" placeholder="rotate.aprs2.net" />
+                <datalist id="aprsIsHostPresets">
+                  <option value="rotate.aprs2.net">Global rotator (default)</option>
+                  <option value="euro.aprs2.net">Europe</option>
+                  <option value="noam.aprs2.net">North America</option>
+                  <option value="soam.aprs2.net">South America</option>
+                  <option value="asia.aprs2.net">Asia</option>
+                  <option value="aunz.aprs2.net">Australia / New Zealand</option>
+                </datalist>
+              </div>
+              <div class="col-4">
+                <label class="form-label small mb-0" for="aprsIsPort">Port</label>
+                <input type="number" class="form-control form-control-sm" id="aprsIsPort"
+                       min="1" max="65535" placeholder="14580" />
+              </div>
+              <div class="col-12 mt-2">
+                <button class="btn btn-outline-info btn-sm" id="saveAprsIsSettings">Save APRS-IS server</button>
+              </div>
+              <div class="col-12"><hr class="my-2" /></div>
+                </div>
+              </div>
               <!-- LoRa-APRS admin section: hidden by default; revealed by
                    frontend/app.js applyFeatureVisibility() only when the
                    backend reports FEATURE_LORA_APRS=true (see /api/features). -->

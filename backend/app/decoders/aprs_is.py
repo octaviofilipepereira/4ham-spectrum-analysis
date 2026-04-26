@@ -21,9 +21,28 @@ from app.decoders.aprs_parser import parse_aprs_packet
 
 
 # ── Configuration ────────────────────────────────────────────────────
+#
+# Host/port are read from the environment on every connection attempt
+# (not captured at import time) so that the Admin Config UI can change
+# them at runtime via /api/settings without a backend restart. Falling
+# back to the official APRS-IS DNS rotator keeps the behaviour identical
+# when the user does not override the value.
 
-APRS_IS_HOST = os.getenv("APRS_IS_HOST", "rotate.aprs2.net")
-APRS_IS_PORT = int(os.getenv("APRS_IS_PORT", "14580"))
+DEFAULT_APRS_IS_HOST = "rotate.aprs2.net"
+DEFAULT_APRS_IS_PORT = 14580
+
+
+def _get_host() -> str:
+    return os.getenv("APRS_IS_HOST", DEFAULT_APRS_IS_HOST) or DEFAULT_APRS_IS_HOST
+
+
+def _get_port() -> int:
+    try:
+        return int(os.getenv("APRS_IS_PORT", str(DEFAULT_APRS_IS_PORT)))
+    except (TypeError, ValueError):
+        return DEFAULT_APRS_IS_PORT
+
+
 APRS_IS_FILTER_RANGE_KM = int(os.getenv("APRS_IS_RANGE_KM", "150"))
 
 
@@ -254,14 +273,16 @@ async def aprs_is_loop(
 
     while not stop_event.is_set():
         reader = writer = None
+        host = _get_host()
+        port = _get_port()
         try:
             if logger:
-                logger(f"aprs_is_connecting:{APRS_IS_HOST}:{APRS_IS_PORT}")
+                logger(f"aprs_is_connecting:{host}:{port}")
             if status_cb:
-                status_cb("connecting", f"{APRS_IS_HOST}:{APRS_IS_PORT}")
+                status_cb("connecting", f"{host}:{port}")
 
             reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(APRS_IS_HOST, APRS_IS_PORT),
+                asyncio.open_connection(host, port),
                 timeout=15.0,
             )
 
@@ -286,7 +307,7 @@ async def aprs_is_loop(
                 continue
 
             if status_cb:
-                status_cb("connected", f"{APRS_IS_HOST}:{APRS_IS_PORT}")
+                status_cb("connected", f"{host}:{port}")
 
             # Main receive loop
             while not stop_event.is_set():
