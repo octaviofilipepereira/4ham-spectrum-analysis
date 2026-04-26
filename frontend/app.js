@@ -3960,6 +3960,12 @@ async function loadSettings() {
       if (btn2m) btn2m.classList.toggle('d-none', !aprsActive);
       if (btnAprs) btnAprs.classList.toggle('d-none', !aprsActive);
     }
+    if (data.aprs_is) {
+      const aprsIsHostInput = document.getElementById("aprsIsHost");
+      const aprsIsPortInput = document.getElementById("aprsIsPort");
+      if (aprsIsHostInput) aprsIsHostInput.value = data.aprs_is.host || "";
+      if (aprsIsPortInput) aprsIsPortInput.value = data.aprs_is.port || "";
+    }
     if (data.lora_aprs) {
       // Defensive: if backend doesn't report 'available' (older build pre-restart),
       // trust 'enabled' so the UI doesn't hide LoRa-related buttons unjustly.
@@ -4558,6 +4564,36 @@ if (saveAprsSettingsBtn) {
       localStorage.setItem("4ham_aprs_active", enabled ? "1" : "0");
     } catch (err) {
       showToastError("Failed to save APRS setting");
+    }
+  });
+}
+
+// ── APRS-IS server (host/port) save ──
+const saveAprsIsSettingsBtn = document.getElementById("saveAprsIsSettings");
+if (saveAprsIsSettingsBtn) {
+  saveAprsIsSettingsBtn.addEventListener("click", async () => {
+    const hostInput = document.getElementById("aprsIsHost");
+    const portInput = document.getElementById("aprsIsPort");
+    const host = (hostInput && hostInput.value.trim()) || "rotate.aprs2.net";
+    const port = parseInt((portInput && portInput.value) || "14580", 10) || 14580;
+    if (port < 1 || port > 65535) {
+      showToastError("APRS-IS port must be between 1 and 65535");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeader() },
+        body: JSON.stringify({ aprs_is: { host, port } }),
+      });
+      if (!resp.ok) {
+        const message = await parseApiError(resp, "Failed to save APRS-IS server");
+        showToastError(message);
+        return;
+      }
+      showToast(`APRS-IS server set to ${host}:${port}`);
+    } catch (err) {
+      showToastError("Failed to save APRS-IS server");
     }
   });
 }
