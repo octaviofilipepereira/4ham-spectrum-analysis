@@ -26,3 +26,19 @@ DirectoryIndex index.html version.php
 <FilesMatch "^(db|auth|snapshot)\.php$">
     Require all denied
 </FilesMatch>
+
+# ────────────────────────────────────────────────────
+#  Cache control — force revalidation of frontend assets so users
+#  always pick up the latest deployed version after a `git pull`,
+#  while still benefiting from 304 Not Modified responses.
+# ────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|js|mjs|css|json|svg)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+        Header set Pragma "no-cache"
+    </FilesMatch>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
