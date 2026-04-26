@@ -58,6 +58,15 @@ _CW_SUBBANDS_HZ = {
     "10m": (28_000_000, 28_300_000),
 }
 
+# Operational sweep bounds: tighter than IARU R1 reference where the upper portion
+# of the CW segment is empirically unused (digital territory or beyond practical
+# sweep budget at 30 s/position). Falls back to _CW_SUBBANDS_HZ when not present.
+_CW_SWEEP_BOUNDS_HZ = {
+    "15m": (21_000_000, 21_070_000),  # 21.070+ is digital in practice
+    "12m": (24_890_000, 24_915_000),  # 24.915 is canonical FT8; no CW above
+    "10m": (28_000_000, 28_080_000),  # CW segment; excludes IBP beacons (out of sweep budget)
+}
+
 _SSB_SUBBANDS_HZ = {
     "160m": (1_843_000, 2_000_000),
     "80m": (3_600_000, 3_800_000),
@@ -92,7 +101,7 @@ def _resolve_cw_sweep_bounds(
     end_hz: int,
 ) -> tuple[int, int]:
     band = str(band_name or "").strip().lower()
-    cw_bounds = _CW_SUBBANDS_HZ.get(band)
+    cw_bounds = _CW_SWEEP_BOUNDS_HZ.get(band) or _CW_SUBBANDS_HZ.get(band)
     if not cw_bounds:
         return int(start_hz), int(end_hz)
 

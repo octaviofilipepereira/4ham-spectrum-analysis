@@ -274,6 +274,17 @@ Indicativo: CT7BFV
 - [ ] Controlos touch-friendly para smartphones
 - [ ] Suporte Progressive Web App (PWA)
 
+#### 8.6. Monitor de Beacons NCDXF/IARU (módulo opcional) 📡
+- [ ] Módulo opcional — só instalado se o utilizador escolher (toggle no instalador TUI, à semelhança de APRS/Direwolf e LoRa-APRS)
+- [ ] Monitorizar os 18 beacons NCDXF/IARU IBP em 14.100 / 18.110 / 21.150 / 24.930 / 28.200 MHz
+- [ ] Baseado no calendário UTC determinístico (ciclo de 3 min, sem sweep cego) — requer relógio sincronizado (`chrony`/`ntpd`)
+- [ ] Por slot: medição de SNR + detecção presença/ausência; confirmação opcional de callsign via decoder CW existente
+- [ ] Nova tabela `beacon_observations` (beacon, frequency_hz, slot_start_utc, snr_db, detected, decoded_text, qrb_km, azimuth_deg)
+- [ ] Modos: park numa única frequência, rotação multi-frequência (via scan rotation/preset scheduler existentes), modo passivo (apenas FFT quando outro modo está activo)
+- [ ] Frontend: painel de beacons em tempo real + heatmap por hora-do-dia × beacon × banda
+- [ ] Objectivo: substituto aberto, moderno, headless e multi-utilizador para Faros/BeaconSee — datasets acessíveis via REST/WebSocket e propagáveis para o mirror cs5arc
+- [ ] Reaproveita primitivas existentes: `scan_park`, `estimate_snr`, decoder CW, mapa de propagação, pipeline de push para mirror (~700 linhas de código novo, sem dependências novas)
+
 ---
 
 ### 9. Otimizações de Infraestrutura 🏗️
@@ -332,3 +343,35 @@ Indicativo: CT7BFV
 4. **BW Cap SSB a 2800 Hz** — Filtro SSB standard 2400 Hz + wide 2700 Hz + 100 Hz margem FFT. Sinais acima de 2800 Hz são ruído/interferência.
 5. **Gate SNR SSB a 8 dB** — Calibrado para setups com boa antena. Será tornado configurável (ver item 1).
 6. **Autenticação Session-Cookie** — Substituiu Basic Auth em v0.6.0. Upgrade para JWT planeado (ver item 10.1).
+
+---
+
+## 🛰️ FUNCIONALIDADES FUTURAS (Investigação / Longo Prazo)
+
+### 11. Módulo de Tracking e Telemetria de Satélites 🛰️
+**Objetivo**: Detecção automática de passagens de satélites via SDR, correcção Doppler, descodificação de telemetria e previsão de passagens — integrado nativamente no 4ham.
+
+**Contexto**: Reutiliza infraestrutura existente (direwolf, cliente KISS TCP, parser APRS, background tasks FastAPI). Novas dependências: `skyfield` (pip, MIT) para mecânica orbital; CLI `gr_satellites` para descodificadores de satélites; dados TLE do Celestrak.
+
+**Tarefas**:
+- [ ] 11.1. **Fase 1 – Motor Orbital**: `tle_manager.py` (fetch Celestrak, cache 6 h), `propagator.py` (previsão de passagens + Doppler via skyfield), endpoints REST `/api/satellites/catalog`, `/api/satellites/passes`, tabelas DB `satellite_catalog`, `satellite_passes`, `satellite_events`
+- [ ] 11.2. **Fase 2 – Integração SDR**: background task `satellite_scheduler.py` (preempção do scan engine via flag `satellite_mode_active`), `doppler_tracker.py` (correcção Doppler em tempo real no RTL-SDR), feed WebSocket `/api/satellites/active-pass`
+- [ ] 11.3. **Fase 3 – Pipeline de Descodificadores**: CLI `gr_satellites` → KISS TCP → reutilizar `direwolf_kiss.py` → `satellite_telemetry_parser.py`, armazenamento de telemetria na DB, painel de linha temporal de passagens no frontend. *Requer GNU Radio 3.10 no servidor — verificar antes de iniciar.*
+- [ ] 11.4. **Fase 4 – Controlo de Rotator**: driver Hamlib `rotctld` (mesma abordagem que o driver CAT planeado), tracking azimute/elevação, estado do rotator na UI
+
+**Benefício**: Estação terrestre completa para satélites sem sair do 4ham. APRS da ISS, imagens de satélites meteorológicos, telemetria de CubeSats.
+
+---
+
+### 12. Monitor de Saúde de Dependências 🔧
+**Objetivo**: Alertas proactivos quando dependências pip/apt/externas estão desactualizadas ou em falta, sem actualizações automáticas.
+
+**Contexto**: Três classes de dependências: pip (pypi), apt (pacotes de sistema), dados externos (ficheiros TLE, base de prefixos). Nunca actualizar automaticamente. UI de administração mostra comandos exactos para copy-paste.
+
+**Tarefas**:
+- [ ] 12.1. Background task `dependency_checker.py` (verificação horária, sem auto-update)
+- [ ] 12.2. Endpoint REST `/api/admin/dependency-status` (JSON: pacote, instalado, mais recente, severidade)
+- [ ] 12.3. Banner de alerta na UI de administração com comandos copy-paste para actualização
+- [ ] 12.4. Pins mínimos em todos os pacotes pip em `requirements.txt` (ex: `skyfield>=1.48.0`)
+
+**Benefício**: Segurança operacional sem quebras inesperadas por actualizações automáticas.
