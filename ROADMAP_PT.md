@@ -285,6 +285,19 @@ Indicativo: CT7BFV
 - [ ] Objectivo: substituto aberto, moderno, headless e multi-utilizador para Faros/BeaconSee — datasets acessíveis via REST/WebSocket e propagáveis para o mirror cs5arc
 - [ ] Reaproveita primitivas existentes: `scan_park`, `estimate_snr`, decoder CW, mapa de propagação, pipeline de push para mirror (~700 linhas de código novo, sem dependências novas)
 
+#### 8.7. Modo FT2 — Acompanhamento Experimental 🧪
+- [ ] **Apenas observação** — acompanhar maturidade upstream antes de qualquer investimento em decoder
+- [ ] Fonte: fork WSJT-X Improved de Uwe Risse (DG2YCB), v3.1.0 (2026-04-18); **NÃO** existe no WSJT-X oficial (K1JT)
+- [ ] Especificações: payload 77-bit (família FT8/FT4), modulação 4-GFSK, período T/R **3.75 s** (= ½ × FT4), largura de banda ~166 Hz
+- [ ] Compatível com a experiência anterior FT2 de IU8LMC (parâmetros), mas a implementação DG2YCB é totalmente open-source (GPLv3, sem reutilização de código IU8LMC)
+- [ ] Critérios de maturidade antes de promover a módulo activo:
+  - [ ] Persistir no WSJT-X Improved além da v3.1.x (sem reversão)
+  - [ ] Tráfego on-air mensurável em sub-banda(s) identificáveis — actualmente sem convenção, provavelmente partilhará segmentos FT4
+  - [ ] Documentação técnica formal publicada (artigo QEX ou equivalente)
+  - [ ] Adopção por pelo menos outra implementação (JTDX, MSHV, ou similar)
+- [ ] Se promovido: dwell ≥ 4–5 s por frequência central para capturar ≥ 1 janela T/R; reaproveitar kernel decoder FT4 LDPC(174,91) com taxa de símbolo ajustada (~41.7 baud vs 20.83 baud do FT4)
+- [ ] Risco: lançado em 2026-04-18 — uso de campo mínimo, ecossistema amador fragmentado pode não convergir
+
 ---
 
 ### 9. Otimizações de Infraestrutura 🏗️
