@@ -143,3 +143,43 @@ function fourham_haversine_km(float $lat1, float $lon1, float $lat2, float $lon2
        + cos($lat1 * $toRad) * cos($lat2 * $toRad) * sin($dLon / 2) ** 2;
     return 2 * $r * asin(min(1.0, sqrt($a)));
 }
+
+/**
+ * Resolve a callsign to its DXCC entity using longest-prefix-match.
+ *
+ * Mirrors backend/app/dependencies/helpers.py::callsign_to_dxcc so that
+ * the cs5arc external mirror enriches callsigns at query time using the
+ * same DXCC index file (lib/dxcc_coords.json) instead of relying on
+ * lat/lon stored on the row (which the home backend does not persist).
+ *
+ * @return array|null  Entity dict (country, lat, lon, continent, cq_zone, …)
+ *                     or null if no prefix matches.
+ */
+function fourham_callsign_to_dxcc(string $callsign): ?array {
+    static $index = null;
+    if ($index === null) {
+        $path = __DIR__ . '/dxcc_coords.json';
+        $index = [];
+        if (is_readable($path)) {
+            $raw = file_get_contents($path);
+            $data = $raw !== false ? json_decode($raw, true) : null;
+            if (is_array($data) && isset($data['index']) && is_array($data['index'])) {
+                $index = $data['index'];
+            }
+        }
+    }
+    if ($index === [] || $callsign === '') {
+        return null;
+    }
+    $cs = strtoupper(trim($callsign));
+    // Strip portable suffixes (/P /M /MM /QRP /QRPP /A /B)
+    $cs = preg_replace('#/(P|M|MM|QRP|QRPP|A|B)$#', '', $cs);
+    $len = min(strlen($cs), 5);
+    for ($l = $len; $l > 0; $l--) {
+        $candidate = substr($cs, 0, $l);
+        if (isset($index[$candidate])) {
+            return $index[$candidate];
+        }
+    }
+    return null;
+}
