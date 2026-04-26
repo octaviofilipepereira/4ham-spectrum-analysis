@@ -132,7 +132,82 @@ def test_has_new_data():
 def test_build_payload_unknown_table_rejected(db):
     # Indirectly: scopes only filter known tables, so an unknown scope is silently
     # ignored. The internal helper rejects unknown tables.
-    from backend.app.external_mirrors.payload import _fetch_events_since
+    from backend.app.external_mirrors.payload import _fetch_events_and_max
 
     with pytest.raises(ValueError):
-        _fetch_events_since(db, "evil_table", 0, 10)
+        _fetch_events_and_max(db, "evil_table", 0, 10)
+
+
+def test_build_payload_no_skipping_under_concurrent_insert(db, monkeypatch):
+    """
+    Regression for the silent-loss race that caused 75k+ callsign rows
+    to be missing from the cs5arc mirror despite a "drained" watermark.
+
+    Pre-fix: ``_fetch_events_since`` and ``_table_max_id`` ran in two
+    separate snapshots.  A row committed between the two queries had
+    id ≤ MAX(id) but was not in the page, so the watermark advanced
+    past it without ever shipping it.
+
+    Post-fix: the page and MAX(id) share one transaction, so any row
+    committed concurrently is either in the page (shipped) or above
+    MAX(id) (caught next tick).  Either way the watermark never
+    overshoots an unshipped row.
+    """
+    # Seed a few callsigns so the first SELECT returns < batch_size and
+    # would, pre-fix, prefer cs_db_max as the frontier.
+    _seed_callsign(db, n=3)
+    _seed_occupancy(db, n=3)
+
+    from backend.app.external_mirrors import payload as payload_mod
+
+    real_fetch = payload_mod._fetch_events_and_max
+    inserted: list[int] = []
+
+    def fetch_with_concurrent_insert(database, table, watermark, limit):
+        # Simulate a writer that commits ONE new callsign row in the
+        # window where, pre-fix, the SELECT had already executed but
+        # MAX(id) had not.  Post-fix, this insert is invisible to the
+        # snapshot, so the returned db_max equals the page's max id.
+        events, db_max = real_fetch(database, table, watermark, limit)
+        if table == "callsign_events" and not inserted:
+            with database._lock:
+                cur = database.conn.execute(
+                    """INSERT INTO callsign_events(timestamp, band, frequency_hz, mode, callsign, snr_db, confidence)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (
+                        "2026-04-22T12:00:99Z",
+                        "20m",
+                        14_074_999,
+                        "FT8",
+                        "CT7RACE",
+                        7.5,
+                        0.8,
+                    ),
+                )
+                database.conn.commit()
+                inserted.append(cur.lastrowid)
+        return events, db_max
+
+    monkeypatch.setattr(payload_mod, "_fetch_events_and_max", fetch_with_concurrent_insert)
+
+    p = build_payload(
+        db,
+        mirror_name="primary",
+        last_watermark=0,
+        scopes=["callsign_events", "occupancy_events"],
+        batch_size=5000,
+    )
+
+    assert inserted, "race-window insert did not run"
+    raced_id = inserted[0]
+    shipped_ids = {e["id"] for e in p["events"]["callsign"]}
+    new_wm = p["meta"]["new_watermark"]
+
+    # Either the raced row is in the payload, or the watermark is below
+    # it so the next tick will pick it up.  It must NEVER be the case
+    # that the watermark sits at or above the raced id while the row
+    # is absent from the payload.
+    if raced_id not in shipped_ids:
+        assert new_wm < raced_id, (
+            f"watermark {new_wm} advanced past unshipped row id={raced_id}"
+        )
