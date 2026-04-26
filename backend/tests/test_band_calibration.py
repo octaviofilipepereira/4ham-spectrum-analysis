@@ -192,13 +192,19 @@ def test_resolve_ssb_bounds_outside_subband_falls_back():
 
 @pytest.mark.parametrize("band", list(_CW_SUBBANDS_HZ.keys()))
 def test_resolve_cw_bounds_clips_to_subband(band):
-    """Wide sweep request must be clipped to the CW subband."""
+    """Wide sweep request must be clipped to a subset of the CW subband.
+
+    The operational sweep bounds may be tighter than IARU R1 (e.g. excluding
+    digital zones above the CW preferred segment) but must never exceed it.
+    """
     cw_start, cw_end = _CW_SUBBANDS_HZ[band]
     wide_start = cw_start - 200_000
     wide_end = cw_end + 200_000
     result_start, result_end = _resolve_cw_sweep_bounds(band, wide_start, wide_end)
-    assert result_start == cw_start, f"{band}: CW clip start {cw_start}, got {result_start}"
-    assert result_end == cw_end, f"{band}: CW clip end {cw_end}, got {result_end}"
+    assert cw_start <= result_start < result_end <= cw_end, (
+        f"{band}: sweep bounds {result_start}-{result_end} must be subset of "
+        f"IARU R1 CW segment {cw_start}-{cw_end}"
+    )
 
 
 def test_resolve_cw_bounds_unknown_band_passthrough():
