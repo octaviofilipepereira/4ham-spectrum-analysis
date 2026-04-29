@@ -106,16 +106,21 @@ def parse_catalog_json(raw: bytes) -> list[dict[str, Any]]:
         raise ValidationError("'satellites' must be a JSON array")
 
     validated: list[dict[str, Any]] = []
+    skipped = 0
     for i, sat in enumerate(satellites):
         if not isinstance(sat, dict):
-            raise ValidationError(f"Entry {i} is not an object")
+            skipped += 1
+            continue
         norad = sat.get("norad_cat_id") or sat.get("norad_id")
         if norad is None:
-            raise ValidationError(f"Entry {i} missing 'norad_cat_id' / 'norad_id'")
+            # SatNOGS sometimes lists pre-launch / re-entry sats without NORAD id
+            skipped += 1
+            continue
         try:
             norad = int(norad)
         except (TypeError, ValueError):
-            raise ValidationError(f"Entry {i} norad_id is not an integer")
+            skipped += 1
+            continue
         name = _sanitize_name(str(sat.get("name") or f"NORAD-{norad}"))
         validated.append({**sat, "norad_cat_id": norad, "name": name})
 
