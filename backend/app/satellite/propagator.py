@@ -65,17 +65,29 @@ def compute_passes(
         raise RuntimeError(f"pyorbital error for NORAD {norad_id}: {exc}") from exc
 
     passes: list[dict[str, Any]] = []
-    for (aos, los, max_elevation) in passes_raw:
-        if max_elevation < min_elev:
+    for entry in passes_raw:
+        # pyorbital.Orbital.get_next_passes returns tuples of
+        # (rise_time, fall_time, max_elevation_time) — all datetimes.
+        # The actual peak elevation must be looked up separately.
+        try:
+            aos, los, max_t = entry
+        except ValueError:
             continue
-        # AOS and LOS come back as datetime objects (UTC)
+        try:
+            az_max, el_max = orb.get_observer_look(max_t, lon, lat, alt)
+        except Exception:
+            # If we can't sample peak elevation, fall back to a permissive
+            # value so the pass is not silently dropped.
+            az_max, el_max = None, min_elev
+        if el_max < min_elev:
+            continue
         passes.append(
             {
                 "norad_id": norad_id,
                 "aos": _dt_iso(aos),
                 "los": _dt_iso(los),
-                "max_elevation": round(float(max_elevation), 2),
-                "max_az": None,  # pyorbital doesn't return per-pass max_az directly
+                "max_elevation": round(float(el_max), 2),
+                "max_az": round(float(az_max), 2) if az_max is not None else None,
                 "tle_epoch": sat["tle_epoch"],
             }
         )
@@ -123,7 +135,7 @@ async def compute_passes_for_all(db=None) -> int:
             _save_passes(db, passes)
             total += len(passes)
         except Exception as exc:
-            _log.debug("Pass compute error NORAD %d: %s", norad_id, exc)
+            _log.warning("Pass compute error NORAD %d: %s", norad_id, exc)
 
     _log.info("Satellite propagator: %d passes computed for %d satellites.", total, len(enabled))
     return total

@@ -24,12 +24,13 @@ def _make_db(settings=None, kv=None):
 
 
 def _mock_pass_tuple():
-    """Return a fake pyorbital pass tuple: (aos_utc, los_utc, max_elevation)."""
+    """Return a fake pyorbital pass tuple: (aos_utc, los_utc, max_elev_time_utc)."""
     from datetime import timezone, timedelta
     now = datetime.now(timezone.utc)
     aos = now
     los = now + __import__("datetime").timedelta(minutes=10)
-    return (aos, los, 30.0)
+    max_t = now + __import__("datetime").timedelta(minutes=5)
+    return (aos, los, max_t)
 
 
 # ── compute_passes ─────────────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ def test_compute_passes_returns_list():
 
     fake_orbital_instance = MagicMock()
     fake_orbital_instance.get_next_passes = MagicMock(return_value=[_mock_pass_tuple()])
+    # get_observer_look returns (azimuth_deg, elevation_deg)
+    fake_orbital_instance.get_observer_look = MagicMock(return_value=(180.0, 45.0))
     fake_orbital_class = MagicMock(return_value=fake_orbital_instance)
     fake_pyorbital = MagicMock()
     fake_pyorbital.Orbital = fake_orbital_class
