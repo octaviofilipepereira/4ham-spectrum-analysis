@@ -419,7 +419,7 @@ export async function loadPassesPanel() {
   try {
     const passes = await _api("/passes?hours=24");
     if (!passes.length) {
-      el.innerHTML = `<li class="text-muted small">${t("noPasses")}</li>`;
+      el.innerHTML = await _renderNoPassesDiagnostic();
       return;
     }
     el.innerHTML = passes
@@ -435,6 +435,47 @@ export async function loadPassesPanel() {
   } catch {
     el.innerHTML = "";
   }
+}
+
+async function _renderNoPassesDiagnostic() {
+  const reasons = [];
+  try {
+    const settings = await _api("/settings").catch(() => ({}));
+    const station = settings.station || {};
+    const lat = parseFloat(station.lat);
+    const lon = parseFloat(station.lon);
+    if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) {
+      reasons.push("Station coordinates not configured (Station tab → Latitude/Longitude).");
+    }
+  } catch {}
+  try {
+    const cat = await _api("/catalog").catch(() => []);
+    const enabled = (cat || []).filter((s) => s.enabled);
+    const withTle = enabled.filter((s) => s.tle_line1 && s.tle_line2);
+    if (!cat.length) {
+      reasons.push("Satellite catalog is empty (Catalog tab → Refresh from SatNOGS).");
+    } else if (!enabled.length) {
+      reasons.push("No satellites enabled in the catalog (Catalog tab).");
+    } else if (!withTle.length) {
+      reasons.push("Enabled satellites have no TLE (TLEs tab → Refresh from Celestrak).");
+    }
+  } catch {}
+  try {
+    const tle = await _api("/tles/status").catch(() => ({}));
+    if (tle && tle.badge === "red") {
+      reasons.push("TLE data is stale or missing (TLEs tab → Refresh).");
+    }
+  } catch {}
+  if (!reasons.length) {
+    reasons.push(
+      "No satellite is predicted to rise above the minimum elevation in the next 24 h. " +
+        "Try lowering the minimum elevation or enabling more satellites."
+    );
+  }
+  const items = reasons.map((r) => `<li>${_esc(r)}</li>`).join("");
+  return `<li class="alert alert-secondary small mb-0"><div class="fw-semibold mb-1">${_esc(
+    t("noPasses")
+  )}</div><ul class="mb-0 ps-3">${items}</ul></li>`;
 }
 
 async function _isInstalled() {

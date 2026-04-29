@@ -232,6 +232,16 @@ async def get_satellite_events(
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────
+@router.get("/settings")
+async def get_satellite_settings(
+    _auth=Depends(verify_basic_auth),
+) -> dict[str, Any]:
+    """Return current satellite + station settings."""
+    current = state.db.get_settings()
+    return {
+        "satellite": current.get("satellite") or {},
+        "station": current.get("station") or {},
+    }
 
 @router.post("/settings")
 async def save_satellite_settings(
