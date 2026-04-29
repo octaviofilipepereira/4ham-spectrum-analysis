@@ -220,6 +220,25 @@ async function _loadTabCatalog() {
 
 let _satCatalogCache = [];
 
+// IARU amateur satellite downlink segments (Hz). A frequency is "ham" if it
+// falls inside any of these ranges.
+const _HAM_BANDS_HZ = [
+  [50_000_000, 54_000_000],          // 6 m
+  [144_000_000, 148_000_000],        // 2 m
+  [430_000_000, 440_000_000],        // 70 cm (incl. 435–438 sat segment)
+  [1_240_000_000, 1_300_000_000],    // 23 cm
+  [2_400_000_000, 2_450_000_000],    // 13 cm
+  [3_400_000_000, 3_475_000_000],    // 9 cm sat
+  [5_650_000_000, 5_925_000_000],    // 5 cm
+  [10_450_000_000, 10_500_000_000],  // 3 cm sat
+  [24_000_000_000, 24_050_000_000],  // 1.2 cm sat
+];
+
+function _isHamDownlink(hz) {
+  if (hz == null) return false;
+  return _HAM_BANDS_HZ.some(([lo, hi]) => hz >= lo && hz <= hi);
+}
+
 function _renderCatalogRows() {
   const listEl = document.getElementById("satelliteCatalogList");
   const filterEl = document.getElementById("satelliteCatalogFilter");
@@ -229,7 +248,8 @@ function _renderCatalogRows() {
   const show = showEl?.value || "active";
   const rows = _satCatalogCache.filter((s) => {
     const hasDl = s.downlink_hz != null;
-    if (show === "active" && (!s.enabled || !hasDl)) return false;
+    const isHam = _isHamDownlink(s.downlink_hz);
+    if (show === "active" && (!s.enabled || !isHam)) return false;
     if (show === "downlink" && !hasDl) return false;
     if (show === "enabled" && !s.enabled) return false;
     if (show === "disabled" && s.enabled) return false;
