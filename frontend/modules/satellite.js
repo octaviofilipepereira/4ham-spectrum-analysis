@@ -75,7 +75,10 @@ async function _refreshStatus() {
 function _renderNavButton(installed) {
   const btn = document.getElementById("satelliteNavBtn");
   if (!btn) return;
-  btn.classList.toggle("d-none", !installed);
+  // Button is always visible so the user can open the modal to install.
+  // We only annotate state via a CSS class for optional styling.
+  btn.classList.remove("d-none");
+  btn.classList.toggle("satellite-nav--installed", !!installed);
 }
 
 function _renderStatusBadge(status) {
