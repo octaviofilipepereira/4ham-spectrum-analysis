@@ -220,13 +220,16 @@ async function _loadTabCatalog() {
 
 let _satCatalogCache = [];
 
-// IARU amateur satellite downlink segments (Hz). A frequency is "ham" if it
-// falls inside any of these ranges.
+// IARU amateur satellite downlink segments + weather satellite bands (Hz).
+// Weather sats are included because we want to receive APT/LRPT/HRIT imagery.
 const _HAM_BANDS_HZ = [
   [50_000_000, 54_000_000],          // 6 m
+  [137_000_000, 138_000_000],        // weather: NOAA APT, Meteor-M LRPT
   [144_000_000, 148_000_000],        // 2 m
+  [400_000_000, 403_000_000],        // weather/cubesat telemetry (UHF METSAT)
   [430_000_000, 440_000_000],        // 70 cm (incl. 435–438 sat segment)
   [1_240_000_000, 1_300_000_000],    // 23 cm
+  [1_690_000_000, 1_710_000_000],    // weather: GOES/Elektro/FengYun HRIT/LRIT
   [2_400_000_000, 2_450_000_000],    // 13 cm
   [3_400_000_000, 3_475_000_000],    // 9 cm sat
   [5_650_000_000, 5_925_000_000],    // 5 cm
