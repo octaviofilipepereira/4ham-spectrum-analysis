@@ -112,9 +112,12 @@ function _renderStatusBadge(status) {
   if (uninstallBtn) {
     uninstallBtn.classList.toggle("d-none", !status.installed);
   }
-  // Hide the install prompt text once installed so the modal stops claiming
-  // the module needs installation. The card itself stays visible to host
-  // the Uninstall button.
+  // Hide the entire install card when the module is already installed —
+  // the Uninstall button now lives in the modal header next to the badge.
+  const installCard = document.getElementById("satelliteInstallCard");
+  if (installCard) {
+    installCard.classList.toggle("d-none", !!status.installed);
+  }
   const promptEl = document.getElementById("satelliteInstallPrompt");
   if (promptEl) {
     promptEl.classList.toggle("d-none", !!status.installed);

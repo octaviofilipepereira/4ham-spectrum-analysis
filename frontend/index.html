@@ -1441,19 +1441,19 @@ Last update: 2026-02-22 16:27:19 UTC
         <!-- Header -->
         <div class="modal-header">
           <h2 class="modal-title h5" id="satelliteModalLabel">&#x1F6F0; Satellite Predict</h2>
-          <span id="satelliteInstallStatus" class="badge bg-secondary ms-2">—</span>
+          <span id="satelliteInstallStatus" class="badge bg-secondary ms-2 d-inline-flex align-items-center px-3 py-2">—</span>
+          <button type="button" class="btn btn-outline-danger btn-sm ms-2 d-none" id="satelliteUninstallBtn">Uninstall</button>
           <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
         <!-- Body -->
         <div class="modal-body">
 
-          <!-- Install card (always visible; buttons disabled/hidden when installed) -->
+          <!-- Install card (only shown when module is NOT installed) -->
           <div id="satelliteInstallCard" class="card mb-3">
             <div class="card-body">
               <p class="mb-2" id="satelliteInstallPrompt">Install the Satellite module to start predicting LEO/GEO passes.</p>
               <button class="btn btn-primary btn-sm" id="satelliteInstallBtn">Install Satellite Module</button>
-              <button class="btn btn-outline-danger btn-sm d-none" id="satelliteUninstallBtn">Uninstall</button>
               <pre id="satelliteInstallLog" class="mt-2 small text-muted" style="max-height:120px;overflow:auto;white-space:pre-wrap;"></pre>
             </div>
           </div>
