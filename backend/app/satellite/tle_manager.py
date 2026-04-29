@@ -58,6 +58,18 @@ async def refresh_tles(db) -> dict[str, Any]:
     """
     import httpx
     from app.satellite.validators import parse_tle_text
+    from app.core import connectivity
+
+    # Skip the network round-trip when the connectivity probe says we are
+    # offline.  Avoids a 15 s stall on every refresh while disconnected;
+    # the existing cache + freshness badge already tell the operator what
+    # is going on.  Probe state may be None on cold start — only skip when
+    # an explicit offline result is known.
+    if connectivity.get_status().get("online") is False:
+        msg = "offline (connectivity probe): keeping cached TLEs"
+        _log.info("TLE refresh skipped — %s", msg)
+        db.set_kv("satellite_tle_last_refresh_error", _now_iso())
+        return {"ok": False, "count": 0, "error": msg}
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:

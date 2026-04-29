@@ -31,6 +31,16 @@ async def refresh_catalog(db) -> dict[str, Any]:
     """
     import httpx
     from app.satellite.validators import ValidationError
+    from app.core import connectivity
+
+    # Skip the (potentially 60 s) network call when the connectivity probe
+    # has confirmed we are offline.  Probe state is None on cold start —
+    # only skip when an explicit offline result is known.
+    if connectivity.get_status().get("online") is False:
+        msg = "offline (connectivity probe): keeping cached catalog"
+        _log.info("Catalog refresh skipped — %s", msg)
+        db.set_kv("satellite_catalog_last_refresh_error", _now_iso())
+        return {"ok": False, "total": 0, "merged": 0, "error": msg}
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:

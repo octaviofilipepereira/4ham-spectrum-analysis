@@ -3449,6 +3449,26 @@ function decodeSpectrumFrame(frame) {
   };
 }
 
+function updateConnectivityBadge(conn) {
+  const el = document.getElementById("satelliteConnBadge");
+  if (!el) return;
+  const online = conn && conn.online;
+  if (online === true) {
+    el.className = "badge bg-success ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} Online";
+    el.title = "Internet reachable — TLE/catalog refresh enabled";
+  } else if (online === false) {
+    el.className = "badge bg-danger ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} Offline";
+    const fails = conn.consecutive_failures ?? 0;
+    el.title = `No internet (probe failed ${fails}\u00d7) — refresh skipped, using cached data`;
+  } else {
+    el.className = "badge bg-secondary ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} —";
+    el.title = "Connectivity probe pending";
+  }
+}
+
 function connectStatus() {
   try {
     const ws = new WebSocket(wsUrl("/ws/status"));
@@ -3465,6 +3485,11 @@ function connectStatus() {
             ? status.agc_gain_db.toFixed(1)
             : "?";
           statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB thr=${threshold}dB agc=${agc}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
+        }
+        // Connectivity badge — surfaced in the Satellite modal so the user
+        // knows TLE/catalog refresh is gated by the network probe.
+        if (data.status && data.status.connectivity) {
+          updateConnectivityBadge(data.status.connectivity);
         }
         if (data.retention_completed) {
           showRetentionToast(data.retention_completed);

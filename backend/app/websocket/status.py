@@ -16,6 +16,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.dependencies.helpers import cpu_percent
+from app.core import connectivity
 
 router = APIRouter()
 
@@ -130,7 +131,8 @@ async def ws_status(websocket: WebSocket) -> None:
                     "agc_gain_db": state.last_agc_gain_db,
                     "drop_rate_pct": round(drop_rate_pct, 2),
                     "protocol_version": state.ws_protocol_version,
-                    "scan": state.scan_engine.status()
+                    "scan": state.scan_engine.status(),
+                    "connectivity": connectivity.get_status(),
                 }
             }
 

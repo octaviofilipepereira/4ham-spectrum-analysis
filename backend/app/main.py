@@ -179,6 +179,14 @@ async def lifespan(app_instance: FastAPI):
     from app.core.ionospheric import ionospheric_refresh_loop
     asyncio.create_task(ionospheric_refresh_loop())
 
+    # Start internet connectivity probe (TCP/53 to public anycast resolvers,
+    # every 60 s).  Other modules (satellite TLE/catalog refresh, mirrors)
+    # can call connectivity.is_online() to skip network round-trips when
+    # offline instead of stalling on long timeouts.
+    from app.core import connectivity as _connectivity
+    _connectivity_task = asyncio.create_task(_connectivity.connectivity_loop())
+    app_instance.state.connectivity_task = _connectivity_task
+
     # Initialise external mirrors subsystem (push-mode replication).
     try:
         from app.external_mirrors import (
@@ -275,6 +283,18 @@ async def lifespan(app_instance: FastAPI):
     try:
         from app.satellite.lifecycle import stop_scheduler as _sat_stop
         await _sat_stop()
+    except Exception:
+        pass
+
+    # Stop connectivity probe gracefully
+    try:
+        _ct = getattr(app_instance.state, "connectivity_task", None)
+        if _ct and not _ct.done():
+            _ct.cancel()
+            try:
+                await _ct
+            except (asyncio.CancelledError, Exception):
+                pass
     except Exception:
         pass
 
