@@ -33,6 +33,7 @@ import {
 import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
+import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -3182,6 +3183,19 @@ initExternalMirrorsUI({
   showToast: typeof showToast === "function" ? showToast : undefined,
   showToastError: typeof showToastError === "function" ? showToastError : undefined,
 });
+
+// Satellite module — init on load, then bind buttons; passes panel on modal open
+(async () => {
+  const lang = document.documentElement.lang?.toLowerCase()?.startsWith("pt") ? "pt" : "en";
+  await initSatellite(lang);
+  bindSatelliteButtons();
+  const satModalEl = document.getElementById("satelliteModal");
+  if (satModalEl) {
+    satModalEl.addEventListener("show.bs.modal", () => {
+      loadPassesPanel().catch(() => {});
+    });
+  }
+})();
 
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });

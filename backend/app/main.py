@@ -34,8 +34,8 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api
-from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api, satellite as satellite_api
+from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status, satellite as ws_satellite
 from app.core import features as _features
 
 
@@ -159,6 +159,15 @@ async def lifespan(app_instance: FastAPI):
     except Exception as exc:
         _log.warning("SDR preview startup skipped: %s", exc)
 
+    # Auto-start satellite scheduler if module is installed
+    try:
+        if _state.db.get_kv("satellite_module_installed") == "true":
+            from app.satellite.lifecycle import start_scheduler as _sat_start
+            await _sat_start()
+            _log.info("Satellite scheduler auto-started (module installed).")
+    except Exception as exc:
+        _log.warning("Satellite scheduler auto-start failed: %s", exc)
+
     # Start retention background task
     asyncio.create_task(_retention_loop())
 
@@ -262,6 +271,13 @@ async def lifespan(app_instance: FastAPI):
         except Exception:
             pass
 
+    # Stop satellite scheduler gracefully
+    try:
+        from app.satellite.lifecycle import stop_scheduler as _sat_stop
+        await _sat_stop()
+    except Exception:
+        pass
+
 
 # ═══════════════════════════════════════════════════════════════════
 # FastAPI Application Setup
@@ -353,6 +369,7 @@ app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
 app.include_router(features_api.router, prefix="/api/features", tags=["Features"])
+app.include_router(satellite_api.router, prefix="/api/satellite", tags=["Satellite"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers
@@ -363,6 +380,7 @@ app.include_router(ws_logs.router, tags=["WebSocket - Logs"])
 app.include_router(ws_events.router, tags=["WebSocket - Events"])
 app.include_router(ws_spectrum.router, tags=["WebSocket - Spectrum"])
 app.include_router(ws_status.router, tags=["WebSocket - Status"])
+app.include_router(ws_satellite.router, tags=["WebSocket - Satellite"])
 
 # ═══════════════════════════════════════════════════════════════════
 # Static File Serving (Frontend)

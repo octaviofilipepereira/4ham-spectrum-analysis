@@ -207,6 +207,11 @@ class Database:
         except sqlite3.OperationalError:
             return
 
+    # Public alias — use this in satellite and other on-demand modules
+    def add_column(self, table: str, column_def: str) -> None:
+        """Idempotently add a column to an existing table (no-op if already exists)."""
+        self._add_column(table, column_def)
+
     def start_scan(self, scan, started_at):
         cursor = self.conn.execute(
             """

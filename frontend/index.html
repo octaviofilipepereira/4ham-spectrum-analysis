@@ -71,6 +71,7 @@ Last update: 2026-02-22 16:27:19 UTC
               </ul>
             </div>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#adminModal">Admin Config</button>
+            <button class="btn btn-outline-info btn-sm d-none" id="satelliteNavBtn" type="button" data-bs-toggle="modal" data-bs-target="#satelliteModal">&#x1F6F0; Satellite</button>
             <a class="btn btn-outline-info btn-sm" href="/4ham_academic_analytics.html" target="_blank" rel="noopener noreferrer">Data Analysis</a>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#helpModal">Help</button>
           </div>
@@ -1429,5 +1430,137 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
     <script type="module" src="app.js?v=20260402000003"></script>
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+       ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║
+       ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <div class="modal fade" id="satelliteModal" tabindex="-1" aria-labelledby="satelliteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+
+        <!-- Header -->
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="satelliteModalLabel">&#x1F6F0; Satellite Predict</h2>
+          <span id="satelliteInstallStatus" class="badge bg-secondary ms-2">—</span>
+          <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+
+          <!-- Install card (always visible; buttons disabled/hidden when installed) -->
+          <div id="satelliteInstallCard" class="card mb-3">
+            <div class="card-body">
+              <p class="mb-2" id="satelliteInstallPrompt">Install the Satellite module to start predicting LEO/GEO passes.</p>
+              <button class="btn btn-primary btn-sm" id="satelliteInstallBtn">Install Satellite Module</button>
+              <button class="btn btn-outline-danger btn-sm d-none" id="satelliteUninstallBtn">Uninstall</button>
+              <pre id="satelliteInstallLog" class="mt-2 small text-muted" style="max-height:120px;overflow:auto;white-space:pre-wrap;"></pre>
+            </div>
+          </div>
+
+          <!-- Tabs (shown after install) -->
+          <ul class="nav nav-tabs mb-3" id="satelliteTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#satTabStation" type="button" role="tab">Station</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabCatalog" type="button" role="tab">Catalog</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabTles" type="button" role="tab">TLEs</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabPrefs" type="button" role="tab">Preferences</button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+
+            <!-- Station tab -->
+            <div class="tab-pane fade show active" id="satTabStation" role="tabpanel">
+              <form class="row g-2 mb-3" id="satelliteStationForm">
+                <div class="col-4">
+                  <label class="form-label small">Latitude</label>
+                  <input type="number" step="any" class="form-control form-control-sm" id="satLat" placeholder="38.7169" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Longitude</label>
+                  <input type="number" step="any" class="form-control form-control-sm" id="satLon" placeholder="-9.1399" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Altitude (m)</label>
+                  <input type="number" step="1" class="form-control form-control-sm" id="satAlt" placeholder="0" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Min. elevation (°)</label>
+                  <input type="number" step="1" min="0" max="90" class="form-control form-control-sm" id="satMinEl" value="5" />
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary btn-sm" id="satelliteSaveStationBtn">Save</button>
+                </div>
+              </form>
+
+              <h6 class="small fw-semibold">Upcoming passes (24 h)</h6>
+              <ul class="list-unstyled" id="satellitePassesList">
+                <li class="text-muted small">Loading…</li>
+              </ul>
+            </div>
+
+            <!-- Catalog tab -->
+            <div class="tab-pane fade" id="satTabCatalog" role="tabpanel">
+              <div class="d-flex gap-2 mb-2">
+                <button class="btn btn-outline-secondary btn-sm" id="satelliteRefreshCatBtn">Refresh (SatNOGS)</button>
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  Import JSON
+                  <input type="file" accept=".json" class="d-none" id="satelliteImportCatInput" />
+                </label>
+              </div>
+              <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
+                <table class="table table-sm table-hover mb-0">
+                  <thead class="table-dark sticky-top">
+                    <tr>
+                      <th>NORAD</th><th>Name</th><th>Downlink</th><th>Mode</th><th>Enabled</th>
+                    </tr>
+                  </thead>
+                  <tbody id="satelliteCatalogList">
+                    <tr><td colspan="5" class="text-muted">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TLEs tab -->
+            <div class="tab-pane fade" id="satTabTles" role="tabpanel">
+              <div class="d-flex align-items-center gap-3 mb-3">
+                <span id="satelliteTleBadge" class="badge bg-secondary">—</span>
+                <span class="small text-muted">Last refresh: <span id="satelliteTleLastRefresh">—</span></span>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="satelliteRefreshTleBtn">Refresh (Celestrak)</button>
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  Import TLE file
+                  <input type="file" accept=".txt,.tle" class="d-none" id="satelliteImportTleInput" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Preferences tab -->
+            <div class="tab-pane fade" id="satTabPrefs" role="tabpanel">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="satAutoTune" disabled />
+                <label class="form-check-label small" for="satAutoTune">Auto-tune SDR to satellite downlink (requires Fase 2)</label>
+              </div>
+            </div>
+
+          </div><!-- /.tab-content -->
+        </div><!-- /.modal-body -->
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#satelliteModal -->
+
   </body>
 </html>
