@@ -196,43 +196,78 @@ async function _loadTabStation() {
 
 async function _loadTabCatalog() {
   const listEl = document.getElementById("satelliteCatalogList");
+  const countEl = document.getElementById("satelliteCatalogCount");
+  const filterEl = document.getElementById("satelliteCatalogFilter");
+  const showEl = document.getElementById("satelliteCatalogShow");
   if (!listEl) return;
   try {
     const catalog = await _api("/catalog");
-    if (!catalog.length) {
-      listEl.innerHTML = `<tr><td colspan="5" class="text-muted">${t("noPasses")}</td></tr>`;
-      return;
+    _satCatalogCache = Array.isArray(catalog) ? catalog : [];
+    if (countEl) countEl.textContent = String(_satCatalogCache.length);
+    _renderCatalogRows();
+    if (filterEl && !filterEl.dataset.bound) {
+      filterEl.dataset.bound = "1";
+      filterEl.addEventListener("input", _renderCatalogRows);
     }
-    listEl.innerHTML = catalog
-      .map(
-        (s) => `
-      <tr>
-        <td>${s.norad_id}</td>
-        <td>${_esc(s.name)}</td>
-        <td>${s.downlink_hz ? (s.downlink_hz / 1e6).toFixed(3) + " MHz" : "—"}</td>
-        <td>${s.mode || "—"}</td>
-        <td>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input sat-enable-toggle" type="checkbox"
-              data-norad="${s.norad_id}" ${s.enabled ? "checked" : ""} />
-          </div>
-        </td>
-      </tr>`
-      )
-      .join("");
-    // Wire toggles
-    listEl.querySelectorAll(".sat-enable-toggle").forEach((cb) => {
-      cb.addEventListener("change", async () => {
-        const norad = Number(cb.dataset.norad);
-        const enabled = cb.checked;
-        await _api(`/catalog/${norad}/enable?enabled=${enabled}`, { method: "POST" }).catch(
-          () => { cb.checked = !enabled; }
-        );
-      });
-    });
+    if (showEl && !showEl.dataset.bound) {
+      showEl.dataset.bound = "1";
+      showEl.addEventListener("change", _renderCatalogRows);
+    }
   } catch (e) {
     listEl.innerHTML = `<tr><td colspan="5" class="text-danger">${_esc(e.message)}</td></tr>`;
   }
+}
+
+let _satCatalogCache = [];
+
+function _renderCatalogRows() {
+  const listEl = document.getElementById("satelliteCatalogList");
+  const filterEl = document.getElementById("satelliteCatalogFilter");
+  const showEl = document.getElementById("satelliteCatalogShow");
+  if (!listEl) return;
+  const q = (filterEl?.value || "").trim().toLowerCase();
+  const show = showEl?.value || "all";
+  const rows = _satCatalogCache.filter((s) => {
+    if (show === "enabled" && !s.enabled) return false;
+    if (show === "disabled" && s.enabled) return false;
+    if (!q) return true;
+    const hay = `${s.norad_id} ${s.name || ""} ${s.mode || ""}`.toLowerCase();
+    return hay.includes(q);
+  });
+  if (!rows.length) {
+    listEl.innerHTML = `<tr><td colspan="5" class="text-muted">${t("noPasses")}</td></tr>`;
+    return;
+  }
+  listEl.innerHTML = rows
+    .map(
+      (s) => `
+    <tr>
+      <td><code>${s.norad_id}</code></td>
+      <td>${_esc(s.name)}</td>
+      <td>${s.downlink_hz ? (s.downlink_hz / 1e6).toFixed(3) + " MHz" : "—"}</td>
+      <td>${s.mode || "—"}</td>
+      <td class="text-center">
+        <div class="form-check form-switch d-inline-block mb-0">
+          <input class="form-check-input sat-enable-toggle" type="checkbox"
+            data-norad="${s.norad_id}" ${s.enabled ? "checked" : ""} />
+        </div>
+      </td>
+    </tr>`
+    )
+    .join("");
+  listEl.querySelectorAll(".sat-enable-toggle").forEach((cb) => {
+    cb.addEventListener("change", async () => {
+      const norad = Number(cb.dataset.norad);
+      const enabled = cb.checked;
+      try {
+        await _api(`/catalog/${norad}/enable?enabled=${enabled}`, { method: "POST" });
+        const sat = _satCatalogCache.find((x) => x.norad_id === norad);
+        if (sat) sat.enabled = enabled;
+      } catch {
+        cb.checked = !enabled;
+      }
+    });
+  });
 }
 
 async function _loadTabTles() {
