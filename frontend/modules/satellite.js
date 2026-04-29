@@ -106,10 +106,18 @@ function _renderStatusBadge(status) {
     installBtn.disabled = status.state === "installing" || status.installed;
     installBtn.textContent =
       status.state === "installing" ? t("installing") : t("install");
+    installBtn.classList.toggle("d-none", !!status.installed);
   }
   const uninstallBtn = document.getElementById("satelliteUninstallBtn");
   if (uninstallBtn) {
     uninstallBtn.classList.toggle("d-none", !status.installed);
+  }
+  // Hide the install prompt text once installed so the modal stops claiming
+  // the module needs installation. The card itself stays visible to host
+  // the Uninstall button.
+  const promptEl = document.getElementById("satelliteInstallPrompt");
+  if (promptEl) {
+    promptEl.classList.toggle("d-none", !!status.installed);
   }
 }
 
