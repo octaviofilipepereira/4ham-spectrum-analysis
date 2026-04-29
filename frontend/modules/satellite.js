@@ -422,19 +422,63 @@ export async function loadPassesPanel() {
       el.innerHTML = await _renderNoPassesDiagnostic();
       return;
     }
-    el.innerHTML = passes
-      .slice(0, 10)
-      .map((p) => {
-        const aos = new Date(p.aos).toLocaleTimeString();
-        const los = new Date(p.los).toLocaleTimeString();
-        return `<li class="small"><strong>${_esc(p.satellite_name || p.norad_id)}</strong>
-          ${t("aos")} ${aos} → ${t("los")} ${los}
-          ${t("maxEl")} ${p.max_elevation.toFixed(1)}°</li>`;
-      })
-      .join("");
+    el.innerHTML = passes.slice(0, 12).map(_renderPassCard).join("");
   } catch {
     el.innerHTML = "";
   }
+}
+
+function _renderPassCard(p) {
+  const aosDate = new Date(p.aos);
+  const losDate = new Date(p.los);
+  const now = Date.now();
+  const aosMs = aosDate.getTime();
+  const losMs = losDate.getTime();
+  const durationMin = Math.max(1, Math.round((losMs - aosMs) / 60000));
+  const aosTime = aosDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const losTime = losDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const isActive = aosMs <= now && losMs >= now;
+  const countdown = isActive
+    ? `<span class="badge bg-danger">LIVE</span>`
+    : `<span class="badge bg-info text-dark">in ${_fmtCountdown(aosMs - now)}</span>`;
+  const el = p.max_elevation ?? 0;
+  let elClass = "bg-secondary";
+  if (el >= 30) elClass = "bg-success";
+  else if (el >= 15) elClass = "bg-primary";
+  else if (el >= 5) elClass = "bg-warning text-dark";
+  const elBadge = `<span class="badge ${elClass}">${el.toFixed(1)}°</span>`;
+  const az = p.max_az != null ? `${Math.round(p.max_az)}°` : "—";
+  const name = _esc(p.satellite_name || `NORAD ${p.norad_id}`);
+  return `
+    <div class="satellite-pass-card${isActive ? " is-active" : ""}">
+      <div class="satellite-pass-card__head">
+        <span class="satellite-pass-card__name" title="${name}">${name}</span>
+        ${countdown}
+      </div>
+      <div class="satellite-pass-card__body">
+        <div class="satellite-pass-card__time">
+          <span class="satellite-pass-card__label">AOS</span>
+          <span class="satellite-pass-card__value">${aosTime}</span>
+          <span class="satellite-pass-card__arrow">→</span>
+          <span class="satellite-pass-card__label">LOS</span>
+          <span class="satellite-pass-card__value">${losTime}</span>
+          <span class="satellite-pass-card__duration">(${durationMin} min)</span>
+        </div>
+        <div class="satellite-pass-card__metrics">
+          <span class="satellite-pass-card__metric"><span class="satellite-pass-card__label">El&nbsp;max</span> ${elBadge}</span>
+          <span class="satellite-pass-card__metric"><span class="satellite-pass-card__label">Az&nbsp;max</span> <span class="satellite-pass-card__value">${az}</span></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _fmtCountdown(ms) {
+  if (ms < 0) return "now";
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
 }
 
 async function _renderNoPassesDiagnostic() {
@@ -473,9 +517,9 @@ async function _renderNoPassesDiagnostic() {
     );
   }
   const items = reasons.map((r) => `<li>${_esc(r)}</li>`).join("");
-  return `<li class="alert alert-secondary small mb-0"><div class="fw-semibold mb-1">${_esc(
+  return `<div class="alert alert-secondary small mb-0"><div class="fw-semibold mb-1">${_esc(
     t("noPasses")
-  )}</div><ul class="mb-0 ps-3">${items}</ul></li>`;
+  )}</div><ul class="mb-0 ps-3">${items}</ul></div>`;
 }
 
 async function _isInstalled() {

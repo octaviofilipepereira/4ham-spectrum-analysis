@@ -1389,6 +1389,105 @@ h1,
   border-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.2) transparent;
 }
 
+/* ── Satellite passes list ────────────────────────────────────────────── */
+
+.satellite-passes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.satellite-pass-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgba(255, 179, 71, 0.45);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.satellite-pass-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  border-left-color: rgba(255, 179, 71, 0.85);
+}
+
+.satellite-pass-card.is-active {
+  border-left-color: #dc3545;
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.satellite-pass-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.satellite-pass-card__name {
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.satellite-pass-card__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+.satellite-pass-card__time,
+.satellite-pass-card__metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.satellite-pass-card__metrics {
+  gap: 12px;
+}
+
+.satellite-pass-card__metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.satellite-pass-card__label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.satellite-pass-card__value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.satellite-pass-card__arrow {
+  color: var(--muted);
+  margin: 0 2px;
+}
+
+.satellite-pass-card__duration {
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 .modal#loginModal .modal-content {
   background: #f7f7f9;
   color: #111;
