@@ -19,6 +19,18 @@ _log = logging.getLogger("uvicorn.error")
 _CELESTRAK_URL = (
     "https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=TLE"
 )
+# Additional Celestrak GROUPs to fetch so we cover weather sats (NOAA APT,
+# Meteor LRPT, GOES/Elektro/FengYun HRIT) and other receivable cubesats that
+# are not in the 'amateur' group. Order matters: later groups overwrite
+# earlier entries for duplicate NORAD ids (which is fine — TLEs are the
+# same regardless of group).
+_CELESTRAK_EXTRA_URLS = [
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=TLE",
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=noaa&FORMAT=TLE",
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=goes&FORMAT=TLE",
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=cubesat&FORMAT=TLE",
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=TLE",
+]
 _TLE_SNAPSHOT = (
     Path(__file__).resolve().parents[3] / "data" / "satellite" / "tle_amateur.txt"
 )
@@ -76,6 +88,16 @@ async def refresh_tles(db) -> dict[str, Any]:
             resp = await client.get(_CELESTRAK_URL)
             resp.raise_for_status()
             raw = resp.content
+            # Fetch additional groups; tolerate per-group failures so a single
+            # 503 from Celestrak does not wipe out the entire refresh.
+            extra_chunks: list[bytes] = []
+            for url in _CELESTRAK_EXTRA_URLS:
+                try:
+                    r = await client.get(url)
+                    r.raise_for_status()
+                    extra_chunks.append(r.content)
+                except Exception as exc:
+                    _log.warning("TLE extra group fetch failed (%s): %s", url, exc)
     except Exception as exc:
         err = str(exc)
         _log.warning("TLE fetch failed (Celestrak): %s", err)
@@ -84,6 +106,13 @@ async def refresh_tles(db) -> dict[str, Any]:
 
     try:
         entries = parse_tle_text(raw)
+        # Append extra groups; _upsert_tles deduplicates via ON CONFLICT
+        # (norad_id) so we can simply concatenate.
+        for chunk in extra_chunks:
+            try:
+                entries.extend(parse_tle_text(chunk))
+            except Exception as exc:
+                _log.warning("TLE extra group parse failed: %s", exc)
     except Exception as exc:
         db.set_kv("satellite_tle_last_refresh_error", _now_iso())
         return {"ok": False, "count": 0, "error": f"Parse error: {exc}"}

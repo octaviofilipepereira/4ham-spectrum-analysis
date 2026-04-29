@@ -252,7 +252,10 @@ function _renderCatalogRows() {
   const rows = _satCatalogCache.filter((s) => {
     const hasDl = s.downlink_hz != null;
     const isHam = _isHamDownlink(s.downlink_hz);
-    if (show === "active" && (!s.enabled || !isHam)) return false;
+    const hasTle = !!s.tle_line1;
+    // 'active' = receivable: enabled + ham/weather band downlink + TLE present
+    // (no TLE = we cannot predict passes, so the entry is useless)
+    if (show === "active" && (!s.enabled || !isHam || !hasTle)) return false;
     if (show === "downlink" && !hasDl) return false;
     if (show === "enabled" && !s.enabled) return false;
     if (show === "disabled" && s.enabled) return false;
