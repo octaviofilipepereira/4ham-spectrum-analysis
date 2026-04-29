@@ -1,0 +1,4 @@
+
+# pytest stray artefact from satellite api tests
+backend/MagicMock/
+**/MagicMock/
