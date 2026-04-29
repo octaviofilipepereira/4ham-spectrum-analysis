@@ -1366,6 +1366,29 @@ h1,
   opacity: 1;
 }
 
+.app-modal .nav-tabs {
+  border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+.app-modal .nav-tabs .nav-link {
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+}
+
+.app-modal .nav-tabs .nav-link:hover,
+.app-modal .nav-tabs .nav-link:focus {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.18) transparent;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-modal .nav-tabs .nav-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.2) transparent;
+}
+
 .modal#loginModal .modal-content {
   background: #f7f7f9;
   color: #111;
