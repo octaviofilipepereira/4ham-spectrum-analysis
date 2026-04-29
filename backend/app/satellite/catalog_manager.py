@@ -68,15 +68,17 @@ async def refresh_catalog(db) -> dict[str, Any]:
     # Transmitter index by norad_cat_id → list of transmitter dicts
     tx_by_norad = _index_transmitters(tx_raw)
 
+    # Keep only sats that have at least one alive transmitter in SatNOGS.
+    # This is the real relevance signal: no transmitter = nothing to listen to.
+    # The SatNOGS 'service' field is no longer populated, so we cannot filter
+    # by 'amateur' there; downstream UI/query filters narrow further by band.
     filtered = []
     for e in entries:
-        if (e.get("service") or "").lower() not in _ALLOWED_SERVICES:
-            continue
         norad = e.get("norad_cat_id") or e.get("norad_id")
+        if not norad or norad not in tx_by_norad:
+            continue
         # Attach transmitters so _upsert_catalog can extract downlink/mode
-        if norad and norad in tx_by_norad:
-            e = {**e, "transmitters": tx_by_norad[norad]}
-        filtered.append(e)
+        filtered.append({**e, "transmitters": tx_by_norad[norad]})
 
     merged = _upsert_catalog(db, filtered, source="satnogs")
 
