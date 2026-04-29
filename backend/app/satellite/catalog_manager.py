@@ -16,6 +16,7 @@ from typing import Any
 _log = logging.getLogger("uvicorn.error")
 
 _SATNOGS_URL = "https://db.satnogs.org/api/satellites/?format=json&status=alive"
+_SATNOGS_TX_URL = "https://db.satnogs.org/api/transmitters/?format=json&alive=true"
 _CAT_SNAPSHOT = (
     Path(__file__).resolve().parents[3] / "data" / "satellite" / "catalog.json"
 )
@@ -26,48 +27,73 @@ _ALLOWED_SERVICES = {"amateur", "educational"}
 
 async def refresh_catalog(db) -> dict[str, Any]:
     """
-    Fetch the SatNOGS DB catalog and merge into satellite_catalog.
-    Returns {"ok": bool, "total": int, "merged": int, "error": str|None}.
+    Fetch the SatNOGS DB catalog (alive sats + alive transmitters) and merge
+    into satellite_catalog. Soft-disable any local NORAD ID that is not in
+    the alive set (kept for history but enabled=0).
+
+    Returns {"ok": bool, "total": int, "merged": int, "disabled": int, "error": str|None}.
     """
     import httpx
-    from app.satellite.validators import ValidationError
     from app.core import connectivity
 
     # Skip the (potentially 60 s) network call when the connectivity probe
-    # has confirmed we are offline.  Probe state is None on cold start —
-    # only skip when an explicit offline result is known.
+    # has confirmed we are offline.
     if connectivity.get_status().get("online") is False:
         msg = "offline (connectivity probe): keeping cached catalog"
         _log.info("Catalog refresh skipped — %s", msg)
         db.set_kv("satellite_catalog_last_refresh_error", _now_iso())
-        return {"ok": False, "total": 0, "merged": 0, "error": msg}
+        return {"ok": False, "total": 0, "merged": 0, "disabled": 0, "error": msg}
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.get(_SATNOGS_URL)
-            resp.raise_for_status()
-            raw = resp.content
+            sat_resp = await client.get(_SATNOGS_URL)
+            sat_resp.raise_for_status()
+            tx_resp = await client.get(_SATNOGS_TX_URL)
+            tx_resp.raise_for_status()
+            sat_raw = sat_resp.content
+            tx_raw = tx_resp.content
     except Exception as exc:
         err = str(exc)
         _log.warning("SatNOGS catalog fetch failed: %s", err)
         db.set_kv("satellite_catalog_last_refresh_error", _now_iso())
-        return {"ok": False, "total": 0, "merged": 0, "error": err}
+        return {"ok": False, "total": 0, "merged": 0, "disabled": 0, "error": err}
 
     try:
         from app.satellite.validators import parse_catalog_json
-        entries = parse_catalog_json(raw)
+        entries = parse_catalog_json(sat_raw)
     except Exception as exc:
         db.set_kv("satellite_catalog_last_refresh_error", _now_iso())
-        return {"ok": False, "total": 0, "merged": 0, "error": f"Parse error: {exc}"}
+        return {"ok": False, "total": 0, "merged": 0, "disabled": 0, "error": f"Parse error: {exc}"}
 
-    filtered = [
-        e for e in entries
-        if (e.get("service") or "").lower() in _ALLOWED_SERVICES
-    ]
+    # Transmitter index by norad_cat_id → list of transmitter dicts
+    tx_by_norad = _index_transmitters(tx_raw)
+
+    filtered = []
+    for e in entries:
+        if (e.get("service") or "").lower() not in _ALLOWED_SERVICES:
+            continue
+        norad = e.get("norad_cat_id") or e.get("norad_id")
+        # Attach transmitters so _upsert_catalog can extract downlink/mode
+        if norad and norad in tx_by_norad:
+            e = {**e, "transmitters": tx_by_norad[norad]}
+        filtered.append(e)
+
     merged = _upsert_catalog(db, filtered, source="satnogs")
+
+    # Soft-disable anything not in the alive set
+    alive_ids = {
+        e.get("norad_cat_id") or e.get("norad_id")
+        for e in filtered
+        if (e.get("norad_cat_id") or e.get("norad_id")) is not None
+    }
+    disabled = _soft_disable_missing(db, alive_ids)
+
     db.set_kv("satellite_catalog_last_refresh_ok", _now_iso())
-    _log.info("Catalog refresh OK: %d/%d entries (amateur/educational).", merged, len(entries))
-    return {"ok": True, "total": len(entries), "merged": merged, "error": None}
+    _log.info(
+        "Catalog refresh OK: merged=%d alive=%d soft-disabled=%d",
+        merged, len(alive_ids), disabled,
+    )
+    return {"ok": True, "total": len(entries), "merged": merged, "disabled": disabled, "error": None}
 
 
 async def import_catalog_from_bytes(db, raw: bytes) -> dict[str, Any]:
@@ -224,6 +250,48 @@ def _satnogs_mode(e: dict) -> str | None:
         if m:
             return str(m)[:16]
     return None
+
+
+def _index_transmitters(raw: bytes) -> dict[int, list[dict]]:
+    """Parse SatNOGS transmitters payload into {norad_cat_id: [transmitters]}."""
+    import json as _json
+    try:
+        data = _json.loads(raw)
+    except Exception as exc:
+        _log.warning("Transmitter payload parse failed: %s", exc)
+        return {}
+    out: dict[int, list[dict]] = {}
+    if not isinstance(data, list):
+        return out
+    for t in data:
+        if not isinstance(t, dict):
+            continue
+        norad = t.get("norad_cat_id") or t.get("norad_id")
+        try:
+            norad = int(norad) if norad is not None else None
+        except (TypeError, ValueError):
+            continue
+        if norad is None:
+            continue
+        out.setdefault(norad, []).append(t)
+    return out
+
+
+def _soft_disable_missing(db, alive_ids: set[int]) -> int:
+    """Set enabled=0 for any catalog entry whose norad_id is not in alive_ids.
+    Does NOT touch entries imported manually (source='manual')."""
+    if not alive_ids:
+        return 0
+    placeholders = ",".join("?" * len(alive_ids))
+    with db._lock:
+        cur = db.conn.execute(
+            f"UPDATE satellite_catalog SET enabled = 0 "
+            f"WHERE enabled = 1 AND source != 'manual' "
+            f"AND norad_id NOT IN ({placeholders})",
+            tuple(alive_ids),
+        )
+        db.conn.commit()
+    return cur.rowcount
 
 
 def _now_iso() -> str:

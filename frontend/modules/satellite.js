@@ -226,8 +226,11 @@ function _renderCatalogRows() {
   const showEl = document.getElementById("satelliteCatalogShow");
   if (!listEl) return;
   const q = (filterEl?.value || "").trim().toLowerCase();
-  const show = showEl?.value || "all";
+  const show = showEl?.value || "active";
   const rows = _satCatalogCache.filter((s) => {
+    const hasDl = s.downlink_hz != null;
+    if (show === "active" && (!s.enabled || !hasDl)) return false;
+    if (show === "downlink" && !hasDl) return false;
     if (show === "enabled" && !s.enabled) return false;
     if (show === "disabled" && s.enabled) return false;
     if (!q) return true;
