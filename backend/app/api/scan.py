@@ -926,16 +926,25 @@ async def _rotation_switch_slot(slot: RotationSlot) -> bool:
         else:
             new_scan["ssb_focus_enable"] = False
 
-        # Stop and restart scan engine (keeps SDR device open internally)
-        await state.scan_engine.stop_async()
-        await state.scan_engine.start_async(new_scan)
+        # Try in-place retune first to avoid the libusb claim/release cycle
+        # that, repeated every 5 minutes by the rotation scheduler, eventually
+        # degrades the RTL-SDR USB handle and requires a physical reboot.
+        retuned = await state.scan_engine.retune_band_async(new_scan)
+        if not retuned:
+            # Fall back to full restart (sample-rate change, device-id change,
+            # or device not currently open).
+            await state.scan_engine.stop_async()
+            await state.scan_engine.start_async(new_scan)
 
         state.scan_state["scan"] = new_scan
         state.scan_state["state"] = "running"
         state.scan_state["scan_id"] = state.db.start_scan(
             new_scan, datetime.now(timezone.utc).isoformat(),
         )
-        log(f"rotation_scan_restarted band={slot.band} range={start_hz}-{end_hz}")
+        log(
+            f"rotation_scan_{'retuned' if retuned else 'restarted'} "
+            f"band={slot.band} range={start_hz}-{end_hz}"
+        )
     else:
         # Same band/freqs — just stop old decoders
         await _stop_ft_external_decoder()

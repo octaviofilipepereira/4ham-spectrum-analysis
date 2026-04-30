@@ -232,6 +232,92 @@ class ScanEngine:
         self.preview = False
         return True
 
+    async def retune_band_async(self, new_config: Dict[str, Any]) -> bool:
+        """Switch scan band/mode WITHOUT closing the SDR device.
+
+        Used by the rotation scheduler to avoid the libusb claim/release
+        cycle every 5 minutes (which over hours degrades the RTL-SDR USB
+        handle and eventually requires a physical power-cycle).
+
+        Returns False when an in-place retune is not possible (no live
+        device, sample-rate change, device-id change). The caller MUST
+        then fall back to stop_async()/start_async().
+        """
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+
+        if self.device is None or self.stream is None or not self.running:
+            return False
+
+        cfg = dict(new_config or {})
+        new_sr = int(cfg.get("sample_rate", self.sample_rate))
+        if new_sr != self.sample_rate:
+            return False
+        new_device_id = cfg.get("device_id")
+        cur_device_id = (self.config or {}).get("device_id")
+        if new_device_id and cur_device_id and new_device_id != cur_device_id:
+            return False
+
+        # Cancel scan loop task (pump task keeps reading IQ → waterfall stays alive)
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+
+        # Apply new band/mode parameters
+        self.config = cfg
+        self.start_hz = int(cfg.get("start_hz", 0))
+        self.end_hz = int(cfg.get("end_hz", 0))
+        self.step_hz = int(cfg.get("step_hz", self.step_hz))
+        self.dwell_ms = int(cfg.get("dwell_ms", self.dwell_ms))
+        self.settle_ms = int(cfg.get("settle_ms", self.settle_ms))
+        self.mode = cfg.get("mode", self.mode)
+        self.center_hz = int(cfg.get("center_hz", (self.start_hz + self.end_hz) // 2 if self.end_hz else self.center_hz))
+        self.current_hz = self.center_hz
+        self._ssb_focus_enabled = bool(cfg.get("ssb_focus_enable", False))
+        self._ssb_focus_hold_ms = max(int(cfg.get("ssb_focus_hold_ms", self._ssb_focus_hold_ms) or 10000), 0)
+        self._ssb_focus_candidate_ttl_s = max(float(cfg.get("ssb_focus_candidate_ttl_s", self._ssb_focus_candidate_ttl_s) or 20.0), 1.0)
+        self._ssb_focus_hits_required = max(int(cfg.get("ssb_focus_hits_required", self._ssb_focus_hits_required) or 2), 1)
+        self._ssb_focus_cooldown_s = max(float(cfg.get("ssb_focus_cooldown_s", self._ssb_focus_cooldown_s) or 20.0), 0.0)
+        self._ssb_focus_bucket_hz = max(int(cfg.get("ssb_focus_bucket_hz", self._ssb_focus_bucket_hz or self.step_hz or 2000) or (self.step_hz or 2000)), 250)
+        _explicit_max_holds = cfg.get("ssb_focus_max_holds_per_pass")
+        if _explicit_max_holds is not None:
+            self._ssb_focus_max_holds_per_pass = max(int(_explicit_max_holds), 1)
+        else:
+            _span_hz = max(0, self.end_hz - self.start_hz)
+            self._ssb_focus_max_holds_per_pass = max(4, min(16, _span_hz // 15_000))
+        self._ssb_focus_holds_in_pass = 0
+        self._ssb_focus_candidates.clear()
+        self._ssb_validated_freqs.clear()
+        self._parked = False
+        self._parked_event.set()
+        if self.step_hz > 0 and self.end_hz > self.start_hz:
+            self.total_steps = ((self.end_hz - self.start_hz) // self.step_hz) + 1
+        else:
+            self.total_steps = 0
+        self.step_index = 0
+        self.pass_count = 0
+
+        # Hardware retune in place (no close/open)
+        try:
+            self.controller.tune(self.device, self.center_hz)
+        except Exception:
+            _log.exception("retune_band_async: controller.tune failed")
+            return False
+
+        # Restart the scan loop if applicable
+        if self.mode == "auto" and self.step_hz > 0 and self.end_hz > self.start_hz:
+            self._task = asyncio.create_task(self._scan_loop())
+
+        _log.info(
+            "scan_engine_retuned start_hz=%d end_hz=%d center_hz=%d mode=%s",
+            self.start_hz, self.end_hz, self.center_hz, self.mode,
+        )
+        return True
+
     async def preview_open(
         self,
         device_id: Optional[str] = None,
