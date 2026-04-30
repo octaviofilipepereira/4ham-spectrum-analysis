@@ -144,18 +144,50 @@ class ScanEngine:
         _sr = self.sample_rate
         _chz = self.center_hz
         loop = asyncio.get_event_loop()
-        self.device, self.stream = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                lambda: self.controller.open(
-                    device_id=device_id,
-                    sample_rate=_sr,
-                    center_hz=_chz,
-                    gain=_gain,
-                ),
+        # USB enumeration on a Pi (especially with an upconverter) can legitimately
+        # take >10s, so give it 25s. Crucially, run_in_executor does NOT cancel the
+        # underlying thread on wait_for timeout — if the open() eventually completes,
+        # the device handle would be silently leaked (RTL-SDR busy on next attempt).
+        # We therefore keep a reference to the future and attach a done-callback
+        # that closes the late-arriving device.
+        open_future = loop.run_in_executor(
+            None,
+            lambda: self.controller.open(
+                device_id=device_id,
+                sample_rate=_sr,
+                center_hz=_chz,
+                gain=_gain,
             ),
-            timeout=10.0,  # prevent blocking the event loop on USB hang
         )
+        try:
+            self.device, self.stream = await asyncio.wait_for(
+                asyncio.shield(open_future),
+                timeout=25.0,
+            )
+        except asyncio.TimeoutError:
+            import logging as _logging
+            _log = _logging.getLogger(__name__)
+
+            def _cleanup_late_open(fut: "asyncio.Future") -> None:
+                try:
+                    result = fut.result()
+                except Exception:
+                    return  # open() actually failed — nothing to clean up
+                try:
+                    dev, stream = result
+                except Exception:
+                    return
+                try:
+                    self.controller.close(dev, stream)
+                    _log.warning(
+                        "sdr_open_late_completion_closed_to_prevent_handle_leak"
+                    )
+                except Exception:
+                    _log.exception("sdr_late_close_failed")
+
+            open_future.add_done_callback(_cleanup_late_open)
+            _log.error("sdr_open_timeout after 25s — handle leak guard armed")
+            raise
         if record_path:
             self._record_fp = open(record_path, "wb")
         self.running = True

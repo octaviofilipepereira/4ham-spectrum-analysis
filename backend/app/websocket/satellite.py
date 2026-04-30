@@ -29,14 +29,14 @@ _connections: set[WebSocket] = set()
 @router.websocket("/ws/satellite")
 async def ws_satellite(websocket: WebSocket) -> None:
     # ── Auth check ────────────────────────────────────────────────
-    if state.auth_enabled:
-        auth_header = websocket.headers.get("authorization", "")
-        from app.core.auth import parse_basic_auth
-        from app.dependencies.auth import _verify_credentials
-        creds = parse_basic_auth(auth_header)
-        if not creds or not _verify_credentials(creds[0], creds[1]):
-            await websocket.close(code=1008)
-            return
+    # Same pattern as ws_events / ws_status: rely on the canonical
+    # state.auth_required flag and state.verify_auth_transport helper.
+    if state.auth_required and not state.verify_auth_transport(
+        websocket.headers.get("authorization"),
+        websocket.headers.get("cookie"),
+    ):
+        await websocket.close(code=1008)
+        return
 
     await websocket.accept()
     _connections.add(websocket)
