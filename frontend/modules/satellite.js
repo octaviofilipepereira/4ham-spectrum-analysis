@@ -220,21 +220,17 @@ async function _loadTabCatalog() {
 
 let _satCatalogCache = [];
 
-// IARU amateur satellite downlink segments + weather satellite bands (Hz).
-// Weather sats are included because we want to receive APT/LRPT/HRIT imagery.
+// Satellite downlink segments actually receivable with our hardware (RTL-SDR
+// R820T2, useful range ~24 MHz–1.5 GHz). Higher bands (1.7 GHz HRIT, 2.4 GHz
+// QO-100, 10 GHz Es'hail) require a dedicated downconverter / LNB chain that
+// we do not have, so we hide them here. Hz.
 const _HAM_BANDS_HZ = [
-  [50_000_000, 54_000_000],          // 6 m
+  [50_000_000, 54_000_000],          // 6 m amateur
   [137_000_000, 138_000_000],        // weather: NOAA APT, Meteor-M LRPT
-  [144_000_000, 148_000_000],        // 2 m
-  [400_000_000, 403_000_000],        // weather/cubesat telemetry (UHF METSAT)
-  [430_000_000, 440_000_000],        // 70 cm (incl. 435–438 sat segment)
-  [1_240_000_000, 1_300_000_000],    // 23 cm
-  [1_690_000_000, 1_710_000_000],    // weather: GOES/Elektro/FengYun HRIT/LRIT
-  [2_400_000_000, 2_450_000_000],    // 13 cm
-  [3_400_000_000, 3_475_000_000],    // 9 cm sat
-  [5_650_000_000, 5_925_000_000],    // 5 cm
-  [10_450_000_000, 10_500_000_000],  // 3 cm sat
-  [24_000_000_000, 24_050_000_000],  // 1.2 cm sat
+  [144_000_000, 148_000_000],        // 2 m amateur
+  [400_000_000, 403_000_000],        // UHF METSAT / cubesat telemetry
+  [430_000_000, 440_000_000],        // 70 cm amateur (incl. 435–438 sat segment)
+  [1_240_000_000, 1_300_000_000],    // 23 cm amateur (top of stable RTL range)
 ];
 
 function _isHamDownlink(hz) {
