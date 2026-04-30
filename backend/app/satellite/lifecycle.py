@@ -72,6 +72,8 @@ async def _run_cycle() -> None:
     from app.satellite.propagator import compute_passes_for_all
     from app.satellite.tle_manager import get_tle_badge
 
+    # compute_passes_for_all() now dispatches to a thread executor internally,
+    # so the CPU-heavy SGP4 propagation no longer blocks the event loop.
     try:
         await compute_passes_for_all()
     except Exception as exc:

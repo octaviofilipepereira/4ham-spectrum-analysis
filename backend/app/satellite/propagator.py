@@ -95,10 +95,22 @@ def compute_passes(
 
 
 async def compute_passes_for_all(db=None) -> int:
+    """Async wrapper: runs the CPU-heavy SGP4 propagation in a worker thread
+    so the event loop stays responsive."""
+    import asyncio
+    return await asyncio.to_thread(_compute_passes_for_all_sync, db)
+
+
+def _compute_passes_for_all_sync(db=None) -> int:
     """
     Recompute passes for all enabled satellites in the catalog.
     Saves results to satellite_passes table (replaces future passes, keeps past).
     Returns total number of passes written.
+
+    This function is fully synchronous and CPU-heavy. Always invoke it via
+    `compute_passes_for_all()` (which dispatches it to a thread executor),
+    or directly from a worker thread — never from the asyncio event loop
+    thread, or it will block FastAPI / WebSocket request handling.
     """
     if db is None:
         from app.dependencies import state as _state
