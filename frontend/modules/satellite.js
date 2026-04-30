@@ -139,8 +139,13 @@ function _connectWs() {
       }
     } catch {}
   };
-  _ws.onclose = () => {
-    // reconnect after 15s
+  _ws.onclose = (ev) => {
+    // If the close was caused by an auth rejection (HTTP 403 during the WS
+    // handshake → close code 1006/1008), do NOT reconnect: the user is not
+    // authenticated and retrying every 15 s only spams the backend logs.
+    // The handshake-failed sockets all emit code 1006 in browsers.
+    const isLikelyAuthFailure = ev?.code === 1006 || ev?.code === 1008;
+    if (isLikelyAuthFailure) return;
     setTimeout(_connectWs, 15000);
   };
 }

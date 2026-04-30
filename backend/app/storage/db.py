@@ -213,48 +213,51 @@ class Database:
         self._add_column(table, column_def)
 
     def start_scan(self, scan, started_at):
-        cursor = self.conn.execute(
-            """
-            INSERT INTO scans(
-                band, start_hz, end_hz, step_hz, dwell_ms, mode, started_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                scan.get("band"),
-                scan.get("start_hz", 0),
-                scan.get("end_hz", 0),
-                scan.get("step_hz", 0),
-                scan.get("dwell_ms", 0),
-                scan.get("mode", "auto"),
-                started_at
+        with self._lock:
+            cursor = self.conn.execute(
+                """
+                INSERT INTO scans(
+                    band, start_hz, end_hz, step_hz, dwell_ms, mode, started_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    scan.get("band"),
+                    scan.get("start_hz", 0),
+                    scan.get("end_hz", 0),
+                    scan.get("step_hz", 0),
+                    scan.get("dwell_ms", 0),
+                    scan.get("mode", "auto"),
+                    started_at
+                )
             )
-        )
-        self.conn.commit()
-        return cursor.lastrowid
+            self.conn.commit()
+            return cursor.lastrowid
 
     def end_scan(self, scan_id, ended_at):
         if scan_id is None:
             return
-        self.conn.execute(
-            "UPDATE scans SET ended_at = ? WHERE id = ?",
-            (ended_at, scan_id)
-        )
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(
+                "UPDATE scans SET ended_at = ? WHERE id = ?",
+                (ended_at, scan_id)
+            )
+            self.conn.commit()
 
     def get_scans(self, limit=100):
-        scans = []
-        for row in self.conn.execute(
-            """
-            SELECT id, band, start_hz, end_hz, step_hz, dwell_ms, mode,
-                   started_at, ended_at
-            FROM scans
-            ORDER BY started_at DESC
-            LIMIT ?
-            """,
-            (limit,)
-        ):
-            scans.append(dict(row))
-        return scans
+        with self._lock:
+            scans = []
+            for row in self.conn.execute(
+                """
+                SELECT id, band, start_hz, end_hz, step_hz, dwell_ms, mode,
+                       started_at, ended_at
+                FROM scans
+                ORDER BY started_at DESC
+                LIMIT ?
+                """,
+                (limit,)
+            ):
+                scans.append(dict(row))
+            return scans
 
     def save_settings(self, settings):
         """Thread-safe settings storage."""
@@ -471,126 +474,134 @@ class Database:
             self.conn.commit()
 
     def upsert_band(self, band):
-        self.conn.execute(
-            "INSERT OR REPLACE INTO bands(name, start_hz, end_hz) VALUES (?, ?, ?)",
-            (band.get("name"), band.get("start_hz", 0), band.get("end_hz", 0))
-        )
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO bands(name, start_hz, end_hz) VALUES (?, ?, ?)",
+                (band.get("name"), band.get("start_hz", 0), band.get("end_hz", 0))
+            )
+            self.conn.commit()
 
     def get_bands(self):
-        rows = self.conn.execute(
-            "SELECT name, start_hz, end_hz FROM bands ORDER BY name"
-        ).fetchall()
-        return [dict(row) for row in rows]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT name, start_hz, end_hz FROM bands ORDER BY name"
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def add_export(self, metadata):
-        self.conn.execute(
-            """
-            INSERT OR REPLACE INTO exports(id, format, path, created_at, row_count, size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                metadata.get("id"),
-                metadata.get("format"),
-                metadata.get("path"),
-                metadata.get("created_at"),
-                int(metadata.get("row_count", 0) or 0),
-                int(metadata.get("size_bytes", 0) or 0),
+        with self._lock:
+            self.conn.execute(
+                """
+                INSERT OR REPLACE INTO exports(id, format, path, created_at, row_count, size_bytes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    metadata.get("id"),
+                    metadata.get("format"),
+                    metadata.get("path"),
+                    metadata.get("created_at"),
+                    int(metadata.get("row_count", 0) or 0),
+                    int(metadata.get("size_bytes", 0) or 0),
+                )
             )
-        )
-        self.conn.commit()
+            self.conn.commit()
 
     def get_export(self, export_id):
-        row = self.conn.execute(
-            "SELECT id, format, path, created_at, row_count, size_bytes FROM exports WHERE id = ?",
-            (export_id,)
-        ).fetchone()
-        return dict(row) if row else None
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT id, format, path, created_at, row_count, size_bytes FROM exports WHERE id = ?",
+                (export_id,)
+            ).fetchone()
+            return dict(row) if row else None
 
     def list_exports(self, limit=100):
-        rows = self.conn.execute(
-            """
-            SELECT id, format, path, created_at, row_count, size_bytes
-            FROM exports
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (limit,)
-        ).fetchall()
-        return [dict(row) for row in rows]
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT id, format, path, created_at, row_count, size_bytes
+                FROM exports
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,)
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def delete_export(self, export_id):
-        self.conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
+            self.conn.commit()
 
     def insert_occupancy(self, event):
-        self.conn.execute(
-            """
-            INSERT INTO occupancy_events(
-                scan_id, timestamp, band, frequency_hz, bandwidth_hz, power_dbm,
-                snr_db, crest_db, threshold_dbm, occupied, mode, confidence, device
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                event.get("scan_id"),
-                event.get("timestamp"),
-                event.get("band"),
-                event.get("frequency_hz", 0),
-                event.get("bandwidth_hz", 0),
-                event.get("power_dbm"),
-                event.get("snr_db"),
-                event.get("crest_db"),
-                event.get("threshold_dbm"),
-                1 if event.get("occupied") else 0,
-                event.get("mode"),
-                event.get("confidence"),
-                event.get("device")
+        with self._lock:
+            self.conn.execute(
+                """
+                INSERT INTO occupancy_events(
+                    scan_id, timestamp, band, frequency_hz, bandwidth_hz, power_dbm,
+                    snr_db, crest_db, threshold_dbm, occupied, mode, confidence, device
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.get("scan_id"),
+                    event.get("timestamp"),
+                    event.get("band"),
+                    event.get("frequency_hz", 0),
+                    event.get("bandwidth_hz", 0),
+                    event.get("power_dbm"),
+                    event.get("snr_db"),
+                    event.get("crest_db"),
+                    event.get("threshold_dbm"),
+                    1 if event.get("occupied") else 0,
+                    event.get("mode"),
+                    event.get("confidence"),
+                    event.get("device")
+                )
             )
-        )
-        self.conn.commit()
+            self.conn.commit()
 
     def insert_callsign(self, event):
-        self.conn.execute(
-            """
-            INSERT INTO callsign_events(
-                scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
-                crest_db, df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
-                payload, lat, lon, msg, source, device, power_dbm, rf_gated, weather_json,
-                symbol_table, symbol_code
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                event.get("scan_id"),
-                event.get("timestamp"),
-                event.get("band"),
-                event.get("frequency_hz", 0),
-                event.get("mode"),
-                event.get("callsign"),
-                event.get("snr_db"),
-                event.get("crest_db"),
-                event.get("df_hz"),
-                event.get("confidence"),
-                event.get("raw"),
-                event.get("grid"),
-                event.get("report"),
-                event.get("time_s"),
-                event.get("dt_s"),
-                1 if event.get("is_new") else 0 if event.get("is_new") is not None else None,
-                event.get("path"),
-                event.get("payload"),
-                event.get("lat"),
-                event.get("lon"),
-                event.get("msg"),
-                event.get("source"),
-                event.get("device"),
-                event.get("power_dbm"),
-                1 if event.get("rf_gated") else 0 if event.get("rf_gated") is not None else None,
-                json.dumps(event["weather"]) if event.get("weather") else None,
-                event.get("symbol_table"),
-                event.get("symbol_code"),
+        with self._lock:
+            self.conn.execute(
+                """
+                INSERT INTO callsign_events(
+                    scan_id, timestamp, band, frequency_hz, mode, callsign, snr_db,
+                    crest_db, df_hz, confidence, raw, grid, report, time_s, dt_s, is_new, path,
+                    payload, lat, lon, msg, source, device, power_dbm, rf_gated, weather_json,
+                    symbol_table, symbol_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.get("scan_id"),
+                    event.get("timestamp"),
+                    event.get("band"),
+                    event.get("frequency_hz", 0),
+                    event.get("mode"),
+                    event.get("callsign"),
+                    event.get("snr_db"),
+                    event.get("crest_db"),
+                    event.get("df_hz"),
+                    event.get("confidence"),
+                    event.get("raw"),
+                    event.get("grid"),
+                    event.get("report"),
+                    event.get("time_s"),
+                    event.get("dt_s"),
+                    1 if event.get("is_new") else 0 if event.get("is_new") is not None else None,
+                    event.get("path"),
+                    event.get("payload"),
+                    event.get("lat"),
+                    event.get("lon"),
+                    event.get("msg"),
+                    event.get("source"),
+                    event.get("device"),
+                    event.get("power_dbm"),
+                    1 if event.get("rf_gated") else 0 if event.get("rf_gated") is not None else None,
+                    json.dumps(event["weather"]) if event.get("weather") else None,
+                    event.get("symbol_table"),
+                    event.get("symbol_code"),
+                )
             )
-        )
-        self.conn.commit()
+            self.conn.commit()
 
     def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
         """Thread-safe event retrieval with proper SQLite synchronization.
@@ -805,50 +816,51 @@ class Database:
             return stats
 
     def get_decoder_baseline_stats(self):
-        baseline = {
-            "callsign_events_total": 0,
-            "callsign_unique_total": 0,
-            "by_source": {},
-            "callsign_modes": {},
-        }
-
-        total_row = self.conn.execute(
-            "SELECT COUNT(*) AS total, COUNT(DISTINCT callsign) AS unique_total FROM callsign_events"
-        ).fetchone()
-        baseline["callsign_events_total"] = int(total_row["total"] or 0) if total_row else 0
-        baseline["callsign_unique_total"] = int(total_row["unique_total"] or 0) if total_row else 0
-
-        for row in self.conn.execute(
-            """
-            SELECT
-                COALESCE(NULLIF(TRIM(CAST(source AS TEXT)), ''), 'unknown') AS source,
-                COUNT(*) AS total,
-                COUNT(DISTINCT callsign) AS unique_callsigns,
-                MAX(timestamp) AS last_seen_at
-            FROM callsign_events
-            GROUP BY source
-            ORDER BY total DESC
-            """
-        ):
-            source = str(row["source"] or "unknown")
-            baseline["by_source"][source] = {
-                "total": int(row["total"] or 0),
-                "unique_callsigns": int(row["unique_callsigns"] or 0),
-                "last_seen_at": row["last_seen_at"],
+        with self._lock:
+            baseline = {
+                "callsign_events_total": 0,
+                "callsign_unique_total": 0,
+                "by_source": {},
+                "callsign_modes": {},
             }
 
-        for row in self.conn.execute(
-            """
-            SELECT COALESCE(NULLIF(TRIM(CAST(mode AS TEXT)), ''), 'Unknown') AS mode, COUNT(*) AS total
-            FROM callsign_events
-            GROUP BY mode
-            ORDER BY total DESC
-            """
-        ):
-            mode = str(row["mode"] or "Unknown")
-            baseline["callsign_modes"][mode] = int(row["total"] or 0)
+            total_row = self.conn.execute(
+                "SELECT COUNT(*) AS total, COUNT(DISTINCT callsign) AS unique_total FROM callsign_events"
+            ).fetchone()
+            baseline["callsign_events_total"] = int(total_row["total"] or 0) if total_row else 0
+            baseline["callsign_unique_total"] = int(total_row["unique_total"] or 0) if total_row else 0
 
-        return baseline
+            for row in self.conn.execute(
+                """
+                SELECT
+                    COALESCE(NULLIF(TRIM(CAST(source AS TEXT)), ''), 'unknown') AS source,
+                    COUNT(*) AS total,
+                    COUNT(DISTINCT callsign) AS unique_callsigns,
+                    MAX(timestamp) AS last_seen_at
+                FROM callsign_events
+                GROUP BY source
+                ORDER BY total DESC
+                """
+            ):
+                source = str(row["source"] or "unknown")
+                baseline["by_source"][source] = {
+                    "total": int(row["total"] or 0),
+                    "unique_callsigns": int(row["unique_callsigns"] or 0),
+                    "last_seen_at": row["last_seen_at"],
+                }
+
+            for row in self.conn.execute(
+                """
+                SELECT COALESCE(NULLIF(TRIM(CAST(mode AS TEXT)), ''), 'Unknown') AS mode, COUNT(*) AS total
+                FROM callsign_events
+                GROUP BY mode
+                ORDER BY total DESC
+                """
+            ):
+                mode = str(row["mode"] or "Unknown")
+                baseline["callsign_modes"][mode] = int(row["total"] or 0)
+
+            return baseline
 
     def get_ssb_metrics(self, window_minutes: int = 15):
         try:
@@ -860,15 +872,16 @@ class Database:
         now = datetime.now(timezone.utc)
         cutoff = (now - timedelta(minutes=minutes)).isoformat()
 
-        rows = self.conn.execute(
-            """
-            SELECT timestamp, callsign, confidence, payload
-            FROM callsign_events
-            WHERE UPPER(mode) = 'SSB' AND timestamp >= ?
-            ORDER BY timestamp DESC
-            """,
-            (cutoff,),
-        ).fetchall()
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT timestamp, callsign, confidence, payload
+                FROM callsign_events
+                WHERE UPPER(mode) = 'SSB' AND timestamp >= ?
+                ORDER BY timestamp DESC
+                """,
+                (cutoff,),
+            ).fetchall()
 
         by_state = {
             "SSB_CONFIRMED": 0,
@@ -961,30 +974,31 @@ class Database:
         )
         """
 
-        occ_before = self.conn.execute(
-            f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
-        ).fetchone()[0]
-        occ_cursor = self.conn.execute(
-            f"DELETE FROM occupancy_events WHERE {occupancy_where_clause}"
-        )
-        occ_deleted = occ_cursor.rowcount
+        with self._lock:
+            occ_before = self.conn.execute(
+                f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
+            ).fetchone()[0]
+            occ_cursor = self.conn.execute(
+                f"DELETE FROM occupancy_events WHERE {occupancy_where_clause}"
+            )
+            occ_deleted = occ_cursor.rowcount
 
-        calls_before = self.conn.execute(
-            f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
-        ).fetchone()[0]
-        calls_cursor = self.conn.execute(
-            f"DELETE FROM callsign_events WHERE {callsign_where_clause}"
-        )
-        calls_deleted = calls_cursor.rowcount
+            calls_before = self.conn.execute(
+                f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
+            ).fetchone()[0]
+            calls_cursor = self.conn.execute(
+                f"DELETE FROM callsign_events WHERE {callsign_where_clause}"
+            )
+            calls_deleted = calls_cursor.rowcount
 
-        self.conn.commit()
+            self.conn.commit()
 
-        occ_after = self.conn.execute(
-            f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
-        ).fetchone()[0]
-        calls_after = self.conn.execute(
-            f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
-        ).fetchone()[0]
+            occ_after = self.conn.execute(
+                f"SELECT COUNT(*) AS total FROM occupancy_events WHERE {occupancy_where_clause}"
+            ).fetchone()[0]
+            calls_after = self.conn.execute(
+                f"SELECT COUNT(*) AS total FROM callsign_events WHERE {callsign_where_clause}"
+            ).fetchone()[0]
 
         return {
             "before": int(occ_before) + int(calls_before),
@@ -1005,9 +1019,10 @@ class Database:
         }
 
     def clear_configuration(self):
-        self.conn.execute("DELETE FROM settings")
-        self.conn.execute("DELETE FROM bands")
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute("DELETE FROM settings")
+            self.conn.execute("DELETE FROM bands")
+            self.conn.commit()
 
     def get_purgeable_events(self, days: int, max_events: int) -> dict:
         """
@@ -1026,113 +1041,114 @@ class Database:
         """
         from datetime import datetime, timedelta, timezone
 
-        occ_age_ids = []
-        call_age_ids = []
+        with self._lock:
+            occ_age_ids = []
+            call_age_ids = []
 
-        # --- Phase 1: age-based ---
-        if days > 0:
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-            occ_age_ids = [
-                r[0] for r in self.conn.execute(
-                    "SELECT id FROM occupancy_events WHERE timestamp < ? ORDER BY timestamp ASC",
-                    (cutoff,)
-                ).fetchall()
-            ]
-            call_age_ids = [
-                r[0] for r in self.conn.execute(
-                    "SELECT id FROM callsign_events WHERE timestamp < ? ORDER BY timestamp ASC",
-                    (cutoff,)
-                ).fetchall()
-            ]
-
-        # --- Phase 2: count-based ---
-        occ_count_ids = []
-        call_count_ids = []
-
-        if max_events > 0:
-            total_occ = self.conn.execute("SELECT COUNT(*) FROM occupancy_events").fetchone()[0]
-            total_call = self.conn.execute("SELECT COUNT(*) FROM callsign_events").fetchone()[0]
-            remaining = (total_occ - len(occ_age_ids)) + (total_call - len(call_age_ids))
-
-            if remaining > max_events:
-                excess = remaining - max_events
-
-                # Take oldest occupancy events first
-                if occ_age_ids:
-                    ph = ",".join("?" * len(occ_age_ids))
-                    rows = self.conn.execute(
-                        f"SELECT id FROM occupancy_events WHERE id NOT IN ({ph})"
-                        f" ORDER BY timestamp ASC LIMIT ?",
-                        occ_age_ids + [excess]
+            # --- Phase 1: age-based ---
+            if days > 0:
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                occ_age_ids = [
+                    r[0] for r in self.conn.execute(
+                        "SELECT id FROM occupancy_events WHERE timestamp < ? ORDER BY timestamp ASC",
+                        (cutoff,)
                     ).fetchall()
-                else:
-                    rows = self.conn.execute(
-                        "SELECT id FROM occupancy_events ORDER BY timestamp ASC LIMIT ?",
-                        (excess,)
+                ]
+                call_age_ids = [
+                    r[0] for r in self.conn.execute(
+                        "SELECT id FROM callsign_events WHERE timestamp < ? ORDER BY timestamp ASC",
+                        (cutoff,)
                     ).fetchall()
-                occ_count_ids = [r[0] for r in rows]
+                ]
 
-                still_excess = excess - len(occ_count_ids)
-                if still_excess > 0:
-                    if call_age_ids:
-                        ph = ",".join("?" * len(call_age_ids))
+            # --- Phase 2: count-based ---
+            occ_count_ids = []
+            call_count_ids = []
+
+            if max_events > 0:
+                total_occ = self.conn.execute("SELECT COUNT(*) FROM occupancy_events").fetchone()[0]
+                total_call = self.conn.execute("SELECT COUNT(*) FROM callsign_events").fetchone()[0]
+                remaining = (total_occ - len(occ_age_ids)) + (total_call - len(call_age_ids))
+
+                if remaining > max_events:
+                    excess = remaining - max_events
+
+                    # Take oldest occupancy events first
+                    if occ_age_ids:
+                        ph = ",".join("?" * len(occ_age_ids))
                         rows = self.conn.execute(
-                            f"SELECT id FROM callsign_events WHERE id NOT IN ({ph})"
+                            f"SELECT id FROM occupancy_events WHERE id NOT IN ({ph})"
                             f" ORDER BY timestamp ASC LIMIT ?",
-                            call_age_ids + [still_excess]
+                            occ_age_ids + [excess]
                         ).fetchall()
                     else:
                         rows = self.conn.execute(
-                            "SELECT id FROM callsign_events ORDER BY timestamp ASC LIMIT ?",
-                            (still_excess,)
+                            "SELECT id FROM occupancy_events ORDER BY timestamp ASC LIMIT ?",
+                            (excess,)
                         ).fetchall()
-                    call_count_ids = [r[0] for r in rows]
+                    occ_count_ids = [r[0] for r in rows]
 
-        occ_ids = list(set(occ_age_ids) | set(occ_count_ids))
-        call_ids = list(set(call_age_ids) | set(call_count_ids))
+                    still_excess = excess - len(occ_count_ids)
+                    if still_excess > 0:
+                        if call_age_ids:
+                            ph = ",".join("?" * len(call_age_ids))
+                            rows = self.conn.execute(
+                                f"SELECT id FROM callsign_events WHERE id NOT IN ({ph})"
+                                f" ORDER BY timestamp ASC LIMIT ?",
+                                call_age_ids + [still_excess]
+                            ).fetchall()
+                        else:
+                            rows = self.conn.execute(
+                                "SELECT id FROM callsign_events ORDER BY timestamp ASC LIMIT ?",
+                                (still_excess,)
+                            ).fetchall()
+                        call_count_ids = [r[0] for r in rows]
 
-        if not occ_ids and not call_ids:
-            return {"events": [], "occ_ids": [], "call_ids": [], "count": 0}
+            occ_ids = list(set(occ_age_ids) | set(occ_count_ids))
+            call_ids = list(set(call_age_ids) | set(call_count_ids))
 
-        # Fetch event records for export
-        events = []
+            if not occ_ids and not call_ids:
+                return {"events": [], "occ_ids": [], "call_ids": [], "count": 0}
 
-        if occ_ids:
-            ph = ",".join("?" * len(occ_ids))
-            rows = self.conn.execute(
-                f"SELECT timestamp, band, frequency_hz, mode, snr_db, power_dbm,"
-                f" scan_id, confidence FROM occupancy_events WHERE id IN ({ph})",
-                occ_ids
-            ).fetchall()
-            for r in rows:
-                events.append({
-                    "type": "occupancy",
-                    "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
-                    "mode": r[3], "callsign": None, "snr_db": r[4],
-                    "power_dbm": r[5], "scan_id": r[6], "confidence": r[7],
-                })
+            # Fetch event records for export
+            events = []
 
-        if call_ids:
-            ph = ",".join("?" * len(call_ids))
-            rows = self.conn.execute(
-                f"SELECT timestamp, band, frequency_hz, mode, callsign, snr_db,"
-                f" scan_id, confidence FROM callsign_events WHERE id IN ({ph})",
-                call_ids
-            ).fetchall()
-            for r in rows:
-                events.append({
-                    "type": "callsign",
-                    "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
-                    "mode": r[3], "callsign": r[4], "snr_db": r[5],
-                    "power_dbm": None, "scan_id": r[6], "confidence": r[7],
-                })
+            if occ_ids:
+                ph = ",".join("?" * len(occ_ids))
+                rows = self.conn.execute(
+                    f"SELECT timestamp, band, frequency_hz, mode, snr_db, power_dbm,"
+                    f" scan_id, confidence FROM occupancy_events WHERE id IN ({ph})",
+                    occ_ids
+                ).fetchall()
+                for r in rows:
+                    events.append({
+                        "type": "occupancy",
+                        "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
+                        "mode": r[3], "callsign": None, "snr_db": r[4],
+                        "power_dbm": r[5], "scan_id": r[6], "confidence": r[7],
+                    })
 
-        return {
-            "events": events,
-            "occ_ids": occ_ids,
-            "call_ids": call_ids,
-            "count": len(events),
-        }
+            if call_ids:
+                ph = ",".join("?" * len(call_ids))
+                rows = self.conn.execute(
+                    f"SELECT timestamp, band, frequency_hz, mode, callsign, snr_db,"
+                    f" scan_id, confidence FROM callsign_events WHERE id IN ({ph})",
+                    call_ids
+                ).fetchall()
+                for r in rows:
+                    events.append({
+                        "type": "callsign",
+                        "timestamp": r[0], "band": r[1], "frequency_hz": r[2],
+                        "mode": r[3], "callsign": r[4], "snr_db": r[5],
+                        "power_dbm": None, "scan_id": r[6], "confidence": r[7],
+                    })
+
+            return {
+                "events": events,
+                "occ_ids": occ_ids,
+                "call_ids": call_ids,
+                "count": len(events),
+            }
 
     def get_all_events_and_keep_newest(self, keep: int) -> dict:
         """
@@ -1211,18 +1227,19 @@ class Database:
         Returns:
             Total number of rows deleted.
         """
-        deleted = 0
-        if occ_ids:
-            ph = ",".join("?" * len(occ_ids))
-            cursor = self.conn.execute(
-                f"DELETE FROM occupancy_events WHERE id IN ({ph})", occ_ids
-            )
-            deleted += cursor.rowcount
-        if call_ids:
-            ph = ",".join("?" * len(call_ids))
-            cursor = self.conn.execute(
-                f"DELETE FROM callsign_events WHERE id IN ({ph})", call_ids
-            )
-            deleted += cursor.rowcount
-        self.conn.commit()
-        return deleted
+        with self._lock:
+            deleted = 0
+            if occ_ids:
+                ph = ",".join("?" * len(occ_ids))
+                cursor = self.conn.execute(
+                    f"DELETE FROM occupancy_events WHERE id IN ({ph})", occ_ids
+                )
+                deleted += cursor.rowcount
+            if call_ids:
+                ph = ",".join("?" * len(call_ids))
+                cursor = self.conn.execute(
+                    f"DELETE FROM callsign_events WHERE id IN ({ph})", call_ids
+                )
+                deleted += cursor.rowcount
+            self.conn.commit()
+            return deleted

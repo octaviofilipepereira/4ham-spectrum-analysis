@@ -3184,8 +3184,10 @@ initExternalMirrorsUI({
   showToastError: typeof showToastError === "function" ? showToastError : undefined,
 });
 
-// Satellite module — init on load, then bind buttons; passes panel on modal open
-(async () => {
+// Satellite module — init AFTER startApplication() (i.e. after auth) to avoid
+// opening /ws/satellite while the user is still on the login modal, which
+// produces 403 spam in backend logs and a broken pre-login UI.
+async function _initSatelliteModule() {
   const lang = document.documentElement.lang?.toLowerCase()?.startsWith("pt") ? "pt" : "en";
   await initSatellite(lang);
   bindSatelliteButtons();
@@ -3195,7 +3197,7 @@ initExternalMirrorsUI({
       loadPassesPanel().catch(() => {});
     });
   }
-})();
+}
 
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });
@@ -5044,6 +5046,9 @@ async function startApplication() {
     return;
   }
   appStarted = true;
+  // Initialise satellite module (opens /ws/satellite). Must run AFTER auth so
+  // the WebSocket carries the session cookie; otherwise backend returns 403.
+  _initSatelliteModule().catch((err) => console.warn("satellite init failed", err));
   connectSpectrum();
   ensureWaterfallFallback();
   connectStatus();
