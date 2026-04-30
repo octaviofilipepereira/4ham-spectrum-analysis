@@ -1992,7 +1992,10 @@ function connectLogs() {
 
 async function fetchFileLog() {
   try {
-    const resp = await fetch("/api/logs/file?limit=2000", { headers: { ...getAuthHeader() } });
+    // 500 lines is enough for the live ops view; the Export button still pulls
+    // 2000 on demand. Previous default of 2000 produced ~235 KB per request
+    // every 8 s and was the single largest contributor to API latency.
+    const resp = await fetch("/api/logs/file?limit=500", { headers: { ...getAuthHeader() } });
     if (!resp.ok) {
       return;
     }
@@ -5072,21 +5075,28 @@ async function startApplication() {
   loadFilters();
   fetchEvents();
   fetchTotal();
-  setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
+  // Events: 200 rows × ~1 KB each = ~200 KB per fetch. 5 s polling overwhelmed
+  // the FastAPI threadpool (HAR analysis 2026-04-30: 8.7 MB transferred in
+  // 100 s for /api/events alone). 15 s gives interactive feel without flooding.
+  setInterval(() => { fetchEvents(); fetchTotal(); }, 15000);
   await syncScanState();
   refreshQuickBandButtons();
   setInterval(syncScanState, 5000);
   fetchModeStats();
-  setInterval(fetchModeStats, 10000);
+  // /api/events/stats runs COUNT(*) GROUP BY mode over ~800k rows; 30 s is plenty.
+  setInterval(fetchModeStats, 30000);
   fetchPropagationSummary();
-  setInterval(fetchPropagationSummary, 15000);
+  // Propagation summary updates derive from the same events; 60 s suffices.
+  setInterval(fetchPropagationSummary, 60000);
   fetchDecoderStatus();
-  setInterval(fetchDecoderStatus, 10000);
+  setInterval(fetchDecoderStatus, 20000);
   connectLogs();
   fetchLogs();
-  setInterval(fetchLogs, 4000);
+  // /ws/logs already pushes new entries in real time; the poll is a safety net.
+  setInterval(fetchLogs, 30000);
   fetchFileLog();
-  setInterval(fetchFileLog, 8000);
+  // Backend log file dump is ~235 KB per call; 30 s polling is enough for ops view.
+  setInterval(fetchFileLog, 30000);
   initMenuDropdownModalBehavior();
 
   try {

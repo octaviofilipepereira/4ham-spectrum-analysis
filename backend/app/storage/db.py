@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS callsign_events (
 CREATE INDEX IF NOT EXISTS idx_occ_time ON occupancy_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_callsign_time ON callsign_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_callsign_value ON callsign_events(callsign);
+-- Composite indices used by the /api/events/stats and /api/events/count
+-- endpoints, which group/filter by mode within a recent timestamp window.
+-- Without these, COUNT(*) GROUP BY mode falls back to a full table scan
+-- of the ~800k row event tables (HAR analysis 2026-04-30 showed ~1 s per call).
+CREATE INDEX IF NOT EXISTS idx_occ_mode_time ON occupancy_events(mode, timestamp);
+CREATE INDEX IF NOT EXISTS idx_callsign_mode_time ON callsign_events(mode, timestamp);
 
 CREATE TABLE IF NOT EXISTS rotation_presets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -159,6 +165,22 @@ class Database:
         self.path = path
         self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        # Performance pragmas:
+        # - WAL: allows concurrent readers while a writer is active and avoids
+        #   blocking every read on the writer fsync, which was a major source
+        #   of API latency under polling load (HAR analysis 2026-04-30).
+        # - synchronous=NORMAL: sufficient durability with WAL; full sync on
+        #   every commit is overkill for a logging workload.
+        # - temp_store=MEMORY: keeps temporary B-trees off disk for COUNT(*)
+        #   group-by queries used by /api/events/stats.
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+            self.conn.execute("PRAGMA temp_store=MEMORY")
+        except sqlite3.DatabaseError:
+            # Pragmas are best-effort; a corrupt or read-only DB will still
+            # surface its real error in the next operation.
+            pass
         self._lock = threading.RLock()  # Thread-safe access to SQLite connection
         self._init_schema()
 
