@@ -668,6 +668,11 @@ const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
 const propagationCard = document.getElementById("propagationCard");
 const aprsMapFullscreenBtn = document.getElementById("aprsMapFullscreenBtn");
+
+// ── Beacon Monitor panel ────────────────────────────────────────────────
+const beaconArea = document.getElementById("beaconArea");
+const vfoBeaconLabel = document.getElementById("vfoBeaconLabel");
+
 const _aprsMapFsBtnLabel = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;vertical-align:-1px;"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/></svg>Fullscreen';
 
 function _setAprsMapFullscreen(fullscreen) {
@@ -753,6 +758,25 @@ async function _checkAprsConnectivity() {
       showToast("⚠️ No internet — APRS limited to RF reception only (144.800 MHz)");
     }
   } catch { /* best-effort */ }
+}
+
+/**
+ * Show or hide the Beacon Monitor panel (inline, replaces waterfall).
+ * @param {boolean} show - true → show beacon panel, false → show waterfall
+ */
+function setBeaconAreaVisible(show) {
+  if (beaconArea) beaconArea.hidden = !show;
+  if (waterfallArea) waterfallArea.hidden = show;
+  if (propagationCard) propagationCard.hidden = show;
+  // Hide Go-to-MHz / SNR / DSP status — irrelevant in BEACON mode
+  if (vfoGotoGroup) vfoGotoGroup.hidden = show;
+  if (show) {
+    // Sync VFO label to current beacon slot
+    _syncBeaconContext();
+  } else {
+    // Hide VFO beacon label when exiting mode
+    if (vfoBeaconLabel) vfoBeaconLabel.hidden = true;
+  }
 }
 
 /** Fetch recent APRS events from the API and populate the map. */
@@ -893,6 +917,27 @@ function _syncAprsMapContext() {
   );
 
   _updateAprsMapCount();
+}
+
+/**
+ * Sync the VFO beacon label to the current slot (freq + callsign).
+ * Called when entering beacon mode or when a new slot starts.
+ */
+function _syncBeaconContext() {
+  if (!beaconArea || beaconArea.hidden) return;
+  if (!vfoBeaconLabel) return;
+
+  // Query BeaconController for current slot freq and callsign
+  const freqHz = beaconController?.currentFreqHz;
+  const callsign = beaconController?.currentCallsign;
+
+  if (freqHz && callsign) {
+    const freqMHz = (freqHz / 1e6).toFixed(3);
+    vfoBeaconLabel.textContent = ` → ${callsign} (${freqMHz} MHz)`;
+    vfoBeaconLabel.hidden = false;
+  } else {
+    vfoBeaconLabel.hidden = true;
+  }
 }
 
 function updateFullscreenButtonState() {
@@ -4933,7 +4978,8 @@ if (quickModeButtons.length) {
       if (mode === "BEACON") {
         if (beaconController?.isBeaconModeActive()) {
           // Toggle off
-          await beaconController.exitBeaconMode();
+          await beaconController.stop();
+          setBeaconAreaVisible(false);
           selectedDecoderMode = null;
           refreshModeButtons();
           logLine("Beacon Analysis mode desactivado.");
@@ -4942,7 +4988,8 @@ if (quickModeButtons.length) {
           if (isScanRunning || latestScanState?.state === "running") {
             await stopScan();
           }
-          await beaconController?.enterBeaconMode();
+          await beaconController?.start();
+          setBeaconAreaVisible(true);
           selectedDecoderMode = "BEACON";
           refreshModeButtons();
           logLine("Beacon Analysis mode activado — scheduler NCDXF iniciado.");
@@ -4952,7 +4999,8 @@ if (quickModeButtons.length) {
 
       // If beacon mode was active, exit it when switching to another mode
       if (beaconController?.isBeaconModeActive()) {
-        await beaconController.exitBeaconMode();
+        await beaconController.stop();
+        setBeaconAreaVisible(false);
       }
       // ── End BEACON special handling ───────────────────────────────────────
 
