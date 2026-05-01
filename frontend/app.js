@@ -922,6 +922,7 @@ function _syncAprsMapContext() {
 /**
  * Sync the VFO beacon label to the current slot (freq + callsign).
  * Called when entering beacon mode or when a new slot starts.
+ * Exposed globally so BeaconController can call it on slot_start.
  */
 function _syncBeaconContext() {
   if (!beaconArea || beaconArea.hidden) return;
@@ -939,6 +940,7 @@ function _syncBeaconContext() {
     vfoBeaconLabel.hidden = true;
   }
 }
+window._syncBeaconContext = _syncBeaconContext;  // expose for BeaconController
 
 function updateFullscreenButtonState() {
   if (!waterfallFullscreenBtn) {

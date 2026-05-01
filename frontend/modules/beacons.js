@@ -4,9 +4,9 @@
  *
  * Responsibilities:
  *  - Connect to /ws/beacons
- *  - Render and update the 18×5 beacon matrix modal
+ *  - Render and update the 18×5 beacon matrix (inline panel, not modal)
  *  - Drive the countdown to the next slot
- *  - Expose enterBeaconMode() / exitBeaconMode() for app.js
+ *  - Expose start() / stop() + currentFreqHz/currentCallsign getters for app.js
  */
 
 const BANDS   = ["20m", "17m", "15m", "12m", "10m"];
@@ -46,18 +46,14 @@ class BeaconController {
     this._activeBand = null;
     this._countdownTimer = null;
     this._schedulerRunning = false;
-    this._pollTimer = null;          // periodic /api/beacons/matrix while modal shown
-    this._modalVisible = false;
+    this._currentFreqHz = null;      // current slot frequency for VFO label
+    this._currentCallsign = null;    // current slot beacon callsign
 
-    this._modal = document.getElementById("beaconModal");
     this._matrixBody = document.getElementById("beaconMatrixBody");
     this._statusBadge = document.getElementById("beaconStatusBadge");
-    this._bandBadge   = document.getElementById("beaconBandBadge");
     this._countdown   = document.getElementById("beaconCountdown");
     this._startBtn    = document.getElementById("beaconStartBtn");
     this._stopBtn     = document.getElementById("beaconStopBtn");
-    this._viewBtn     = document.getElementById("viewBeaconRotationBtn");
-    this._rotBtn      = document.getElementById("rotationToggleBtn");
     this._bandBtns    = Array.from(document.querySelectorAll("[data-quick-band]"));
     this._beaconModeBtn = document.querySelector('[data-quick-mode="BEACON"]');
 
@@ -106,10 +102,17 @@ class BeaconController {
   _onSlotStart(msg) {
     this._activeSlot = msg.slot_index;
     this._activeBand = BANDS.indexOf(msg.band_name);
+    this._currentFreqHz = msg.freq_hz;         // save for VFO label getter
+    this._currentCallsign = msg.callsign;      // save for VFO label getter
     this._schedulerRunning = true;
     this._refreshStatusBadge();
     this._renderMatrix();
     this._startCountdown(msg.slot_start_utc);
+    
+    // Notify app.js to update VFO beacon label
+    if (typeof window._syncBeaconContext === "function") {
+      window._syncBeaconContext();
+    }
   }
 
   _onObservation(obs) {
@@ -190,17 +193,13 @@ class BeaconController {
     if (this._stopBtn)  this._stopBtn.disabled  = !this._schedulerRunning;
   }
 
-  // ── Enter / exit beacon mode ───────────────────────────────────────────────
+  // ── Public API: start/stop + getters ──────────────────────────────────────
 
-  async enterBeaconMode() {
+  async start() {
     this._beaconModeActive = true;
 
     // Disable band buttons
     this._bandBtns.forEach(b => { b.disabled = true; });
-
-    // Swap rotation button → view beacon rotation
-    if (this._rotBtn) this._rotBtn.classList.add("d-none");
-    if (this._viewBtn) this._viewBtn.classList.remove("d-none");
 
     // Style the beacon mode button
     if (this._beaconModeBtn) {
@@ -219,15 +218,13 @@ class BeaconController {
     }
   }
 
-  async exitBeaconMode() {
+  async stop() {
     this._beaconModeActive = false;
+    this._currentFreqHz = null;
+    this._currentCallsign = null;
 
     // Re-enable band buttons
     this._bandBtns.forEach(b => { b.disabled = false; });
-
-    // Restore rotation button
-    if (this._rotBtn) this._rotBtn.classList.remove("d-none");
-    if (this._viewBtn) this._viewBtn.classList.add("d-none");
 
     // Deactivate beacon mode button
     if (this._beaconModeBtn) {
@@ -248,10 +245,18 @@ class BeaconController {
     return this._beaconModeActive;
   }
 
+  get currentFreqHz() {
+    return this._currentFreqHz;
+  }
+
+  get currentCallsign() {
+    return this._currentCallsign;
+  }
+
   // ── UI bindings ────────────────────────────────────────────────────────────
 
   _bindUI() {
-    // Start/stop buttons inside the modal
+    // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
       try {
         await fetch("/api/beacons/start", {
@@ -268,61 +273,6 @@ class BeaconController {
         });
       } catch (_) {}
     });
-
-    // Fetch initial matrix when modal opens + start polling fallback (3 s)
-    // Polling is a safety net so the matrix advances even if the WS push
-    // is delayed, dropped, or the connection silently died.
-    this._modal?.addEventListener("shown.bs.modal", () => {
-      this._modalVisible = true;
-      this._fetchMatrix();
-      this._fetchStatus();
-      clearInterval(this._pollTimer);
-      this._pollTimer = setInterval(() => {
-        if (!this._modalVisible) return;
-        this._fetchMatrix();
-        this._fetchStatus();
-      }, 3000);
-    });
-    this._modal?.addEventListener("hidden.bs.modal", () => {
-      this._modalVisible = false;
-      clearInterval(this._pollTimer);
-      this._pollTimer = null;
-    });
-  }
-
-  async _fetchMatrix() {
-    try {
-      const res = await fetch("/api/beacons/matrix", { headers: this._authHeaders() });
-      if (!res.ok) return;
-      const data = await res.json();
-      // Populate matrixData from history
-      (data.matrix || []).forEach((row, slotIdx) => {
-        (row || []).forEach((obs, bandIdx) => {
-          if (obs) {
-            const key = `${slotIdx}:${bandIdx}`;
-            this._matrixData[key] = obs;
-          }
-        });
-      });
-      this._activeSlot = data.current_slot_index ?? null;
-      this._renderMatrix();
-    } catch (_) {}
-  }
-
-  async _fetchStatus() {
-    try {
-      const res = await fetch("/api/beacons/status", { headers: this._authHeaders() });
-      if (!res.ok) return;
-      const data = await res.json();
-      const sched = data?.scheduler || {};
-      this._schedulerRunning = Boolean(sched.running);
-      // Sync active band from scheduler — survives WS gaps
-      const bandIdx = BANDS.indexOf(sched.current_band);
-      if (bandIdx >= 0) this._activeBand = bandIdx;
-      this._refreshStatusBadge();
-      // Re-render so the active cell highlight follows scheduler state
-      this._renderMatrix();
-    } catch (_) {}
   }
 
   _authHeaders() {
