@@ -184,11 +184,12 @@ class BeaconController {
     if (!this._statusBadge) return;
     if (this._schedulerRunning) {
       this._statusBadge.textContent = "● Running";
-      this._statusBadge.className = "badge bg-success ms-2";
+      this._statusBadge.className = "btn btn-sm btn-success";
     } else {
       this._statusBadge.textContent = "○ Stopped";
-      this._statusBadge.className = "badge bg-secondary ms-2";
+      this._statusBadge.className = "btn btn-sm btn-secondary";
     }
+    this._statusBadge.disabled = true;
     if (this._startBtn) this._startBtn.disabled = this._schedulerRunning;
     if (this._stopBtn)  this._stopBtn.disabled  = !this._schedulerRunning;
   }
