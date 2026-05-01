@@ -157,6 +157,36 @@ CREATE TABLE IF NOT EXISTS external_mirror_audit (
 
 CREATE INDEX IF NOT EXISTS idx_ext_mirror_audit_mirror_ts
   ON external_mirror_audit(mirror_id, ts DESC);
+
+-- ── NCDXF/IARU Beacon Analysis ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS beacon_observations (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  slot_start_utc     TEXT    NOT NULL,
+  slot_index         INTEGER NOT NULL,
+  beacon_callsign    TEXT    NOT NULL,
+  beacon_index       INTEGER NOT NULL,
+  beacon_location    TEXT,
+  beacon_status      TEXT,
+  band_name          TEXT    NOT NULL,
+  freq_hz            INTEGER NOT NULL,
+  detected           INTEGER NOT NULL DEFAULT 0,
+  id_confirmed       INTEGER NOT NULL DEFAULT 0,
+  id_confidence      REAL,
+  drift_ms           REAL,
+  dash_levels_detected INTEGER NOT NULL DEFAULT 0,
+  snr_db_100w        REAL,
+  snr_db_10w         REAL,
+  snr_db_1w          REAL,
+  snr_db_100mw       REAL,
+  recorded_at        TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_beacon_obs_time
+  ON beacon_observations(slot_start_utc DESC);
+CREATE INDEX IF NOT EXISTS idx_beacon_obs_callsign
+  ON beacon_observations(beacon_callsign, slot_start_utc DESC);
+CREATE INDEX IF NOT EXISTS idx_beacon_obs_band
+  ON beacon_observations(band_name, slot_start_utc DESC);
 """
 
 
@@ -624,6 +654,87 @@ class Database:
                 )
             )
             self.conn.commit()
+
+    # ── NCDXF Beacon Observations ─────────────────────────────────────────────
+
+    def insert_beacon_observation(self, obs: dict) -> int:
+        """Insert one beacon observation row.  Returns the new row id."""
+        from datetime import datetime, timezone as _tz
+        recorded_at = datetime.now(_tz.utc).isoformat()
+        with self._lock:
+            cur = self.conn.execute(
+                """
+                INSERT INTO beacon_observations(
+                    slot_start_utc, slot_index, beacon_callsign, beacon_index,
+                    beacon_location, beacon_status, band_name, freq_hz,
+                    detected, id_confirmed, id_confidence, drift_ms,
+                    dash_levels_detected,
+                    snr_db_100w, snr_db_10w, snr_db_1w, snr_db_100mw,
+                    recorded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    obs.get("slot_start_utc"),
+                    obs.get("slot_index"),
+                    obs.get("beacon_callsign"),
+                    obs.get("beacon_index"),
+                    obs.get("beacon_location"),
+                    obs.get("beacon_status"),
+                    obs.get("band_name"),
+                    obs.get("freq_hz"),
+                    1 if obs.get("detected") else 0,
+                    1 if obs.get("id_confirmed") else 0,
+                    obs.get("id_confidence"),
+                    obs.get("drift_ms"),
+                    obs.get("dash_levels_detected", 0),
+                    obs.get("snr_db_100w"),
+                    obs.get("snr_db_10w"),
+                    obs.get("snr_db_1w"),
+                    obs.get("snr_db_100mw"),
+                    recorded_at,
+                ),
+            )
+            self.conn.commit()
+            return cur.lastrowid
+
+    def get_beacon_observations(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        band: str | None = None,
+        callsign: str | None = None,
+        detected_only: bool = False,
+    ) -> list[dict]:
+        """Return beacon observations ordered newest-first."""
+        clauses: list[str] = []
+        params: list = []
+        if band:
+            clauses.append("band_name = ?")
+            params.append(band)
+        if callsign:
+            clauses.append("UPPER(beacon_callsign) = UPPER(?)")
+            params.append(callsign)
+        if detected_only:
+            clauses.append("detected = 1")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        params += [limit, offset]
+        with self._lock:
+            rows = self.conn.execute(
+                f"""
+                SELECT id, slot_start_utc, slot_index, beacon_callsign,
+                       beacon_index, beacon_location, beacon_status,
+                       band_name, freq_hz, detected, id_confirmed,
+                       id_confidence, drift_ms, dash_levels_detected,
+                       snr_db_100w, snr_db_10w, snr_db_1w, snr_db_100mw,
+                       recorded_at
+                FROM beacon_observations
+                {where}
+                ORDER BY slot_start_utc DESC
+                LIMIT ? OFFSET ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
         """Thread-safe event retrieval with proper SQLite synchronization.
