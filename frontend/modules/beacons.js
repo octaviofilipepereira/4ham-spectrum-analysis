@@ -206,16 +206,8 @@ class BeaconController {
       this._beaconModeBtn.classList.add("is-active");
       this._beaconModeBtn.setAttribute("aria-pressed", "true");
     }
-
-    // Auto-start scheduler if not running
-    if (!this._schedulerRunning) {
-      try {
-        await fetch("/api/beacons/start", {
-          method: "POST",
-          headers: this._authHeaders(),
-        });
-      } catch (_) {}
-    }
+    // NOTE: do NOT auto-start the scheduler here. The user must click
+    // "Start monitoring" inside the panel to begin scanning.
   }
 
   async stop() {
@@ -232,13 +224,16 @@ class BeaconController {
       this._beaconModeBtn.setAttribute("aria-pressed", "false");
     }
 
-    // Stop scheduler
-    try {
-      await fetch("/api/beacons/stop", {
-        method: "POST",
-        headers: this._authHeaders(),
-      });
-    } catch (_) {}
+    // If scheduler is running when leaving the mode, stop it for safety.
+    // (Otherwise we'd keep parking the SDR with no UI to show it.)
+    if (this._schedulerRunning) {
+      try {
+        await fetch("/api/beacons/stop", {
+          method: "POST",
+          headers: this._authHeaders(),
+        });
+      } catch (_) {}
+    }
   }
 
   isBeaconModeActive() {

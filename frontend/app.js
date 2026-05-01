@@ -4994,7 +4994,7 @@ if (quickModeButtons.length) {
           setBeaconAreaVisible(true);
           selectedDecoderMode = "BEACON";
           refreshModeButtons();
-          logLine("Beacon Analysis mode activado — scheduler NCDXF iniciado.");
+          logLine("Beacon Monitor mode aberto — clica 'Start monitoring' para iniciar scheduler.");
         }
         return;
       }
