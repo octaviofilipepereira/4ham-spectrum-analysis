@@ -221,8 +221,12 @@ class BeaconScheduler:
                 self._scan_park(band.freq_hz)
 
             # Flush stale IQ then wait for SDR PLL settle
-            if self._iq_flush:
-                self._iq_flush()
+            if self._iq_queue is not None:
+                while not self._iq_queue.empty():
+                    try:
+                        self._iq_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
             await asyncio.sleep(_SETTLE_S)
 
             # Collect IQ for the usable window
