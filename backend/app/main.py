@@ -181,30 +181,12 @@ async def lifespan(app_instance: FastAPI):
         def _slot_cb(callsign: str, freq_hz: int, slot_index: int, slot_start_utc: str) -> None:
             _asyncio.ensure_future(broadcast_slot_start(callsign, freq_hz, slot_index, slot_start_utc))
 
-        # Wrap scan_engine attributes/methods as callables.
-        # `read_iq()` returns the next chunk from the spectrum queue (or None);
-        # the int arg is currently unused by the engine but kept for API parity.
-        # `sample_rate` is an int attribute, not a method, so we wrap in a lambda.
+        # Create dedicated IQ queue for beacon scheduler (separate from FFT's _spectrum_queue).
+        # This queue will be registered via scan_engine.register_iq_listener() when the
+        # scheduler starts, ensuring the beacon monitor does NOT steal IQ chunks from the
+        # waterfall/spectrum display.
         _engine = _state.scan_engine
-
-        def _iq_provider():
-            if _engine is None:
-                return None
-            try:
-                return _engine.read_iq(0)
-            except Exception:
-                return None
-
-        def _iq_flush() -> None:
-            # Drain any stale chunks left in the spectrum queue before measuring.
-            if _engine is None:
-                return
-            for _ in range(64):
-                try:
-                    if _engine.read_iq(0) is None:
-                        break
-                except Exception:
-                    break
+        _state.beacon_iq_queue = _asyncio.Queue(maxsize=128)
 
         def _sample_rate_provider() -> int:
             if _engine is None:
@@ -212,8 +194,7 @@ async def lifespan(app_instance: FastAPI):
             return int(getattr(_engine, "sample_rate", 2048000) or 2048000)
 
         _state.beacon_scheduler = BeaconScheduler(
-            iq_provider=_iq_provider,
-            iq_flush=_iq_flush,
+            iq_queue=_state.beacon_iq_queue,
             sample_rate_provider=_sample_rate_provider,
             scan_park=getattr(_engine, "park", None) if _engine else None,
             scan_unpark=getattr(_engine, "unpark", None) if _engine else None,

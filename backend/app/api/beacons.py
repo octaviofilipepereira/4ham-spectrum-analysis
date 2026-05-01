@@ -81,6 +81,11 @@ async def beacon_start(
         sched._band_index = 0
         sched._slots_on_band = 0
 
+    # Register dedicated IQ listener before starting the scheduler
+    # (avoids stealing from the waterfall's _spectrum_queue)
+    if state.scan_engine and state.beacon_iq_queue:
+        state.scan_engine.register_iq_listener(state.beacon_iq_queue)
+
     started = await sched.start()
     return {"ok": started, **sched.snapshot()}
 
@@ -92,6 +97,11 @@ async def beacon_stop() -> dict[str, Any]:
     if sched is None:
         raise HTTPException(status_code=503, detail="beacon_scheduler_unavailable")
     stopped = await sched.stop()
+    
+    # Unregister IQ listener when stopped (zero cost when inactive)
+    if state.scan_engine and state.beacon_iq_queue:
+        state.scan_engine.unregister_iq_listener(state.beacon_iq_queue)
+    
     return {"ok": stopped, **sched.snapshot()}
 
 

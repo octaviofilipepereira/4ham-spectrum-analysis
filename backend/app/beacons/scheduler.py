@@ -95,8 +95,7 @@ class BeaconScheduler:
     def __init__(
         self,
         bands: list[BeaconBand] | None = None,
-        iq_provider: Optional[Callable[[], Optional[np.ndarray]]] = None,
-        iq_flush: Optional[Callable[[], None]] = None,
+        iq_queue: Optional[asyncio.Queue] = None,
         sample_rate_provider: Optional[Callable[[], int]] = None,
         scan_park: Optional[Callable[[int], None]] = None,
         scan_unpark: Optional[Callable[[], None]] = None,
@@ -105,8 +104,7 @@ class BeaconScheduler:
         target_sample_rate: int = 8000,
     ) -> None:
         self._bands = list(bands or BANDS)
-        self._iq_provider = iq_provider
-        self._iq_flush = iq_flush
+        self._iq_queue = iq_queue
         self._sample_rate_provider = sample_rate_provider
         self._scan_park = scan_park
         self._scan_unpark = scan_unpark
@@ -308,8 +306,15 @@ class BeaconScheduler:
         slot_start_utc: datetime,
     ) -> Optional[np.ndarray]:
         """Collect _COLLECT_S seconds of IQ, demodulate (np.real), resample."""
-        if not self._iq_provider:
+        if not self._iq_queue:
             return None
+
+        # Flush stale IQ from the queue before starting fresh collection
+        while not self._iq_queue.empty():
+            try:
+                self._iq_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
         target_samples = int(_COLLECT_S * self._target_sr)
         deadline = slot_start_utc.timestamp() + SLOT_SECONDS - _GUARD_S
@@ -319,9 +324,11 @@ class BeaconScheduler:
         while collected < target_samples and self._running:
             if datetime.now(timezone.utc).timestamp() >= deadline:
                 break
-            chunk = self._iq_provider()
+            try:
+                chunk = await asyncio.wait_for(self._iq_queue.get(), timeout=0.1)
+            except asyncio.TimeoutError:
+                continue
             if chunk is None or len(chunk) == 0:
-                await asyncio.sleep(0.005)
                 continue
             audio = np.real(chunk).astype(np.float32)
             # Resample if necessary
