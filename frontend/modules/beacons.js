@@ -206,6 +206,10 @@ class BeaconController {
       this._beaconModeBtn.classList.add("is-active");
       this._beaconModeBtn.setAttribute("aria-pressed", "true");
     }
+
+    // Render the empty 18×5 matrix immediately so the user sees the
+    // beacon list (callsigns + waiting markers) before scheduler starts.
+    this._renderMatrix();
     // NOTE: do NOT auto-start the scheduler here. The user must click
     // "Start monitoring" inside the panel to begin scanning.
   }
