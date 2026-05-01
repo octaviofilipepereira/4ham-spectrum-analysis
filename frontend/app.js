@@ -34,6 +34,7 @@ import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
 import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
+import { BeaconController } from "./modules/beacons.js";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -154,6 +155,9 @@ const audioTxGainInput = document.getElementById("audioTxGain");
 const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
 const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
+
+// NCDXF Beacon controller — initialised once DOM is ready
+let beaconController = null;
 
 // Immediately show/hide APRS-related buttons from cached state (avoids flash)
 {
@@ -4924,7 +4928,34 @@ if (quickModeButtons.length) {
         return;
       }
       const mode = String(button.dataset.quickMode || "").trim();
-      
+
+      // ── BEACON mode: special handling — takes over scan engine ────────────
+      if (mode === "BEACON") {
+        if (beaconController?.isBeaconModeActive()) {
+          // Toggle off
+          await beaconController.exitBeaconMode();
+          selectedDecoderMode = null;
+          refreshModeButtons();
+          logLine("Beacon Analysis mode desactivado.");
+        } else {
+          // Exit any running scan first
+          if (isScanRunning || latestScanState?.state === "running") {
+            await stopScan();
+          }
+          await beaconController?.enterBeaconMode();
+          selectedDecoderMode = "BEACON";
+          refreshModeButtons();
+          logLine("Beacon Analysis mode activado — scheduler NCDXF iniciado.");
+        }
+        return;
+      }
+
+      // If beacon mode was active, exit it when switching to another mode
+      if (beaconController?.isBeaconModeActive()) {
+        await beaconController.exitBeaconMode();
+      }
+      // ── End BEACON special handling ───────────────────────────────────────
+
       // During active scan: allow mode change but prevent deselection.
       // Also check latestScanState as a fallback in case isScanRunning was
       // briefly set false by a syncScanState race between polls.
@@ -5098,6 +5129,11 @@ async function startApplication() {
   // Backend log file dump is ~235 KB per call; 30 s polling is enough for ops view.
   setInterval(fetchFileLog, 30000);
   initMenuDropdownModalBehavior();
+
+  // Initialise beacon controller (WS + modal)
+  if (!beaconController) {
+    beaconController = new BeaconController();
+  }
 
   try {
     const res = await fetch("/api/health");

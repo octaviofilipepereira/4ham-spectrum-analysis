@@ -1901,3 +1901,75 @@ h1,
 .aprs-marker-lora .aprs-station-leader,
 .aprs-marker-lora .aprs-station-anchor { background: #ec4899; }
 
+/* ── Beacon Analysis matrix ──────────────────────────────────────────── */
+.beacon-matrix {
+  font-size: 0.78rem;
+  border-collapse: collapse;
+}
+
+.beacon-matrix th,
+.beacon-matrix td {
+  padding: 4px 6px;
+  vertical-align: middle;
+  text-align: center;
+  border: 1px solid #2a2a3a;
+}
+
+.beacon-callsign {
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.80rem;
+}
+
+.beacon-callsign-header {
+  text-align: left;
+}
+
+/* Active slot row — amber glow */
+.beacon-row--active td {
+  background: rgba(255, 193, 7, 0.10);
+}
+
+/* Active cell — being listened to right now */
+.beacon-cell--active {
+  background: rgba(255, 193, 7, 0.25) !important;
+  outline: 2px solid #ffc107;
+  outline-offset: -2px;
+  animation: beacon-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes beacon-pulse {
+  from { background: rgba(255, 193, 7, 0.18); }
+  to   { background: rgba(255, 193, 7, 0.35); }
+}
+
+/* Confirmed ID — green */
+.beacon-cell--confirmed {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+/* Detected (dashes only, no ID confirm) — blue */
+.beacon-cell--detected {
+  background: rgba(56, 189, 248, 0.10);
+}
+
+/* Nothing heard */
+.beacon-cell--absent td,
+.beacon-cell--absent {
+  color: var(--muted, #777);
+}
+
+.beacon-dashes {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 2px;
+  color: #ffc107;
+}
+
+/* Beacon mode button active state (amber outline → solid amber) */
+.mode-quick-btn[data-quick-mode="BEACON"].is-active {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #000;
+}
+

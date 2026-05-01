@@ -138,6 +138,7 @@ Last update: 2026-02-22 16:27:19 UTC
               <!-- Rotation toggle + mode buttons -->
               <div class="col-12 d-flex flex-wrap gap-2 mt-2 align-items-center">
                 <button class="btn btn-primary rotation-toggle-btn" type="button" id="rotationToggleBtn" title="Configure scan rotation between bands and modes">Config Scan Rotation</button>
+                <button class="btn btn-outline-warning btn-sm d-none" type="button" id="viewBeaconRotationBtn" data-bs-toggle="modal" data-bs-target="#beaconModal" title="View NCDXF beacon rotation matrix and live propagation data">&#x1F4E1; View Beacon Rotation</button>
                 <div class="scan-quick-modes" aria-label="Quick mode selection">
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="CW">CW</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="WSPR">WSPR</button>
@@ -145,6 +146,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT8">FT8</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="SSB">SSB</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="APRS">APRS</button>
+                  <button class="btn btn-outline-warning btn-sm mode-quick-btn" type="button" data-quick-mode="BEACON" title="NCDXF/IARU International Beacon Network monitor — takes over scan engine">&#x1F4E1; Beacon</button>
                 </div>
                 <div class="d-none d-flex align-items-center gap-2" id="cwScanParamsRow">
                   <label class="form-label mb-0" for="cwStepHz">CW Step (Hz)</label>
@@ -1591,6 +1593,72 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
   </div><!-- /#satelliteModal -->
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+       ║  BEACON MODAL — NCDXF/IARU Beacon Analysis                           ║
+       ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <div class="modal fade app-modal" id="beaconModal" tabindex="-1" aria-labelledby="beaconModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+
+        <!-- Header -->
+        <div class="modal-header">
+          <h2 class="modal-title h5 me-3" id="beaconModalLabel">&#x1F4E1; Beacon Analysis &mdash; NCDXF/IARU</h2>
+          <span id="beaconStatusBadge" class="badge bg-secondary ms-2">&#x25CB; Stopped</span>
+          <span id="beaconCountdown" class="ms-3 small text-muted"></span>
+          <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+
+          <p class="small text-muted mb-3">
+            The NCDXF International Beacon Network transmits every 10 seconds on 5 bands (20/17/15/12/10 m).
+            Each beacon sends its callsign in CW at 22 WPM, followed by 1 s dashes at 100 W, 10 W, 1 W and 100 mW.
+            Use this mode to assess propagation from 18 fixed stations around the world.
+          </p>
+
+          <!-- Controls row -->
+          <div class="d-flex gap-2 align-items-center mb-3">
+            <button class="btn btn-success btn-sm" id="beaconStartBtn">&#x25B6; Start monitoring</button>
+            <button class="btn btn-danger btn-sm" id="beaconStopBtn" disabled>&#x25A0; Stop</button>
+            <span class="small text-muted ms-3">Scheduler takes over scan engine. Band buttons disabled while active.</span>
+          </div>
+
+          <!-- 18×5 matrix table -->
+          <div class="table-responsive">
+            <table class="table table-sm table-dark table-bordered beacon-matrix mb-0">
+              <thead class="sticky-top">
+                <tr>
+                  <th class="beacon-callsign-header">Beacon</th>
+                  <th class="text-center">20 m<br><small class="text-muted">14.100</small></th>
+                  <th class="text-center">17 m<br><small class="text-muted">18.110</small></th>
+                  <th class="text-center">15 m<br><small class="text-muted">21.150</small></th>
+                  <th class="text-center">12 m<br><small class="text-muted">24.930</small></th>
+                  <th class="text-center">10 m<br><small class="text-muted">28.200</small></th>
+                </tr>
+              </thead>
+              <tbody id="beaconMatrixBody">
+                <tr><td colspan="6" class="text-center text-muted small py-3">Waiting for data…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3">
+            <small class="text-muted">
+              <strong>&#x25D0; Confirmed</strong> = CW ID matched &nbsp;|
+              <strong>&#x2588;&#x2588;&#x2588;&#x2588;</strong> = 4 dash levels = full copy &nbsp;|
+              SNR shown for 100 W level.
+            </small>
+          </div>
+        </div><!-- /.modal-body -->
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#beaconModal -->
 
   </body>
 </html>
