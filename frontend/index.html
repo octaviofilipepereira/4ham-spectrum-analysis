@@ -256,20 +256,24 @@ Last update: 2026-02-22 16:27:19 UTC
               <!-- Beacon Analysis — inline panel (replaces modal, shown when BEACON mode active) -->
               <div class="beacon-area" id="beaconArea" hidden>
                 <div class="beacon-panel">
-                  <!-- Header + controls row (single line) -->
-                  <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
-                    <h2 class="h5 mb-0 me-2">&#x1F4E1; Beacon Analysis &mdash; NCDXF/IARU</h2>
-                    <button class="btn btn-sm btn-secondary" id="beaconStatusBadge" type="button" disabled>&#x25CB; Stopped</button>
-                    <button class="btn btn-success btn-sm" id="beaconStartBtn">&#x25B6; Start monitoring</button>
-                    <button class="btn btn-danger btn-sm" id="beaconStopBtn" disabled>&#x25A0; Stop</button>
-                    <span id="beaconCountdown" class="small text-muted ms-2"></span>
+                  <div class="beacon-header mb-2">
+                    <h2 class="h5 mb-0">&#x1F4E1; Beacon Analysis &mdash; NCDXF/IARU</h2>
                   </div>
 
                   <p class="small text-muted mb-2">
                     The NCDXF International Beacon Network transmits every 10 seconds on 5 bands (20/17/15/12/10 m).
                     Each beacon sends its callsign in CW at 22 WPM, followed by 1 s dashes at 100 W, 10 W, 1 W and 100 mW.
-                    Scheduler takes over scan engine; band buttons are disabled while active.
+                    Use this mode to assess propagation from 18 fixed stations around the world.
                   </p>
+
+                  <!-- Controls row -->
+                  <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                    <button class="btn btn-sm btn-secondary" id="beaconStatusBadge" type="button" disabled>&#x25CB; Stopped</button>
+                    <button class="btn btn-success btn-sm" id="beaconStartBtn">&#x25B6; Start monitoring</button>
+                    <button class="btn btn-danger btn-sm" id="beaconStopBtn" disabled>&#x25A0; Stop</button>
+                    <span id="beaconCountdown" class="small text-muted ms-2"></span>
+                    <span class="small text-muted ms-auto">Scheduler takes over scan engine. Band buttons disabled while active.</span>
+                  </div>
 
                   <!-- 18×5 matrix table -->
                   <div class="table-responsive">
@@ -1478,7 +1482,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260502010300"></script>
+    <script type="module" src="app.js?v=20260502010400"></script>
 
   <!-- ╔══════════════════════════════════════════════════════════════════════╗
        ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║
