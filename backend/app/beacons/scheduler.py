@@ -147,8 +147,9 @@ class BeaconScheduler:
         if self._task:
             self._task.cancel()
             try:
-                await self._task
-            except asyncio.CancelledError:
+                # Bound the wait so a slow detect() can't hang the API call
+                await asyncio.wait_for(self._task, timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
             self._task = None
         self._release_park()
