@@ -143,23 +143,24 @@ class BeaconController {
   }
 
   _renderCell(obs, isActive) {
-    let inner = "·";
+    let inner = "<span class='text-secondary'>·</span>";
     let cls = "beacon-cell";
     if (isActive) cls += " beacon-cell--active";
     if (obs) {
       if (obs.detected) {
         const dashes = obs.dash_levels_detected || 0;
         const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
-        inner = `<span class="beacon-dashes">${"▐".repeat(dashes)}${"░".repeat(4 - dashes)}</span><br><small>${snr} dB</small>`;
+        const dotCls = obs.id_confirmed ? "text-success fw-bold" : "text-success";
+        inner = `<span class="${dotCls}" style="font-size:1.1rem">●</span><br><small>${"▐".repeat(dashes)}${"░".repeat(4 - dashes)} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
-        inner = "<span class='text-muted'>—</span>";
+        inner = `<span class="text-danger" style="font-size:1.1rem">●</span>`;
         cls += " beacon-cell--absent";
       }
     } else if (isActive) {
       inner = "<span class='beacon-cell__spinner'>⏳</span>";
     }
-    return `<td class="${cls}">${inner}</td>`;
+    return `<td class="${cls} text-center">${inner}</td>`;
   }
 
   // ── Countdown ──────────────────────────────────────────────────────────────
