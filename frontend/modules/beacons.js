@@ -46,6 +46,8 @@ class BeaconController {
     this._activeBand = null;
     this._countdownTimer = null;
     this._schedulerRunning = false;
+    this._pollTimer = null;          // periodic /api/beacons/matrix while modal shown
+    this._modalVisible = false;
 
     this._modal = document.getElementById("beaconModal");
     this._matrixBody = document.getElementById("beaconMatrixBody");
@@ -85,6 +87,8 @@ class BeaconController {
   }
 
   _onMessage(msg) {
+    // Lightweight debug — visible in browser console for diagnostics
+    try { console.debug("[beacons] ws msg", msg.type, msg); } catch (_) {}
     switch (msg.type) {
       case "beacon_status":
         this._schedulerRunning = Boolean(msg.scheduler?.running);
@@ -265,10 +269,24 @@ class BeaconController {
       } catch (_) {}
     });
 
-    // Fetch initial matrix when modal opens
+    // Fetch initial matrix when modal opens + start polling fallback (3 s)
+    // Polling is a safety net so the matrix advances even if the WS push
+    // is delayed, dropped, or the connection silently died.
     this._modal?.addEventListener("shown.bs.modal", () => {
+      this._modalVisible = true;
       this._fetchMatrix();
       this._fetchStatus();
+      clearInterval(this._pollTimer);
+      this._pollTimer = setInterval(() => {
+        if (!this._modalVisible) return;
+        this._fetchMatrix();
+        this._fetchStatus();
+      }, 3000);
+    });
+    this._modal?.addEventListener("hidden.bs.modal", () => {
+      this._modalVisible = false;
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
     });
   }
 
@@ -296,8 +314,14 @@ class BeaconController {
       const res = await fetch("/api/beacons/status", { headers: this._authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
-      this._schedulerRunning = Boolean(data?.scheduler?.running);
+      const sched = data?.scheduler || {};
+      this._schedulerRunning = Boolean(sched.running);
+      // Sync active band from scheduler — survives WS gaps
+      const bandIdx = BANDS.indexOf(sched.current_band);
+      if (bandIdx >= 0) this._activeBand = bandIdx;
       this._refreshStatusBadge();
+      // Re-render so the active cell highlight follows scheduler state
+      this._renderMatrix();
     } catch (_) {}
   }
 
