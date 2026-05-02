@@ -34,7 +34,7 @@ import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
 import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
-import { BeaconController } from "./modules/beacons.js?v=20260502011100";
+import { BeaconController } from "./modules/beacons.js?v=20260502011200";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -767,7 +767,8 @@ async function _checkAprsConnectivity() {
 function setBeaconAreaVisible(show) {
   if (beaconArea) beaconArea.hidden = !show;
   if (waterfallArea) waterfallArea.hidden = show;
-  if (propagationCard) propagationCard.hidden = show;
+  // Keep propagation card visible in BEACON mode — it complements the
+  // beacon matrix with band activity and the QTH-centric globe.
   // Hide Go-to-MHz / SNR / DSP status — irrelevant in BEACON mode
   if (vfoGotoGroup) vfoGotoGroup.hidden = show;
   if (show) {
