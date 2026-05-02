@@ -146,16 +146,42 @@ class BeaconController {
       </td>`;
     }
     const ratio = Math.min(1, det / Math.max(1, total));
-    // Green intensity scales with detection ratio: 25 % alpha minimum so
-    // even a single detection is visible.
-    const alpha = (0.25 + 0.55 * ratio).toFixed(2);
+    // Compute age of last detection so we can FADE OUT cells where
+    // the most recent detection is old (otherwise a hit from 15 h ago
+    // would look as "fresh" as one from 5 min ago at the 24 h window).
+    let ageHours = null;
+    if (cell.last_detected_utc) {
+      const t = Date.parse(cell.last_detected_utc);
+      if (!isNaN(t)) ageHours = Math.max(0, (now - t) / 3_600_000);
+    }
+    // Freshness factor: 1.0 if <30 min, decays linearly to 0.15 at 12 h.
+    let freshness = 1.0;
+    if (ageHours != null) {
+      if (ageHours <= 0.5) freshness = 1.0;
+      else if (ageHours >= 12) freshness = 0.15;
+      else freshness = 1.0 - 0.85 * ((ageHours - 0.5) / 11.5);
+    }
+    // Green intensity scales with detection ratio AND freshness.
+    const alpha = (0.10 + 0.70 * ratio * freshness).toFixed(2);
     const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
     let ago = "";
     if (cell.last_detected_utc) {
       const t = Date.parse(cell.last_detected_utc);
       if (!isNaN(t)) {
         const dt = Math.max(0, Math.round((now - t) / 1000));
-        ago = dt < 60 ? `${dt}s ago` : `${Math.round(dt / 60)}m ago`;
+        if (dt < 60) {
+          ago = `${dt}s ago`;
+        } else if (dt < 3600) {
+          ago = `${Math.round(dt / 60)}m ago`;
+        } else if (dt < 86400) {
+          const h = Math.floor(dt / 3600);
+          const m = Math.round((dt % 3600) / 60);
+          ago = m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
+        } else {
+          const d = Math.floor(dt / 86400);
+          const h = Math.round((dt % 86400) / 3600);
+          ago = h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
+        }
       }
     }
     const title = `Detected ${det}/${total} slots in window\nBest SNR: ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
