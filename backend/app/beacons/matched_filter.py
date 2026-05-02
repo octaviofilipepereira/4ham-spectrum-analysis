@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 import numpy as np
 
@@ -56,13 +56,22 @@ CONFIRM_THRESHOLD: float = 0.18
 # Minimum SNR (dB) above noise floor to count a dash as "detected"
 DASH_DETECT_THRESHOLD_DB: float = 3.0
 
+# Weak-copy detection can combine sub-threshold ID evidence with an ordered
+# dash sequence. The 100 W dash remains the anchor; later power steps only add
+# bonus when the sequence still makes physical sense.
+DETECT_SCORE_THRESHOLD: float = 1.25
+
 # Noise floor is estimated from [6.5 s .. 9.5 s] of the slot (guard region)
 _NOISE_WIN_START_S: float = 6.5
 _NOISE_WIN_END_S: float   = 9.5
 
-# CW ID onset window to search for drift measurement
-_ID_ONSET_START_S: float = 0.0
-_ID_ONSET_END_S: float   = 1.5
+# Search enough of the slot to cover the full NCDXF CW ID plus a short guard.
+_MIN_ID_WINDOW_S: float = 1.5
+_ID_WINDOW_GUARD_S: float = 0.4
+
+# Valid IDs start at the slot boundary; later matches are too ambiguous to use
+# for confirmation.
+_MAX_CONFIRM_DRIFT_MS: float = 600.0
 
 
 # ── Morse code table (minimal: only characters used in callsigns) ─────────────
@@ -105,6 +114,52 @@ def _build_cw_template(callsign: str, sample_rate: int, wpm: float = CW_ID_WPM) 
     return np.concatenate(samples)
 
 
+def _dash_evidence_ratio(lead_dash_snr_db: Optional[float], dash_detect_db: float) -> float:
+    if lead_dash_snr_db is None or dash_detect_db <= 0.0:
+        return 0.0
+    return max(0.0, float(lead_dash_snr_db)) / dash_detect_db
+
+
+def _sequence_dash_evidence_ratio(
+    dash_snrs: Sequence[Optional[float]],
+    dash_detect_db: float,
+) -> float:
+    if not dash_snrs:
+        return 0.0
+
+    ratios = [_dash_evidence_ratio(snr, dash_detect_db) for snr in dash_snrs]
+    lead_ratio = ratios[0]
+    if lead_ratio <= 0.0:
+        return 0.0
+
+    sequence_ratio = lead_ratio
+    running_prefix = min(1.0, lead_ratio)
+    for ratio, weight in zip(ratios[1:], (0.35, 0.20, 0.10)):
+        running_prefix = min(running_prefix, ratio)
+        if running_prefix <= 0.0:
+            break
+        sequence_ratio += weight * running_prefix
+
+    return sequence_ratio
+
+
+def _combined_detect_score(
+    confidence: float,
+    dash_snrs: Sequence[Optional[float]],
+    confirm_threshold: float,
+    dash_detect_db: float,
+) -> float:
+    id_ratio = max(0.0, float(confidence)) / max(confirm_threshold, 1e-9)
+    dash_ratio = _sequence_dash_evidence_ratio(dash_snrs, dash_detect_db)
+    return id_ratio + dash_ratio
+
+
+def _threshold_gap(current: Optional[float], threshold: float) -> Optional[float]:
+    if current is None:
+        return None
+    return max(0.0, threshold - float(current))
+
+
 class SlotDetector:
     """Detect NCDXF beacon content in a single 10 s audio window.
 
@@ -135,8 +190,11 @@ class SlotDetector:
         self._slot_start_utc = slot_start_utc
         self._confirm_threshold = confirm_threshold
         self._dash_detect_db = dash_detect_db
-        # Pre-build the template (cached for this instance)
         self._template = _build_cw_template(self._callsign, self._sr)
+        self._id_window_samples = max(
+            int(_MIN_ID_WINDOW_S * self._sr),
+            len(self._template) + int(_ID_WINDOW_GUARD_S * self._sr),
+        )
 
     def detect(self, audio: np.ndarray) -> dict[str, Any]:
         """Run all detectors against *audio* and return an observation dict.
@@ -153,6 +211,12 @@ class SlotDetector:
             "id_confidence": 0.0,
             "drift_ms": None,
             "dash_levels_detected": 0,
+            "lead_dash_snr_db": None,
+            "detect_score": 0.0,
+            "detect_score_gap": None,
+            "id_threshold_gap": None,
+            "lead_dash_gap_db": None,
+            "detected_via": "none",
             "snr_db_100w": None,
             "snr_db_10w": None,
             "snr_db_1w": None,
@@ -180,6 +244,9 @@ class SlotDetector:
             result[key] = round(float(snr), 2) if snr is not None else None
             dash_snrs.append(snr)
 
+        lead_dash_snr = dash_snrs[0] if dash_snrs else None
+        result["lead_dash_snr_db"] = round(float(lead_dash_snr), 2) if lead_dash_snr is not None else None
+
         # Count detected dashes (from strongest down, stopping at first miss)
         dashes = 0
         for snr in dash_snrs:
@@ -190,17 +257,47 @@ class SlotDetector:
         result["dash_levels_detected"] = dashes
 
         # ── ID confirmation ─────────────────────────────────────────────────
-        # Only examine the first ~1.5 s of the slot (ID window)
-        id_end = int(_ID_ONSET_END_S * self._sr)
-        id_audio = audio_n[:id_end]
+        # Examine enough of the slot to cover the complete CW ID, otherwise
+        # longer callsigns become artificially ambiguous and valid copy drops out.
+        id_audio = audio_n[: self._id_window_samples]
         confidence, drift_ms = self._id_correlation(id_audio)
         result["id_confidence"] = round(float(confidence), 4)
-        result["id_confirmed"] = bool(confidence >= self._confirm_threshold)
-        if drift_ms is not None:
+        result["id_confirmed"] = bool(
+            confidence >= self._confirm_threshold
+            and drift_ms is not None
+            and drift_ms <= _MAX_CONFIRM_DRIFT_MS
+        )
+        if result["id_confirmed"] and drift_ms is not None:
             result["drift_ms"] = round(float(drift_ms), 1)
 
-        # Detected = any dash heard OR ID confirmed
-        result["detected"] = dashes > 0 or result["id_confirmed"]
+        detect_score = _combined_detect_score(
+            confidence,
+            dash_snrs,
+            self._confirm_threshold,
+            self._dash_detect_db,
+        )
+        result["detect_score"] = round(float(detect_score), 4)
+        result["detect_score_gap"] = round(
+            float(max(0.0, DETECT_SCORE_THRESHOLD - detect_score)), 4
+        )
+        result["id_threshold_gap"] = round(
+            float(_threshold_gap(confidence, self._confirm_threshold) or 0.0), 4
+        )
+        result["lead_dash_gap_db"] = round(
+            float(_threshold_gap(lead_dash_snr, self._dash_detect_db) or 0.0), 2
+        )
+
+        # Detected = any dash heard OR a raw ID peak above threshold. Strict
+        # ambiguity/drift gating remains reserved for id_confirmed.
+        if dashes > 0:
+            result["detected"] = True
+            result["detected_via"] = "dash"
+        elif confidence >= self._confirm_threshold:
+            result["detected"] = True
+            result["detected_via"] = "id"
+        elif detect_score >= DETECT_SCORE_THRESHOLD:
+            result["detected"] = True
+            result["detected_via"] = "combined"
 
         return result
 
@@ -240,37 +337,47 @@ class SlotDetector:
         id_audio: np.ndarray,
     ) -> tuple[float, Optional[float]]:
         """
-        Normalised cross-correlation of id_audio against self._template.
+        Correlate id_audio against the expected callsign template.
 
         Returns (confidence, drift_ms):
-          confidence — normalised peak (0..1)
-          drift_ms   — delay of peak vs. expected t=0 in the slot; positive
-                       means the ID started late
+          confidence — score for the expected callsign template
+          drift_ms   — delay of the best expected-template peak
         """
-        tmpl = self._template
-        if len(id_audio) < len(tmpl) // 2:
+        return self._correlation_peak(id_audio, self._template)
+
+    def _correlation_peak(
+        self,
+        id_audio: np.ndarray,
+        template: np.ndarray,
+    ) -> tuple[float, Optional[float]]:
+        min_overlap = max(1, len(template) // 2)
+        if len(id_audio) < min_overlap:
             return 0.0, None
 
-        # Pad to same length for FFT-based correlation
-        n = len(id_audio) + len(tmpl) - 1
-        n_fft = 1 << (n - 1).bit_length()  # next power of 2
+        x = id_audio.astype(np.float32, copy=False)
+        x = x - float(np.mean(x))
 
-        X = np.fft.rfft(id_audio, n=n_fft)
-        T = np.fft.rfft(tmpl, n=n_fft)
+        n = len(x) + len(template) - 1
+        n_fft = 1 << (n - 1).bit_length()
+
+        X = np.fft.rfft(x, n=n_fft)
+        T = np.fft.rfft(template, n=n_fft)
         corr = np.fft.irfft(X * np.conj(T), n=n_fft)[:n]
 
-        # Normalise by the energy of the template
-        tmpl_energy = float(np.sum(tmpl ** 2))
-        if tmpl_energy < 1e-12:
+        signal_ref = x[: min(len(x), len(template))]
+        norm = float(np.sqrt(np.sum(template ** 2)) * max(np.linalg.norm(signal_ref), 1e-9))
+        if norm < 1e-12:
             return 0.0, None
-        signal_rms = float(np.sqrt(np.mean(id_audio[:len(tmpl)] ** 2))) if len(id_audio) >= len(tmpl) else 1.0
-        norm = tmpl_energy * max(signal_rms, 1e-9)
         corr_norm = corr / norm
 
-        peak_idx = int(np.argmax(corr_norm))
-        confidence = float(np.clip(corr_norm[peak_idx], 0.0, 1.0))
+        # Ignore peaks whose template overlap is too small to be specific.
+        max_start = max(0, len(x) - min_overlap)
+        valid_corr = corr_norm[: max_start + 1]
+        if len(valid_corr) == 0:
+            return 0.0, None
 
-        # drift_ms: peak_idx == 0 means template starts at sample 0 (no drift)
-        drift_ms = (peak_idx / self._sr) * 1000.0 if confidence >= self._confirm_threshold else None
+        peak_idx = int(np.argmax(valid_corr))
+        confidence = float(np.clip(valid_corr[peak_idx], 0.0, 1.0))
+        drift_ms = (peak_idx / self._sr) * 1000.0
 
         return confidence, drift_ms

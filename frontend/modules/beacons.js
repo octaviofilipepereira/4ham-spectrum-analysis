@@ -170,7 +170,9 @@ class BeaconController {
     }
     const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
     const dashes = Number(cell.max_dashes || 0);
-    const meter  = renderBeaconMeter(dashes);
+    const displayLevel = dashes > 0 ? dashes : 1;
+    const bestSignalLabel = dashes > 0 ? `${dashes}/4 dashes` : "weak CW ID-only copy";
+    const meter  = renderBeaconMeter(displayLevel);
     let ago = "";
     if (cell.last_detected_utc) {
       const t = Date.parse(cell.last_detected_utc);
@@ -191,7 +193,7 @@ class BeaconController {
         }
       }
     }
-    const title = `Detected ${det}/${total} slots in window\nBest signal: ${dashes}/4 dashes, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
+    const title = `Detected ${det}/${total} slots in window\nBest signal: ${bestSignalLabel}, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
       <small class="text-white">${meter} ${snr} dB<br>${det}/${total} &middot; ${ago}</small>
     </td>`;
@@ -332,8 +334,9 @@ class BeaconController {
     if (obs) {
       if (obs.detected) {
         const dashes = obs.dash_levels_detected || 0;
+        const displayLevel = dashes > 0 ? dashes : 1;
         const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
-        const meter = renderBeaconMeter(dashes);
+        const meter = renderBeaconMeter(displayLevel);
         const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="ID confirmed">✓</span> ' : "";
         inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";

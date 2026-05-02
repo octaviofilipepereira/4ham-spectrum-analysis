@@ -34,7 +34,13 @@ from app.beacons.catalog import (
     all_active_beacons,
     DASH_WINDOWS,
 )
-from app.beacons.matched_filter import SlotDetector, _build_cw_template
+from app.beacons.scheduler import apply_catalog_status_rules, _downsample_envelope
+from app.beacons.matched_filter import (
+    DETECT_SCORE_THRESHOLD,
+    SlotDetector,
+    _build_cw_template,
+    _combined_detect_score,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +196,7 @@ def _make_cw_audio(
 
     # CW ID at t=0
     template = _build_cw_template(callsign, sr, wpm)
-    id_len = min(len(template), int(1.0 * sr))
+    id_len = min(len(template), total_samples)
     audio[:id_len] += template[:id_len]
 
     # 4 dashes at the timing windows
@@ -244,6 +250,8 @@ class TestSlotDetector:
         result = self._detector().detect(audio)
         for key in ("detected", "id_confirmed", "id_confidence",
                     "drift_ms", "dash_levels_detected",
+                    "lead_dash_snr_db", "detect_score", "detect_score_gap",
+                    "id_threshold_gap", "lead_dash_gap_db", "detected_via",
                     "snr_db_100w", "snr_db_10w", "snr_db_1w", "snr_db_100mw"):
             assert key in result, f"Missing key: {key}"
 
@@ -260,6 +268,11 @@ class TestSlotDetector:
     def test_clean_signal_id_confirmed(self):
         audio = _make_cw_audio("CS3B", snr_db=30.0)
         result = self._detector("CS3B").detect(audio)
+        assert result["id_confirmed"] is True
+
+    def test_long_callsign_clean_signal_id_confirmed(self):
+        audio = _make_cw_audio("4U1UN", snr_db=30.0)
+        result = self._detector("4U1UN").detect(audio)
         assert result["id_confirmed"] is True
 
     def test_snr_100w_positive_on_strong_signal(self):
@@ -304,3 +317,56 @@ class TestSlotDetector:
             tmpl = _build_cw_template(beacon.callsign, SR)
             assert len(tmpl) > 0, f"Empty template for {beacon.callsign}"
             assert np.any(tmpl > 0), f"All-silence template for {beacon.callsign}"
+
+    def test_combined_score_recovers_near_threshold_copy(self):
+        score = _combined_detect_score(0.1295, [2.68, 1.81, 0.89, 0.12], 0.18, 3.0)
+        assert score >= DETECT_SCORE_THRESHOLD
+
+    def test_combined_score_rewards_ordered_weak_sequence(self):
+        score = _combined_detect_score(0.08, [1.8, 1.4, 0.9, 0.6], 0.18, 3.0)
+        assert score >= DETECT_SCORE_THRESHOLD
+
+    def test_combined_score_rejects_late_only_spikes(self):
+        score = _combined_detect_score(0.1477, [-0.56, -1.26, 4.41, 2.83], 0.18, 3.0)
+        assert score < DETECT_SCORE_THRESHOLD
+
+    def test_combined_score_rejects_flat_band_noise(self):
+        score = _combined_detect_score(0.0510, [0.55, 0.20, 0.10, 0.0], 0.18, 3.0)
+        assert score < DETECT_SCORE_THRESHOLD
+
+
+class TestBeaconCatalogStatusRules:
+    def test_off_air_id_only_detection_is_suppressed(self):
+        obs = {
+            "detected": True,
+            "id_confirmed": False,
+            "drift_ms": None,
+            "dash_levels_detected": 0,
+        }
+        apply_catalog_status_rules(obs, "off_air")
+        assert obs["detected"] is False
+        assert obs["id_confirmed"] is False
+        assert obs["drift_ms"] is None
+
+    def test_off_air_dash_detection_is_preserved(self):
+        obs = {
+            "detected": True,
+            "id_confirmed": False,
+            "drift_ms": None,
+            "dash_levels_detected": 2,
+        }
+        apply_catalog_status_rules(obs, "off_air")
+        assert obs["detected"] is True
+        assert obs["dash_levels_detected"] == 2
+
+
+class TestSchedulerEnvelopeDownsampling:
+    def test_exact_factor_downsample_uses_block_mean(self):
+        audio = np.arange(8, dtype=np.float32)
+        out = _downsample_envelope(audio, src_sr=8, target_sr=2)
+        assert np.allclose(out, np.array([1.5, 5.5], dtype=np.float32))
+
+    def test_exact_factor_downsample_trims_partial_tail(self):
+        audio = np.arange(10, dtype=np.float32)
+        out = _downsample_envelope(audio, src_sr=8, target_sr=2)
+        assert len(out) == 2

@@ -174,12 +174,21 @@ async def lifespan(app_instance: FastAPI):
         from app.websocket.beacons import broadcast_slot_start, broadcast_observation
         import asyncio as _asyncio
 
+        async def _persist_and_broadcast_observation(obs: dict) -> None:
+            try:
+                loop = _asyncio.get_running_loop()
+                await _asyncio.gather(
+                    loop.run_in_executor(None, _state.db.insert_beacon_observation, obs),
+                    broadcast_observation(obs),
+                )
+            except Exception:
+                _log.exception("beacon observation persistence error")
+
         def _obs_cb(obs: dict) -> None:
-            _state.db.insert_beacon_observation(obs)
-            _asyncio.ensure_future(broadcast_observation(obs))
+            _asyncio.create_task(_persist_and_broadcast_observation(dict(obs)))
 
         def _slot_cb(callsign: str, freq_hz: int, slot_index: int, slot_start_utc: str) -> None:
-            _asyncio.ensure_future(broadcast_slot_start(callsign, freq_hz, slot_index, slot_start_utc))
+            _asyncio.create_task(broadcast_slot_start(callsign, freq_hz, slot_index, slot_start_utc))
 
         # Create dedicated IQ queue for beacon scheduler (separate from FFT's _spectrum_queue).
         # This queue will be registered via scan_engine.register_iq_listener() when the

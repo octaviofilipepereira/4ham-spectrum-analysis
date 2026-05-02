@@ -34,7 +34,7 @@ import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
 import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
-import { BeaconController } from "./modules/beacons.js?v=20260502114500";
+import { BeaconController } from "./modules/beacons.js?v=20260502135500";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -343,6 +343,7 @@ let modeStatsCache = {};
 let totalEventsInDB = 0;
 // internalFtStatusModal removed — Internal FT not used in this setup
 const externalFtStatusModalEl = document.getElementById("externalFtStatusModal");
+const beaconStatusModalEl = document.getElementById("beaconStatusModal");
 const cwStatusModalEl = document.getElementById("cwStatusModal");
 const ssbStatusModalEl = document.getElementById("ssbStatusModal");
 // pskStatusModal removed — PSK decoder not yet implemented
@@ -3608,11 +3609,14 @@ function connectStatus() {
 
 async function fetchDecoderStatus() {
   try {
-    const resp = await fetch("/api/decoders/status", { headers: { ...getAuthHeader() } });
-    if (!resp.ok) {
+    const [resp, beaconResp] = await Promise.all([
+      fetch("/api/decoders/status", { headers: { ...getAuthHeader() } }),
+      fetch("/api/beacons/status", { headers: { ...getAuthHeader() } }),
+    ]);
+    if (!resp.ok || !beaconResp.ok) {
       throw new Error("decoder status failed");
     }
-    const data = await resp.json();
+    const [data, beaconData] = await Promise.all([resp.json(), beaconResp.json()]);
     const status = data.status || {};
     const intNative = status.internal_native || {};
     const extFt = status.external_ft || {};
@@ -3620,6 +3624,23 @@ async function fetchDecoderStatus() {
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
+    const beaconSt = beaconData?.scheduler || {};
+    const beaconRunning = Boolean(beaconSt.running);
+    const isBeaconUiMode = String(selectedDecoderMode || "").trim().toUpperCase() === "BEACON";
+
+    if (beaconRunning && beaconController && !beaconController.isBeaconModeActive()) {
+      await beaconController.start();
+      setAprsMapVisible(false);
+      setBeaconAreaVisible(true);
+      selectedDecoderMode = "BEACON";
+      wfc.selectedDecoderMode = "BEACON";
+      refreshModeButtons();
+      if (eventsSearchModeInput && eventsSearchModeInput.value !== "BEACON") {
+        eventsSearchModeInput.value = "BEACON";
+        fetchEvents();
+        fetchTotal();
+      }
+    }
 
     // External FT
     if (externalFtStatusModalEl) {
@@ -3633,12 +3654,21 @@ async function fetchDecoderStatus() {
       }
     }
 
+    // Beacon monitor detector — separate from the generic CW scan decoder
+    if (beaconStatusModalEl) {
+      const runLabel = beaconRunning ? "Running" : "Stopped";
+      const bandLabel = beaconSt.current_band ? ` (${beaconSt.current_band})` : "";
+      beaconStatusModalEl.textContent = `${runLabel}${bandLabel}`;
+    }
+
     // CW — enabled either by CW_INTERNAL_ENABLE env var OR force-started by scan mode
     if (cwStatusModalEl) {
       const cwSt = (cwDec.status || {});
       if (cwDec.enabled || cwSt.running) {
         const runLabel = cwSt.running ? "Running" : "Stopped";
         cwStatusModalEl.textContent = `Configured / ${runLabel}`;
+      } else if (beaconRunning || isBeaconUiMode) {
+        cwStatusModalEl.textContent = "Disabled (BEACON uses separate detector)";
       } else {
         cwStatusModalEl.textContent = "Disabled";
       }
@@ -3677,6 +3707,7 @@ async function fetchDecoderStatus() {
     if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
     if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Unavailable";
+    if (beaconStatusModalEl) beaconStatusModalEl.textContent = "Unavailable";
     if (cwStatusModalEl) cwStatusModalEl.textContent = "Unavailable";
     if (ssbStatusModalEl) ssbStatusModalEl.textContent = "Unavailable";
 
@@ -5197,6 +5228,13 @@ async function startApplication() {
   fetchPropagationSummary();
   // Propagation summary updates derive from the same events; 60 s suffices.
   setInterval(fetchPropagationSummary, 60000);
+
+  // Initialise beacon controller before decoder-status polling so the first
+  // beacon-status fetch can restore BEACON mode after a page reload.
+  if (!beaconController) {
+    beaconController = new BeaconController();
+  }
+
   fetchDecoderStatus();
   setInterval(fetchDecoderStatus, 20000);
   connectLogs();
@@ -5207,11 +5245,6 @@ async function startApplication() {
   // Backend log file dump is ~235 KB per call; 30 s polling is enough for ops view.
   setInterval(fetchFileLog, 30000);
   initMenuDropdownModalBehavior();
-
-  // Initialise beacon controller (WS + modal)
-  if (!beaconController) {
-    beaconController = new BeaconController();
-  }
 
   try {
     const res = await fetch("/api/health");

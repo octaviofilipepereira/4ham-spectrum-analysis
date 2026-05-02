@@ -17,7 +17,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <title>4ham Spectrum Analysis</title>
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=20260502114500" />
+    <link rel="stylesheet" href="styles.css?v=20260502123500" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
     <script>
       // Fire version fetch as early as possible (no auth required)
@@ -303,7 +303,7 @@ Last update: 2026-02-22 16:27:19 UTC
                         <span class="beacon-meter__seg beacon-meter__seg--on-3"></span>
                         <span class="beacon-meter__seg beacon-meter__seg--on-4"></span>
                       </span>
-                      = signal strength on the latest monitored pass in this session (1–4 dash levels, full copy = 4) &nbsp;|&nbsp;
+                      = signal strength on the latest monitored pass in this session (1–4 levels; weak CW ID-only copy also shows 1 segment, full dash copy = 4) &nbsp;|&nbsp;
                       <span class="beacon-meter beacon-meter--nocopy" aria-hidden="true">
                         <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
                         <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
@@ -1361,6 +1361,7 @@ Last update: 2026-02-22 16:27:19 UTC
                 <h2 class="h5">Decoder Status</h2>
                 <ul class="summary">
                   <li>External FT (jt9/wsprd): <span id="externalFtStatusModal">Unknown</span></li>
+                  <li>Beacon monitor detector: <span id="beaconStatusModal">Unknown</span></li>
                   <li>CW decoder: <span id="cwStatusModal">Unknown</span></li>
                   <li>SSB / Voice ASR: <span id="ssbStatusModal">Unknown</span></li>
                   <li>PSK decoder: <span>Not available</span></li>
@@ -1530,7 +1531,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260502114500"></script>
+    <script type="module" src="app.js?v=20260502135500"></script>
 
   <!-- ╔══════════════════════════════════════════════════════════════════════╗
        ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 import numpy as np
@@ -65,6 +65,39 @@ _COLLECT_S: float = SLOT_SECONDS - _SETTLE_S - _GUARD_S   # ~9.55 s
 
 # Minimum fraction of expected samples to consider a window valid
 _MIN_FILL_RATIO: float = 0.6
+
+
+def _downsample_envelope(audio: np.ndarray, src_sr: int, target_sr: int) -> np.ndarray:
+    """Downsample the keyed envelope to the detector sample rate."""
+    if src_sr == target_sr:
+        return audio
+
+    # The RTL path runs at 2.048 Msps and the beacon detector at 8 kHz, so
+    # the ratio is an exact 256:1. Averaging fixed-size blocks preserves the
+    # envelope shape while avoiding the ~0.5 s resample_poly cost on the Pi.
+    if src_sr > target_sr and src_sr % target_sr == 0:
+        factor = src_sr // target_sr
+        usable = (len(audio) // factor) * factor
+        if usable <= 0:
+            return np.array([], dtype=np.float32)
+        return audio[:usable].reshape(-1, factor).mean(axis=1, dtype=np.float32)
+
+    from math import gcd
+    from scipy.signal import resample_poly
+
+    g = gcd(target_sr, src_sr)
+    up = target_sr // g
+    down = src_sr // g
+    return resample_poly(audio, up, down)
+
+
+def apply_catalog_status_rules(obs: dict[str, Any], beacon_status: str) -> dict[str, Any]:
+    """Apply catalog-aware detection rules before persisting an observation."""
+    if beacon_status == "off_air" and obs.get("detected") and not obs.get("dash_levels_detected"):
+        obs["detected"] = False
+        obs["id_confirmed"] = False
+        obs["drift_ms"] = None
+    return obs
 
 
 class BeaconScheduler:
@@ -121,6 +154,7 @@ class BeaconScheduler:
         self._started_at: Optional[str] = None
         self._stopped_at: Optional[str] = None
         self._last_error: Optional[str] = None
+        self._parked_freq_hz: Optional[int] = None
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -190,21 +224,30 @@ class BeaconScheduler:
         """Main UTC-aligned slot loop."""
         # ── 1. Align to the next 10-second UTC boundary ───────────────────────
         now = datetime.now(timezone.utc)
-        wait_s = SLOT_SECONDS - (now.timestamp() % SLOT_SECONDS)
+        slot_start_utc = next_slot_start(now)
+        wait_s = max(0.0, (slot_start_utc - now).total_seconds())
         if wait_s < 0.2:
             # Too close to the boundary — skip to the one after
-            wait_s += SLOT_SECONDS
+            slot_start_utc += timedelta(seconds=SLOT_SECONDS)
+            wait_s = max(0.0, (slot_start_utc - now).total_seconds())
         _log.info("beacon_scheduler_aligning wait=%.2fs", wait_s)
         await asyncio.sleep(wait_s)
 
         # ── 2. Slot loop ──────────────────────────────────────────────────────
         while self._running:
-            slot_start_utc = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
+            late_start_s = max(0.0, now.timestamp() - slot_start_utc.timestamp())
             slot_index = current_slot_index(slot_start_utc)
             band = self._bands[self._band_index]
 
             # Identify expected beacon on this (slot, band)
             beacon = beacon_at(slot_index, band.index)
+
+            if late_start_s >= 0.05:
+                _log.warning(
+                    "beacon_slot_late_start late=%.2fs beacon=%s band=%s",
+                    late_start_s, beacon.callsign, band.name,
+                )
 
             # Notify frontend of slot start (for live highlight)
             if self._on_slot_start:
@@ -216,22 +259,34 @@ class BeaconScheduler:
                 except Exception:
                     pass
 
-            # Park SDR on beacon frequency
-            if self._scan_park:
+            # Retune only when the monitored band changes. Re-parking the same
+            # frequency every 10 s forces an unnecessary settle window and can
+            # push the slot late on slower hardware.
+            needs_settle = bool(self._scan_park) and self._parked_freq_hz != band.freq_hz
+            if needs_settle and self._scan_park:
                 self._scan_park(band.freq_hz)
+                self._parked_freq_hz = band.freq_hz
 
-            # Flush stale IQ then wait for SDR PLL settle
+            # Flush stale IQ before starting the next slot window.
             if self._iq_queue is not None:
                 while not self._iq_queue.empty():
                     try:
                         self._iq_queue.get_nowait()
                     except asyncio.QueueEmpty:
                         break
-            await asyncio.sleep(_SETTLE_S)
+
+            # Only pay the settle penalty after an actual retune. On steady
+            # same-band monitoring the SDR is already parked and stable.
+            if needs_settle:
+                await asyncio.sleep(_SETTLE_S)
 
             # Collect IQ for the usable window
             src_sr = self._sample_rate_provider() if self._sample_rate_provider else self._target_sr
-            audio = await self._collect_audio(src_sr, slot_start_utc)
+            audio = await self._collect_audio(
+                src_sr,
+                slot_start_utc,
+                flush_before_capture=needs_settle,
+            )
 
             # Slot timing
             self._total_slots += 1
@@ -269,13 +324,32 @@ class BeaconScheduler:
                 loop = asyncio.get_running_loop()
                 result = await loop.run_in_executor(None, detector.detect, audio)
                 obs.update(result)
+                apply_catalog_status_rules(obs, beacon.status)
                 _log.info(
                     "beacon_slot beacon=%s band=%s detected=%s id=%s "
-                    "dashes=%d snr100w=%s drift_ms=%s",
+                    "via=%s score=%s dashes=%d snr100w=%s drift_ms=%s",
                     beacon.callsign, band.name, obs["detected"],
-                    obs["id_confirmed"], obs["dash_levels_detected"],
+                    obs["id_confirmed"], obs.get("detected_via"),
+                    obs.get("detect_score"), obs["dash_levels_detected"],
                     obs["snr_db_100w"], obs["drift_ms"],
                 )
+                if (
+                    not obs["detected"]
+                    and beacon.status == "active"
+                    and band.name in {"20m", "17m"}
+                ):
+                    _log.info(
+                        "beacon_slot_margin beacon=%s band=%s score=%s score_gap=%s "
+                        "id_gap=%s lead_dash_gap_db=%s conf=%s snr100w=%s",
+                        beacon.callsign,
+                        band.name,
+                        obs.get("detect_score"),
+                        obs.get("detect_score_gap"),
+                        obs.get("id_threshold_gap"),
+                        obs.get("lead_dash_gap_db"),
+                        obs.get("id_confidence"),
+                        obs.get("snr_db_100w"),
+                    )
             else:
                 _log.debug(
                     "beacon_slot_no_audio beacon=%s band=%s", beacon.callsign, band.name
@@ -300,20 +374,19 @@ class BeaconScheduler:
                     band.name, next_band.name,
                 )
 
-            # Sleep until the next slot boundary. If we've already crossed
-            # it (DSP took longer than the slot), warn and skip ahead so we
-            # stay UTC-aligned instead of drifting.
-            into = seconds_into_slot()
-            if into >= SLOT_SECONDS - 0.1:
-                drift = into - (SLOT_SECONDS - 0.1)
+            # Sleep until the next expected UTC slot boundary. If DSP pushed
+            # us slightly into that next slot, start it immediately instead of
+            # sleeping almost a full extra slot and skipping a beacon.
+            next_slot_utc = slot_start_utc + timedelta(seconds=SLOT_SECONDS)
+            remaining = next_slot_utc.timestamp() - datetime.now(timezone.utc).timestamp()
+            if remaining < 0:
                 _log.warning(
                     "beacon_slot_drift drift=%.2fs beacon=%s band=%s",
-                    drift, beacon.callsign, band.name,
+                    abs(remaining), beacon.callsign, band.name,
                 )
-            remaining = SLOT_SECONDS - into
-            # Clamp: at least 0.1 s, at most 10 s
-            remaining = max(0.1, min(float(SLOT_SECONDS), remaining))
-            await asyncio.sleep(remaining)
+            if remaining > 0:
+                await asyncio.sleep(min(float(SLOT_SECONDS), remaining))
+            slot_start_utc = next_slot_utc
 
     # ── IQ collection ─────────────────────────────────────────────────────────
 
@@ -321,24 +394,29 @@ class BeaconScheduler:
         self,
         src_sr: int,
         slot_start_utc: datetime,
+        flush_before_capture: bool = False,
     ) -> Optional[np.ndarray]:
-        """Collect _COLLECT_S seconds of IQ, demodulate (np.real), resample."""
+        """Collect one slot envelope and resample it once to detector rate."""
         if not self._iq_queue:
             return None
 
-        # Flush stale IQ from the queue before starting fresh collection
-        while not self._iq_queue.empty():
-            try:
-                self._iq_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
+        # After an actual retune, drop the settle-period samples that landed in
+        # the queue while the frontend PLL was stabilising. On same-frequency
+        # slots we keep the already aligned audio and start consuming at t=0.
+        if flush_before_capture:
+            while not self._iq_queue.empty():
+                try:
+                    self._iq_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
 
         target_samples = int(_COLLECT_S * self._target_sr)
+        target_src_samples = int(_COLLECT_S * src_sr)
         deadline = slot_start_utc.timestamp() + SLOT_SECONDS - _GUARD_S
         buf: list[np.ndarray] = []
-        collected = 0
+        collected_src = 0
 
-        while collected < target_samples and self._running:
+        while collected_src < target_src_samples and self._running:
             if datetime.now(timezone.utc).timestamp() >= deadline:
                 break
             try:
@@ -347,29 +425,27 @@ class BeaconScheduler:
                 continue
             if chunk is None or len(chunk) == 0:
                 continue
-            audio = np.real(chunk).astype(np.float32)
-            # Resample if necessary (run off the event loop — resample_poly
-            # at 2.4 MHz → 8 kHz can take hundreds of ms on a Pi)
-            if src_sr != self._target_sr:
-                try:
-                    from scipy.signal import resample_poly
-                    from math import gcd
-                    g = gcd(self._target_sr, src_sr)
-                    up = self._target_sr // g
-                    down = src_sr // g
-                    loop = asyncio.get_running_loop()
-                    audio = await loop.run_in_executor(
-                        None, resample_poly, audio, up, down
-                    )
-                except Exception:
-                    pass
-            buf.append(audio)
-            collected += len(audio)
+            # Beacon detection works on the keyed amplitude envelope. Using
+            # IQ magnitude keeps the envelope stable regardless of carrier
+            # phase, whereas taking only I can null the signal entirely.
+            buf.append(np.abs(chunk).astype(np.float32))
+            collected_src += len(chunk)
             await asyncio.sleep(0)  # yield to event loop
 
         if not buf:
             return None
-        return np.concatenate(buf)[:target_samples]
+
+        audio = np.concatenate(buf)[:target_src_samples]
+        if src_sr != self._target_sr:
+            try:
+                loop = asyncio.get_running_loop()
+                audio = await loop.run_in_executor(
+                    None, _downsample_envelope, audio, src_sr, self._target_sr
+                )
+            except Exception:
+                pass
+
+        return audio[:target_samples]
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -379,6 +455,7 @@ class BeaconScheduler:
                 self._scan_unpark()
             except Exception:
                 pass
+        self._parked_freq_hz = None
 
 
 def _now_iso() -> str:
