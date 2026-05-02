@@ -269,8 +269,6 @@ class BeaconScheduler:
                 loop = asyncio.get_running_loop()
                 result = await loop.run_in_executor(None, detector.detect, audio)
                 obs.update(result)
-                if obs["detected"]:
-                    self._total_observations += 1
                 _log.info(
                     "beacon_slot beacon=%s band=%s detected=%s id=%s "
                     "dashes=%d snr100w=%s drift_ms=%s",
@@ -282,6 +280,8 @@ class BeaconScheduler:
                 _log.debug(
                     "beacon_slot_no_audio beacon=%s band=%s", beacon.callsign, band.name
                 )
+
+            self._total_observations += 1
 
             # Emit observation
             if self._on_observation:

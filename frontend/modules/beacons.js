@@ -49,7 +49,7 @@ class BeaconController {
     this._schedulerRunning = false;
     this._currentFreqHz = null;      // current slot frequency for VFO label
     this._currentCallsign = null;    // current slot beacon callsign
-    this._cycleStartMs = null;       // current 3-minute UTC cycle boundary
+    this._cycleStartMs = null;       // latest 3-minute UTC cycle boundary seen on the wire
 
     this._matrixBody = document.getElementById("beaconMatrixBody");
     this._statusBadge = document.getElementById("beaconStatusBadge");
@@ -81,7 +81,7 @@ class BeaconController {
     this._connect();
   }
 
-  // ── Initial matrix load (restore only cells from the current UTC cycle) ───
+  // ── Initial matrix load (restore whatever the backend can still provide) ───
 
   async _loadInitialMatrix() {
     try {
@@ -121,6 +121,7 @@ class BeaconController {
     this._matrixData = {};
     this._activeSlot = null;
     this._activeBand = null;
+    this._cycleStartMs = null;
   }
 
   // ── Recent activity heatmap (last N hours) ─────────────────────────────────
@@ -236,17 +237,11 @@ class BeaconController {
 
   _onSlotStart(msg) {
     const nextCycleStartMs = this._cycleStartMsFor(msg.slot_start_utc);
-    const cycleChanged = (
-      nextCycleStartMs != null
-      && this._cycleStartMs != null
-      && nextCycleStartMs !== this._cycleStartMs
-    );
 
-    // Keep missed-slot placeholders only within the cycle in progress.
-    // When the UTC cycle rolls over, the live grid resets to neutral.
-    if (cycleChanged) {
-      this._resetLiveMatrix();
-    } else if (this._activeSlot != null && this._activeBand != null && this._activeBand >= 0) {
+    // Keep the last monitored pass visible across the monitoring session.
+    // If the previous active cell never received an observation event, close
+    // it as a no-copy pass instead of letting it stay blank indefinitely.
+    if (this._activeSlot != null && this._activeBand != null && this._activeBand >= 0) {
       const prevKey = `${this._activeSlot}:${this._activeBand}`;
       if (!this._matrixData[prevKey]) {
         this._matrixData[prevKey] = {
@@ -343,7 +338,7 @@ class BeaconController {
         inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
-        inner = `<span title="Monitored in this cycle, no copy">${renderBeaconMeter(0, "fail")}</span>`;
+        inner = `<span title="Latest monitored pass: no copy">${renderBeaconMeter(0, "nocopy")}</span>`;
         cls += " beacon-cell--absent";
       }
     } else if (isActive) {
@@ -393,6 +388,10 @@ class BeaconController {
 
   async start() {
     this._beaconModeActive = true;
+
+    if (!this._schedulerRunning) {
+      this._resetLiveMatrix();
+    }
 
     // Disable band & mode buttons (scheduler owns the scan engine)
     this._bandBtns.forEach(b => { b.disabled = true; });
@@ -466,6 +465,9 @@ class BeaconController {
 
     // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
+      this._resetLiveMatrix();
+      this._renderMatrix();
+
       // Optimistic UI: give immediate feedback while the backend aligns to
       // the next UTC 10-second boundary and warms up the SDR (can take up
       // to ~10 s before the first slot_start arrives).
@@ -513,13 +515,13 @@ class BeaconController {
   }
 }
 
-/** Render a 4-segment signal-strength meter (light → dark green). */
+/** Render a 4-segment meter for successful copy or no-copy passes. */
 function renderBeaconMeter(dashes, variant = "success") {
   const n = Math.max(0, Math.min(4, Math.round(dashes || 0)));
-  if (variant === "fail") {
-    let html = '<span class="beacon-meter beacon-meter--fail" aria-label="signal not copied">';
+  if (variant === "nocopy" || variant === "fail") {
+    let html = '<span class="beacon-meter beacon-meter--nocopy" aria-label="latest monitored pass had no copy">';
     for (let i = 1; i <= 4; i++) {
-      html += '<span class="beacon-meter__seg beacon-meter__seg--fail"></span>';
+      html += '<span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>';
     }
     html += "</span>";
     return html;
