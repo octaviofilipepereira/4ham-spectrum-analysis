@@ -283,6 +283,20 @@ class BeaconController {
   _bindUI() {
     // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
+      // Optimistic UI: give immediate feedback while the backend aligns to
+      // the next UTC 10-second boundary and warms up the SDR (can take up
+      // to ~10 s before the first slot_start arrives).
+      if (this._startBtn) {
+        this._startBtn.disabled = true;
+        this._startBtn.textContent = "Starting\u2026 Please wait";
+      }
+      if (this._statusBadge) {
+        this._statusBadge.textContent = "\u23F3 Starting\u2026";
+        this._statusBadge.className = "btn btn-sm btn-warning";
+      }
+      if (this._countdown) {
+        this._countdown.textContent = "Aligning to next UTC slot\u2026";
+      }
       try {
         await fetch("/api/beacons/start", {
           method: "POST",
