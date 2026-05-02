@@ -160,9 +160,9 @@ class BeaconController {
       if (obs.detected) {
         const dashes = obs.dash_levels_detected || 0;
         const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
-        const dotCls = obs.id_confirmed ? "text-success fw-bold" : "text-success";
         const meter = renderBeaconMeter(dashes);
-        inner = `<span class="${dotCls}" style="font-size:1.1rem">●</span><br><small>${meter} ${snr} dB</small>`;
+        const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="ID confirmed">✓</span> ' : "";
+        inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
         inner = `<span class="text-danger" style="font-size:1.1rem">●</span>`;
