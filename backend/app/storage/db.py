@@ -736,6 +736,38 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_beacon_heatmap(self, hours: float = 2.0) -> list[dict]:
+        """Aggregated beacon activity over the last ``hours`` hours.
+
+        Returns one row per (beacon_index, band_name) cell with:
+          - total slots monitored in window
+          - detections (detected=1) in window
+          - id_confirmed count in window
+          - max SNR (snr_db_100w) for any detected slot
+          - last detected slot_start_utc (or NULL if none)
+        """
+        cutoff_iso = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat()
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT
+                  beacon_index,
+                  band_name,
+                  COUNT(*)                                AS total_slots,
+                  SUM(detected)                           AS detections,
+                  SUM(id_confirmed)                       AS id_confirmed,
+                  MAX(CASE WHEN detected=1 THEN snr_db_100w END) AS max_snr_db,
+                  MAX(CASE WHEN detected=1 THEN slot_start_utc END) AS last_detected_utc
+                FROM beacon_observations
+                WHERE slot_start_utc >= ?
+                GROUP BY beacon_index, band_name
+                """,
+                (cutoff_iso,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def get_events(self, limit=None, offset=0, band=None, mode=None, callsign=None, start=None, end=None, snr_min=None):
         """Thread-safe event retrieval with proper SQLite synchronization.
 

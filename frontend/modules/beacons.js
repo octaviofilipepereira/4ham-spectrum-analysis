@@ -54,6 +54,10 @@ class BeaconController {
     this._countdown   = document.getElementById("beaconCountdown");
     this._startBtn    = document.getElementById("beaconStartBtn");
     this._stopBtn     = document.getElementById("beaconStopBtn");
+    this._historyBody    = document.getElementById("beaconHistoryBody");
+    this._historyHours   = document.getElementById("beaconHistoryHours");
+    this._historyRefresh = document.getElementById("beaconHistoryRefresh");
+    this._historyTimer   = null;
     this._bandBtns    = Array.from(document.querySelectorAll("[data-quick-band]"));
     // All mode buttons EXCEPT the BEACON one (that one stays clickable so the user can leave the mode)
     this._modeBtns    = Array.from(document.querySelectorAll('[data-quick-mode]')).filter(
@@ -69,6 +73,9 @@ class BeaconController {
 
     this._bindUI();
     this._loadInitialMatrix();
+    this._loadHistory();
+    // Refresh history once per minute so the rolling window stays current.
+    this._historyTimer = setInterval(() => this._loadHistory(), 60_000);
     this._connect();
   }
 
@@ -92,6 +99,69 @@ class BeaconController {
       }
       this._renderMatrix();
     } catch (_) {}
+  }
+
+  // ── Recent activity heatmap (last N hours) ─────────────────────────────────
+
+  async _loadHistory() {
+    if (!this._historyBody) return;
+    const hours = parseFloat(this._historyHours?.value || "2") || 2;
+    try {
+      const r = await fetch(`/api/beacons/heatmap?hours=${encodeURIComponent(hours)}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      this._renderHistory(data?.matrix, hours);
+    } catch (_) {}
+  }
+
+  _renderHistory(matrix, hours) {
+    if (!this._historyBody || !Array.isArray(matrix)) return;
+    const now = Date.now();
+    const rows = [];
+    for (let s = 0; s < SLOTS_PER_CYCLE; s++) {
+      const b = BEACONS[s];
+      let cells = `<td class="beacon-callsign text-info" title="${b.callsign} — ${b.location}">${b.callsign}<span class="beacon-loc">— ${b.location}</span></td>`;
+      const row = matrix[s] || [];
+      for (let bi = 0; bi < BANDS.length; bi++) {
+        cells += this._renderHistoryCell(row[bi], now);
+      }
+      rows.push(`<tr>${cells}</tr>`);
+    }
+    if (!rows.length) {
+      this._historyBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted small py-3">No data in last ${hours} h</td></tr>`;
+      return;
+    }
+    this._historyBody.innerHTML = rows.join("");
+  }
+
+  _renderHistoryCell(cell, now) {
+    if (!cell || !cell.total_slots) {
+      return `<td class="beacon-cell text-secondary text-center"><span title="never sampled in window">·</span></td>`;
+    }
+    const det   = Number(cell.detections || 0);
+    const total = Number(cell.total_slots || 0);
+    if (det <= 0) {
+      return `<td class="beacon-cell text-center" title="${total} slot(s) monitored, 0 detections">
+        <small class="text-muted">0/${total}</small>
+      </td>`;
+    }
+    const ratio = Math.min(1, det / Math.max(1, total));
+    // Green intensity scales with detection ratio: 25 % alpha minimum so
+    // even a single detection is visible.
+    const alpha = (0.25 + 0.55 * ratio).toFixed(2);
+    const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
+    let ago = "";
+    if (cell.last_detected_utc) {
+      const t = Date.parse(cell.last_detected_utc);
+      if (!isNaN(t)) {
+        const dt = Math.max(0, Math.round((now - t) / 1000));
+        ago = dt < 60 ? `${dt}s ago` : `${Math.round(dt / 60)}m ago`;
+      }
+    }
+    const title = `Detected ${det}/${total} slots in window\nBest SNR: ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
+    return `<td class="beacon-cell text-center" style="background-color: rgba(40,167,69,${alpha});" title="${title}">
+      <small><strong>${det}/${total}</strong> &middot; ${snr} dB<br><span class="text-light">${ago}</span></small>
+    </td>`;
   }
 
   // ── WS connection ──────────────────────────────────────────────────────────
@@ -181,6 +251,11 @@ class BeaconController {
     const key = `${rowIdx}:${BANDS.indexOf(obs.band_name)}`;
     this._matrixData[key] = obs;
     this._renderMatrix();
+    // If a new detection just landed, refresh the history view immediately so
+    // the user sees the green cell without waiting for the next minute tick.
+    if (obs.detected) {
+      this._loadHistory();
+    }
   }
 
   // ── Matrix rendering ───────────────────────────────────────────────────────
@@ -334,6 +409,10 @@ class BeaconController {
   // ── UI bindings ────────────────────────────────────────────────────────────
 
   _bindUI() {
+    // History controls
+    this._historyHours?.addEventListener("change", () => this._loadHistory());
+    this._historyRefresh?.addEventListener("click", () => this._loadHistory());
+
     // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
       // Optimistic UI: give immediate feedback while the backend aligns to

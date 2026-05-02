@@ -9,6 +9,7 @@ POST /api/beacons/start           → start scheduler (optional band selection)
 POST /api/beacons/stop            → stop scheduler
 GET  /api/beacons/catalog         → all 18 beacons with current status
 GET  /api/beacons/matrix          → 18×5 matrix of current-cycle observations
+GET  /api/beacons/heatmap         → 18×5 aggregated activity over last N hours
 GET  /api/beacons/observations    → paginated observation history (SQLite)
 """
 
@@ -174,6 +175,39 @@ async def beacon_matrix() -> dict[str, Any]:
 
 
 # ── Observations ──────────────────────────────────────────────────────────────
+
+@router.get("/heatmap")
+async def beacon_heatmap(
+    hours: float = Query(default=2.0, ge=0.1, le=72.0),
+) -> dict[str, Any]:
+    """Aggregated 18×5 activity heatmap over the last ``hours`` hours.
+
+    Distinct from ``/matrix`` (which reflects only the live current state).
+    Each cell carries detection counts so the UI can show recent propagation
+    history without lying about the *current* slot.
+    """
+    rows = state.db.get_beacon_heatmap(hours=hours)
+    cell: dict[tuple[int, str], dict] = {}
+    for row in rows:
+        b_idx = row.get("beacon_index")
+        if b_idx is None:
+            continue
+        cell[(int(b_idx), row["band_name"])] = row
+
+    matrix: list[list[dict | None]] = []
+    for s in range(18):
+        row_data: list[dict | None] = []
+        for band in BANDS:
+            row_data.append(cell.get((s, band.name)))
+        matrix.append(row_data)
+
+    return {
+        "hours": hours,
+        "bands": [b.name for b in BANDS],
+        "beacons": [b.callsign for b in BEACONS],
+        "matrix": matrix,
+    }
+
 
 @router.get("/observations")
 async def beacon_observations(

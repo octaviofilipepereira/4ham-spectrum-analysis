@@ -307,6 +307,41 @@ Last update: 2026-02-22 16:27:19 UTC
                       SNR shown for 100 W reference level.
                     </small>
                   </div>
+
+                  <!-- Recent activity heatmap (separate from live matrix) -->
+                  <div class="beacon-history mt-4">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                      <h3 class="h6 mb-0 text-light">Recent activity &mdash; last
+                        <select id="beaconHistoryHours" class="form-select form-select-sm d-inline-block" style="width:auto">
+                          <option value="0.5">30 min</option>
+                          <option value="1">1 h</option>
+                          <option value="2" selected>2 h</option>
+                          <option value="6">6 h</option>
+                          <option value="24">24 h</option>
+                        </select>
+                        <small class="text-muted ms-2">(historical &mdash; not the current slot state)</small>
+                      </h3>
+                      <button class="btn btn-sm btn-outline-secondary" id="beaconHistoryRefresh" type="button" title="Refresh history">&#x21BB;</button>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-dark table-bordered beacon-matrix mb-0">
+                        <thead>
+                          <tr>
+                            <th class="beacon-callsign-header">Beacon</th>
+                            <th class="text-center">20 m</th>
+                            <th class="text-center">17 m</th>
+                            <th class="text-center">15 m</th>
+                            <th class="text-center">12 m</th>
+                            <th class="text-center">10 m</th>
+                          </tr>
+                        </thead>
+                        <tbody id="beaconHistoryBody">
+                          <tr><td colspan="6" class="text-center text-muted small py-3">Loading history…</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <small class="text-muted">Cell shows detections / total slots &middot; best SNR &middot; time since last detection. Empty cells were never sampled in the window.</small>
+                  </div>
                 </div><!-- /.beacon-panel -->
               </div><!-- /#beaconArea -->
 
