@@ -2008,6 +2008,22 @@ h1,
   gap: 2px;
 }
 
+.beacon-history-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.05;
+}
+
+.beacon-history-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.82);
+  white-space: nowrap;
+}
+
 .beacon-meter-row {
   display: inline-flex;
   align-items: center;
@@ -2033,6 +2049,25 @@ h1,
 }
 .beacon-meter-row .beacon-meter {
   margin-right: 0;
+}
+
+.beacon-history-cell .beacon-meter-value {
+  min-width: 2.1rem;
+  font-size: 0.72rem;
+}
+
+.beacon-cell--history-hit {
+  --bs-table-bg: rgba(34, 197, 94, 0.10);
+  background: rgba(34, 197, 94, 0.10);
+}
+
+.beacon-cell--history-monitored {
+  --bs-table-bg: rgba(217, 119, 6, 0.10);
+  background: rgba(217, 119, 6, 0.10);
+}
+
+.beacon-cell--history-unsampled {
+  color: rgba(255, 255, 255, 0.42);
 }
 .beacon-meter__seg {
   width: 7px;

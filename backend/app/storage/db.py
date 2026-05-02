@@ -743,8 +743,8 @@ class Database:
           - total slots monitored in window
           - detections (detected=1) in window
           - id_confirmed count in window
-          - max SNR (snr_db_100w) for any detected slot
-          - last detected slot_start_utc (or NULL if none)
+                    - best detected pass summary from one coherent observation row
+                    - latest detected slot_start_utc (or NULL if none)
         """
         cutoff_iso = (
             datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -752,18 +752,57 @@ class Database:
         with self._lock:
             rows = self.conn.execute(
                 """
-                SELECT
-                  beacon_index,
-                  band_name,
-                  COUNT(*)                                AS total_slots,
-                  SUM(detected)                           AS detections,
-                  SUM(id_confirmed)                       AS id_confirmed,
-                  MAX(CASE WHEN detected=1 THEN snr_db_100w END) AS max_snr_db,
-                  MAX(CASE WHEN detected=1 THEN dash_levels_detected END) AS max_dashes,
-                  MAX(CASE WHEN detected=1 THEN slot_start_utc END) AS last_detected_utc
-                FROM beacon_observations
-                WHERE slot_start_utc >= ?
-                GROUP BY beacon_index, band_name
+                                WITH windowed AS (
+                                    SELECT *
+                                    FROM beacon_observations
+                                    WHERE slot_start_utc >= ?
+                                ),
+                                counts AS (
+                                    SELECT
+                                        beacon_index,
+                                        band_name,
+                                        COUNT(*) AS total_slots,
+                                        SUM(detected) AS detections,
+                                        SUM(id_confirmed) AS id_confirmed,
+                                        MAX(CASE WHEN detected=1 THEN slot_start_utc END) AS latest_detected_utc
+                                    FROM windowed
+                                    GROUP BY beacon_index, band_name
+                                ),
+                                ranked_detected AS (
+                                    SELECT
+                                        beacon_index,
+                                        band_name,
+                                        slot_start_utc AS best_detected_utc,
+                                        snr_db_100w AS best_snr_db,
+                                        dash_levels_detected AS best_dashes,
+                                        id_confirmed AS best_id_confirmed,
+                                        ROW_NUMBER() OVER (
+                                            PARTITION BY beacon_index, band_name
+                                            ORDER BY
+                                                dash_levels_detected DESC,
+                                                COALESCE(snr_db_100w, -9999.0) DESC,
+                                                id_confirmed DESC,
+                                                slot_start_utc DESC
+                                        ) AS row_num
+                                    FROM windowed
+                                    WHERE detected = 1
+                                )
+                                SELECT
+                                    counts.beacon_index,
+                                    counts.band_name,
+                                    counts.total_slots,
+                                    counts.detections,
+                                    counts.id_confirmed,
+                                    ranked_detected.best_snr_db,
+                                    ranked_detected.best_dashes,
+                                    ranked_detected.best_id_confirmed,
+                                    ranked_detected.best_detected_utc,
+                                    counts.latest_detected_utc
+                                FROM counts
+                                LEFT JOIN ranked_detected
+                                    ON ranked_detected.beacon_index = counts.beacon_index
+                                 AND ranked_detected.band_name = counts.band_name
+                                 AND ranked_detected.row_num = 1
                 """,
                 (cutoff_iso,),
             ).fetchall()

@@ -159,43 +159,43 @@ class BeaconController {
 
   _renderHistoryCell(cell, now) {
     if (!cell || !cell.total_slots) {
-      return `<td class="beacon-cell text-secondary text-center"><span title="never sampled in window">·</span></td>`;
+      return `<td class="beacon-cell beacon-cell--history-unsampled text-secondary text-center"><span title="No monitored slots in window">·</span></td>`;
     }
     const det   = Number(cell.detections || 0);
     const total = Number(cell.total_slots || 0);
+    const confirmed = Number(cell.id_confirmed || 0);
     if (det <= 0) {
-      return `<td class="beacon-cell text-center" title="${total} slot(s) monitored, 0 detections">
-        <small class="text-white">0/${total}</small>
+      const title = `Monitored ${total} slot(s) in window\n0 detected passes\nHistorical summary counts detected passes only; weak live telemetry below threshold is excluded.`;
+      return `<td class="beacon-cell beacon-cell--history-monitored text-center" title="${title}">
+        <small class="beacon-history-cell text-white">
+          <span class="beacon-meter-row">
+            ${renderBeaconMeter(0, "nocopy")}
+            <span class="beacon-meter-value">0</span>
+          </span>
+          <span class="beacon-history-meta">0/${total} mon</span>
+        </small>
       </td>`;
     }
-    const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
-    const dashes = Number(cell.max_dashes || 0);
-    const displayLevel = dashes > 0 ? dashes : 1;
-    const bestSignalLabel = dashes > 0 ? `${dashes}/4 dashes` : "weak CW ID-only copy";
-    const meter  = renderBeaconMeter(displayLevel);
-    let ago = "";
-    if (cell.last_detected_utc) {
-      const t = Date.parse(cell.last_detected_utc);
-      if (!isNaN(t)) {
-        const dt = Math.max(0, Math.round((now - t) / 1000));
-        if (dt < 60) {
-          ago = `${dt}s ago`;
-        } else if (dt < 3600) {
-          ago = `${Math.round(dt / 60)}m ago`;
-        } else if (dt < 86400) {
-          const h = Math.floor(dt / 3600);
-          const m = Math.round((dt % 3600) / 60);
-          ago = m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
-        } else {
-          const d = Math.floor(dt / 86400);
-          const h = Math.round((dt % 86400) / 3600);
-          ago = h > 0 ? `${d}d ${h}h ago` : `${d}d ago`;
-        }
-      }
-    }
-    const title = `Detected ${det}/${total} slots in window\nBest signal: ${bestSignalLabel}, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
+    const bestDashes = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+    const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? Number(cell.best_snr_db).toFixed(1) : "n/a";
+    const bestPass = {
+      dash_levels_detected: bestDashes,
+      snr_db_100w: cell.best_snr_db,
+      id_confirmed: Number(cell.best_id_confirmed || 0) > 0,
+    };
+    const title = [
+      `Detected ${det}/${total} monitored slots in window`,
+      `Confirmed IDs: ${confirmed}`,
+      `Best detected pass: 100 W ${bestSnr} dB, sequence ${bestDashes}/4, at ${cell.best_detected_utc || "?"}`,
+      `Latest detected pass: ${cell.latest_detected_utc || "?"}`,
+      "Historical summary counts detected passes only; weak live telemetry below threshold is excluded.",
+    ].join("\n");
+    const summary = confirmed > 0 ? `✓${confirmed} · ${det}/${total} mon` : `${det}/${total} mon`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
-      <small class="text-white">${meter} ${snr} dB<br>${det}/${total} &middot; ${ago}</small>
+      <small class="beacon-history-cell text-white">
+        ${renderBeaconTelemetry(bestPass)}
+        <span class="beacon-history-meta">${summary}</span>
+      </small>
     </td>`;
   }
 

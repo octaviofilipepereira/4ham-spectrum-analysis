@@ -17,7 +17,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <title>4ham Spectrum Analysis</title>
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=20260502163200" />
+    <link rel="stylesheet" href="styles.css?v=20260502173500" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
     <script>
       // Fire version fetch as early as possible (no auth required)
@@ -347,7 +347,7 @@ Last update: 2026-02-22 16:27:19 UTC
                         </tbody>
                       </table>
                     </div>
-                    <small class="text-muted">Cell shows detections / total slots &middot; best SNR &middot; time since last detection. Empty cells were never sampled in the window.</small>
+                    <small class="text-muted">Cell shows one coherent best detected pass in the window: top meter = best 100 W reference, bottom meter = best ordered sequence from that same pass, footer = confirmed IDs and detections/monitored slots. Orange cells were monitored with no detections; dot = never monitored in the window.</small>
                   </div>
                 </div><!-- /.beacon-panel -->
               </div><!-- /#beaconArea -->
@@ -1531,7 +1531,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260502162000"></script>
+    <script type="module" src="app.js?v=20260502173500"></script>
 
   <!-- ╔══════════════════════════════════════════════════════════════════════╗
        ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║
