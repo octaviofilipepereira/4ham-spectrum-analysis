@@ -55,6 +55,10 @@ class BeaconController {
     this._startBtn    = document.getElementById("beaconStartBtn");
     this._stopBtn     = document.getElementById("beaconStopBtn");
     this._bandBtns    = Array.from(document.querySelectorAll("[data-quick-band]"));
+    // All mode buttons EXCEPT the BEACON one (that one stays clickable so the user can leave the mode)
+    this._modeBtns    = Array.from(document.querySelectorAll('[data-quick-mode]')).filter(
+      b => b.getAttribute("data-quick-mode") !== "BEACON"
+    );
     this._beaconModeBtn = document.querySelector('[data-quick-mode="BEACON"]');
 
     this._bindUI();
@@ -201,8 +205,9 @@ class BeaconController {
   async start() {
     this._beaconModeActive = true;
 
-    // Disable band buttons
+    // Disable band & mode buttons (scheduler owns the scan engine)
     this._bandBtns.forEach(b => { b.disabled = true; });
+    this._modeBtns.forEach(b => { b.disabled = true; });
 
     // Style the beacon mode button
     if (this._beaconModeBtn) {
@@ -222,8 +227,9 @@ class BeaconController {
     this._currentFreqHz = null;
     this._currentCallsign = null;
 
-    // Re-enable band buttons
+    // Re-enable band & mode buttons
     this._bandBtns.forEach(b => { b.disabled = false; });
+    this._modeBtns.forEach(b => { b.disabled = false; });
 
     // Deactivate beacon mode button
     if (this._beaconModeBtn) {
@@ -268,12 +274,22 @@ class BeaconController {
       } catch (_) {}
     });
     this._stopBtn?.addEventListener("click", async () => {
+      // Optimistic UI: update state immediately so the user sees feedback,
+      // even if the backend takes a moment to finalize the in-flight slot.
+      this._schedulerRunning = false;
+      this._activeSlot = null;
+      this._activeBand = null;
+      clearInterval(this._countdownTimer);
+      if (this._countdown) this._countdown.textContent = "Stopping\u2026";
+      this._refreshStatusBadge();
+      this._renderMatrix();
       try {
         await fetch("/api/beacons/stop", {
           method: "POST",
           headers: this._authHeaders(),
         });
       } catch (_) {}
+      if (this._countdown) this._countdown.textContent = "";
     });
   }
 
