@@ -1905,6 +1905,8 @@ h1,
 .beacon-matrix {
   font-size: calc(0.78rem + 2px);
   border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
 }
 
 .beacon-matrix th,
@@ -1922,6 +1924,11 @@ h1,
 .beacon-matrix td.beacon-callsign,
 .beacon-matrix th.beacon-callsign-header {
   text-align: left;
+}
+
+.beacon-matrix td:not(.beacon-callsign),
+.beacon-matrix th:not(.beacon-callsign-header) {
+  width: calc((100% - 14rem) / 5);
 }
 
 .beacon-callsign {
@@ -2010,7 +2017,7 @@ h1,
 }
 
 .beacon-meter-value {
-  min-width: 2.7rem;
+  min-width: 2.3rem;
   text-align: left;
   font-variant-numeric: tabular-nums;
   color: #f8fbff;
