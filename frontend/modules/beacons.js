@@ -33,6 +33,7 @@ const BEACONS = [
 
 const SLOT_SECONDS = 10;
 const SLOTS_PER_CYCLE = 18;
+const CYCLE_MS = SLOT_SECONDS * SLOTS_PER_CYCLE * 1000;
 
 class BeaconController {
   constructor() {
@@ -48,6 +49,7 @@ class BeaconController {
     this._schedulerRunning = false;
     this._currentFreqHz = null;      // current slot frequency for VFO label
     this._currentCallsign = null;    // current slot beacon callsign
+    this._cycleStartMs = null;       // current 3-minute UTC cycle boundary
 
     this._matrixBody = document.getElementById("beaconMatrixBody");
     this._statusBadge = document.getElementById("beaconStatusBadge");
@@ -79,13 +81,14 @@ class BeaconController {
     this._connect();
   }
 
-  // ── Initial matrix load (so a hard refresh keeps existing data) ────────────
+  // ── Initial matrix load (restore only cells from the current UTC cycle) ───
 
   async _loadInitialMatrix() {
     try {
       const r = await fetch("/api/beacons/matrix", { cache: "no-store" });
       if (!r.ok) return;
       const data = await r.json();
+      this._setCycleStartFromIso(data?.cycle_start_utc);
       const matrix = data?.matrix;
       if (!Array.isArray(matrix)) return;
       for (let rowIdx = 0; rowIdx < matrix.length; rowIdx++) {
@@ -99,6 +102,25 @@ class BeaconController {
       }
       this._renderMatrix();
     } catch (_) {}
+  }
+
+  _cycleStartMsFor(slotStartIso) {
+    const slotStartMs = Date.parse(slotStartIso);
+    if (Number.isNaN(slotStartMs)) return null;
+    return slotStartMs - (slotStartMs % CYCLE_MS);
+  }
+
+  _setCycleStartFromIso(slotStartIso) {
+    const cycleStartMs = this._cycleStartMsFor(slotStartIso);
+    if (cycleStartMs != null) {
+      this._cycleStartMs = cycleStartMs;
+    }
+  }
+
+  _resetLiveMatrix() {
+    this._matrixData = {};
+    this._activeSlot = null;
+    this._activeBand = null;
   }
 
   // ── Recent activity heatmap (last N hours) ─────────────────────────────────
@@ -213,10 +235,18 @@ class BeaconController {
   }
 
   _onSlotStart(msg) {
-    // Before switching the active marker, ensure the previously active
-    // cell has SOME state — if no observation arrived (DSP overrun, lost
-    // WS frame, etc.) we still want a red dot, not a blank cell.
-    if (this._activeSlot != null && this._activeBand != null && this._activeBand >= 0) {
+    const nextCycleStartMs = this._cycleStartMsFor(msg.slot_start_utc);
+    const cycleChanged = (
+      nextCycleStartMs != null
+      && this._cycleStartMs != null
+      && nextCycleStartMs !== this._cycleStartMs
+    );
+
+    // Keep missed-slot placeholders only within the cycle in progress.
+    // When the UTC cycle rolls over, the live grid resets to neutral.
+    if (cycleChanged) {
+      this._resetLiveMatrix();
+    } else if (this._activeSlot != null && this._activeBand != null && this._activeBand >= 0) {
       const prevKey = `${this._activeSlot}:${this._activeBand}`;
       if (!this._matrixData[prevKey]) {
         this._matrixData[prevKey] = {
@@ -227,6 +257,9 @@ class BeaconController {
           _placeholder: true,
         };
       }
+    }
+    if (nextCycleStartMs != null) {
+      this._cycleStartMs = nextCycleStartMs;
     }
     // Row is keyed by beacon_index (0..17 in the IARU/NCDXF order),
     // NOT by slot_index — the schedule is offset between bands.
@@ -251,6 +284,14 @@ class BeaconController {
   }
 
   _onObservation(obs) {
+    const obsCycleStartMs = this._cycleStartMsFor(obs.slot_start_utc);
+    if (obsCycleStartMs != null) {
+      if (this._cycleStartMs == null) {
+        this._cycleStartMs = obsCycleStartMs;
+      } else if (obsCycleStartMs !== this._cycleStartMs) {
+        return;
+      }
+    }
     // Match the row by beacon_index (the BEACONS array order). Using
     // slot_index % 18 here would shift one row per band (NCDXF rotates
     // by band_index on each band), causing 17m/15m/12m/10m to look
@@ -302,7 +343,7 @@ class BeaconController {
         inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
-        inner = `<span class="text-danger" style="font-size:1.1rem">●</span>`;
+        inner = `<span title="Monitored in this cycle, no copy">${renderBeaconMeter(0, "fail")}</span>`;
         cls += " beacon-cell--absent";
       }
     } else if (isActive) {
@@ -473,8 +514,16 @@ class BeaconController {
 }
 
 /** Render a 4-segment signal-strength meter (light → dark green). */
-function renderBeaconMeter(dashes) {
+function renderBeaconMeter(dashes, variant = "success") {
   const n = Math.max(0, Math.min(4, Math.round(dashes || 0)));
+  if (variant === "fail") {
+    let html = '<span class="beacon-meter beacon-meter--fail" aria-label="signal not copied">';
+    for (let i = 1; i <= 4; i++) {
+      html += '<span class="beacon-meter__seg beacon-meter__seg--fail"></span>';
+    }
+    html += "</span>";
+    return html;
+  }
   let html = '<span class="beacon-meter" aria-label="signal level ' + n + '/4">';
   for (let i = 1; i <= 4; i++) {
     const cls = i <= n ? `beacon-meter__seg beacon-meter__seg--on-${i}` : "beacon-meter__seg";

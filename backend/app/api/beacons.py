@@ -20,7 +20,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.dependencies import state
-from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_slot_index
+from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_cycle_window, current_slot_index
 
 router = APIRouter()
 
@@ -133,24 +133,33 @@ async def beacon_matrix() -> dict[str, Any]:
     """Return the 18×5 observation matrix for the current UTC cycle.
 
     ``matrix[slot_index][band_index]`` contains the most recent observation
-    for that cell (or null if none recorded yet this cycle).
+    for that cell within the current UTC cycle (or null if the slot has not
+    been visited yet in this cycle).
 
     Also returns the current slot index for the frontend highlight.
     """
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     slot_idx = current_slot_index(now)
+    cycle_start, cycle_end = current_cycle_window(now)
 
-    # Pull recent observations from DB (covers ~5 cycles to ensure all
-    # 90 cells have a chance of being represented even when one band
-    # is on the rotation more than the others)
+    # Pull enough recent rows to cover the current cycle, then discard any
+    # observations that belong to earlier/later cycles.
     rows = state.db.get_beacon_observations(limit=450)
 
-    # Build lookup: (beacon_index, band_name) → most recent observation.
-    # Use beacon_index (NCDXF rotation order) NOT slot_index — the schedule
-    # offsets between bands so the same row maps to different slots.
+    # Build lookup: (beacon_index, band_name) → most recent observation in the
+    # current cycle. Use beacon_index (NCDXF rotation order) NOT slot_index —
+    # the schedule offsets between bands so the same row maps to different
+    # slots.
     cell: dict[tuple[int, str], dict] = {}
     for row in rows:
+        try:
+            slot_start = datetime.fromisoformat(row["slot_start_utc"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not (cycle_start <= slot_start < cycle_end):
+            continue
         b_idx = row.get("beacon_index")
         if b_idx is None:
             b_idx = (row.get("slot_index") or 0) % 18
@@ -168,6 +177,8 @@ async def beacon_matrix() -> dict[str, Any]:
 
     return {
         "current_slot_index": slot_idx,
+        "cycle_start_utc": cycle_start.isoformat(),
+        "cycle_end_utc": cycle_end.isoformat(),
         "bands": [b.name for b in BANDS],
         "beacons": [b.callsign for b in BEACONS],
         "matrix": matrix,

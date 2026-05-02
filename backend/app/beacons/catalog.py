@@ -34,7 +34,7 @@ SNR on the path is ≥ ~30 dB above the noise floor.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Final
 
 
@@ -151,6 +151,15 @@ def current_slot_index(now_utc: datetime | None = None) -> int:
     now = now_utc or datetime.now(timezone.utc)
     epoch_s = int(now.timestamp())
     return (epoch_s % CYCLE_SECONDS) // SLOT_SECONDS
+
+
+def current_cycle_window(now_utc: datetime | None = None) -> tuple[datetime, datetime]:
+    """UTC start/end datetimes for the current 3-minute NCDXF cycle."""
+    now = now_utc or datetime.now(timezone.utc)
+    epoch_s = int(now.timestamp())
+    cycle_start_epoch = epoch_s - (epoch_s % CYCLE_SECONDS)
+    cycle_start = datetime.fromtimestamp(cycle_start_epoch, tz=timezone.utc)
+    return cycle_start, cycle_start + timedelta(seconds=CYCLE_SECONDS)
 
 
 def seconds_into_slot(now_utc: datetime | None = None) -> float:

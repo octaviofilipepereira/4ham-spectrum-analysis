@@ -2003,6 +2003,11 @@ h1,
 .beacon-meter__seg--on-2 { background: #29a829; border-color: #29a829; }
 .beacon-meter__seg--on-3 { background: #5edc5e; border-color: #5edc5e; }
 .beacon-meter__seg--on-4 { background: #b6f5b6; border-color: #b6f5b6; }
+.beacon-meter__seg--fail {
+  background: rgba(153, 27, 27, 0.92);
+  border-color: #f87171;
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.14);
+}
 
 /* Beacon mode button active state (amber outline → solid amber) */
 .mode-quick-btn[data-quick-mode="BEACON"].is-active {
