@@ -395,19 +395,21 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     
-    # Prevent stale frontend assets after a deploy. HTML is never cached
-    # (no-store). JS/CSS/JSON/SVG/PNG go through the browser cache but are
-    # always revalidated against the server's ETag/Last-Modified, so users
-    # get the new code immediately after `git pull` without manual hard
-    # reload, while still benefiting from 304 responses when unchanged.
+    # Prevent stale frontend assets after a deploy. We send no-store on
+    # ALL frontend resources (HTML, JS/MJS, CSS, JSON, MAPs, SVG) so the
+    # browser never serves cached copies — every request hits the server
+    # fresh. This is intentionally aggressive because deploys here are
+    # frequent and stale modules have caused repeated user-facing bugs.
+    # API responses and binary vendor assets keep their default behaviour.
     content_type = response.headers.get("content-type", "")
     path = request.url.path
-    if "text/html" in content_type:
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    is_api = path.startswith("/api/") or path.startswith("/ws/")
+    is_html = "text/html" in content_type
+    is_frontend_asset = path.endswith((".js", ".mjs", ".css", ".json", ".map", ".svg", ".html"))
+    if not is_api and (is_html or is_frontend_asset):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
-    elif path.endswith((".js", ".mjs", ".css", ".json", ".map", ".svg", ".html")):
-        response.headers["Cache-Control"] = "no-cache, must-revalidate"
     
     # Remove server header to avoid information disclosure
     if "server" in response.headers:
