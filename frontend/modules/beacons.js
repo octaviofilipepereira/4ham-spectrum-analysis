@@ -68,7 +68,30 @@ class BeaconController {
     ].filter(Boolean);
 
     this._bindUI();
+    this._loadInitialMatrix();
     this._connect();
+  }
+
+  // ── Initial matrix load (so a hard refresh keeps existing data) ────────────
+
+  async _loadInitialMatrix() {
+    try {
+      const r = await fetch("/api/beacons/matrix", { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      const matrix = data?.matrix;
+      if (!Array.isArray(matrix)) return;
+      for (let rowIdx = 0; rowIdx < matrix.length; rowIdx++) {
+        const row = matrix[rowIdx] || [];
+        for (let bandIdx = 0; bandIdx < row.length; bandIdx++) {
+          const obs = row[bandIdx];
+          if (obs) {
+            this._matrixData[`${rowIdx}:${bandIdx}`] = obs;
+          }
+        }
+      }
+      this._renderMatrix();
+    } catch (_) {}
   }
 
   // ── WS connection ──────────────────────────────────────────────────────────

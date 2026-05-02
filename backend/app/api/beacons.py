@@ -140,13 +140,20 @@ async def beacon_matrix() -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     slot_idx = current_slot_index(now)
 
-    # Pull last 18*5=90 observations from DB (one per slot×band cell max)
-    rows = state.db.get_beacon_observations(limit=90)
+    # Pull recent observations from DB (covers ~5 cycles to ensure all
+    # 90 cells have a chance of being represented even when one band
+    # is on the rotation more than the others)
+    rows = state.db.get_beacon_observations(limit=450)
 
-    # Build lookup: (slot_index, band_name) → most recent observation
+    # Build lookup: (beacon_index, band_name) → most recent observation.
+    # Use beacon_index (NCDXF rotation order) NOT slot_index — the schedule
+    # offsets between bands so the same row maps to different slots.
     cell: dict[tuple[int, str], dict] = {}
     for row in rows:
-        key = (row["slot_index"] % 18, row["band_name"])
+        b_idx = row.get("beacon_index")
+        if b_idx is None:
+            b_idx = (row.get("slot_index") or 0) % 18
+        key = (b_idx, row["band_name"])
         if key not in cell:
             cell[key] = row
 
