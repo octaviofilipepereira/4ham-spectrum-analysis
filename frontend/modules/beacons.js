@@ -170,9 +170,12 @@ class BeaconController {
     }
     const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
     const dashes = Number(cell.max_dashes || 0);
-    const displayLevel = dashes > 0 ? dashes : 1;
     const bestSignalLabel = dashes > 0 ? `${dashes}/4 dashes` : "weak CW ID-only copy";
-    const meter  = renderBeaconMeter(displayLevel);
+    const telemetry = renderBeaconTelemetry({
+      snrDb: cell.max_snr_db,
+      dashes,
+      valueClass: "text-white",
+    });
     let ago = "";
     if (cell.last_detected_utc) {
       const t = Date.parse(cell.last_detected_utc);
@@ -193,9 +196,9 @@ class BeaconController {
         }
       }
     }
-    const title = `Detected ${det}/${total} slots in window\nBest signal: ${bestSignalLabel}, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
+    const title = `Detected ${det}/${total} slots in window\nBest 100 W reference: ${snr} dB\nBest dash sequence: ${bestSignalLabel}\nLast: ${cell.last_detected_utc || "?"}`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
-      <small class="text-white">${meter} ${snr} dB<br>${det}/${total} &middot; ${ago}</small>
+      <small class="beacon-cell__content">${telemetry}<span class="beacon-history-meta text-white">${det}/${total} &middot; ${ago}</span></small>
     </td>`;
   }
 
@@ -332,14 +335,19 @@ class BeaconController {
     let cls = "beacon-cell";
     if (isActive) cls += " beacon-cell--active";
     if (obs) {
-      if (obs.detected) {
-        const dashes = obs.dash_levels_detected || 0;
-        const displayLevel = dashes > 0 ? dashes : 1;
-        const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
-        const meter = renderBeaconMeter(displayLevel);
-        const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="ID confirmed">✓</span> ' : "";
-        inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
-        cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
+      if (hasBeaconTelemetry(obs) || obs.detected) {
+        const dashes = Number(obs.dash_levels_detected || 0);
+        const telemetry = renderBeaconTelemetry({
+          snrDb: obs.snr_db_100w,
+          dashes,
+        });
+        const statusTag = renderBeaconStatusTag(obs);
+        inner = `<small class="beacon-cell__content">${statusTag}${telemetry}</small>`;
+        if (obs.detected) {
+          cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
+        } else {
+          cls += " beacon-cell--observed";
+        }
       } else {
         inner = `<span title="Latest monitored pass: no copy">${renderBeaconMeter(0, "nocopy")}</span>`;
         cls += " beacon-cell--absent";
@@ -519,8 +527,8 @@ class BeaconController {
 }
 
 /** Render a 4-segment meter for successful copy or no-copy passes. */
-function renderBeaconMeter(dashes, variant = "success") {
-  const n = Math.max(0, Math.min(4, Math.round(dashes || 0)));
+function renderBeaconMeter(level, variant = "sequence") {
+  const n = Math.max(0, Math.min(4, Math.round(level || 0)));
   if (variant === "nocopy" || variant === "fail") {
     let html = '<span class="beacon-meter beacon-meter--nocopy" aria-label="latest monitored pass had no copy">';
     for (let i = 1; i <= 4; i++) {
@@ -529,13 +537,65 @@ function renderBeaconMeter(dashes, variant = "success") {
     html += "</span>";
     return html;
   }
-  let html = '<span class="beacon-meter" aria-label="signal level ' + n + '/4">';
+  const meterClass = variant === "reference" ? "beacon-meter beacon-meter--reference" : "beacon-meter";
+  const segmentPrefix = variant === "reference" ? "ref" : "on";
+  let html = '<span class="' + meterClass + '" aria-label="signal level ' + n + '/4">';
   for (let i = 1; i <= 4; i++) {
-    const cls = i <= n ? `beacon-meter__seg beacon-meter__seg--on-${i}` : "beacon-meter__seg";
+    const cls = i <= n ? `beacon-meter__seg beacon-meter__seg--${segmentPrefix}-${i}` : "beacon-meter__seg";
     html += `<span class="${cls}"></span>`;
   }
   html += "</span>";
   return html;
+}
+
+function hasBeaconTelemetry(obs) {
+  return [obs.snr_db_100w, obs.snr_db_10w, obs.snr_db_1w, obs.snr_db_100mw].some(
+    (value) => value != null,
+  );
+}
+
+function referenceMeterLevel(snrDb) {
+  const value = Number(snrDb);
+  if (!Number.isFinite(value) || value < 0.0) return 0;
+  if (value < 1.5) return 1;
+  if (value < 3.0) return 2;
+  if (value < 4.5) return 3;
+  return 4;
+}
+
+function renderBeaconTelemetry({ snrDb, dashes, valueClass = "" }) {
+  const dashCount = Math.max(0, Math.min(4, Math.round(Number(dashes || 0))));
+  const snrLabel = Number.isFinite(Number(snrDb)) ? `${Number(snrDb).toFixed(1)} dB` : "n/a";
+  const valueClassAttr = valueClass ? ` ${valueClass}` : "";
+  return `<span class="beacon-cell__metrics">
+    <span class="beacon-metric-row">
+      <span class="beacon-metric-label">100W</span>
+      ${renderBeaconMeter(referenceMeterLevel(snrDb), "reference")}
+      <span class="beacon-metric-value${valueClassAttr}">${snrLabel}</span>
+    </span>
+    <span class="beacon-metric-row">
+      <span class="beacon-metric-label">SEQ</span>
+      ${renderBeaconMeter(dashCount, "sequence")}
+      <span class="beacon-metric-value${valueClassAttr}">${dashCount}/4</span>
+    </span>
+  </span>`;
+}
+
+function renderBeaconStatusTag(obs) {
+  if (obs.id_confirmed) {
+    return '<span class="beacon-cell__state beacon-cell__state--confirmed" title="CW ID confirmed">✓ ID</span>';
+  }
+  if (!obs.detected) {
+    return "";
+  }
+  const labels = {
+    dash: "DASH",
+    combined: "CMB",
+    id: "ID",
+  };
+  const label = labels[obs.detected_via] || "COPY";
+  const title = obs.detected_via ? `Detected via ${obs.detected_via}` : "Detected copy";
+  return `<span class="beacon-cell__state beacon-cell__state--detected" title="${title}">${label}</span>`;
 }
 
 export { BeaconController, renderBeaconMeter };

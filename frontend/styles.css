@@ -1991,12 +1991,78 @@ h1,
   display: inline-flex;
   gap: 2px;
   vertical-align: middle;
+.beacon-cell--observed {
+  background: rgba(255, 255, 255, 0.04);
+}
   height: 10px;
   margin-right: 4px;
 }
 .beacon-meter__seg {
   width: 7px;
   height: 100%;
+.beacon-cell__content {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.beacon-cell__metrics {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.beacon-metric-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.beacon-metric-label {
+  min-width: 2.35rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+.beacon-metric-value {
+  font-variant-numeric: tabular-nums;
+  color: #f8fbff;
+}
+.beacon-cell--observed .beacon-metric-label,
+.beacon-cell--history-hit .beacon-metric-label {
+  color: rgba(255, 255, 255, 0.62);
+}
+.beacon-cell__state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.beacon-cell__state--confirmed {
+  color: #dcfce7;
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(34, 197, 94, 0.32);
+}
+.beacon-cell__state--detected {
+  color: #d7f2ff;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.34);
+}
+.beacon-history-meta {
+  display: block;
+  margin-top: 3px;
+}
+.beacon-legend-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
   border-radius: 1px;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -2006,6 +2072,10 @@ h1,
 .beacon-meter__seg--on-3 { background: #5edc5e; border-color: #5edc5e; }
 .beacon-meter__seg--on-4 { background: #b6f5b6; border-color: #b6f5b6; }
 .beacon-meter__seg--nocopy,
+.beacon-metric-row .beacon-meter,
+.beacon-legend-metric .beacon-meter {
+  margin-right: 0;
+}
 .beacon-meter__seg--fail {
   background: rgba(217, 119, 6, 0.96);
   border-color: #fbbf24;
@@ -2017,5 +2087,9 @@ h1,
   background-color: #ffc107;
   border-color: #ffc107;
   color: #000;
+.beacon-meter__seg--ref-1 { background: #145e75; border-color: #145e75; }
+.beacon-meter__seg--ref-2 { background: #1f88a8; border-color: #1f88a8; }
+.beacon-meter__seg--ref-3 { background: #49b7d4; border-color: #49b7d4; }
+.beacon-meter__seg--ref-4 { background: #9ce8ff; border-color: #9ce8ff; }
 }
 
