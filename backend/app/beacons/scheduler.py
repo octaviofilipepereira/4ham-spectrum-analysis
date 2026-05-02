@@ -264,7 +264,10 @@ class BeaconScheduler:
                     sample_rate=self._target_sr,
                     slot_start_utc=slot_start_utc,
                 )
-                result = detector.detect(audio)
+                # Run matched-filter / FFT off the event loop so the next
+                # 10-s UTC slot boundary isn't missed on slow CPUs (Pi).
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, detector.detect, audio)
                 obs.update(result)
                 if obs["detected"]:
                     self._total_observations += 1
@@ -297,8 +300,17 @@ class BeaconScheduler:
                     band.name, next_band.name,
                 )
 
-            # Sleep until the next slot boundary
-            remaining = SLOT_SECONDS - seconds_into_slot()
+            # Sleep until the next slot boundary. If we've already crossed
+            # it (DSP took longer than the slot), warn and skip ahead so we
+            # stay UTC-aligned instead of drifting.
+            into = seconds_into_slot()
+            if into >= SLOT_SECONDS - 0.1:
+                drift = into - (SLOT_SECONDS - 0.1)
+                _log.warning(
+                    "beacon_slot_drift drift=%.2fs beacon=%s band=%s",
+                    drift, beacon.callsign, band.name,
+                )
+            remaining = SLOT_SECONDS - into
             # Clamp: at least 0.1 s, at most 10 s
             remaining = max(0.1, min(float(SLOT_SECONDS), remaining))
             await asyncio.sleep(remaining)
@@ -336,13 +348,19 @@ class BeaconScheduler:
             if chunk is None or len(chunk) == 0:
                 continue
             audio = np.real(chunk).astype(np.float32)
-            # Resample if necessary
+            # Resample if necessary (run off the event loop — resample_poly
+            # at 2.4 MHz → 8 kHz can take hundreds of ms on a Pi)
             if src_sr != self._target_sr:
                 try:
                     from scipy.signal import resample_poly
                     from math import gcd
                     g = gcd(self._target_sr, src_sr)
-                    audio = resample_poly(audio, self._target_sr // g, src_sr // g)
+                    up = self._target_sr // g
+                    down = src_sr // g
+                    loop = asyncio.get_running_loop()
+                    audio = await loop.run_in_executor(
+                        None, resample_poly, audio, up, down
+                    )
                 except Exception:
                     pass
             buf.append(audio)
