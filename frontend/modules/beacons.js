@@ -145,25 +145,9 @@ class BeaconController {
         <small class="text-muted">0/${total}</small>
       </td>`;
     }
-    const ratio = Math.min(1, det / Math.max(1, total));
-    // Compute age of last detection so we can FADE OUT cells where
-    // the most recent detection is old (otherwise a hit from 15 h ago
-    // would look as "fresh" as one from 5 min ago at the 24 h window).
-    let ageHours = null;
-    if (cell.last_detected_utc) {
-      const t = Date.parse(cell.last_detected_utc);
-      if (!isNaN(t)) ageHours = Math.max(0, (now - t) / 3_600_000);
-    }
-    // Freshness factor: 1.0 if <30 min, decays linearly to 0.15 at 12 h.
-    let freshness = 1.0;
-    if (ageHours != null) {
-      if (ageHours <= 0.5) freshness = 1.0;
-      else if (ageHours >= 12) freshness = 0.15;
-      else freshness = 1.0 - 0.85 * ((ageHours - 0.5) / 11.5);
-    }
-    // Green intensity scales with detection ratio AND freshness.
-    const alpha = (0.10 + 0.70 * ratio * freshness).toFixed(2);
     const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
+    const dashes = Number(cell.max_dashes || 0);
+    const meter  = renderBeaconMeter(dashes);
     let ago = "";
     if (cell.last_detected_utc) {
       const t = Date.parse(cell.last_detected_utc);
@@ -184,9 +168,9 @@ class BeaconController {
         }
       }
     }
-    const title = `Detected ${det}/${total} slots in window\nBest SNR: ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
-    return `<td class="beacon-cell text-center" style="background-color: rgba(40,167,69,${alpha});" title="${title}">
-      <small><strong>${det}/${total}</strong> &middot; ${snr} dB<br><span class="text-light">${ago}</span></small>
+    const title = `Detected ${det}/${total} slots in window\nBest signal: ${dashes}/4 dashes, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
+    return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
+      <small>${meter} ${snr} dB<br><span class="text-muted">${det}/${total} &middot; ${ago}</span></small>
     </td>`;
   }
 

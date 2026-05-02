@@ -759,6 +759,7 @@ class Database:
                   SUM(detected)                           AS detections,
                   SUM(id_confirmed)                       AS id_confirmed,
                   MAX(CASE WHEN detected=1 THEN snr_db_100w END) AS max_snr_db,
+                  MAX(CASE WHEN detected=1 THEN dash_levels_detected END) AS max_dashes,
                   MAX(CASE WHEN detected=1 THEN slot_start_utc END) AS last_detected_utc
                 FROM beacon_observations
                 WHERE slot_start_utc >= ?
