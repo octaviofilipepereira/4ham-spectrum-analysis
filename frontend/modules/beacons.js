@@ -333,12 +333,8 @@ class BeaconController {
     if (isActive) cls += " beacon-cell--active";
     if (obs) {
       if (obs.detected) {
-        const dashes = obs.dash_levels_detected || 0;
-        const displayLevel = dashes > 0 ? dashes : 1;
-        const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
-        const meter = renderBeaconMeter(displayLevel);
-        const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="ID confirmed">✓</span> ' : "";
-        inner = `<small>${confirmedMark}${meter} ${snr} dB</small>`;
+        const title = renderBeaconCellTitle(obs);
+        inner = `<small class="beacon-cell__reading" title="${title}">${renderBeaconTelemetry(obs)}</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
         inner = `<span title="Latest monitored pass: no copy">${renderBeaconMeter(0, "nocopy")}</span>`;
@@ -516,6 +512,45 @@ class BeaconController {
     // Reuse app.js helper if available globally
     return (typeof getAuthHeader === "function") ? getAuthHeader() : {};
   }
+}
+
+function referenceMeterLevel(snrDb) {
+  const value = Number(snrDb);
+  if (!Number.isFinite(value) || value < 0.0) return 0;
+  if (value < 1.5) return 1;
+  if (value < 3.0) return 2;
+  if (value < 4.5) return 3;
+  return 4;
+}
+
+function renderBeaconTelemetry(obs) {
+  const dashCount = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+  const snrLabel = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
+  const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="CW ID confirmed">✓</span>' : "";
+  return `<span class="beacon-cell__telemetry">
+    <span class="beacon-meter-row" title="100 W reference dash: ${snrLabel}">
+      ${renderBeaconMeter(referenceMeterLevel(obs.snr_db_100w))}
+      <span class="beacon-meter-value">${snrLabel}</span>
+      ${confirmedMark}
+    </span>
+    <span class="beacon-meter-row" title="Ordered dash sequence heard: ${dashCount}/4">
+      ${renderBeaconMeter(dashCount)}
+      <span class="beacon-meter-value">${dashCount}/4</span>
+    </span>
+  </span>`;
+}
+
+function renderBeaconCellTitle(obs) {
+  const dashCount = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+  const snrLabel = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
+  const lines = [
+    `100 W reference dash: ${snrLabel}`,
+    `Ordered dash sequence heard: ${dashCount}/4`,
+  ];
+  if (obs.id_confirmed) {
+    lines.push("CW ID confirmed");
+  }
+  return lines.join("\n");
 }
 
 /** Render a 4-segment meter for successful copy or no-copy passes. */

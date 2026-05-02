@@ -1986,6 +1986,36 @@ h1,
   color: #ffc107;
 }
 
+.beacon-cell__reading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.05;
+}
+
+.beacon-cell__telemetry {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.beacon-meter-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.beacon-meter-value {
+  min-width: 2.7rem;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  color: #f8fbff;
+}
+
 /* Signal strength meter — 4 segments, light green → dark green */
 .beacon-meter {
   display: inline-flex;
@@ -1993,6 +2023,9 @@ h1,
   vertical-align: middle;
   height: 10px;
   margin-right: 4px;
+}
+.beacon-meter-row .beacon-meter {
+  margin-right: 0;
 }
 .beacon-meter__seg {
   width: 7px;
