@@ -527,7 +527,8 @@ function refreshQuickBandButtons() {
     const buttonBand = String(button.dataset.quickBand || "").trim();
     const isAvailable = availableBands.has(buttonBand);
     const isActive = isAvailable && buttonBand === activeBand;
-    button.disabled = !isAvailable || scanActionInFlight;
+    const beaconLock = !!beaconController?.isBeaconModeActive();
+    button.disabled = beaconLock || !isAvailable || scanActionInFlight;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
@@ -537,10 +538,14 @@ function refreshQuickBandButtons() {
 
 function refreshModeButtons() {
   if (quickModeButtons.length) {
+    const beaconLock = !!beaconController?.isBeaconModeActive();
     quickModeButtons.forEach((button) => {
       const buttonMode = String(button.dataset.quickMode || "").trim();
       const isActive = selectedDecoderMode === buttonMode;
-      button.disabled = scanActionInFlight;
+      // While BEACON mode is active, lock all mode buttons EXCEPT the BEACON
+      // one (so the user can still click it to leave the mode).
+      const isBeaconBtn = buttonMode === "BEACON";
+      button.disabled = (beaconLock && !isBeaconBtn) || scanActionInFlight;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
@@ -2133,7 +2138,12 @@ function updateScanButtonState() {
   startBtn.textContent = isScanRunning
     ? (rotationRunning ? "Stop Rotation Scanning" : "Stop Single Scanning")
     : "Start Single Scanning";
-  startBtn.disabled = false;
+  // While BEACON mode is active, the scheduler owns the engine — keep the
+  // single/rotation scan button disabled together with Config Scan Rotation.
+  const beaconLock = !!beaconController?.isBeaconModeActive();
+  startBtn.disabled = beaconLock;
+  const rotationToggleBtn = document.getElementById("rotationToggleBtn");
+  if (rotationToggleBtn) rotationToggleBtn.disabled = beaconLock;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
   refreshQuickBandButtons();
