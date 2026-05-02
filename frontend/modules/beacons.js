@@ -152,6 +152,11 @@ class BeaconController {
     // NOT by slot_index — the schedule is offset between bands.
     this._activeSlot = (msg.beacon_index != null) ? msg.beacon_index : (msg.slot_index % SLOTS_PER_CYCLE);
     this._activeBand = BANDS.indexOf(msg.band_name);
+    // Clear any stale observation for the now-active cell so the cell
+    // shows the ⏳ spinner until the new observation arrives.
+    if (this._activeSlot != null && this._activeBand >= 0) {
+      delete this._matrixData[`${this._activeSlot}:${this._activeBand}`];
+    }
     this._currentFreqHz = msg.freq_hz;         // save for VFO label getter
     this._currentCallsign = msg.callsign;      // save for VFO label getter
     this._schedulerRunning = true;
