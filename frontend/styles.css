@@ -1903,7 +1903,7 @@ h1,
 
 /* ── Beacon Analysis matrix ──────────────────────────────────────────── */
 .beacon-matrix {
-  font-size: 0.78rem;
+  font-size: calc(0.78rem + 2px);
   border-collapse: collapse;
 }
 
@@ -1914,6 +1914,10 @@ h1,
   text-align: center;
   border: 1px solid #2a2a3a;
 }
+.beacon-matrix th small,
+.beacon-matrix td small {
+  font-size: calc(0.78rem + 2px);
+}
 
 .beacon-matrix td.beacon-callsign,
 .beacon-matrix th.beacon-callsign-header {
@@ -1922,7 +1926,7 @@ h1,
 
 .beacon-callsign {
   font-family: var(--font-mono, monospace);
-  font-size: 0.80rem;
+  font-size: calc(0.80rem + 2px);
   width: 14rem;
   max-width: 14rem;
   white-space: nowrap;
@@ -1931,7 +1935,7 @@ h1,
 }
 .beacon-callsign .beacon-loc {
   font-family: var(--font-sans, sans-serif);
-  font-size: 0.72rem;
+  font-size: calc(0.72rem + 2px);
   color: var(--muted, #9aa);
   margin-left: 0.4rem;
 }
