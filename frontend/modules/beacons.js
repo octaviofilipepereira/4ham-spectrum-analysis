@@ -342,8 +342,7 @@ class BeaconController {
           dashes,
         });
         const statusTag = renderBeaconStatusTag(obs);
-        const cellTitle = renderBeaconCellTitle(obs, dashes);
-        inner = `<small class="beacon-cell__content" title="${cellTitle}">${statusTag}${telemetry}</small>`;
+        inner = `<small class="beacon-cell__content">${statusTag}${telemetry}</small>`;
         if (obs.detected) {
           cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
         } else {
@@ -569,11 +568,13 @@ function renderBeaconTelemetry({ snrDb, dashes, valueClass = "" }) {
   const snrLabel = Number.isFinite(Number(snrDb)) ? `${Number(snrDb).toFixed(1)} dB` : "n/a";
   const valueClassAttr = valueClass ? ` ${valueClass}` : "";
   return `<span class="beacon-cell__metrics">
-    <span class="beacon-metric-row" title="100 W reference dash">
+    <span class="beacon-metric-row">
+      <span class="beacon-metric-label">100W</span>
       ${renderBeaconMeter(referenceMeterLevel(snrDb), "reference")}
       <span class="beacon-metric-value${valueClassAttr}">${snrLabel}</span>
     </span>
-    <span class="beacon-metric-row" title="Consecutive dash sequence heard">
+    <span class="beacon-metric-row">
+      <span class="beacon-metric-label">SEQ</span>
       ${renderBeaconMeter(dashCount, "sequence")}
       <span class="beacon-metric-value${valueClassAttr}">${dashCount}/4</span>
     </span>
@@ -582,23 +583,19 @@ function renderBeaconTelemetry({ snrDb, dashes, valueClass = "" }) {
 
 function renderBeaconStatusTag(obs) {
   if (obs.id_confirmed) {
-    return '<span class="beacon-cell__state beacon-cell__state--confirmed" title="CW ID confirmed">✓</span>';
+    return '<span class="beacon-cell__state beacon-cell__state--confirmed" title="CW ID confirmed">✓ ID</span>';
   }
-  return "";
-}
-
-function renderBeaconCellTitle(obs, dashes) {
-  const lines = [];
-  const snrLabel = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
-  lines.push(`100 W reference: ${snrLabel}`);
-  lines.push(`Dash sequence: ${dashes}/4`);
-  if (obs.detected_via) {
-    lines.push(`Detected via: ${obs.detected_via}`);
+  if (!obs.detected) {
+    return "";
   }
-  if (obs.id_confirmed) {
-    lines.push("CW ID confirmed");
-  }
-  return lines.join("\n");
+  const labels = {
+    dash: "DASH",
+    combined: "CMB",
+    id: "ID",
+  };
+  const label = labels[obs.detected_via] || "COPY";
+  const title = obs.detected_via ? `Detected via ${obs.detected_via}` : "Detected copy";
+  return `<span class="beacon-cell__state beacon-cell__state--detected" title="${title}">${label}</span>`;
 }
 
 export { BeaconController, renderBeaconMeter };

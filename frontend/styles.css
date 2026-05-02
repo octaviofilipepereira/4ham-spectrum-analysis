@@ -1979,21 +1979,20 @@ h1,
 .beacon-cell--absent {
   color: var(--muted, #777);
 }
-  align-items: center;
+
 .beacon-dashes {
   font-family: var(--font-mono, monospace);
   letter-spacing: 2px;
   color: #ffc107;
 }
 
-  align-items: center;
+/* Signal strength meter — 4 segments, light green → dark green */
 .beacon-meter {
   display: inline-flex;
   gap: 2px;
   vertical-align: middle;
 .beacon-cell--observed {
   background: rgba(255, 255, 255, 0.04);
-  justify-content: center;
 }
   height: 10px;
   margin-right: 4px;
@@ -2038,8 +2037,6 @@ h1,
 .beacon-cell__state {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 1.15rem;
   padding: 0.08rem 0.38rem;
   border-radius: 999px;
   font-size: 0.56rem;
@@ -2060,7 +2057,6 @@ h1,
 .beacon-history-meta {
   display: block;
   margin-top: 3px;
-  text-align: center;
 }
 .beacon-legend-metric {
   display: inline-flex;
