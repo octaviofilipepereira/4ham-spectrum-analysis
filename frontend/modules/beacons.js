@@ -64,6 +64,7 @@ class BeaconController {
     this._extraScanBtns = [
       document.getElementById("startScan"),
       document.getElementById("rotationToggleBtn"),
+      document.getElementById("rotationPresetsMenuBtn"),
     ].filter(Boolean);
 
     this._bindUI();

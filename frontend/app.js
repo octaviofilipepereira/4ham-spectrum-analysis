@@ -2144,6 +2144,8 @@ function updateScanButtonState() {
   startBtn.disabled = beaconLock;
   const rotationToggleBtn = document.getElementById("rotationToggleBtn");
   if (rotationToggleBtn) rotationToggleBtn.disabled = beaconLock;
+  const rotationPresetsMenuBtn = document.getElementById("rotationPresetsMenuBtn");
+  if (rotationPresetsMenuBtn) rotationPresetsMenuBtn.disabled = beaconLock;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
   refreshQuickBandButtons();
