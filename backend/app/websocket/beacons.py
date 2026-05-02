@@ -81,8 +81,12 @@ async def broadcast_slot_start(
     """Called by BeaconScheduler.on_slot_start — broadcast slot_start event."""
     if not _connections:
         return
-    beacon = beacon_at(slot_index % 18, 0)  # for location info
     band = next((b for b in BANDS if b.freq_hz == freq_hz), None)
+    band_index = band.index if band else 0
+    # Per the NCDXF schedule, the beacon transmitting at slot S on band B is
+    # BEACONS[(S - B) % 18]. The frontend matrix needs the row to be the
+    # beacon index, not the raw slot index, so it stays aligned across bands.
+    beacon = beacon_at(slot_index % 18, band_index)
     msg = json.dumps({
         "type": "slot_start",
         "callsign": callsign,
@@ -90,6 +94,7 @@ async def broadcast_slot_start(
         "slot_index": slot_index,
         "slot_start_utc": slot_start_utc,
         "band_name": band.name if band else None,
+        "beacon_index": beacon.index,
     })
     await _broadcast(msg)
 

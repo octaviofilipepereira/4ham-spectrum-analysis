@@ -110,7 +110,9 @@ class BeaconController {
   }
 
   _onSlotStart(msg) {
-    this._activeSlot = msg.slot_index;
+    // Row is keyed by beacon_index (0..17 in the IARU/NCDXF order),
+    // NOT by slot_index — the schedule is offset between bands.
+    this._activeSlot = (msg.beacon_index != null) ? msg.beacon_index : (msg.slot_index % SLOTS_PER_CYCLE);
     this._activeBand = BANDS.indexOf(msg.band_name);
     this._currentFreqHz = msg.freq_hz;         // save for VFO label getter
     this._currentCallsign = msg.callsign;      // save for VFO label getter
@@ -126,7 +128,14 @@ class BeaconController {
   }
 
   _onObservation(obs) {
-    const key = `${obs.slot_index % SLOTS_PER_CYCLE}:${BANDS.indexOf(obs.band_name)}`;
+    // Match the row by beacon_index (the BEACONS array order). Using
+    // slot_index % 18 here would shift one row per band (NCDXF rotates
+    // by band_index on each band), causing 17m/15m/12m/10m to look
+    // "incomplete".
+    const rowIdx = (obs.beacon_index != null)
+      ? obs.beacon_index
+      : (obs.slot_index % SLOTS_PER_CYCLE);
+    const key = `${rowIdx}:${BANDS.indexOf(obs.band_name)}`;
     this._matrixData[key] = obs;
     this._renderMatrix();
   }
@@ -138,7 +147,7 @@ class BeaconController {
     const rows = [];
     for (let s = 0; s < SLOTS_PER_CYCLE; s++) {
       const b = BEACONS[s];
-      const isActiveRow = (this._activeSlot !== null && s === (this._activeSlot % SLOTS_PER_CYCLE));
+      const isActiveRow = (this._activeSlot !== null && s === this._activeSlot);
       const rowClass = isActiveRow ? "beacon-row--active" : "";
       let cells = `<td class="beacon-callsign ${isActiveRow ? "fw-bold text-warning" : "text-info"}" title="${b.callsign} — ${b.location}">${b.callsign}<span class="beacon-loc">— ${b.location}</span></td>`;
       for (let bi = 0; bi < BANDS.length; bi++) {
