@@ -60,6 +60,11 @@ class BeaconController {
       b => b.getAttribute("data-quick-mode") !== "BEACON"
     );
     this._beaconModeBtn = document.querySelector('[data-quick-mode="BEACON"]');
+    // Other scan controls that must be disabled while BEACON owns the engine
+    this._extraScanBtns = [
+      document.getElementById("startScan"),
+      document.getElementById("rotationToggleBtn"),
+    ].filter(Boolean);
 
     this._bindUI();
     this._connect();
@@ -208,6 +213,7 @@ class BeaconController {
     // Disable band & mode buttons (scheduler owns the scan engine)
     this._bandBtns.forEach(b => { b.disabled = true; });
     this._modeBtns.forEach(b => { b.disabled = true; });
+    this._extraScanBtns.forEach(b => { b.disabled = true; });
 
     // Style the beacon mode button
     if (this._beaconModeBtn) {
@@ -230,6 +236,7 @@ class BeaconController {
     // Re-enable band & mode buttons
     this._bandBtns.forEach(b => { b.disabled = false; });
     this._modeBtns.forEach(b => { b.disabled = false; });
+    this._extraScanBtns.forEach(b => { b.disabled = false; });
 
     // Deactivate beacon mode button
     if (this._beaconModeBtn) {
