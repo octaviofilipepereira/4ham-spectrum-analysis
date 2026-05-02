@@ -1915,8 +1915,12 @@ h1,
   border: 1px solid #2a2a3a;
 }
 
-.beacon-callsign {
+.beacon-matrix td.beacon-callsign,
+.beacon-matrix th.beacon-callsign-header {
   text-align: left;
+}
+
+.beacon-callsign {
   font-family: var(--font-mono, monospace);
   font-size: 0.80rem;
   width: 14rem;
@@ -1933,7 +1937,6 @@ h1,
 }
 
 .beacon-callsign-header {
-  text-align: left;
   width: 14rem;
 }
 
