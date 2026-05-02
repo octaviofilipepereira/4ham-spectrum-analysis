@@ -243,6 +243,11 @@ class BeaconController {
     this._currentFreqHz = null;
     this._currentCallsign = null;
 
+    // Release the VFO display lock (set by _syncBeaconContext on slot_start)
+    if (typeof window._syncBeaconContext === "function") {
+      try { window._syncBeaconContext(); } catch (_) {}
+    }
+
     // Re-enable band & mode buttons
     this._bandBtns.forEach(b => { b.disabled = false; });
     this._modeBtns.forEach(b => { b.disabled = false; });

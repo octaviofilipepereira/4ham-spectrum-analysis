@@ -1137,11 +1137,27 @@ export class WaterfallController {
   updateVFODisplay(startHz, endHz) {
     const vfoFreqEl = this.#dom.vfoFreqEl;
     if (!vfoFreqEl || !Number.isFinite(startHz) || !Number.isFinite(endHz)) return;
+    // External code (e.g. BeaconController) may pin the VFO display to a
+    // specific frequency. While locked, ignore wide-range updates that
+    // would otherwise reset the readout to the band centre on every frame.
+    if (this.vfoLocked) return;
     const centre = Math.round((startHz + endHz) / 2);
     if (centre === this.#vfoDisplayHz) return;
     this.#vfoDisplayHz = centre;
     vfoFreqEl.innerHTML = this.#formatVFOFreq(centre);
     this.#cb.onVFOUpdate?.();
+  }
+
+  /** Pin the VFO readout to a specific frequency until unlockVFO() is called. */
+  lockVFOTo(hz) {
+    if (!Number.isFinite(hz)) return;
+    this.vfoLocked = false;            // temporarily allow the write below
+    this.updateVFODisplay(hz, hz);
+    this.vfoLocked = true;
+  }
+
+  unlockVFO() {
+    this.vfoLocked = false;
   }
 
   // ── Debug ────────────────────────────────────────────────────────────────

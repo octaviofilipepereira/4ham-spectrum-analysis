@@ -451,7 +451,10 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
 
   const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
   wfc.renderRuler(bandStartHz, bandEndHz);
-  wfc.updateVFODisplay(bandStartHz, bandEndHz);
+  // Don't clobber the beacon-pinned VFO display while BEACON mode is active.
+  if (!beaconController?.isBeaconModeActive()) {
+    wfc.updateVFODisplay(bandStartHz, bandEndHz);
+  }
   wfc.clearFrame();
 
   try {
@@ -938,9 +941,12 @@ function _syncBeaconContext() {
   const callsign = beaconController?.currentCallsign;
 
   if (freqHz && callsign) {
-    // Update the main VFO display to show the exact beacon frequency
-    // the SDR is currently tuned to (slot freq), not the band centre.
-    if (wfc && typeof wfc.updateVFODisplay === "function") {
+    // Pin the main VFO display to the exact beacon frequency the SDR is
+    // currently tuned to. Lock it so per-frame updates from the spectrum
+    // pipeline (which carry the band-wide range) don't overwrite it.
+    if (wfc && typeof wfc.lockVFOTo === "function") {
+      wfc.lockVFOTo(freqHz);
+    } else if (wfc && typeof wfc.updateVFODisplay === "function") {
       wfc.updateVFODisplay(freqHz, freqHz);
     }
     if (vfoBeaconLabel) {
@@ -948,8 +954,9 @@ function _syncBeaconContext() {
       vfoBeaconLabel.textContent = ` → ${callsign} (${freqMHz} MHz)`;
       vfoBeaconLabel.hidden = false;
     }
-  } else if (vfoBeaconLabel) {
-    vfoBeaconLabel.hidden = true;
+  } else {
+    if (wfc && typeof wfc.unlockVFO === "function") wfc.unlockVFO();
+    if (vfoBeaconLabel) vfoBeaconLabel.hidden = true;
   }
 }
 window._syncBeaconContext = _syncBeaconContext;  // expose for BeaconController
@@ -5126,7 +5133,9 @@ saveBandBtn.addEventListener("click", async () => {
     if (String(bandSelect?.value || "") === String(payload.band.name)) {
       if (isScanRunning) {
         wfc.renderRuler(Number(payload.band.start_hz), Number(payload.band.end_hz));
-        wfc.updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        if (!beaconController?.isBeaconModeActive()) {
+          wfc.updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        }
         showToast("Band saved. New limits apply fully on next scan restart.");
       } else {
         await applyPreviewBandRange(payload.band.name, { syncInputs: true });
