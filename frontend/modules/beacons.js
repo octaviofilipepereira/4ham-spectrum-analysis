@@ -142,7 +142,7 @@ class BeaconController {
     const total = Number(cell.total_slots || 0);
     if (det <= 0) {
       return `<td class="beacon-cell text-center" title="${total} slot(s) monitored, 0 detections">
-        <small class="text-muted">0/${total}</small>
+        <small class="text-white">0/${total}</small>
       </td>`;
     }
     const snr   = (cell.max_snr_db != null) ? Number(cell.max_snr_db).toFixed(1) : "?";
@@ -170,7 +170,7 @@ class BeaconController {
     }
     const title = `Detected ${det}/${total} slots in window\nBest signal: ${dashes}/4 dashes, SNR ${snr} dB (100 W ref)\nLast: ${cell.last_detected_utc || "?"}`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
-      <small>${meter} ${snr} dB<br><span class="text-muted">${det}/${total} &middot; ${ago}</span></small>
+      <small class="text-white">${meter} ${snr} dB<br>${det}/${total} &middot; ${ago}</small>
     </td>`;
   }
 
