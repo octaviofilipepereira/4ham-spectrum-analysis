@@ -151,7 +151,8 @@ class BeaconController {
         const dashes = obs.dash_levels_detected || 0;
         const snr = obs.snr_db_100w != null ? obs.snr_db_100w.toFixed(1) : "?";
         const dotCls = obs.id_confirmed ? "text-success fw-bold" : "text-success";
-        inner = `<span class="${dotCls}" style="font-size:1.1rem">●</span><br><small>${"▐".repeat(dashes)}${"░".repeat(4 - dashes)} ${snr} dB</small>`;
+        const meter = renderBeaconMeter(dashes);
+        inner = `<span class="${dotCls}" style="font-size:1.1rem">●</span><br><small>${meter} ${snr} dB</small>`;
         cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
       } else {
         inner = `<span class="text-danger" style="font-size:1.1rem">●</span>`;
@@ -282,4 +283,16 @@ class BeaconController {
   }
 }
 
-export { BeaconController };
+/** Render a 4-segment signal-strength meter (light → dark green). */
+function renderBeaconMeter(dashes) {
+  const n = Math.max(0, Math.min(4, Math.round(dashes || 0)));
+  let html = '<span class="beacon-meter" aria-label="signal level ' + n + '/4">';
+  for (let i = 1; i <= 4; i++) {
+    const cls = i <= n ? `beacon-meter__seg beacon-meter__seg--on-${i}` : "beacon-meter__seg";
+    html += `<span class="${cls}"></span>`;
+  }
+  html += "</span>";
+  return html;
+}
+
+export { BeaconController, renderBeaconMeter };

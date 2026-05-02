@@ -1966,6 +1966,26 @@ h1,
   color: #ffc107;
 }
 
+/* Signal strength meter — 4 segments, light green → dark green */
+.beacon-meter {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+  height: 10px;
+  margin-right: 4px;
+}
+.beacon-meter__seg {
+  width: 7px;
+  height: 100%;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.beacon-meter__seg--on-1 { background: #b6f5b6; border-color: #b6f5b6; }
+.beacon-meter__seg--on-2 { background: #5edc5e; border-color: #5edc5e; }
+.beacon-meter__seg--on-3 { background: #29a829; border-color: #29a829; }
+.beacon-meter__seg--on-4 { background: #146e14; border-color: #146e14; }
+
 /* Beacon mode button active state (amber outline → solid amber) */
 .mode-quick-btn[data-quick-mode="BEACON"].is-active {
   background-color: #ffc107;
