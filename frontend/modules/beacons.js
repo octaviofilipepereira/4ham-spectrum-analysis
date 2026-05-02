@@ -130,7 +130,7 @@ class BeaconController {
       const b = BEACONS[s];
       const isActiveRow = (this._activeSlot !== null && s === (this._activeSlot % SLOTS_PER_CYCLE));
       const rowClass = isActiveRow ? "beacon-row--active" : "";
-      let cells = `<td class="beacon-callsign ${isActiveRow ? "fw-bold text-warning" : "text-info"}">${b.callsign}</td>`;
+      let cells = `<td class="beacon-callsign ${isActiveRow ? "fw-bold text-warning" : "text-info"}">${b.callsign} <small class="text-muted fw-normal">— ${b.location}</small></td>`;
       for (let bi = 0; bi < BANDS.length; bi++) {
         const isActiveCell = isActiveRow && bi === this._activeBand;
         const key = `${s}:${bi}`;
