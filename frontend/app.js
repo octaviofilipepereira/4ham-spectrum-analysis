@@ -932,17 +932,23 @@ function _syncAprsMapContext() {
  */
 function _syncBeaconContext() {
   if (!beaconArea || beaconArea.hidden) return;
-  if (!vfoBeaconLabel) return;
 
   // Query BeaconController for current slot freq and callsign
   const freqHz = beaconController?.currentFreqHz;
   const callsign = beaconController?.currentCallsign;
 
   if (freqHz && callsign) {
-    const freqMHz = (freqHz / 1e6).toFixed(3);
-    vfoBeaconLabel.textContent = ` → ${callsign} (${freqMHz} MHz)`;
-    vfoBeaconLabel.hidden = false;
-  } else {
+    // Update the main VFO display to show the exact beacon frequency
+    // the SDR is currently tuned to (slot freq), not the band centre.
+    if (wfc && typeof wfc.updateVFODisplay === "function") {
+      wfc.updateVFODisplay(freqHz, freqHz);
+    }
+    if (vfoBeaconLabel) {
+      const freqMHz = (freqHz / 1e6).toFixed(3);
+      vfoBeaconLabel.textContent = ` → ${callsign} (${freqMHz} MHz)`;
+      vfoBeaconLabel.hidden = false;
+    }
+  } else if (vfoBeaconLabel) {
     vfoBeaconLabel.hidden = true;
   }
 }
