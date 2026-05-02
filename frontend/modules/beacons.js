@@ -226,7 +226,12 @@ class BeaconController {
       this._statusBadge.className = "btn btn-sm btn-secondary";
     }
     this._statusBadge.disabled = true;
-    if (this._startBtn) this._startBtn.disabled = this._schedulerRunning;
+    if (this._startBtn) {
+      this._startBtn.disabled = this._schedulerRunning;
+      // Restore the original label once the scheduler is running (or stopped),
+      // overriding the "Starting… Please wait" optimistic text.
+      this._startBtn.innerHTML = "&#x25B6; Start monitoring";
+    }
     if (this._stopBtn)  this._stopBtn.disabled  = !this._schedulerRunning;
   }
 
