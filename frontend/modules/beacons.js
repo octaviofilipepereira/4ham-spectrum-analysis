@@ -110,6 +110,21 @@ class BeaconController {
   }
 
   _onSlotStart(msg) {
+    // Before switching the active marker, ensure the previously active
+    // cell has SOME state — if no observation arrived (DSP overrun, lost
+    // WS frame, etc.) we still want a red dot, not a blank cell.
+    if (this._activeSlot != null && this._activeBand != null && this._activeBand >= 0) {
+      const prevKey = `${this._activeSlot}:${this._activeBand}`;
+      if (!this._matrixData[prevKey]) {
+        this._matrixData[prevKey] = {
+          detected: false,
+          id_confirmed: false,
+          dash_levels_detected: 0,
+          snr_db_100w: null,
+          _placeholder: true,
+        };
+      }
+    }
     // Row is keyed by beacon_index (0..17 in the IARU/NCDXF order),
     // NOT by slot_index — the schedule is offset between bands.
     this._activeSlot = (msg.beacon_index != null) ? msg.beacon_index : (msg.slot_index % SLOTS_PER_CYCLE);
