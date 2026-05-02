@@ -202,8 +202,9 @@
         .on("end", () => svg.style("cursor", "grab"))
     );
 
-    // ── Scroll wheel = zoom (scale only) ─────────────────────────────────
+    // ── Ctrl/⌘ + scroll wheel = zoom; plain wheel = page scroll ──────────
     svg.node().addEventListener("wheel", (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return;  // let page scroll
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
       kScale = Math.max(0.25, Math.min(12, kScale * factor));
