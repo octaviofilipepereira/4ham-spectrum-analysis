@@ -72,15 +72,19 @@ async def beacon_start(
     if sched._running:
         return {"ok": False, "detail": "already_running", **sched.snapshot()}
 
-    # Optionally restrict to a subset of bands
-    if bands:
-        band_map = {b.name: b for b in BANDS}
-        selected = [band_map[n] for n in bands if n in band_map]
+    requested_bands = bands if isinstance(bands, list) else None
+
+    band_map = {b.name: b for b in BANDS}
+    if requested_bands is None:
+        selected = list(BANDS)
+    else:
+        selected = [band_map[n] for n in requested_bands if n in band_map]
         if not selected:
             raise HTTPException(status_code=400, detail="no_valid_bands")
-        sched._bands = selected
-        sched._band_index = 0
-        sched._slots_on_band = 0
+
+    sched._bands = selected
+    sched._band_index = 0
+    sched._slots_on_band = 0
 
     # Register dedicated IQ listener before starting the scheduler
     # (avoids stealing from the waterfall's _spectrum_queue)

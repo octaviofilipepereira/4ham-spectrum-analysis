@@ -41,6 +41,7 @@ from app.beacons.matched_filter import (
     _build_cw_template,
     _combined_detect_score,
 )
+from app.api import beacons as beacon_api
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -370,3 +371,62 @@ class TestSchedulerEnvelopeDownsampling:
         audio = np.arange(10, dtype=np.float32)
         out = _downsample_envelope(audio, src_sr=8, target_sr=2)
         assert len(out) == 2
+
+
+class _DummyBeaconScheduler:
+    def __init__(self, bands):
+        self._bands = list(bands)
+        self._band_index = 1 if len(self._bands) > 1 else 0
+        self._slots_on_band = 7
+        self._running = False
+
+    async def start(self) -> bool:
+        self._running = True
+        return True
+
+    def snapshot(self) -> dict[str, object]:
+        band = self._bands[self._band_index] if self._bands else None
+        return {
+            "running": self._running,
+            "bands": [b.name for b in self._bands],
+            "current_band": band.name if band else None,
+            "current_freq_hz": band.freq_hz if band else None,
+            "slots_on_band": self._slots_on_band,
+            "total_slots": 0,
+            "total_observations": 0,
+            "started_at": None,
+            "stopped_at": None,
+            "last_error": None,
+        }
+
+
+class TestBeaconApiStartBands:
+    @pytest.mark.asyncio
+    async def test_start_without_bands_resets_to_all_bands(self, monkeypatch):
+        sched = _DummyBeaconScheduler([BANDS[0], BANDS[1]])
+        monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
+        monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
+        monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+
+        result = await beacon_api.beacon_start()
+
+        assert result["ok"] is True
+        assert result["bands"] == [band.name for band in BANDS]
+        assert [band.name for band in sched._bands] == [band.name for band in BANDS]
+        assert sched._band_index == 0
+        assert sched._slots_on_band == 0
+
+    @pytest.mark.asyncio
+    async def test_start_with_explicit_subset_keeps_requested_bands(self, monkeypatch):
+        sched = _DummyBeaconScheduler(BANDS)
+        monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
+        monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
+        monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+
+        result = await beacon_api.beacon_start(["20m", "17m"])
+
+        assert result["ok"] is True
+        assert result["bands"] == ["20m", "17m"]
+        assert [band.name for band in sched._bands] == ["20m", "17m"]
+        assert sched._band_index == 0
+        assert sched._slots_on_band == 0
