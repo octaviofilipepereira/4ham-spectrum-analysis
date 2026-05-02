@@ -1917,13 +1917,24 @@ h1,
 
 .beacon-callsign {
   text-align: left;
-  white-space: nowrap;
   font-family: var(--font-mono, monospace);
   font-size: 0.80rem;
+  width: 14rem;
+  max-width: 14rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.beacon-callsign .beacon-loc {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.72rem;
+  color: var(--muted, #9aa);
+  margin-left: 0.4rem;
 }
 
 .beacon-callsign-header {
   text-align: left;
+  width: 14rem;
 }
 
 /* Active slot row — amber glow */
