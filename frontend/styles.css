@@ -1361,6 +1361,20 @@ h1,
   color: rgba(245, 247, 255, 0.8);
 }
 
+.app-modal .rtl-recovery-card {
+  background: #ffffff;
+  color: #101726;
+  border: 1px solid rgba(16, 23, 38, 0.12);
+}
+
+.app-modal .rtl-recovery-card .rtl-recovery-helper-text {
+  color: #4c556d;
+}
+
+.app-modal .rtl-recovery-card .text-muted {
+  color: #5f677f !important;
+}
+
 .app-modal .rtl-recovery-toggle {
   color: inherit;
 }

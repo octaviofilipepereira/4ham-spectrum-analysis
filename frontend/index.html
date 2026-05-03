@@ -773,7 +773,7 @@ Last update: 2026-02-22 16:27:19 UTC
               </div>
               <div class="col-12 d-none" id="rtlRecoverySection">
                 <h3 class="h6 mb-1">RTL recovery</h3>
-                <div class="alert alert-warning py-2 mb-0" role="status">
+                <div class="alert rtl-recovery-card py-2 mb-0" role="status">
                   <div class="d-flex justify-content-between align-items-start gap-2 flex-nowrap">
                     <button
                       class="btn btn-link p-0 text-start text-decoration-none flex-grow-1 rtl-recovery-toggle collapsed"
@@ -787,7 +787,7 @@ Last update: 2026-02-22 16:27:19 UTC
                         <span class="rtl-recovery-chevron" aria-hidden="true">▸</span>
                         <span>Show recovery details</span>
                       </span>
-                      <small class="d-block mt-2 admin-config-helper-text">If preview or waterfall stays stuck after restart, stop the backend, reset the current RTL USB device with <code>usbreset</code>, then start the backend again.</small>
+                      <small class="d-block mt-2 rtl-recovery-helper-text">If preview or waterfall stays stuck after restart, stop the backend, run the reset command shown below for the current RTL USB device, then start the backend again.</small>
                     </button>
                     <span id="rtlRecoveryBadge" class="badge bg-secondary mt-1">checking…</span>
                   </div>
