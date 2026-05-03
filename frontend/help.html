@@ -533,6 +533,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td>Retention</td><td>Maximum event count before auto-export + purge; number of recent events to keep; export directory.</td></tr>
         <tr><td>Authentication</td><td>Change admin password.</td></tr>
         <tr><td>SSB Voice Transcription</td><td>Enable/disable Whisper ASR for automatic SSB voice-to-text. Requires <code>openai-whisper</code> package.</td></tr>
+        <tr><td>RTL recovery</td><td>Shows the current RTL USB node, the bus/device address, and the recommended <code>usbreset</code> commands to recover the dongle when preview/waterfall stays stuck without frames.</td></tr>
       </tbody>
     </table>
 
@@ -578,6 +579,22 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         </tr>
       </tbody>
     </table>
+
+    <h3 class="sub-title">RTL-SDR USB reset recovery</h3>
+    <p>
+      When the backend restarts correctly but preview mode remains stuck in <em>Awaiting Spectrum Stream</em> and the waterfall does not move,
+      the RTL can be wedged at USB/driver level. In that case, open <strong>Admin Config</strong> and use the <strong>RTL recovery</strong>
+      panel to identify the current USB node and the exact reset command for the dongle.
+    </p>
+    <ol>
+      <li>Stop the backend with <code>bash scripts/server_control.sh stop</code>.</li>
+      <li>Run the reset command shown in Admin Config, for example <code>sudo usbreset 001/008</code> or <code>sudo usbreset 0bda:2838</code>.</li>
+      <li>Start the backend again with <code>bash scripts/server_control.sh start</code>.</li>
+    </ol>
+    <p>
+      Use this workflow only when a normal restart does not restore the waterfall. The displayed bus/device address can change after unplugging,
+      rebooting, or reconnecting the RTL, so always read the current value from Admin Config before running <code>usbreset</code>.
+    </p>
 
     <h3 class="sub-title">Retention policy</h3>
     <p>

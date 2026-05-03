@@ -1357,6 +1357,10 @@ h1,
   color: var(--muted);
 }
 
+.app-modal .admin-config-helper-text {
+  color: rgba(245, 247, 255, 0.8);
+}
+
 .app-modal .btn-close {
   filter: invert(1) brightness(1.2);
   opacity: 0.85;

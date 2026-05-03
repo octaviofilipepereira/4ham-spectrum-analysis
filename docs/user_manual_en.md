@@ -623,6 +623,7 @@ Data auto-refreshes every **15 minutes** from NOAA SWPC.
 | **Retention** | Maximum event limit before auto-export+purge; number of recent events to keep; export directory |
 | **Authentication** | Change administrator password |
 | **SSB Voice Transcription** | Enable/disable Whisper ASR for SSB voice-to-text. Requires `openai-whisper` package |
+| **RTL recovery** | Shows the current RTL USB node, the bus/device address, and the recommended `usbreset` commands to recover the dongle when preview/waterfall stays stuck without frames |
 
 ### Admin Config panel — Buttons
 
@@ -637,6 +638,16 @@ Data auto-refreshes every **15 minutes** from NOAA SWPC.
 | **Purge invalid events** | Prompts for confirmation and deletes all incomplete or malformed occupancy and callsign events from the database (missing timestamp, invalid frequency, null/unknown callsign, etc.). Updates counters in the UI after completion |
 | **Reset defaults** | Prompts for confirmation and restores the application's default settings (active modes, summary options and other general settings). **Does not affect** saved events, custom bands, device configuration or audio configuration |
 | **Reset total** | ⚠️ Destructive. Prompts for confirmation and deletes **all** settings and custom bands from the database (`DELETE FROM settings`, `DELETE FROM bands`), clears the browser's localStorage and reloads the page. Equivalent to a clean installation state. Events are not affected |
+
+### RTL-SDR recovery with `usbreset`
+
+If the backend starts correctly but preview mode remains stuck in `Awaiting Spectrum Stream` and the waterfall does not move, the RTL can be wedged at USB/driver level. In that case, open **Admin Config** and inspect the **RTL recovery** block to confirm the current USB node and the exact reset command for the dongle.
+
+1. Stop the backend with `bash scripts/server_control.sh stop`.
+2. Run the command shown in Admin Config, for example `sudo usbreset 001/008` or `sudo usbreset 0bda:2838`.
+3. Start the backend again with `bash scripts/server_control.sh start`.
+
+Use this workflow only when a normal restart does not restore the waterfall. The bus/device address can change after unplugging, rebooting, or reconnecting the RTL, so always confirm the current value in **Admin Config** before running `usbreset`.
 
 ### Scan controls
 - **Start scanning / Stop scanning** — starts or stops the active scan

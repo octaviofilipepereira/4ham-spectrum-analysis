@@ -155,6 +155,15 @@ const audioTxGainInput = document.getElementById("audioTxGain");
 const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
 const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
+const rtlRecoverySection = document.getElementById("rtlRecoverySection");
+const rtlRecoveryBadge = document.getElementById("rtlRecoveryBadge");
+const rtlRecoveryDeviceName = document.getElementById("rtlRecoveryDeviceName");
+const rtlRecoveryDevicePath = document.getElementById("rtlRecoveryDevicePath");
+const rtlRecoveryBusDevice = document.getElementById("rtlRecoveryBusDevice");
+const rtlRecoveryCommand = document.getElementById("rtlRecoveryCommand");
+const rtlRecoveryVidPidCommand = document.getElementById("rtlRecoveryVidPidCommand");
+const rtlRecoveryAvailability = document.getElementById("rtlRecoveryAvailability");
+const rtlRecoverySequence = document.getElementById("rtlRecoverySequence");
 
 // NCDXF Beacon controller — initialised once DOM is ready
 let beaconController = null;
@@ -4018,6 +4027,65 @@ async function loadBands() {
   renderScanContextSummary(latestScanState);
 }
 
+function renderRtlRecoveryInfo(info) {
+  if (!rtlRecoverySection) {
+    return;
+  }
+
+  rtlRecoverySection.classList.remove("d-none");
+  const detected = Boolean(info?.detected);
+  const usbresetInstalled = Boolean(info?.usbreset_installed);
+  const stopCommand = info?.stop_command || "bash scripts/server_control.sh stop";
+  const startCommand = info?.start_command || "bash scripts/server_control.sh start";
+  const resetCommand = info?.usbreset_command || info?.usbreset_vid_pid_command || "sudo usbreset <bus/device>";
+
+  if (!detected) {
+    if (rtlRecoveryBadge) {
+      rtlRecoveryBadge.textContent = usbresetInstalled ? "RTL not detected" : "usbreset missing";
+      rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-secondary" : "badge bg-warning text-dark";
+    }
+    if (rtlRecoveryDeviceName) rtlRecoveryDeviceName.textContent = "No RTL USB device currently detected";
+    if (rtlRecoveryDevicePath) rtlRecoveryDevicePath.textContent = "-";
+    if (rtlRecoveryBusDevice) rtlRecoveryBusDevice.textContent = "-";
+    if (rtlRecoveryCommand) rtlRecoveryCommand.textContent = usbresetInstalled ? "sudo usbreset <bus/device>" : "usbreset not installed";
+    if (rtlRecoveryVidPidCommand) rtlRecoveryVidPidCommand.textContent = "-";
+    if (rtlRecoveryAvailability) {
+      rtlRecoveryAvailability.textContent = usbresetInstalled
+        ? "Connect the RTL and reopen Admin Config or click Refresh devices to resolve the current USB node."
+        : "The usbreset utility is not installed on the server.";
+    }
+    if (rtlRecoverySequence) {
+      rtlRecoverySequence.textContent = [stopCommand, "sudo usbreset <bus/device>", startCommand].join("\n");
+    }
+    return;
+  }
+
+  const deviceName = [info?.manufacturer, info?.product]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  if (rtlRecoveryBadge) {
+    rtlRecoveryBadge.textContent = usbresetInstalled ? "usbreset ready" : "usbreset missing";
+    rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-success" : "badge bg-warning text-dark";
+  }
+  if (rtlRecoveryDeviceName) {
+    rtlRecoveryDeviceName.textContent = deviceName || `${info?.vendor_id || ""}:${info?.product_id || ""}` || "RTL detected";
+  }
+  if (rtlRecoveryDevicePath) rtlRecoveryDevicePath.textContent = info?.device_path || "-";
+  if (rtlRecoveryBusDevice) rtlRecoveryBusDevice.textContent = info?.bus_device || "-";
+  if (rtlRecoveryCommand) rtlRecoveryCommand.textContent = info?.usbreset_command || "-";
+  if (rtlRecoveryVidPidCommand) rtlRecoveryVidPidCommand.textContent = info?.usbreset_vid_pid_command || "-";
+  if (rtlRecoveryAvailability) {
+    rtlRecoveryAvailability.textContent = usbresetInstalled
+      ? "Use this only when preview or scan stays stuck after restart and the waterfall keeps waiting for frames."
+      : "The RTL USB node was detected, but the usbreset utility is not installed on the server.";
+  }
+  if (rtlRecoverySequence) {
+    rtlRecoverySequence.textContent = [stopCommand, resetCommand, startCommand].join("\n");
+  }
+}
+
 async function loadSettings() {
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
@@ -4067,6 +4135,7 @@ async function loadSettings() {
       await refreshAdminAuthFields();
     }
     applyDeviceConfigToForm(data.device_config || {});
+    renderRtlRecoveryInfo(data.rtl_recovery || {});
     if (data.asr) {
       if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.checked = data.asr.enabled !== false;
       if (ssbAsrAvailableBadge) {
@@ -4664,8 +4733,9 @@ if (checkForUpdatesBtn) {
   });
 }
 
-refreshDevicesBtn.addEventListener("click", () => {
-  loadDevices();
+refreshDevicesBtn.addEventListener("click", async () => {
+  await loadDevices();
+  await loadSettings();
 });
 
 if (saveAsrSettingsBtn) {

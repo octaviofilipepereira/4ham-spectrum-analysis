@@ -771,6 +771,25 @@ Last update: 2026-02-22 16:27:19 UTC
                 <div id="adminSetupStatus" class="alert alert-success py-2 mb-0 d-none" role="status"></div>
                 <small class="text-muted">Este estado mostra o áudio guardado e é atualizado após "Auto-detect Device" ou "Auto-detect áudio".</small>
               </div>
+              <div class="col-12 d-none" id="rtlRecoverySection">
+                <div class="alert alert-warning py-2 mb-0" role="status">
+                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h3 class="h6 mb-0">RTL recovery</h3>
+                    <span id="rtlRecoveryBadge" class="badge bg-secondary">checking…</span>
+                  </div>
+                  <small class="d-block mt-2">If preview or waterfall stays stuck after restart, stop the backend, reset the current RTL USB device with <code>usbreset</code>, then start the backend again.</small>
+                  <div class="small mt-2"><strong>Detected RTL:</strong> <span id="rtlRecoveryDeviceName">-</span></div>
+                  <div class="small"><strong>USB device:</strong> <code id="rtlRecoveryDevicePath">-</code></div>
+                  <div class="small"><strong>Bus/device:</strong> <code id="rtlRecoveryBusDevice">-</code></div>
+                  <div class="small"><strong>Reset command:</strong> <code id="rtlRecoveryCommand">-</code></div>
+                  <div class="small"><strong>VID:PID fallback:</strong> <code id="rtlRecoveryVidPidCommand">-</code></div>
+                  <small id="rtlRecoveryAvailability" class="text-muted d-block mt-2"></small>
+                  <div class="small fw-semibold mt-2">Recovery sequence</div>
+                  <pre id="rtlRecoverySequence" class="small border rounded px-2 py-2 mb-0">bash scripts/server_control.sh stop
+sudo usbreset &lt;bus/device&gt;
+bash scripts/server_control.sh start</pre>
+                </div>
+              </div>
               <div class="col-12">
                 <div class="form-check mt-1">
                   <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
@@ -993,7 +1012,7 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12">
                 <h3 class="h6 mb-1">External Mirrors (push to remote PHP/MySQL)</h3>
-                <small class="d-block text-muted mb-2">
+                <small class="d-block admin-config-helper-text mb-2">
                   Push selected dashboard data (callsign &amp; occupancy events) to one or more remote PHP/MySQL hosts.
                   Tokens are bcrypt-hashed at rest and only shown once at creation/rotation. After 5 consecutive failures
                   a mirror is auto-disabled. Re-enabling clears the failure counter.

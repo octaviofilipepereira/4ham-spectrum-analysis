@@ -623,6 +623,7 @@ Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC
 | **Retention** | Limite máximo de eventos antes de auto-exportar+purge; número de eventos recentes a manter; diretório de exportação |
 | **Authentication** | Alterar password de administrador |
 | **SSB Voice Transcription** | Ativar/desativar Whisper ASR para SSB voice-to-text. Requer pacote `openai-whisper` |
+| **RTL recovery** | Mostra o nó USB actual do RTL, o endereço bus/device e os comandos `usbreset` recomendados para recuperar o dongle quando preview/cascata ficam presos sem frames |
 
 ### Painel Admin Config — Botões
 
@@ -637,6 +638,16 @@ Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC
 | **Purge invalid events** | Pede confirmação e elimina da base de dados todos os eventos de ocupação e callsign incompletos ou mal formados (sem timestamp, frequência inválida, callsign nulo/unknown, etc.). Atualiza os contadores no UI após a conclusão |
 | **Reset defaults** | Pede confirmação e repõe as definições padrão da aplicação (modos activos, opções de summary e outras configurações gerais). **Não afecta** eventos guardados, bandas customizadas, device configuration nem audio configuration |
 | **Reset total** | ⚠️ Destrutivo. Pede confirmação e elimina **todas** as definições e bandas customizadas da base de dados (`DELETE FROM settings`, `DELETE FROM bands`), limpa o localStorage do browser e recarrega a página. Equivale a estado de instalação limpa. Os eventos não são afectados |
+
+### Recuperação RTL-SDR com `usbreset`
+
+Se o backend arrancar mas o modo preview continuar preso em `Awaiting Spectrum Stream` e a cascata não mexer, o RTL pode ter ficado bloqueado a nível USB/driver. Nessa situação, abrir o **Admin Config** e consultar o bloco **RTL recovery** para confirmar o nó USB actual do dongle e o comando exacto a executar.
+
+1. Parar o backend com `bash scripts/server_control.sh stop`.
+2. Executar o comando indicado no Admin Config, por exemplo `sudo usbreset 001/008` ou `sudo usbreset 0bda:2838`.
+3. Voltar a arrancar o backend com `bash scripts/server_control.sh start`.
+
+Este procedimento só deve ser usado quando um restart normal não recupera a cascata. O endereço bus/device pode mudar depois de desligar, reiniciar ou voltar a ligar o RTL, por isso convém confirmar sempre o valor actual no **Admin Config** antes de correr `usbreset`.
 
 ### Controlos de scan
 - **Start scanning / Stop scanning** — inicia ou para o scan ativo
