@@ -318,14 +318,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <!-- Recent activity heatmap (separate from live matrix) -->
                   <div class="beacon-history mt-4">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                      <h3 class="h6 mb-0 text-light">Recent activity &mdash; last
-                        <select id="beaconHistoryHours" class="form-select form-select-sm d-inline-block" style="width:auto">
-                          <option value="0.5">30 min</option>
-                          <option value="1">1 h</option>
-                          <option value="2" selected>2 h</option>
-                          <option value="6">6 h</option>
-                          <option value="24">24 h</option>
-                        </select>
+                      <h3 class="h6 mb-0 text-light">Recent activity &mdash; last 12 h
                         <small class="text-muted ms-2">(historical &mdash; not the current slot state)</small>
                       </h3>
                       <button class="btn btn-sm btn-outline-secondary" id="beaconHistoryRefresh" type="button" title="Refresh history">&#x21BB;</button>
@@ -347,7 +340,7 @@ Last update: 2026-02-22 16:27:19 UTC
                         </tbody>
                       </table>
                     </div>
-                    <small class="text-muted">Cell shows one coherent best detected pass in the window: top meter = best 100 W reference, bottom meter = best ordered sequence from that same pass, footer = confirmed IDs and detections/monitored slots. Orange cells were monitored with no detections; dot = never monitored in the window.</small>
+                    <small class="text-muted">Recent activity is always a rolling 12-hour window. Each cell shows one coherent best detected pass in that window. Use the info icon inside a cell for the detailed 12-hour view with richer history and pass-level visuals.</small>
                   </div>
                 </div><!-- /.beacon-panel -->
               </div><!-- /#beaconArea -->
@@ -521,17 +514,51 @@ timedatectl timesync-status</pre>
       </div>
     </div>
 
-    <div class="modal fade app-modal" id="beaconHistoryInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconHistoryInfoModalLabel">
-      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal fade app-modal beacon-history-info-modal" id="beaconHistoryInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconHistoryInfoModalLabel">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
             <h2 class="modal-title h5" id="beaconHistoryInfoModalLabel">Beacon recent activity details</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div id="beaconHistoryInfoWindow" class="small text-info fw-semibold mb-1">-</div>
-            <p id="beaconHistoryInfoSummary" class="small text-white mb-3">-</p>
-            <div id="beaconHistoryInfoRecords" class="small">Loading details…</div>
+            <div class="beacon-history-info-modal__hero mb-4">
+              <div>
+                <div id="beaconHistoryInfoWindow" class="small text-info fw-semibold mb-1">-</div>
+                <p id="beaconHistoryInfoSummary" class="small text-white mb-0">-</p>
+              </div>
+            </div>
+
+            <div id="beaconHistoryInfoStats" class="beacon-history-info-modal__stats mb-4"></div>
+
+            <div class="beacon-history-info-modal__charts mb-4">
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Copy mix</div>
+                <div class="beacon-history-info-panel__subtext">Rolling 12-hour split between confirmed, detected-only, and no-copy monitored slots.</div>
+                <div id="beaconHistoryInfoMixChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Recent rhythm</div>
+                <div class="beacon-history-info-panel__subtext">Older to newer monitored passes, colour-coded by copy quality.</div>
+                <div id="beaconHistoryInfoDetectionChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">100 W SNR trend</div>
+                <div class="beacon-history-info-panel__subtext">Reference-dash strength across the latest monitored passes in this cell.</div>
+                <div id="beaconHistoryInfoSnrChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Dash sequence trend</div>
+                <div class="beacon-history-info-panel__subtext">Ordered dash copy from `0/4` to `4/4` across the same pass history.</div>
+                <div id="beaconHistoryInfoDashChart"></div>
+              </section>
+            </div>
+
+            <div class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Latest monitored passes</div>
+              <div class="beacon-history-info-panel__subtext">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
+              <div id="beaconHistoryInfoRecords" class="small mt-3">Loading details…</div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
@@ -1622,7 +1649,7 @@ bash scripts/server_control.sh start</pre>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260503142000"></script>
+    <script type="module" src="app.js?v=20260503154800"></script>
 
   <!-- ╔══════════════════════════════════════════════════════════════════════╗
        ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║

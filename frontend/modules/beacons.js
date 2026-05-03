@@ -34,6 +34,8 @@ const BEACONS = [
 const SLOT_SECONDS = 10;
 const SLOTS_PER_CYCLE = 18;
 const CYCLE_MS = SLOT_SECONDS * SLOTS_PER_CYCLE * 1000;
+const HISTORY_WINDOW_HOURS = 12;
+const HISTORY_MODAL_LIMIT = 24;
 
 class BeaconController {
   constructor() {
@@ -70,9 +72,13 @@ class BeaconController {
     this._historyInfoModalEl = document.getElementById("beaconHistoryInfoModal");
     this._historyInfoWindow = document.getElementById("beaconHistoryInfoWindow");
     this._historyInfoSummary = document.getElementById("beaconHistoryInfoSummary");
+    this._historyInfoStats = document.getElementById("beaconHistoryInfoStats");
+    this._historyInfoMixChart = document.getElementById("beaconHistoryInfoMixChart");
+    this._historyInfoDetectionChart = document.getElementById("beaconHistoryInfoDetectionChart");
+    this._historyInfoSnrChart = document.getElementById("beaconHistoryInfoSnrChart");
+    this._historyInfoDashChart = document.getElementById("beaconHistoryInfoDashChart");
     this._historyInfoRecords = document.getElementById("beaconHistoryInfoRecords");
     this._historyBody    = document.getElementById("beaconHistoryBody");
-    this._historyHours   = document.getElementById("beaconHistoryHours");
     this._historyRefresh = document.getElementById("beaconHistoryRefresh");
     this._historyTimer   = null;
     this._historyCells   = new Map();
@@ -318,7 +324,7 @@ class BeaconController {
 
   async _loadHistory() {
     if (!this._historyBody) return;
-    const hours = parseFloat(this._historyHours?.value || "2") || 2;
+    const hours = HISTORY_WINDOW_HOURS;
     const requestSeq = ++this._historyLoadSeq;
     try {
       const r = await fetch(`/api/beacons/heatmap?hours=${encodeURIComponent(hours)}`, { cache: "no-store" });
@@ -343,7 +349,7 @@ class BeaconController {
       rows.push(`<tr>${cells}</tr>`);
     }
     if (!rows.length) {
-      this._historyBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted small py-3">No data in last ${hours} h</td></tr>`;
+      this._historyBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted small py-3">No data in last ${formatHistoryWindow(hours)}</td></tr>`;
       return;
     }
     this._historyBody.innerHTML = rows.join("");
@@ -405,7 +411,7 @@ class BeaconController {
 
   _renderHistoryInfoModal(detail) {
     if (this._historyInfoWindow) {
-      this._historyInfoWindow.textContent = `${detail.callsign} — ${detail.location} · ${detail.band} · last ${formatHistoryWindow(detail.hours)}`;
+      this._historyInfoWindow.textContent = `${detail.callsign} — ${detail.location} · ${detail.band} · rolling ${formatHistoryWindow(detail.hours)}`;
     }
     if (!this._historyInfoSummary) {
       return;
@@ -423,9 +429,30 @@ class BeaconController {
     const latest = formatUtcTimestamp(cell.latest_detected_utc);
     if (detections <= 0) {
       this._historyInfoSummary.textContent = `Monitored ${total} slot(s) in the selected window. No detected passes were recorded for this cell.`;
+      this._renderHistoryInfoVisuals(detail, []);
       return;
     }
     this._historyInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). Confirmed CW IDs: ${confirmed}. Best pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
+    this._renderHistoryInfoVisuals(detail, []);
+  }
+
+  _renderHistoryInfoVisuals(detail, observations) {
+    const cell = detail.cell || {};
+    if (this._historyInfoStats) {
+      this._historyInfoStats.innerHTML = renderHistoryInfoStats(detail, observations);
+    }
+    if (this._historyInfoMixChart) {
+      this._historyInfoMixChart.innerHTML = renderHistoryMixChart(cell);
+    }
+    if (this._historyInfoDetectionChart) {
+      this._historyInfoDetectionChart.innerHTML = renderHistoryRhythmChart(observations);
+    }
+    if (this._historyInfoSnrChart) {
+      this._historyInfoSnrChart.innerHTML = renderHistoryMetricChart(observations, "snr");
+    }
+    if (this._historyInfoDashChart) {
+      this._historyInfoDashChart.innerHTML = renderHistoryMetricChart(observations, "dash");
+    }
   }
 
   async _openHistoryInfo(detailKey) {
@@ -452,7 +479,7 @@ class BeaconController {
       callsign: detail.callsign,
       band: detail.band,
       hours: String(detail.hours),
-      limit: "12",
+      limit: String(HISTORY_MODAL_LIMIT),
     });
     try {
       const response = await fetch(`/api/beacons/observations?${params.toString()}`, { cache: "no-store" });
@@ -463,7 +490,9 @@ class BeaconController {
       if (requestSeq !== this._historyInfoSeq) {
         return;
       }
-      this._renderHistoryInfoRows(Array.isArray(payload?.observations) ? payload.observations : []);
+      const observations = Array.isArray(payload?.observations) ? payload.observations : [];
+      this._renderHistoryInfoVisuals(detail, observations);
+      this._renderHistoryInfoRows(observations);
     } catch (_) {
       if (requestSeq !== this._historyInfoSeq) {
         return;
@@ -479,33 +508,31 @@ class BeaconController {
       return;
     }
     if (!observations.length) {
-      this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows matched this cell in the selected window.</div>';
+      this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows matched this cell in the rolling 12-hour window.</div>';
       return;
     }
     const rows = observations.map((obs) => {
-      const detected = obs.detected ? "yes" : "no";
-      const confirmed = obs.id_confirmed ? `yes (${formatConfidence(obs.id_confidence)})` : "no";
       const snr = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
       const dashes = `${Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))))}/4`;
       const drift = Number.isFinite(Number(obs.drift_ms)) ? `${Math.round(Number(obs.drift_ms))} ms` : "n/a";
       return `<tr>
         <td>${escapeHtml(formatUtcTimestamp(obs.slot_start_utc))}</td>
-        <td>${escapeHtml(detected)}</td>
-        <td>${escapeHtml(confirmed)}</td>
-        <td>${escapeHtml(snr)}</td>
-        <td>${escapeHtml(dashes)}</td>
-        <td>${escapeHtml(drift)}</td>
+        <td>${renderHistoryStateBadge(obs)}</td>
+        <td>${renderHistoryConfirmBadge(obs)}</td>
+        <td>${renderHistoryRowMetric(obs, "snr")}</td>
+        <td>${renderHistoryRowMetric(obs, "dash")}</td>
+        <td><span class="beacon-history-drift-chip">${escapeHtml(drift)}</span></td>
       </tr>`;
     });
-    this._historyInfoRecords.innerHTML = `<div class="table-responsive">
-      <table class="table table-sm table-dark align-middle mb-0">
+    this._historyInfoRecords.innerHTML = `<div class="table-responsive beacon-history-info-table-wrap">
+      <table class="table table-sm table-dark align-middle mb-0 beacon-history-info-table">
         <thead>
           <tr>
             <th>UTC slot</th>
-            <th>Detected</th>
+            <th>Copy</th>
             <th>CW ID</th>
-            <th>100 W</th>
-            <th>Seq</th>
+            <th>100 W profile</th>
+            <th>Sequence profile</th>
             <th>Drift</th>
           </tr>
         </thead>
@@ -789,7 +816,6 @@ class BeaconController {
 
   _bindUI() {
     // History controls
-    this._historyHours?.addEventListener("change", () => this._loadHistory());
     this._historyRefresh?.addEventListener("click", () => this._loadHistory());
     this._historyBody?.addEventListener("click", (event) => {
       const trigger = event.target.closest("[data-beacon-history-info]");
@@ -914,6 +940,143 @@ function renderBeaconCellTitle(obs) {
 
 function renderHistoryInfoButton(detailKey, detail) {
   return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}">i</button>`;
+}
+
+function renderHistoryInfoStats(detail, observations) {
+  const cell = detail.cell || {};
+  const total = Number(cell.total_slots || 0);
+  const detections = Number(cell.detections || 0);
+  const confirmed = Number(cell.id_confirmed || 0);
+  const detectionRate = total > 0 ? `${Math.round((detections / total) * 100)}%` : "0%";
+  const confirmationRate = detections > 0 ? `${Math.round((confirmed / detections) * 100)}%` : "0%";
+  const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+  const bestSeq = `${Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))))}/4`;
+  const latest = formatUtcTimestamp(cell.latest_detected_utc);
+  const cards = [
+    { label: "Window", value: formatHistoryWindow(detail.hours), note: "Fixed rolling view" },
+    { label: "Coverage", value: `${total} slot(s)`, note: `${detectionRate} with copy` },
+    { label: "CW ID quality", value: `${confirmed} confirmed`, note: `${confirmationRate} of detected passes` },
+    { label: "Best pass", value: `${bestSnr} · ${bestSeq}`, note: formatUtcTimestamp(cell.best_detected_utc) },
+    { label: "Latest detected", value: latest, note: `${observations.length} latest monitored rows loaded` },
+  ];
+  return cards.map((card) => `
+    <div class="beacon-history-info-stat">
+      <div class="beacon-history-info-stat__label">${escapeHtml(card.label)}</div>
+      <div class="beacon-history-info-stat__value">${escapeHtml(card.value)}</div>
+      <div class="beacon-history-info-stat__note">${escapeHtml(card.note)}</div>
+    </div>
+  `).join("");
+}
+
+function renderHistoryMixChart(cell) {
+  const total = Number(cell.total_slots || 0);
+  if (total <= 0) {
+    return '<div class="beacon-history-chart__empty">No monitored slots in the rolling 12-hour window.</div>';
+  }
+  const detections = Math.max(0, Number(cell.detections || 0));
+  const confirmed = Math.max(0, Number(cell.id_confirmed || 0));
+  const detectedOnly = Math.max(detections - confirmed, 0);
+  const noCopy = Math.max(total - detections, 0);
+  return `<div class="beacon-history-mix">
+    <div class="beacon-history-mix__bar" role="img" aria-label="Copy mix across the rolling 12-hour window">
+      <span class="beacon-history-mix__seg beacon-history-mix__seg--confirmed" style="width:${pct(confirmed, total)}%"></span>
+      <span class="beacon-history-mix__seg beacon-history-mix__seg--detected" style="width:${pct(detectedOnly, total)}%"></span>
+      <span class="beacon-history-mix__seg beacon-history-mix__seg--nocopy" style="width:${pct(noCopy, total)}%"></span>
+    </div>
+    <div class="beacon-history-mix__legend">
+      ${renderMixLegendItem("Confirmed", confirmed, total, "confirmed")}
+      ${renderMixLegendItem("Detected only", detectedOnly, total, "detected")}
+      ${renderMixLegendItem("No copy", noCopy, total, "nocopy")}
+    </div>
+  </div>`;
+}
+
+function renderHistoryRhythmChart(observations) {
+  if (!observations.length) {
+    return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
+  }
+  const bars = observations.slice().reverse().map((obs) => {
+    const cls = obs.id_confirmed ? "confirmed" : (obs.detected ? "detected" : "nocopy");
+    const height = obs.id_confirmed ? 100 : (obs.detected ? 72 : 26);
+    const title = `${formatUtcTimestamp(obs.slot_start_utc)} | ${obs.id_confirmed ? "CW ID confirmed" : (obs.detected ? "Detected copy" : "No copy")}`;
+    return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${escapeHtml(title)}"></span>`;
+  }).join("");
+  return `<div class="beacon-history-rhythm">
+    <div class="beacon-history-rhythm__bars">${bars}</div>
+    <div class="beacon-history-chart__caption">Older on the left, newer on the right. Green = confirmed, blue = detected, amber = monitored with no copy.</div>
+  </div>`;
+}
+
+function renderHistoryMetricChart(observations, kind) {
+  if (!observations.length) {
+    return '<div class="beacon-history-chart__empty">No monitored rows loaded yet for this chart.</div>';
+  }
+  const reversed = observations.slice().reverse();
+  const maxValue = kind === "snr"
+    ? Math.max(6, ...reversed.map((obs) => Math.max(0, Number(obs.snr_db_100w || 0))))
+    : 4;
+  const bars = reversed.map((obs) => {
+    const rawValue = kind === "snr"
+      ? Math.max(0, Number(obs.snr_db_100w || 0))
+      : Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+    const pctHeight = maxValue > 0 ? Math.max(8, Math.round((rawValue / maxValue) * 100)) : 8;
+    const title = kind === "snr"
+      ? `${formatUtcTimestamp(obs.slot_start_utc)} | 100 W reference ${Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a"}`
+      : `${formatUtcTimestamp(obs.slot_start_utc)} | Dash copy ${rawValue}/4`;
+    const cls = obs.detected ? "live" : "muted";
+    return `<span class="beacon-history-metric__bar beacon-history-metric__bar--${cls}" style="height:${pctHeight}%" title="${escapeHtml(title)}"></span>`;
+  }).join("");
+  const caption = kind === "snr"
+    ? "100 W reference-dash intensity across the latest monitored passes."
+    : "Ordered dash-copy quality across the same pass history.";
+  return `<div class="beacon-history-metric">
+    <div class="beacon-history-metric__bars">${bars}</div>
+    <div class="beacon-history-chart__caption">${escapeHtml(caption)}</div>
+  </div>`;
+}
+
+function renderHistoryStateBadge(obs) {
+  const text = obs.id_confirmed ? "Confirmed" : (obs.detected ? "Detected" : "No copy");
+  const cls = obs.id_confirmed ? "confirmed" : (obs.detected ? "detected" : "nocopy");
+  return `<span class="beacon-history-state-chip beacon-history-state-chip--${cls}">${escapeHtml(text)}</span>`;
+}
+
+function renderHistoryConfirmBadge(obs) {
+  if (!obs.id_confirmed) {
+    return '<span class="beacon-history-confirm-chip beacon-history-confirm-chip--no">No CW ID</span>';
+  }
+  return `<span class="beacon-history-confirm-chip beacon-history-confirm-chip--yes">CW ID ${escapeHtml(formatConfidence(obs.id_confidence))}</span>`;
+}
+
+function renderHistoryRowMetric(obs, kind) {
+  if (kind === "snr") {
+    const value = Number(obs.snr_db_100w);
+    const width = Number.isFinite(value) ? Math.max(6, Math.min(100, Math.round((Math.max(0, value) / 6) * 100))) : 6;
+    const label = Number.isFinite(value) ? `${value.toFixed(1)} dB` : "n/a";
+    return `<div class="beacon-history-rowmetric">
+      <span class="beacon-history-rowmetric__bar"><span class="beacon-history-rowmetric__fill" style="width:${width}%"></span></span>
+      <span class="beacon-history-rowmetric__label">${escapeHtml(label)}</span>
+    </div>`;
+  }
+  const dashes = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+  return `<div class="beacon-history-rowmetric beacon-history-rowmetric--sequence">
+    ${renderBeaconMeter(dashes, dashes > 0 ? "success" : "nocopy")}
+    <span class="beacon-history-rowmetric__label">${escapeHtml(`${dashes}/4`)}</span>
+  </div>`;
+}
+
+function renderMixLegendItem(label, value, total, variant) {
+  return `<div class="beacon-history-mix__legend-item">
+    <span class="beacon-history-mix__legend-dot beacon-history-mix__legend-dot--${variant}"></span>
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(`${value}`)}</strong>
+    <span class="text-muted">${escapeHtml(`${pct(value, total)}%`)}</span>
+  </div>`;
+}
+
+function pct(value, total) {
+  if (!Number.isFinite(Number(total)) || Number(total) <= 0) return 0;
+  return Math.round((Number(value) / Number(total)) * 100);
 }
 
 function formatHistoryWindow(hours) {
