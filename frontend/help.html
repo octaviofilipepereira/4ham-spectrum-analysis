@@ -219,6 +219,8 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li>Uses a UTC-aligned scheduler instead of the normal scan sweep.</li>
       <li>Shows a live 18×5 matrix with one row per beacon and one column per band.</li>
       <li>Shows a separate <strong>Recent activity</strong> heatmap for a fixed rolling 12-hour window.</li>
+      <li>Keeps the propagation card visible in Beacon mode, but switches it to a Beacon-native globe with the latest confirmed detections.</li>
+      <li>Computes a Beacon propagation summary per band plus a global median score.</li>
       <li>Blocks startup when host time cannot be validated safely enough for exact slot alignment.</li>
     </ul>
 
@@ -231,6 +233,8 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li>Click <strong>Stop</strong> to stop the scheduler and release the scan engine.</li>
     </ol>
 
+    <p>If you hard-refresh the same browser tab while Beacon mode is open, 4ham returns directly to the Beacon panel instead of going back to the standard startup layout.</p>
+
     <div class="warn-box">
       <strong>Important:</strong> While Beacon Analysis is running, the scheduler owns the scan engine. Normal band buttons and other scan modes are intentionally disabled.
     </div>
@@ -242,6 +246,9 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><strong>Meter rows</strong> — top row is the 100 W reference dash strength; bottom row is the ordered dash sequence heard from 0 to 4.</li>
       <li><strong>No copy</strong> — the orange no-copy bar means that slot was monitored but no reliable copy was obtained.</li>
       <li><strong>Recent activity</strong> — the lower table is always a rolling 12-hour view and shows the best detected pass per cell, not the current live slot state.</li>
+      <li><strong>Events button</strong> — each history cell opens the detailed rows for that beacon/band, including <code>Detected</code>, <code>Weak trace</code>, and <code>No copy</code>.</li>
+      <li><strong>Beacon map</strong> — shows confirmed detections only, drawn in near real time from your QTH to the corresponding beacon; hover shows the latest available detection for that beacon.</li>
+      <li><strong>Beacon score</strong> — shows per-band scores computed from Beacon observations plus a global score based on the median of the monitored bands.</li>
     </ul>
 
     <h3 class="sub-title">Public Beacon Semantics</h3>
@@ -262,38 +269,52 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       </tbody>
     </table>
 
-    <h3 class="sub-title">Planned Beacon Propagation Score</h3>
-    <p>The Beacon Propagation Score is defined for future Beacon analytics/export and is not yet part of the current Beacon panel.</p>
+    <h3 class="sub-title">Beacon Map and Propagation Score</h3>
+    <p>The Beacon panel now includes its own Beacon-native map and Beacon-native propagation score, without replacing the generic map used by the other modes.</p>
+
+    <p>Map behavior:</p>
+    <ul>
+      <li>Uses <strong>confirmed detections only</strong>; <code>Weak trace</code> does not draw an arc on the globe.</li>
+      <li>Keeps, for each beacon, the <strong>latest confirmed detection</strong> inside the selected map window.</li>
+      <li>Hover shows callsign, location, band, UTC time of the latest detection, 100 W SNR, heard dashes, and approximate distance to your QTH.</li>
+      <li>While you are hovering, dragging, or zooming, refreshes are deferred so the current view does not jump back to the default zoom/orientation.</li>
+    </ul>
+
+    <p>Score behavior:</p>
+    <ul>
+      <li>Each band uses a <strong>60-minute</strong> rolling window; if no useful data exists there, the UI falls back to <strong>24 hours</strong>.</li>
+      <li><code>Weak trace</code> means positive energy on the 100 W dash without crossing the <code>Detected</code> threshold; it contributes partially to the score, but not to the globe and not to the binary recent-activity aggregate.</li>
+      <li>The global Beacon score is the <strong>median</strong> of the band scores that actually contain monitored observations.</li>
+    </ul>
+
     <table class="manual-table">
       <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
       <tbody>
-        <tr><td><code>W</code></td><td>Window in minutes</td></tr>
-        <tr><td><code>E(W)</code></td><td>Expected slots per cell in that window</td></tr>
-        <tr><td><code>M</code></td><td>Observed coverage (<strong>Coverage</strong>)</td></tr>
-        <tr><td><code>D</code></td><td>Detected slots (<strong>Detected</strong>)</td></tr>
-        <tr><td><code>C</code></td><td>Coverage confidence factor</td></tr>
-        <tr><td><code>R</code></td><td>Positive observation rate</td></tr>
-        <tr><td><code>S</code></td><td>Normalised median <code>100 W SNR</code> across detected slots</td></tr>
-        <tr><td><code>B</code></td><td>Best detected-pass quality</td></tr>
+        <tr><td><code>W</code></td><td>Rolling window in minutes used for the band score</td></tr>
+        <tr><td><code>D_r</code></td><td>Detection rate = <code>Detected / Monitored</code></td></tr>
+        <tr><td><code>W_r</code></td><td><code>Weak trace</code> rate = <code>Weak / Monitored</code></td></tr>
+        <tr><td><code>T</code></td><td>Trace component = <code>min(1, D_r + 0.35 × W_r)</code></td></tr>
+        <tr><td><code>S</code></td><td>Normalised median <code>100 W SNR</code> = <code>clip((median_snr_100W - 3) / 18, 0, 1)</code></td></tr>
+        <tr><td><code>B</code></td><td>Median dash quality = <code>median_dashes / 4</code></td></tr>
+        <tr><td><code>Q</code></td><td>Recency component = <code>clip(1 - age_latest_meaningful / W, 0, 1)</code></td></tr>
       </tbody>
     </table>
-    <pre class="small border rounded px-2 py-2 mb-3">E(W) = W / 15
+    <pre class="small border rounded px-2 py-2 mb-3">T = min(1, D_r + 0.35 × W_r)
 
-C = sqrt(min(1, M / E(W)))
+S = clip((median_snr_100W - 3) / 18, 0, 1)
 
-R = D / M
+B = median_dashes / 4
 
-S = clip((median_snr_100W + 3) / 9, 0, 1)
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
 
-B = 0.5 * (best_dashes / 4)
-  + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
 
-P = 0                                  if D = 0
-P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  if D &gt; 0</pre>
+GlobalScore = median(BandScore_i across bands with monitored slots)</pre>
     <ul>
       <li><code>clip(x, 0, 1)</code> limits the value to the <code>[0, 1]</code> range.</li>
-      <li><code>median_snr_100W</code> uses detected slots only.</li>
-      <li><strong>No copy</strong> is shown publicly but is not added to the score again, because it is already represented by <code>R = D / M</code>.</li>
+      <li><code>median_snr_100W</code> uses <code>Detected</code> slots first; if none exist, it falls back to the band's <code>Weak trace</code> rows.</li>
+      <li><code>age_latest_meaningful</code> measures the age of the latest useful observation (<code>Detected</code> or <code>Weak trace</code>) inside the window.</li>
+      <li><strong>No copy</strong> remains visible publicly, but enters the score only indirectly by lowering <code>D_r</code> and <code>W_r</code>.</li>
     </ul>
 
     <h3 class="sub-title">Time Validation Before Startup</h3>
@@ -945,6 +966,11 @@ chronyc sources -v</pre>
       The propagation map is an orthographic 3D globe centred on your QTH, embedded in the
       <strong>Academic Analytics</strong> dashboard. It combines two data layers: band-by-band
       ionospheric zone predictions from NOAA SWPC, and your actual confirmed SDR contacts.
+    </p>
+    <p>
+      When the active mode is <strong>Beacon / NCDXF</strong>, this same card switches to the Beacon globe:
+      it shows only the latest confirmed detection per beacon inside the selected time window and preserves
+      zoom/orientation while the operator is inspecting the map.
     </p>
 
     <h3 class="sub-title">Map elements</h3>

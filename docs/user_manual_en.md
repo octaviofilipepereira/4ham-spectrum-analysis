@@ -238,6 +238,8 @@ Each slot sends:
 
 This module exists to measure real propagation between your station and a stable set of beacons distributed around the world.
 
+While this mode is active, the propagation card remains visible but switches to a Beacon-specific globe, separate from the generic map used by the other modes.
+
 ### How to use it in the panel
 
 1. Click **📻 NCDXF — Beacon Monitor** in the mode bar.
@@ -245,6 +247,8 @@ This module exists to measure real propagation between your station and a stable
 3. 4ham first validates the host time state.
 4. If validation passes, the scheduler takes control of the scan engine.
 5. Click **Stop** to stop the module and release the scan engine.
+
+If you hard-refresh the same browser tab while Beacon mode is open, 4ham returns directly to this panel instead of falling back to the standard startup layout.
 
 Important:
 - while Beacon Analysis is active, the normal scan controls are intentionally locked
@@ -258,6 +262,9 @@ Important:
 - **Bottom meter**: ordered dash sequence heard, from 0 to 4.
 - **No copy**: means the slot was monitored but no reliable copy was obtained.
 - **Recent activity**: always uses a rolling 12-hour window and shows the best detected pass per cell; it is not the current live slot state.
+- **Events button**: each history cell opens detailed rows for that beacon/band, including the `Detected`, `Weak trace`, and `No copy` states.
+- **Beacon map**: shows confirmed detections only, plotted in near real time between your QTH and the corresponding beacon; hover shows the latest available detection for that beacon.
+- **Beacon score**: shows per-band scores computed from Beacon observations plus a global score obtained from the median of the monitored bands.
 
 ### Public Beacon semantics
 
@@ -274,41 +281,50 @@ Internal engineering diagnostics still exist in the system, but they do not ente
 | `100 W SNR` | Strength of the 100 W reference dash in the observed slot. |
 | `Best pass` | Best detected pass in the window, ranked first by ordered dash sequence and then by 100 W dash SNR. |
 
-### Planned Propagation Score model
+### Beacon Map and Propagation Score
 
-The **Beacon Propagation Score** is defined for future Beacon analytics/export and is not yet part of the current Beacon panel.
+The Beacon panel now includes its own Beacon-native map and Beacon-native propagation score, without replacing the generic map used by the other modes.
+
+Map behavior:
+- uses **confirmed detections only**; `Weak trace` does not draw an arc on the globe
+- keeps, for each beacon, the **latest confirmed detection** inside the selected map window
+- hover shows callsign, location, band, UTC time of the latest detection, 100 W SNR, heard dashes, and approximate distance to your QTH
+- while you are hovering, dragging, or zooming, refreshes are deferred so the current view does not jump back to the default zoom/orientation
+
+Score behavior:
+- each band uses a **60-minute** rolling window; if no useful data exists there, the UI falls back to **24 hours**
+- `Weak trace` means positive energy on the 100 W dash without crossing the `Detected` threshold; it contributes partially to the score, but not to the globe and not to the binary recent-activity aggregate
+- the global Beacon score is the **median** of the band scores that actually contain monitored observations
 
 | Symbol | Meaning |
 |---|---|
-| `W` | window in minutes |
-| `E(W)` | expected slots per cell in that window |
-| `M` | observed coverage (`Coverage`) |
-| `D` | detected slots (`Detected`) |
-| `C` | coverage confidence factor |
-| `R` | positive observation rate |
-| `S` | normalised median `100 W SNR` across detected slots |
-| `B` | best detected-pass quality |
+| `W` | rolling window in minutes used for the band score |
+| `D_r` | detection rate = `Detected / Monitored` |
+| `W_r` | `Weak trace` rate = `Weak / Monitored` |
+| `T` | trace component = `min(1, D_r + 0.35 × W_r)` |
+| `S` | normalised median `100 W SNR` = `clip((median_snr_100W - 3) / 18, 0, 1)` |
+| `B` | median dash quality = `median_dashes / 4` |
+| `Q` | recency component = `clip(1 - age_latest_meaningful / W, 0, 1)` |
 
 ```text
-E(W) = W / 15
+T = min(1, D_r + 0.35 × W_r)
 
-C = sqrt(min(1, M / E(W)))
+S = clip((median_snr_100W - 3) / 18, 0, 1)
 
-R = D / M
+B = median_dashes / 4
 
-S = clip((median_snr_100W + 3) / 9, 0, 1)
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
 
-B = 0.5 * (best_dashes / 4)
-   + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
 
-P = 0                                  if D = 0
-P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  if D > 0
+GlobalScore = median(BandScore_i across bands with monitored slots)
 ```
 
 Notes:
 - `clip(x, 0, 1)` limits the value to the `[0, 1]` range.
-- `median_snr_100W` uses detected slots only.
-- `No copy` is shown publicly but is not added to the score again, because it is already represented by `R = D / M`.
+- `median_snr_100W` uses `Detected` slots first; if none exist, it falls back to the band's `Weak trace` rows.
+- `age_latest_meaningful` measures the age of the latest useful observation (`Detected` or `Weak trace`) inside the window.
+- `No copy` remains visible publicly, but enters the score only indirectly by lowering `D_r` and `W_r`.
 
 ### Time validation before startup
 
@@ -660,6 +676,8 @@ Events outside the selected window are not shown on the map. This allows focusin
 ### Overview
 
 The propagation map is an orthographic 3D globe centred on your QTH, rendered with D3.js inside the Academic Analytics dashboard. It combines two data layers:
+
+When the active mode is **Beacon / NCDXF**, this same card switches to the Beacon globe: it shows only the latest confirmed detection per beacon inside the selected time window and preserves zoom/orientation while the operator is inspecting the map.
 
 1. **Ionospheric zone predictions** — band-by-band predicted propagation coverage, derived in real time from NOAA SWPC solar/geomagnetic indices via a calibrated ionospheric model.
 2. **Confirmed SDR contacts** — callsign-confirmed decodes from your SDR sessions, plotted as dots and great-circle arcs to the decoded station's grid locator position.

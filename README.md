@@ -36,7 +36,9 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 - Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
 
 ## Beacon Analysis - NCDXF/IARU
-4ham includes a dedicated Beacon Analysis mode for the NCDXF International Beacon Network. It monitors 18 fixed beacons on the 20 m, 17 m, 15 m, 12 m, and 10 m bands using strict 10-second UTC slots, with a live 18x5 matrix for the current monitored pass and a separate recent-activity heatmap for historical observation.
+4ham includes a dedicated Beacon Analysis mode for the NCDXF International Beacon Network. It monitors 18 fixed beacons on the 20 m, 17 m, 15 m, 12 m, and 10 m bands using strict 10-second UTC slots, with a live 18x5 matrix for the current monitored pass, a separate recent-activity heatmap for historical observation, and a Beacon-native propagation globe shown in parallel with the normal propagation card.
+
+In BEACON/NCDXF mode, the propagation card switches from the generic contacts feed to the latest confirmed beacon detections inside the selected map window. Hover shows the latest detection details for each beacon, and refreshes preserve the current zoom/orientation while the operator is interacting with the globe. Beacon propagation scoring is now computed from Beacon observations per band, with a global score derived as the median of the monitored band scores. If the page is hard-refreshed in the same browser tab while Beacon mode is active, 4ham restores the Beacon panel instead of returning to the standard startup layout.
 
 Beacon Analysis uses its own UTC-aligned scheduler, so the normal scan engine is intentionally locked while the module is running. Before startup, 4ham validates host time quality. `healthy` allows startup; `degraded` and `offline` block startup to avoid false observations. The operating system timezone itself does not need to be UTC; what matters is correct absolute time and an active synchronization source.
 

@@ -238,6 +238,8 @@ Cada slot transmite:
 
 Este módulo existe para medir propagação real entre a tua estação e um conjunto estável de beacons distribuídos pelo mundo.
 
+Enquanto este modo está activo, o card de propagação continua visível mas passa para um globo Beacon específico, independente do mapa genérico usado pelos restantes modos.
+
 ### Como usar no painel
 
 1. Clicar em **📻 NCDXF — Beacon Monitor** na barra de modos.
@@ -245,6 +247,8 @@ Este módulo existe para medir propagação real entre a tua estação e um conj
 3. O 4ham valida primeiro o estado temporal do host.
 4. Se a validação passar, o scheduler toma controlo do scan engine.
 5. Clicar em **Stop** para parar o módulo e libertar o scan engine.
+
+Se fizeres hard refresh na mesma tab enquanto o modo Beacon está aberto, o 4ham volta directamente a este painel em vez de regressar ao arranque standard.
 
 Importante:
 - enquanto o Beacon Analysis está activo, os controlos normais de scan ficam bloqueados
@@ -258,6 +262,9 @@ Importante:
 - **Bottom meter**: sequência ordenada de dashes ouvidas, de 0 a 4.
 - **No copy**: significa que o slot foi monitorizado mas não houve cópia fiável.
 - **Recent activity**: usa sempre uma janela rolling de 12 horas e mostra o melhor passe detectado por célula; não representa o slot live actual.
+- **Botão Events**: em cada célula do histórico abre o detalhe desse beacon/banda, incluindo linhas recentes e o estado `Detected`, `Weak trace` ou `No copy`.
+- **Mapa Beacon**: mostra apenas detecções confirmadas, desenhadas em tempo quase real entre o teu QTH e o beacon correspondente; ao passar com o rato mostra a última detecção disponível para esse beacon.
+- **Score Beacon**: apresenta score por banda calculado a partir das observações Beacon e um score global obtido pela mediana das bandas monitorizadas.
 
 ### Semântica pública do Beacon
 
@@ -274,41 +281,50 @@ Diagnósticos internos de engenharia continuam a existir no sistema, mas não en
 | `100 W SNR` | Intensidade da dash de referência a 100 W no slot observado. |
 | `Best pass` | Melhor passe detectado na janela, ordenado primeiro pela sequência de dashes ouvidas e depois pelo SNR da dash de 100 W. |
 
-### Modelo planeado de Propagation Score
+### Mapa Beacon e Propagation Score
 
-O **Beacon Propagation Score** está definido para analytics/export futuros do módulo Beacon e ainda não faz parte do painel Beacon actual.
+O painel Beacon já inclui um mapa Beacon próprio e um Propagation Score Beacon próprio, sem substituir o mapa genérico dos outros modos.
+
+Comportamento do mapa:
+- usa apenas **detecções confirmadas** do Beacon; `Weak trace` não desenha linha no globo
+- mantém, por beacon, a **última detecção confirmada** dentro da janela temporal escolhida no seletor do mapa
+- no hover mostra indicativo, localização, banda, hora UTC da última detecção, SNR de 100 W, dashes ouvidas e distância aproximada ao teu QTH
+- enquanto estás em hover, a arrastar ou a fazer zoom, os refreshes ficam em espera e a vista actual não salta para o zoom/orientação inicial
+
+Comportamento do score:
+- cada banda usa uma janela rolling de **60 minutos**; se não houver dados úteis nessa janela, a UI faz fallback para **24 horas**
+- `Weak trace` significa energia positiva na dash de 100 W sem cumprir o limiar para `Detected`; conta parcialmente para o score, mas não entra no mapa nem altera o agregado binário do heatmap
+- o score global Beacon é a **mediana** dos scores das bandas com observações monitorizadas
 
 | Símbolo | Significado |
 |---|---|
-| `W` | janela em minutos |
-| `E(W)` | número esperado de slots por célula nessa janela |
-| `M` | cobertura observada (`Coverage`) |
-| `D` | slots detectados (`Detected`) |
-| `C` | factor de confiança da cobertura |
-| `R` | taxa de observação positiva |
-| `S` | mediana normalizada do `100 W SNR` dos slots detectados |
-| `B` | qualidade do melhor passe detectado |
+| `W` | janela rolling em minutos usada para o score da banda |
+| `D_r` | taxa de detecção = `Detected / Monitored` |
+| `W_r` | taxa de `Weak trace` = `Weak / Monitored` |
+| `T` | componente de traço = `min(1, D_r + 0.35 × W_r)` |
+| `S` | mediana normalizada do `100 W SNR` = `clip((median_snr_100W - 3) / 18, 0, 1)` |
+| `B` | qualidade mediana de dashes = `median_dashes / 4` |
+| `Q` | componente de recência = `clip(1 - age_latest_meaningful / W, 0, 1)` |
 
 ```text
-E(W) = W / 15
+T = min(1, D_r + 0.35 × W_r)
 
-C = sqrt(min(1, M / E(W)))
+S = clip((median_snr_100W - 3) / 18, 0, 1)
 
-R = D / M
+B = median_dashes / 4
 
-S = clip((median_snr_100W + 3) / 9, 0, 1)
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
 
-B = 0.5 * (best_dashes / 4)
-   + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
 
-P = 0                                  se D = 0
-P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  se D > 0
+GlobalScore = mediana(BandScore_i das bandas com slots monitorizados)
 ```
 
 Notas:
 - `clip(x, 0, 1)` limita o valor ao intervalo `[0, 1]`.
-- `median_snr_100W` usa apenas slots detectados.
-- `No copy` é mostrado publicamente mas não entra duas vezes no score, porque já está reflectido em `R = D / M`.
+- `median_snr_100W` usa primeiro slots `Detected`; se não existirem, usa os `Weak trace` dessa banda.
+- `age_latest_meaningful` mede a idade da última observação útil (`Detected` ou `Weak trace`) dentro da janela.
+- `No copy` continua visível publicamente, mas entra no score apenas de forma indirecta ao baixar `D_r` e `W_r`.
 
 ### Validação temporal antes do arranque
 
@@ -660,6 +676,8 @@ Eventos fora da janela selecionada não aparecem no mapa. Isto permite focar na 
 ### Visão geral
 
 O mapa de propagação é um globo ortográfico 3D centrado no QTH do utilizador, renderizado com D3.js no dashboard Academic Analytics. Combina duas camadas de dados:
+
+Quando o modo activo é **Beacon / NCDXF**, este mesmo card muda para o globo Beacon: mostra apenas a última detecção confirmada por beacon dentro da janela temporal escolhida e mantém zoom/orientação enquanto o operador está a inspeccionar o mapa.
 
 1. **Previsão de zonas ionosféricas** — cobertura de propagação prevista por banda, calculada em tempo real a partir dos índices solares/geomagnéticos do NOAA SWPC através de um modelo ionosférico calibrado.
 2. **Contactos SDR confirmados** — descodificações com indicativo confirmado das sessões SDR, representadas como pontos e arcos de ortodrómia até à posição do locator da estação remota.
