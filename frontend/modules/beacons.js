@@ -367,7 +367,7 @@ class BeaconController {
     this._historyCells.set(detailKey, detail);
     const infoButton = renderHistoryInfoButton(detailKey, detail);
     if (!cell || !cell.total_slots) {
-      return `<td class="beacon-cell beacon-cell--history-unsampled text-secondary text-center"><small class="beacon-history-cell"><span title="No monitored slots in window">·</span>${infoButton}</small></td>`;
+      return `<td class="beacon-cell beacon-cell--history-unsampled text-secondary text-center"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span title="No monitored slots in window">·</span></span>${infoButton}</small></td>`;
     }
     const det   = Number(cell.detections || 0);
     const total = Number(cell.total_slots || 0);
@@ -375,11 +375,13 @@ class BeaconController {
       const title = `Monitored ${total} slot(s) in window\n0 detected passes\nHistorical summary counts detected passes only; weak live telemetry below threshold is excluded.`;
       return `<td class="beacon-cell beacon-cell--history-monitored text-center" title="${title}">
         <small class="beacon-history-cell text-white">
-          <span class="beacon-meter-row">
-            ${renderBeaconMeter(0, "nocopy")}
-            <span class="beacon-meter-value">0</span>
+          <span class="beacon-history-cell__body">
+            <span class="beacon-meter-row">
+              ${renderBeaconMeter(0, "nocopy")}
+              <span class="beacon-meter-value">0</span>
+            </span>
+            <span class="beacon-history-meta">0/${total} mon</span>
           </span>
-          <span class="beacon-history-meta">0/${total} mon</span>
           ${infoButton}
         </small>
       </td>`;
@@ -399,8 +401,10 @@ class BeaconController {
     const summary = `${det}/${total} mon`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
       <small class="beacon-history-cell text-white">
-        ${renderBeaconTelemetry(bestPass)}
-        <span class="beacon-history-meta">${summary}</span>
+        <span class="beacon-history-cell__body">
+          ${renderBeaconTelemetry(bestPass)}
+          <span class="beacon-history-meta">${summary}</span>
+        </span>
         ${infoButton}
       </small>
     </td>`;
@@ -923,7 +927,7 @@ function renderBeaconCellTitle(obs) {
 }
 
 function renderHistoryInfoButton(detailKey, detail) {
-  return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}">i</button>`;
+  return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}"><span aria-hidden="true">&#9432;</span></button>`;
 }
 
 function renderHistoryInfoStats(detail, observations) {
