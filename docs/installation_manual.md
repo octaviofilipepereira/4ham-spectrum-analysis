@@ -52,7 +52,7 @@ cd 4ham-spectrum-analysis
 chmod +x install.sh && ./install.sh
 ```
 
-The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), and optional systemd service activation. No manual steps are required after `git clone`.
+The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), optional systemd service activation, and the `usbreset` utility used by the RTL recovery workflow. No manual steps are required after `git clone`.
 
 To remove the installation:
 ```
@@ -113,8 +113,10 @@ For manual or customised setups, follow the sections below.
 ### 1) System dependencies
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils
 ```
+
+`usbutils` also provides `usbreset`, which is used by the Admin Config RTL recovery workflow.
 
 Optional utilities:
 ```
@@ -189,7 +191,7 @@ Open the backend-served UI in your browser:
 Use a 64-bit OS (Raspberry Pi OS 64-bit recommended), then install dependencies:
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils
 ```
 
 **RTL-SDR v4 only** — follow section 2a from the Linux section above (build from `rtlsdrblog/rtl-sdr-blog` source and apply kernel blacklist). The process is identical on Raspberry Pi.

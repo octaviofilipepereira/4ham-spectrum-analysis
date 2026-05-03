@@ -95,6 +95,7 @@ validate_runtime_dependencies() {
   local -a required_cmds=(
     SoapySDRUtil
     rtl_test
+    usbreset
     ffmpeg
     jt9
     wsprd
@@ -234,7 +235,7 @@ whiptail --backtitle "$BT" --title "Welcome" \
 Welcome to the 4ham Spectrum Analysis installer!
 
 This wizard will:
-  1. Install system packages (SoapySDR, RTL-SDR, Python, Node.js, third-party decoders)
+  1. Install system packages (SoapySDR, RTL-SDR, Python, Node.js, usbreset, third-party decoders)
   2. Optionally build the RTL-SDR Blog v4 driver from source
   3. Optionally install OpenAI Whisper for SSB voice transcription
   4. Optionally install Direwolf for APRS packet decoding
@@ -422,7 +423,8 @@ run_sudo apt-get update -qq >> "$LOG_FILE" 2>&1 \
 
 disable_soapysdr_server_if_running
 
-gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, decoders, build tools)..."
+gauge_step 18 "Installing system packages (SoapySDR, Python, Node.js, usbreset, decoders, build tools)..."
+# usbutils provides lsusb and usbreset on supported Debian-family systems
 run_sudo apt-get install -y \
   python3-venv python3-pip git \
   nodejs npm \

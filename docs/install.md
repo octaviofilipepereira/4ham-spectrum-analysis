@@ -29,6 +29,8 @@ The installer presents an interactive graphical wizard (whiptail) that:
 5. Asks for an admin username and password (stored securely as bcrypt in the local SQLite database)
 6. Installs and starts the systemd background service (auto-start on boot)
 
+On supported Debian-family systems the installer also installs `usbutils`, which provides the `usbreset` utility used by the RTL recovery workflow in Admin Config.
+
 At the end, open the printed URL in your browser and log in. No further steps needed.
 
 Frontend routes after install:
@@ -43,7 +45,7 @@ Frontend routes after install:
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:
 	- `sudo apt update`
-	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr`
+	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils`
 3. **RTL-SDR v4 only** — the standard `rtl-sdr` apt package does not support the RTL-SDR Blog v4. Build the updated driver from source:
 	```bash
 	sudo apt remove -y rtl-sdr librtlsdr0 librtlsdr-dev
@@ -63,6 +65,7 @@ Frontend routes after install:
 	sudo modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
 	```
 	Verify: `rtl_test -t`
+ 	The `usbutils` package also provides `usbreset`, used by the Admin Config RTL recovery workflow.
 4. Create a virtual environment and install Python dependencies:
 	- `python3 -m venv .venv`
 	- `source .venv/bin/activate`
