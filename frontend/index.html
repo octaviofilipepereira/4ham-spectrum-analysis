@@ -521,6 +521,25 @@ timedatectl timesync-status</pre>
       </div>
     </div>
 
+    <div class="modal fade app-modal" id="beaconHistoryInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconHistoryInfoModalLabel">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="beaconHistoryInfoModalLabel">Beacon recent activity details</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="beaconHistoryInfoWindow" class="small text-info fw-semibold mb-1">-</div>
+            <p id="beaconHistoryInfoSummary" class="small text-muted mb-3">-</p>
+            <div id="beaconHistoryInfoRecords" class="small">Loading details…</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Fullscreen Propagation Map modal -->
     <div class="modal fade" id="mapFullscreenModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-fullscreen">
@@ -1603,7 +1622,7 @@ bash scripts/server_control.sh start</pre>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260502173500"></script>
+    <script type="module" src="app.js?v=20260503142000"></script>
 
   <!-- ╔══════════════════════════════════════════════════════════════════════╗
        ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║

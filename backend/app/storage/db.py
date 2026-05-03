@@ -704,10 +704,16 @@ class Database:
         band: str | None = None,
         callsign: str | None = None,
         detected_only: bool = False,
+        hours: float | None = None,
     ) -> list[dict]:
         """Return beacon observations ordered newest-first."""
         clauses: list[str] = []
         params: list = []
+        if hours is not None:
+            clauses.append("slot_start_utc >= ?")
+            params.append(
+                (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+            )
         if band:
             clauses.append("band_name = ?")
             params.append(band)

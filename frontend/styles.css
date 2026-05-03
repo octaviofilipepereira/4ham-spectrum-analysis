@@ -2109,6 +2109,30 @@ h1,
   line-height: 1.05;
 }
 
+.beacon-history-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.66);
+  color: #dbeafe;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.beacon-history-info-btn:hover,
+.beacon-history-info-btn:focus-visible {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: rgba(191, 219, 254, 0.68);
+  color: #ffffff;
+}
+
 .beacon-history-meta {
   display: block;
   margin-top: 2px;

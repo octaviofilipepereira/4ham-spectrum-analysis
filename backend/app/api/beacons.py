@@ -574,6 +574,7 @@ async def beacon_observations(
     band: str | None = Query(default=None),
     callsign: str | None = Query(default=None),
     detected_only: bool = Query(default=False),
+    hours: float | None = Query(default=None, ge=0.1, le=72.0),
 ) -> dict[str, Any]:
     """Paginated beacon observation history."""
     rows = state.db.get_beacon_observations(
@@ -582,5 +583,6 @@ async def beacon_observations(
         band=band,
         callsign=callsign,
         detected_only=detected_only,
+        hours=hours,
     )
     return {"observations": rows, "count": len(rows), "offset": offset}

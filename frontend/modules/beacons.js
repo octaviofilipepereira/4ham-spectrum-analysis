@@ -67,10 +67,17 @@ class BeaconController {
     this._timeSyncModalResolveNote = document.getElementById("beaconTimeSyncModalResolveNote");
     this._timeSyncModalResolveCommands = document.getElementById("beaconTimeSyncModalResolveCommands");
     this._timeSyncModalRetryNote = document.getElementById("beaconTimeSyncModalRetryNote");
+    this._historyInfoModalEl = document.getElementById("beaconHistoryInfoModal");
+    this._historyInfoWindow = document.getElementById("beaconHistoryInfoWindow");
+    this._historyInfoSummary = document.getElementById("beaconHistoryInfoSummary");
+    this._historyInfoRecords = document.getElementById("beaconHistoryInfoRecords");
     this._historyBody    = document.getElementById("beaconHistoryBody");
     this._historyHours   = document.getElementById("beaconHistoryHours");
     this._historyRefresh = document.getElementById("beaconHistoryRefresh");
     this._historyTimer   = null;
+    this._historyCells   = new Map();
+    this._historyLoadSeq = 0;
+    this._historyInfoSeq = 0;
     this._bandBtns    = Array.from(document.querySelectorAll("[data-quick-band]"));
     // All mode buttons EXCEPT the BEACON one (that one stays clickable so the user can leave the mode)
     this._modeBtns    = Array.from(document.querySelectorAll('[data-quick-mode]')).filter(
@@ -312,24 +319,26 @@ class BeaconController {
   async _loadHistory() {
     if (!this._historyBody) return;
     const hours = parseFloat(this._historyHours?.value || "2") || 2;
+    const requestSeq = ++this._historyLoadSeq;
     try {
       const r = await fetch(`/api/beacons/heatmap?hours=${encodeURIComponent(hours)}`, { cache: "no-store" });
       if (!r.ok) return;
       const data = await r.json();
+      if (requestSeq !== this._historyLoadSeq) return;
       this._renderHistory(data?.matrix, hours);
     } catch (_) {}
   }
 
   _renderHistory(matrix, hours) {
     if (!this._historyBody || !Array.isArray(matrix)) return;
-    const now = Date.now();
+    this._historyCells.clear();
     const rows = [];
     for (let s = 0; s < SLOTS_PER_CYCLE; s++) {
       const b = BEACONS[s];
       let cells = `<td class="beacon-callsign text-info" title="${b.callsign} — ${b.location}">${b.callsign}<span class="beacon-loc">— ${b.location}</span></td>`;
       const row = matrix[s] || [];
       for (let bi = 0; bi < BANDS.length; bi++) {
-        cells += this._renderHistoryCell(row[bi], now);
+        cells += this._renderHistoryCell(row[bi], s, bi, hours);
       }
       rows.push(`<tr>${cells}</tr>`);
     }
@@ -340,9 +349,19 @@ class BeaconController {
     this._historyBody.innerHTML = rows.join("");
   }
 
-  _renderHistoryCell(cell, now) {
+  _renderHistoryCell(cell, slotIndex, bandIndex, hours) {
+    const detail = {
+      callsign: BEACONS[slotIndex]?.callsign || "?",
+      location: BEACONS[slotIndex]?.location || "Unknown location",
+      band: BANDS[bandIndex] || "?",
+      hours,
+      cell: cell || null,
+    };
+    const detailKey = `${slotIndex}:${bandIndex}:${hours}`;
+    this._historyCells.set(detailKey, detail);
+    const infoButton = renderHistoryInfoButton(detailKey, detail);
     if (!cell || !cell.total_slots) {
-      return `<td class="beacon-cell beacon-cell--history-unsampled text-secondary text-center"><span title="No monitored slots in window">·</span></td>`;
+      return `<td class="beacon-cell beacon-cell--history-unsampled text-secondary text-center"><small class="beacon-history-cell"><span title="No monitored slots in window">·</span>${infoButton}</small></td>`;
     }
     const det   = Number(cell.detections || 0);
     const total = Number(cell.total_slots || 0);
@@ -356,6 +375,7 @@ class BeaconController {
             <span class="beacon-meter-value">0</span>
           </span>
           <span class="beacon-history-meta">0/${total} mon</span>
+          ${infoButton}
         </small>
       </td>`;
     }
@@ -378,8 +398,120 @@ class BeaconController {
       <small class="beacon-history-cell text-white">
         ${renderBeaconTelemetry(bestPass)}
         <span class="beacon-history-meta">${summary}</span>
+        ${infoButton}
       </small>
     </td>`;
+  }
+
+  _renderHistoryInfoModal(detail) {
+    if (this._historyInfoWindow) {
+      this._historyInfoWindow.textContent = `${detail.callsign} — ${detail.location} · ${detail.band} · last ${formatHistoryWindow(detail.hours)}`;
+    }
+    if (!this._historyInfoSummary) {
+      return;
+    }
+    const cell = detail.cell;
+    if (!cell || !cell.total_slots) {
+      this._historyInfoSummary.textContent = "No monitored slots were recorded for this beacon/band cell in the selected window.";
+      return;
+    }
+    const total = Number(cell.total_slots || 0);
+    const detections = Number(cell.detections || 0);
+    const confirmed = Number(cell.id_confirmed || 0);
+    const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+    const bestSeq = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+    const latest = formatUtcTimestamp(cell.latest_detected_utc);
+    if (detections <= 0) {
+      this._historyInfoSummary.textContent = `Monitored ${total} slot(s) in the selected window. No detected passes were recorded for this cell.`;
+      return;
+    }
+    this._historyInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). Confirmed CW IDs: ${confirmed}. Best pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
+  }
+
+  async _openHistoryInfo(detailKey) {
+    const detail = this._historyCells.get(detailKey);
+    if (!detail) {
+      return;
+    }
+    this._renderHistoryInfoModal(detail);
+    if (this._historyInfoRecords) {
+      this._historyInfoRecords.innerHTML = '<div class="text-muted">Loading details…</div>';
+    }
+    if (this._historyInfoModalEl && window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(this._historyInfoModalEl).show();
+    }
+    if (!detail.cell?.total_slots) {
+      if (this._historyInfoRecords) {
+        this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows exist for this cell in the selected window.</div>';
+      }
+      return;
+    }
+
+    const requestSeq = ++this._historyInfoSeq;
+    const params = new URLSearchParams({
+      callsign: detail.callsign,
+      band: detail.band,
+      hours: String(detail.hours),
+      limit: "12",
+    });
+    try {
+      const response = await fetch(`/api/beacons/observations?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("history_detail_fetch_failed");
+      }
+      const payload = await response.json();
+      if (requestSeq !== this._historyInfoSeq) {
+        return;
+      }
+      this._renderHistoryInfoRows(Array.isArray(payload?.observations) ? payload.observations : []);
+    } catch (_) {
+      if (requestSeq !== this._historyInfoSeq) {
+        return;
+      }
+      if (this._historyInfoRecords) {
+        this._historyInfoRecords.innerHTML = '<div class="text-danger">Unable to load observation details for this cell.</div>';
+      }
+    }
+  }
+
+  _renderHistoryInfoRows(observations) {
+    if (!this._historyInfoRecords) {
+      return;
+    }
+    if (!observations.length) {
+      this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows matched this cell in the selected window.</div>';
+      return;
+    }
+    const rows = observations.map((obs) => {
+      const detected = obs.detected ? "yes" : "no";
+      const confirmed = obs.id_confirmed ? `yes (${formatConfidence(obs.id_confidence)})` : "no";
+      const snr = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
+      const dashes = `${Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))))}/4`;
+      const drift = Number.isFinite(Number(obs.drift_ms)) ? `${Math.round(Number(obs.drift_ms))} ms` : "n/a";
+      return `<tr>
+        <td>${escapeHtml(formatUtcTimestamp(obs.slot_start_utc))}</td>
+        <td>${escapeHtml(detected)}</td>
+        <td>${escapeHtml(confirmed)}</td>
+        <td>${escapeHtml(snr)}</td>
+        <td>${escapeHtml(dashes)}</td>
+        <td>${escapeHtml(drift)}</td>
+      </tr>`;
+    });
+    this._historyInfoRecords.innerHTML = `<div class="table-responsive">
+      <table class="table table-sm table-dark align-middle mb-0">
+        <thead>
+          <tr>
+            <th>UTC slot</th>
+            <th>Detected</th>
+            <th>CW ID</th>
+            <th>100 W</th>
+            <th>Seq</th>
+            <th>Drift</th>
+          </tr>
+        </thead>
+        <tbody>${rows.join("")}</tbody>
+      </table>
+    </div>`;
   }
 
   // ── WS connection ──────────────────────────────────────────────────────────
@@ -659,6 +791,14 @@ class BeaconController {
     // History controls
     this._historyHours?.addEventListener("change", () => this._loadHistory());
     this._historyRefresh?.addEventListener("click", () => this._loadHistory());
+    this._historyBody?.addEventListener("click", (event) => {
+      const trigger = event.target.closest("[data-beacon-history-info]");
+      if (!trigger) {
+        return;
+      }
+      event.preventDefault();
+      this._openHistoryInfo(trigger.getAttribute("data-beacon-history-info"));
+    });
 
     // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
@@ -770,6 +910,40 @@ function renderBeaconCellTitle(obs) {
     lines.push("CW ID confirmed");
   }
   return lines.join("\n");
+}
+
+function renderHistoryInfoButton(detailKey, detail) {
+  return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}">i</button>`;
+}
+
+function formatHistoryWindow(hours) {
+  const value = Number(hours);
+  if (!Number.isFinite(value) || value <= 0) return "selected window";
+  if (value < 1) return `${Math.round(value * 60)} min`;
+  const wholeHours = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return `${wholeHours} h`;
+}
+
+function formatUtcTimestamp(value) {
+  if (!value) return "n/a";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
+
+function formatConfidence(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "n/a";
+  return numeric.toFixed(2);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /** Render a 4-segment meter for successful copy or no-copy passes. */
