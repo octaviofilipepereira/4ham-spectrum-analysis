@@ -5407,6 +5407,14 @@ async function startApplication() {
       }
     }
   } catch (_) { /* best effort */ }
+
+  // Restore BEACON/NCDXF UI immediately after the first scan-state probe so a
+  // hard refresh does not visibly fall back to the standard startup layout.
+  if (!beaconController) {
+    beaconController = new BeaconController();
+  }
+  await restoreBeaconUiModeFromSession();
+
   await loadDevices();
   await loadBands();
   await loadSettings();
@@ -5427,14 +5435,6 @@ async function startApplication() {
   fetchPropagationSummary();
   // Propagation summary updates derive from the same events; 60 s suffices.
   setInterval(fetchPropagationSummary, 60000);
-
-  // Initialise beacon controller before decoder-status polling so the first
-  // beacon-status fetch can restore BEACON mode after a page reload.
-  if (!beaconController) {
-    beaconController = new BeaconController();
-  }
-
-  await restoreBeaconUiModeFromSession();
 
   fetchDecoderStatus();
   setInterval(fetchDecoderStatus, 20000);
