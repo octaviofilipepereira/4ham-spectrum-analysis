@@ -772,22 +772,37 @@ Last update: 2026-02-22 16:27:19 UTC
                 <small class="text-muted">Este estado mostra o áudio guardado e é atualizado após "Auto-detect Device" ou "Auto-detect áudio".</small>
               </div>
               <div class="col-12 d-none" id="rtlRecoverySection">
+                <h3 class="h6 mb-1">RTL recovery</h3>
                 <div class="alert alert-warning py-2 mb-0" role="status">
-                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h3 class="h6 mb-0">RTL recovery</h3>
-                    <span id="rtlRecoveryBadge" class="badge bg-secondary">checking…</span>
+                  <div class="d-flex justify-content-between align-items-start gap-2 flex-nowrap">
+                    <button
+                      class="btn btn-link p-0 text-start text-decoration-none flex-grow-1 rtl-recovery-toggle collapsed"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#rtlRecoveryDetails"
+                      aria-expanded="false"
+                      aria-controls="rtlRecoveryDetails"
+                    >
+                      <span class="d-flex align-items-center gap-2 small fw-semibold">
+                        <span class="rtl-recovery-chevron" aria-hidden="true">▸</span>
+                        <span>Show recovery details</span>
+                      </span>
+                      <small class="d-block mt-2 admin-config-helper-text">If preview or waterfall stays stuck after restart, stop the backend, reset the current RTL USB device with <code>usbreset</code>, then start the backend again.</small>
+                    </button>
+                    <span id="rtlRecoveryBadge" class="badge bg-secondary mt-1">checking…</span>
                   </div>
-                  <small class="d-block mt-2">If preview or waterfall stays stuck after restart, stop the backend, reset the current RTL USB device with <code>usbreset</code>, then start the backend again.</small>
-                  <div class="small mt-2"><strong>Detected RTL:</strong> <span id="rtlRecoveryDeviceName">-</span></div>
-                  <div class="small"><strong>USB device:</strong> <code id="rtlRecoveryDevicePath">-</code></div>
-                  <div class="small"><strong>Bus/device:</strong> <code id="rtlRecoveryBusDevice">-</code></div>
-                  <div class="small"><strong>Reset command:</strong> <code id="rtlRecoveryCommand">-</code></div>
-                  <div class="small"><strong>VID:PID fallback:</strong> <code id="rtlRecoveryVidPidCommand">-</code></div>
-                  <small id="rtlRecoveryAvailability" class="text-muted d-block mt-2"></small>
-                  <div class="small fw-semibold mt-2">Recovery sequence</div>
-                  <pre id="rtlRecoverySequence" class="small border rounded px-2 py-2 mb-0">bash scripts/server_control.sh stop
+                  <div class="collapse mt-2" id="rtlRecoveryDetails">
+                    <div class="small"><strong>Detected RTL:</strong> <span id="rtlRecoveryDeviceName">-</span></div>
+                    <div class="small"><strong>USB device:</strong> <code id="rtlRecoveryDevicePath">-</code></div>
+                    <div class="small"><strong>Bus/device:</strong> <code id="rtlRecoveryBusDevice">-</code></div>
+                    <div class="small"><strong>Reset command:</strong> <code id="rtlRecoveryCommand">-</code></div>
+                    <div class="small"><strong>VID:PID fallback:</strong> <code id="rtlRecoveryVidPidCommand">-</code></div>
+                    <small id="rtlRecoveryAvailability" class="text-muted d-block mt-2"></small>
+                    <div class="small fw-semibold mt-2">Recovery sequence</div>
+                    <pre id="rtlRecoverySequence" class="small border rounded px-2 py-2 mb-0">bash scripts/server_control.sh stop
 sudo usbreset &lt;bus/device&gt;
 bash scripts/server_control.sh start</pre>
+                  </div>
                 </div>
               </div>
               <div class="col-12">

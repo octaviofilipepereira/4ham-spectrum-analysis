@@ -1361,6 +1361,26 @@ h1,
   color: rgba(245, 247, 255, 0.8);
 }
 
+.app-modal .rtl-recovery-toggle {
+  color: inherit;
+}
+
+.app-modal .rtl-recovery-toggle:hover,
+.app-modal .rtl-recovery-toggle:focus {
+  color: inherit;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+.app-modal .rtl-recovery-chevron {
+  display: inline-flex;
+  transition: transform 0.18s ease;
+}
+
+.app-modal .rtl-recovery-toggle:not(.collapsed) .rtl-recovery-chevron {
+  transform: rotate(90deg);
+}
+
 .app-modal .btn-close {
   filter: invert(1) brightness(1.2);
   opacity: 0.85;

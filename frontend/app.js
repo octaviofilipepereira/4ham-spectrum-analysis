@@ -4067,7 +4067,7 @@ function renderRtlRecoveryInfo(info) {
 
   if (rtlRecoveryBadge) {
     rtlRecoveryBadge.textContent = usbresetInstalled ? "usbreset ready" : "usbreset missing";
-    rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-success" : "badge bg-warning text-dark";
+    rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-white text-dark border" : "badge bg-warning text-dark";
   }
   if (rtlRecoveryDeviceName) {
     rtlRecoveryDeviceName.textContent = deviceName || `${info?.vendor_id || ""}:${info?.product_id || ""}` || "RTL detected";
