@@ -86,3 +86,27 @@ def test_get_rtl_runtime_status_for_v3_hf_target_mode_2():
     assert status["rtl_generation_detected"] == 3
     assert status["direct_sampling_policy"] == "v3_hf_direct_sampling_below_24mhz"
     assert status["direct_sampling_mode_target"] == "2"
+
+
+class _CloseRaisesDevice:
+    def __init__(self):
+        self.calls = []
+
+    def deactivateStream(self, stream):
+        self.calls.append(("deactivate", stream))
+        raise RuntimeError("deactivate failed")
+
+    def closeStream(self, stream):
+        self.calls.append(("close", stream))
+
+
+def test_close_still_attempts_close_stream_after_deactivate_failure():
+    ctrl = controller.SDRController()
+    device = _CloseRaisesDevice()
+
+    ctrl.close(device, "stream-1")
+
+    assert device.calls == [
+        ("deactivate", "stream-1"),
+        ("close", "stream-1"),
+    ]

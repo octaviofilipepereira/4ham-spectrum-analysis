@@ -74,6 +74,76 @@ class ScanEngine:
         # bucket_hz -> timestamp when the frequency was hold-validated
         self._ssb_validated_freqs: Dict[int, float] = {}
 
+    def _release_device(self, clear_preview_bounds: bool = False) -> None:
+        device = self.device
+        stream = self.stream
+        self.device = None
+        self.stream = None
+        if clear_preview_bounds:
+            self.preview_start_hz = 0
+            self.preview_end_hz = 0
+        if device is None and stream is None:
+            return
+        try:
+            self.controller.close(device, stream)
+        except Exception:
+            pass
+
+    async def _open_device_with_timeout(
+        self,
+        *,
+        device_id: Optional[str],
+        sample_rate: int,
+        center_hz: int,
+        gain: Optional[float],
+        timeout_s: float,
+        timeout_label: str,
+    ) -> tuple[Optional[Any], Optional[Any]]:
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        loop = asyncio.get_event_loop()
+        open_future = loop.run_in_executor(
+            None,
+            lambda: self.controller.open(
+                device_id=device_id,
+                sample_rate=sample_rate,
+                center_hz=center_hz,
+                gain=gain,
+            ),
+        )
+        try:
+            return await asyncio.wait_for(
+                asyncio.shield(open_future),
+                timeout=timeout_s,
+            )
+        except asyncio.TimeoutError:
+            def _cleanup_late_open(fut: "asyncio.Future") -> None:
+                try:
+                    result = fut.result()
+                except Exception:
+                    return
+                try:
+                    dev, stream = result
+                except Exception:
+                    return
+                try:
+                    self.controller.close(dev, stream)
+                    _log.warning(
+                        "%s_late_completion_closed_to_prevent_handle_leak",
+                        timeout_label,
+                    )
+                except Exception:
+                    _log.exception("%s_late_close_failed", timeout_label)
+
+            open_future.add_done_callback(_cleanup_late_open)
+            _log.error(
+                "%s_timeout after %.1fs - handle leak guard armed",
+                timeout_label,
+                timeout_s,
+            )
+            raise
+
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
         # Allow per-scan override of the recording size limit
@@ -143,51 +213,20 @@ class ScanEngine:
         _gain = self.config.get("gain")
         _sr = self.sample_rate
         _chz = self.center_hz
-        loop = asyncio.get_event_loop()
         # USB enumeration on a Pi (especially with an upconverter) can legitimately
         # take >10s, so give it 25s. Crucially, run_in_executor does NOT cancel the
         # underlying thread on wait_for timeout — if the open() eventually completes,
         # the device handle would be silently leaked (RTL-SDR busy on next attempt).
         # We therefore keep a reference to the future and attach a done-callback
         # that closes the late-arriving device.
-        open_future = loop.run_in_executor(
-            None,
-            lambda: self.controller.open(
-                device_id=device_id,
-                sample_rate=_sr,
-                center_hz=_chz,
-                gain=_gain,
-            ),
+        self.device, self.stream = await self._open_device_with_timeout(
+            device_id=device_id,
+            sample_rate=_sr,
+            center_hz=_chz,
+            gain=_gain,
+            timeout_s=25.0,
+            timeout_label="sdr_open",
         )
-        try:
-            self.device, self.stream = await asyncio.wait_for(
-                asyncio.shield(open_future),
-                timeout=25.0,
-            )
-        except asyncio.TimeoutError:
-            import logging as _logging
-            _log = _logging.getLogger(__name__)
-
-            def _cleanup_late_open(fut: "asyncio.Future") -> None:
-                try:
-                    result = fut.result()
-                except Exception:
-                    return  # open() actually failed — nothing to clean up
-                try:
-                    dev, stream = result
-                except Exception:
-                    return
-                try:
-                    self.controller.close(dev, stream)
-                    _log.warning(
-                        "sdr_open_late_completion_closed_to_prevent_handle_leak"
-                    )
-                except Exception:
-                    _log.exception("sdr_late_close_failed")
-
-            open_future.add_done_callback(_cleanup_late_open)
-            _log.error("sdr_open_timeout after 25s — handle leak guard armed")
-            raise
         if record_path:
             self._record_fp = open(record_path, "wb")
         self.running = True
@@ -223,13 +262,8 @@ class ScanEngine:
                 pass
             finally:
                 self._record_fp = None
-        try:
-            self.controller.close(self.device, self.stream)
-        except Exception:
-            pass
-        self.device = None
-        self.stream = None
         self.preview = False
+        self._release_device()
         return True
 
     async def retune_band_async(self, new_config: Dict[str, Any]) -> bool:
@@ -342,35 +376,29 @@ class ScanEngine:
             return False  # scan owns the device — do not interfere
         # Close existing preview device if open
         if self.preview:
-            try:
-                self.controller.close(self.device, self.stream)
-            except Exception:
-                pass
-            self.device = None
-            self.stream = None
-            self.preview = False
+            self.preview_close()
         self.sample_rate = int(sample_rate or 2048000)
         self.center_hz = int(center_hz or 14175000)
         self.preview_start_hz = int(start_hz or 0)
         self.preview_end_hz = int(end_hz or 0)
         _sr = self.sample_rate
         _chz = self.center_hz
-        loop = asyncio.get_event_loop()
-        self.device, self.stream = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                lambda: self.controller.open(
-                    device_id=device_id,
-                    sample_rate=_sr,
-                    center_hz=_chz,
-                    gain=gain,
-                ),
-            ),
-            timeout=10.0,  # prevent blocking the event loop on USB hang
-        )
+        try:
+            self.device, self.stream = await self._open_device_with_timeout(
+                device_id=device_id,
+                sample_rate=_sr,
+                center_hz=_chz,
+                gain=gain,
+                timeout_s=25.0,
+                timeout_label="preview_open",
+            )
+        except Exception:
+            self.preview = False
+            self._spectrum_queue = None
+            self._release_device(clear_preview_bounds=True)
+            raise
         if self.device is None:
-            self.preview_start_hz = 0
-            self.preview_end_hz = 0
+            self._release_device(clear_preview_bounds=True)
             return False
         self.preview = True
         self._spectrum_queue = asyncio.Queue(maxsize=8)
@@ -389,14 +417,7 @@ class ScanEngine:
             self._pump_task = None
         self._spectrum_queue = None
         self.preview = False  # clear flag BEFORE closing device
-        try:
-            self.controller.close(self.device, self.stream)
-        except Exception:
-            pass
-        self.device = None
-        self.stream = None
-        self.preview_start_hz = 0
-        self.preview_end_hz = 0
+        self._release_device(clear_preview_bounds=True)
 
     def park(self, frequency_hz: int) -> None:
         """Hold the scanner on *frequency_hz* until unpark() is called.
