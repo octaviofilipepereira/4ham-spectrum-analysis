@@ -38,6 +38,8 @@ class ScanEngine:
         self.preview: bool = False  # True when device open for passive monitoring
         self.preview_start_hz: int = 0  # Band start Hz used during preview (0 = unknown)
         self.preview_end_hz: int = 0    # Band end Hz used during preview (0 = unknown)
+        self.preview_device_id: Optional[str] = None
+        self.preview_gain: Optional[float] = None
         self._task: Optional[asyncio.Task] = None
         self._record_fp: Optional[BinaryIO] = None
         self._record_bytes: int = 0
@@ -73,6 +75,7 @@ class ScanEngine:
         self._ssb_focus_candidates: Dict[int, Dict[str, float]] = {}
         # bucket_hz -> timestamp when the frequency was hold-validated
         self._ssb_validated_freqs: Dict[int, float] = {}
+        self._iq_starvation_recover_s: float = 5.0
 
     def _release_device(self, clear_preview_bounds: bool = False) -> None:
         device = self.device
@@ -143,6 +146,42 @@ class ScanEngine:
                 timeout_s,
             )
             raise
+
+    async def _recover_preview_device(self) -> bool:
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        if not self.preview or self.running:
+            return False
+
+        self._release_device()
+        try:
+            self.device, self.stream = await self._open_device_with_timeout(
+                device_id=self.preview_device_id,
+                sample_rate=self.sample_rate,
+                center_hz=self.center_hz,
+                gain=self.preview_gain,
+                timeout_s=25.0,
+                timeout_label="preview_recover",
+            )
+        except Exception:
+            self.preview = False
+            self._spectrum_queue = None
+            self._release_device(clear_preview_bounds=True)
+            raise
+
+        if self.device is None:
+            self.preview = False
+            self._spectrum_queue = None
+            self._release_device(clear_preview_bounds=True)
+            return False
+
+        _log.warning(
+            "preview_iq_stream_recovered center_hz=%d sample_rate=%d",
+            int(self.center_hz or 0),
+            int(self.sample_rate or 0),
+        )
+        return True
 
     async def start_async(self, config: Optional[Dict[str, Any]]) -> bool:
         self.config = config or {}
@@ -263,6 +302,8 @@ class ScanEngine:
             finally:
                 self._record_fp = None
         self.preview = False
+        self.preview_device_id = None
+        self.preview_gain = None
         self._release_device()
         return True
 
@@ -381,6 +422,8 @@ class ScanEngine:
         self.center_hz = int(center_hz or 14175000)
         self.preview_start_hz = int(start_hz or 0)
         self.preview_end_hz = int(end_hz or 0)
+        self.preview_device_id = device_id
+        self.preview_gain = gain
         _sr = self.sample_rate
         _chz = self.center_hz
         try:
@@ -395,9 +438,13 @@ class ScanEngine:
         except Exception:
             self.preview = False
             self._spectrum_queue = None
+            self.preview_device_id = None
+            self.preview_gain = None
             self._release_device(clear_preview_bounds=True)
             raise
         if self.device is None:
+            self.preview_device_id = None
+            self.preview_gain = None
             self._release_device(clear_preview_bounds=True)
             return False
         self.preview = True
@@ -417,6 +464,8 @@ class ScanEngine:
             self._pump_task = None
         self._spectrum_queue = None
         self.preview = False  # clear flag BEFORE closing device
+        self.preview_device_id = None
+        self.preview_gain = None
         self._release_device(clear_preview_bounds=True)
 
     def park(self, frequency_hz: int) -> None:
@@ -628,6 +677,7 @@ class ScanEngine:
         import logging as _logging
         _log = _logging.getLogger(__name__)
         chunk_size = 4096
+        stalled_since: Optional[float] = None
         while self.running or self.preview:
             try:
                 samples = self.controller.read_samples(
@@ -635,12 +685,37 @@ class ScanEngine:
                 )
             except Exception as exc:
                 _log.debug("IQ pump read error: %s", exc)
-                await asyncio.sleep(0.01)
-                continue
+                samples = None
 
             if samples is None:
+                now_monotonic = time.monotonic()
+                if stalled_since is None:
+                    stalled_since = now_monotonic
+                elif (
+                    self.preview
+                    and not self.running
+                    and (now_monotonic - stalled_since) >= self._iq_starvation_recover_s
+                ):
+                    _log.warning(
+                        "preview_iq_starvation_detected stall_s=%.2f center_hz=%d sample_rate=%d",
+                        now_monotonic - stalled_since,
+                        int(self.center_hz or 0),
+                        int(self.sample_rate or 0),
+                    )
+                    stalled_since = None
+                    try:
+                        recovered = await self._recover_preview_device()
+                    except Exception:
+                        _log.exception("preview_iq_recovery_failed")
+                        await asyncio.sleep(0.5)
+                        continue
+                    if not recovered:
+                        await asyncio.sleep(0.5)
+                        continue
                 await asyncio.sleep(0.005)
                 continue
+
+            stalled_since = None
 
             # Recording (scan mode only)
             if self._record_fp and self.running:
