@@ -34,7 +34,7 @@ import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
 import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
-import { BeaconController } from "./modules/beacons.js?v=20260503183500";
+import { BeaconController } from "./modules/beacons.js?v=20260503185500";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");

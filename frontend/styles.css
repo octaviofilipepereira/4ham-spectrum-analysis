@@ -2111,30 +2111,14 @@ h1,
 }
 
 .beacon-history-info-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 62px;
-  height: 24px;
+  min-width: 0;
+  min-height: 24px;
   margin-top: 1px;
   flex: 0 0 auto;
-  padding: 0 9px;
-  border: 1px solid #ffc107;
-  border-radius: 999px;
-  background: #ffc107;
-  color: #000;
-  font-size: 0.68rem;
-  font-weight: 700;
+  padding: 0.14rem 0.45rem;
+  font-size: 0.7rem;
   letter-spacing: 0.03em;
-  line-height: 1;
-  box-shadow: 0 0 0 1px rgba(120, 53, 15, 0.18), 0 4px 10px rgba(255, 193, 7, 0.22);
-}
-
-.beacon-history-info-btn:hover,
-.beacon-history-info-btn:focus-visible {
-  background: #ffcd39;
-  border-color: #ffcd39;
-  color: #000;
+  white-space: nowrap;
 }
 
 .beacon-history-info-modal .modal-dialog {
