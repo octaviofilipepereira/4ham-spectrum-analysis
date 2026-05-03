@@ -11,19 +11,20 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
 2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
-4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
-5. [Presets de Rotação & Scheduler](#presets-de-rotação--scheduler)
-6. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
-7. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
-8. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
-9. [Configuração Inicial](#configuração-inicial)
-10. [Interface do Utilizador](#interface-do-utilizador)
-11. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
-12. [Exportação de Dados](#exportação-de-dados)
-13. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
-14. [Descodificação APRS — Pipeline VHF](#descodificação-aprs--pipeline-vhf)
-15. [Resolução de Problemas](#resolução-de-problemas)
+3. [Beacon Analysis — NCDXF/IARU](#beacon-analysis--ncdxfiaru)
+4. [Dashboard Academic Analytics](#dashboard-academic-analytics)
+5. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
+6. [Presets de Rotação & Scheduler](#presets-de-rotação--scheduler)
+7. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
+8. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
+9. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
+10. [Configuração Inicial](#configuração-inicial)
+11. [Interface do Utilizador](#interface-do-utilizador)
+12. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+13. [Exportação de Dados](#exportação-de-dados)
+14. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
+15. [Descodificação APRS — Pipeline VHF](#descodificação-aprs--pipeline-vhf)
+16. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -225,6 +226,88 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ---
 
+## Beacon Analysis — NCDXF/IARU
+
+### O que faz este módulo?
+
+O **Beacon Analysis** é um módulo dedicado à rede internacional **NCDXF/IARU Beacon Network**. Os 18 radiofaróis fixos transmitem em **slots UTC exactos de 10 segundos** nas bandas de **20, 17, 15, 12 e 10 metros**.
+
+Cada slot transmite:
+- indicativo CW a 22 WPM
+- quatro dashes de 1 segundo em **100 W**, **10 W**, **1 W** e **100 mW**
+
+Este módulo existe para medir propagação real entre a tua estação e um conjunto estável de beacons distribuídos pelo mundo.
+
+### Como usar no painel
+
+1. Clicar em **📻 NCDXF — Beacon Monitor** na barra de modos.
+2. Clicar em **Start monitoring** dentro do painel Beacon.
+3. O 4ham valida primeiro o estado temporal do host.
+4. Se a validação passar, o scheduler toma controlo do scan engine.
+5. Clicar em **Stop** para parar o módulo e libertar o scan engine.
+
+Importante:
+- enquanto o Beacon Analysis está activo, os controlos normais de scan ficam bloqueados
+- este módulo usa scheduler próprio e não o sweep normal do scanner
+
+### Como interpretar o painel
+
+- **Status badge**: mostra se o scheduler está parado, a validar tempo, a arrancar ou em execução.
+- **Matriz live 18×5**: cada linha é um beacon; cada coluna é uma banda.
+- **Confirmed**: indica que o indicativo CW foi confirmado.
+- **Top meter**: intensidade da dash de referência a 100 W, com o SNR à direita.
+- **Bottom meter**: sequência ordenada de dashes ouvidas, de 0 a 4.
+- **No copy**: significa que o slot foi monitorizado mas não houve cópia fiável.
+- **Recent activity**: mostra o melhor passe coerente dentro da janela temporal seleccionada; não representa o slot live actual.
+
+### Validação temporal antes do arranque
+
+O Beacon Analysis depende de slots UTC exactos de 10 segundos. Por isso, o 4ham valida o tempo do host antes de permitir o arranque do scheduler.
+
+Importante: o sistema operativo não precisa de estar com timezone UTC. O que interessa é a hora absoluta estar correcta e existir uma fonte de sincronização activa.
+
+Estados de validação:
+- `healthy`: arranque permitido. Relógio sincronizado, NTP activo, leap normal e métricas dentro dos limiares do Beacon.
+- `degraded`: arranque bloqueado. Causas típicas: offset absoluto acima de 500 ms, root distance acima de 1000 ms, sem servidor activo ou prova temporal incompleta.
+- `offline`: arranque bloqueado. Causas típicas: relógio não sincronizado, NTP inactivo, leap não normal, offset absoluto acima de 2000 ms, root distance acima de 5000 ms ou prova indisponível.
+
+### Como verificar no host
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+O que confirmar:
+- `timedatectl status`: `System clock synchronized: yes` e NTP activo.
+- `timedatectl timesync-status`: servidor seleccionado e valores razoáveis de offset e root distance.
+- `chronyc tracking`: `Leap status: Normal` e offset baixo, quando o host usa chrony.
+- `chronyc sources -v`: pelo menos uma fonte activa, normalmente marcada com `^*`.
+
+### Como resolver no host
+
+#### systemd-timesyncd
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+#### chrony
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Só voltar a tentar iniciar o Beacon Analysis depois de a verificação confirmar relógio sincronizado e uma fonte temporal válida.
+
 ---
 
 ## Configuração Inicial
@@ -234,7 +317,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 - Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - Sincronização de tempo NTP (obrigatório para FT8/FT4)
-- Beacon Analysis (NCDXF/IARU): o arranque é bloqueado se o 4ham não conseguir validar um estado UTC saudável no host
+- Beacon Analysis (NCDXF/IARU): requer estado UTC saudável no host; ver capítulo **Beacon Analysis — NCDXF/IARU**
 
 ### Instalação rápida (instalador gráfico)
 A partir da v0.7.1, o projeto inclui um instalador TUI interativo:

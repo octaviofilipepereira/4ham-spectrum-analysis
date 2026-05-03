@@ -61,6 +61,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#overview">Overview</a></li>
       <li><a href="#interface">Interface tour</a></li>
       <li><a href="#scan-modes">Scan modes</a></li>
+      <li><a href="#beacon-analysis">Beacon Analysis &mdash; NCDXF/IARU</a></li>
       <li><a href="#rotation">Scan Rotation</a></li>
       <li><a href="#presets-scheduler">Rotation Presets &amp; Scheduler</a></li>
       <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
@@ -202,6 +203,83 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <div class="info-box">
       💡 <strong>FT8/FT4 dial frequency</strong> — the decoder locks onto the standard dial frequency for each band (e.g. 14.074 MHz for FT8 20m). A single waterfall marker represents the last decoded callsign for that band/mode combination.
     </div>
+  </section>
+
+  <!-- 3b. BEACON ANALYSIS -->
+  <section id="beacon-analysis">
+    <h2 class="section-title">3b · Beacon Analysis &mdash; NCDXF/IARU</h2>
+    <p>
+      <strong>Beacon Analysis</strong> is a dedicated module for the NCDXF International Beacon Network.
+      The network transmits on a strict 10-second UTC schedule across 5 bands (20/17/15/12/10 m) from 18 fixed stations.
+      Each beacon sends its callsign in CW at 22 WPM, followed by 1-second dashes at 100 W, 10 W, 1 W and 100 mW.
+    </p>
+
+    <h3 class="sub-title">What This Module Does</h3>
+    <ul>
+      <li>Uses a UTC-aligned scheduler instead of the normal scan sweep.</li>
+      <li>Shows a live 18×5 matrix with one row per beacon and one column per band.</li>
+      <li>Shows a separate <strong>Recent activity</strong> heatmap for the last 30 minutes to 24 hours.</li>
+      <li>Blocks startup when host time cannot be validated safely enough for exact slot alignment.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Use It</h3>
+    <ol>
+      <li>Click <strong>📻 NCDXF — Beacon Monitor</strong> in the quick mode bar.</li>
+      <li>Click <strong>Start monitoring</strong> inside the Beacon panel.</li>
+      <li>The module first validates host UTC time. If validation fails, a blocking modal explains the reason and the recovery steps.</li>
+      <li>If validation succeeds, the scheduler takes over the scan engine and the normal band/mode scan controls remain locked while Beacon monitoring is active.</li>
+      <li>Click <strong>Stop</strong> to stop the scheduler and release the scan engine.</li>
+    </ol>
+
+    <div class="warn-box">
+      <strong>Important:</strong> While Beacon Analysis is running, the scheduler owns the scan engine. Normal band buttons and other scan modes are intentionally disabled.
+    </div>
+
+    <h3 class="sub-title">How To Read The Panel</h3>
+    <ul>
+      <li><strong>Status badge</strong> — shows whether the Beacon scheduler is stopped, validating host time, starting, or running.</li>
+      <li><strong>Live matrix</strong> — each cell represents the latest monitored pass for one beacon on one band.</li>
+      <li><strong>Confirmed</strong> — a green confirmed indication means the CW callsign was matched.</li>
+      <li><strong>Meter rows</strong> — top row is the 100 W reference dash strength; bottom row is the ordered dash sequence heard from 0 to 4.</li>
+      <li><strong>No copy</strong> — the orange no-copy bar means that slot was monitored but no reliable copy was obtained.</li>
+      <li><strong>Recent activity</strong> — the lower table shows the best coherent detected pass in the selected historical window, not the current live slot state.</li>
+    </ul>
+
+    <h3 class="sub-title">Time Validation Before Startup</h3>
+    <p>
+      Beacon Analysis depends on exact 10-second UTC slots. The application therefore validates host time before allowing the scheduler to start.
+      The operating system timezone does <em>not</em> need to be set to UTC. What matters is correct absolute time plus an active synchronization source.
+    </p>
+    <ul>
+      <li><strong>Healthy</strong> — startup allowed. Clock synchronized, NTP active, leap state normal, and timing quality within the Beacon thresholds.</li>
+      <li><strong>Degraded</strong> — startup blocked. Typical causes: absolute offset above 500 ms, root distance above 1000 ms, no active server, or only partial probe information.</li>
+      <li><strong>Offline</strong> — startup blocked. Typical causes: unsynchronized clock, inactive NTP, abnormal leap state, absolute offset above 2000 ms, root distance above 5000 ms, or no usable probe.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Verify On The Host</h3>
+    <pre class="small border rounded px-2 py-2 mb-3">timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v</pre>
+    <ul>
+      <li><code>timedatectl status</code> — <strong>System clock synchronized</strong> should be <code>yes</code> and NTP should be active.</li>
+      <li><code>timedatectl timesync-status</code> — a selected server should be present, with reasonable offset and root distance values.</li>
+      <li><code>chronyc tracking</code> — when chrony is in use, <strong>Leap status</strong> should be <code>Normal</code> and the offset should be low.</li>
+      <li><code>chronyc sources -v</code> — when chrony is in use, at least one active source should be present, normally marked <code>^*</code>.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Resolve On The Host</h3>
+    <p><strong>systemd-timesyncd</strong></p>
+    <pre class="small border rounded px-2 py-2 mb-3">sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status</pre>
+    <p><strong>chrony</strong></p>
+    <pre class="small border rounded px-2 py-2 mb-3">sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v</pre>
+    <p>Retry Beacon Analysis only after the verification step confirms a synchronized clock and a valid time source.</p>
   </section>
 
   <!-- 4. SCAN ROTATION -->
@@ -1065,15 +1143,7 @@ sudo bash scripts/enable_aprs.sh</pre>
     </ul>
 
     <h3 class="sub-title">Beacon Analysis start is blocked</h3>
-    <p>
-      Beacon Analysis (NCDXF/IARU) now validates the host UTC time before starting the scheduler.
-      If 4ham cannot confirm a healthy UTC sync state, startup is blocked and a modal explains the reason.
-    </p>
-    <ul>
-      <li>Check <code>timedatectl status</code> — <strong>System clock synchronized</strong> should be <code>yes</code>.</li>
-      <li>Check <code>timedatectl timesync-status</code> or <code>chronyc tracking</code> — the host should have an active time source.</li>
-      <li>Large offsets or missing NTP sync can shift the 10-second UTC slots and produce false beacon observations.</li>
-    </ul>
+    <p>See <a href="#beacon-analysis">3b · Beacon Analysis — NCDXF/IARU</a> for the full Beacon chapter, including validation states, verification commands, panel interpretation, and host recovery steps.</p>
 
     <h3 class="sub-title">FT8/FT4 markers appear and then disappear</h3>
     <p>

@@ -80,9 +80,50 @@ Frontend routes after install:
 4. Run backend with uvicorn:
 	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
 
-## Time Sync
+## Beacon Analysis - host time validation
 - Enable NTP for FT8/FT4 decoding.
-- Beacon Analysis also depends on reliable UTC timing. If 4ham cannot validate a healthy host time-sync state, Beacon Analysis startup is blocked to avoid false observations.
+- Beacon Analysis also depends on reliable UTC timing. If 4ham cannot validate a healthy host time-sync state, startup is blocked to avoid false observations.
+- The system timezone does not need to be UTC. What matters is correct absolute time plus an active synchronization source.
+
+Validation states:
+- `healthy`: startup allowed.
+- `degraded`: startup blocked when timing quality is marginal, for example absolute offset above 500 ms or root distance above 1000 ms.
+- `offline`: startup blocked when the host is unsynchronized or clearly outside safe limits, for example absolute offset above 2000 ms or root distance above 5000 ms.
+
+How to verify on the host:
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+What to confirm:
+- `timedatectl status`: `System clock synchronized: yes` and active NTP.
+- `timedatectl timesync-status`: selected server plus reasonable offset and root distance values.
+- `chronyc tracking`: `Leap status: Normal` and low offset when chrony is in use.
+- `chronyc sources -v`: at least one active source, normally marked with `^*`.
+
+How to resolve with systemd-timesyncd:
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+How to resolve with chrony:
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Retry Beacon Analysis only after verification confirms a synchronized clock and a valid time source.
 
 ## Production service (Linux/systemd)
 Use the service installer script for end-user production runs:
