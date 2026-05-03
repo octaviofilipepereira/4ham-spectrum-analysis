@@ -500,11 +500,19 @@ Last update: 2026-02-22 16:27:19 UTC
             <div class="small mb-1"><strong>Detected source:</strong> <span id="beaconTimeSyncModalSource">-</span></div>
             <div class="small mb-1"><strong>Selected server:</strong> <span id="beaconTimeSyncModalServer">-</span></div>
             <div class="small mb-3"><strong>Metrics:</strong> <span id="beaconTimeSyncModalMetrics">-</span></div>
-            <div class="small fw-semibold mb-1">Check on the host</div>
+            <div class="small fw-semibold mb-1">1. Verify on the host</div>
+            <p class="small beacon-time-sync-modal__note mb-2">Run these checks first and confirm the host reports a synchronized clock and an active time source.</p>
             <pre id="beaconTimeSyncModalChecks" class="small border rounded px-2 py-2 mb-0">timedatectl status
 timedatectl timesync-status
 chronyc tracking
 chronyc sources -v</pre>
+            <div class="small fw-semibold mb-1 mt-3">2. Resolve on the host</div>
+            <p id="beaconTimeSyncModalResolveNote" class="small beacon-time-sync-modal__note mb-2">Re-enable or restart the host time-sync service, then verify again.</p>
+            <pre id="beaconTimeSyncModalResolveCommands" class="small border rounded px-2 py-2 mb-0">sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status</pre>
+            <p id="beaconTimeSyncModalRetryNote" class="small beacon-time-sync-modal__note mt-3 mb-0">Retry Beacon Analysis only after the verification step reports a synchronized clock and a valid time source.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>

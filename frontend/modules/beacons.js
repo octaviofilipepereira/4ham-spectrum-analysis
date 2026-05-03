@@ -63,6 +63,10 @@ class BeaconController {
     this._timeSyncModalSource = document.getElementById("beaconTimeSyncModalSource");
     this._timeSyncModalServer = document.getElementById("beaconTimeSyncModalServer");
     this._timeSyncModalMetrics = document.getElementById("beaconTimeSyncModalMetrics");
+    this._timeSyncModalChecks = document.getElementById("beaconTimeSyncModalChecks");
+    this._timeSyncModalResolveNote = document.getElementById("beaconTimeSyncModalResolveNote");
+    this._timeSyncModalResolveCommands = document.getElementById("beaconTimeSyncModalResolveCommands");
+    this._timeSyncModalRetryNote = document.getElementById("beaconTimeSyncModalRetryNote");
     this._historyBody    = document.getElementById("beaconHistoryBody");
     this._historyHours   = document.getElementById("beaconHistoryHours");
     this._historyRefresh = document.getElementById("beaconHistoryRefresh");
@@ -146,9 +150,83 @@ class BeaconController {
     return map[String(code || "").trim()] || "Time sync validation failed";
   }
 
+  _buildTimeSyncRecipe(timeSync) {
+    const sync = timeSync && typeof timeSync === "object" ? timeSync : {};
+    const source = String(sync.source || "").trim().toLowerCase();
+    const ntpService = String(sync.ntp_service || "").trim().toLowerCase();
+    const reasonCode = String(sync.reason_code || "").trim().toLowerCase();
+    const isTimedatectl = source === "timedatectl" || ["active", "inactive", "failed", "disabled", "no"].includes(ntpService);
+    const isChrony = source === "chrony";
+    const verifyCommands = isChrony
+      ? [
+          "chronyc tracking",
+          "chronyc sources -v",
+          "timedatectl status",
+        ]
+      : isTimedatectl
+        ? [
+            "timedatectl status",
+            "timedatectl timesync-status",
+          ]
+        : [
+            "timedatectl status",
+            "timedatectl timesync-status",
+            "chronyc tracking",
+            "chronyc sources -v",
+          ];
+
+    if (isChrony) {
+      return {
+        verifyCommands,
+        resolveNote: reasonCode === "offset_too_high" || reasonCode === "root_distance_too_high"
+          ? "Chrony is present but the clock quality is still outside the safe Beacon thresholds. Force an immediate step, then verify again."
+          : "Chrony is the active time source on this host. Re-enable it if needed, then verify again.",
+        resolveCommands: [
+          "sudo systemctl enable --now chrony",
+          "sudo chronyc makestep",
+          "chronyc tracking",
+          "chronyc sources -v",
+        ],
+        retryNote: "Retry Beacon Analysis only after chrony reports a synchronized clock and at least one valid source.",
+      };
+    }
+
+    if (isTimedatectl) {
+      return {
+        verifyCommands,
+        resolveNote: reasonCode === "ntp_inactive"
+          ? "The host reports systemd time sync but NTP is inactive. Re-enable it, restart the service, then verify again."
+          : "The host reports systemd time sync. Re-enable NTP, restart the service, wait a few seconds, then verify again.",
+        resolveCommands: [
+          "sudo timedatectl set-ntp true",
+          "sudo systemctl restart systemd-timesyncd",
+          "timedatectl status",
+          "timedatectl timesync-status",
+        ],
+        retryNote: "Retry Beacon Analysis only after timedatectl reports 'System clock synchronized: yes' and a valid server.",
+      };
+    }
+
+    return {
+      verifyCommands,
+      resolveNote: "4ham could not identify the active time-sync stack on this host. Use the commands below for the stack that is installed, then verify again before retrying Beacon Analysis.",
+      resolveCommands: [
+        "# systemd-timesyncd",
+        "sudo timedatectl set-ntp true",
+        "sudo systemctl restart systemd-timesyncd",
+        "",
+        "# chrony",
+        "sudo systemctl enable --now chrony",
+        "sudo chronyc makestep",
+      ],
+      retryNote: "Retry Beacon Analysis only after one of the verification paths reports a synchronized clock and an active source.",
+    };
+  }
+
   _renderTimeSyncModal(timeSync, message) {
     if (!this._timeSyncModalEl) return;
     const sync = timeSync && typeof timeSync === "object" ? timeSync : {};
+    const recipe = this._buildTimeSyncRecipe(sync);
     const serverBits = [];
     if (sync.server_name) serverBits.push(sync.server_name);
     if (sync.server_address) serverBits.push(sync.server_address);
@@ -175,6 +253,18 @@ class BeaconController {
     if (this._timeSyncModalMetrics) {
       const leap = sync.leap_status ? `leap ${sync.leap_status}` : null;
       this._timeSyncModalMetrics.textContent = [...metrics, leap].filter(Boolean).join(" | ") || "No detailed metrics reported";
+    }
+    if (this._timeSyncModalChecks) {
+      this._timeSyncModalChecks.textContent = recipe.verifyCommands.join("\n");
+    }
+    if (this._timeSyncModalResolveNote) {
+      this._timeSyncModalResolveNote.textContent = recipe.resolveNote;
+    }
+    if (this._timeSyncModalResolveCommands) {
+      this._timeSyncModalResolveCommands.textContent = recipe.resolveCommands.join("\n");
+    }
+    if (this._timeSyncModalRetryNote) {
+      this._timeSyncModalRetryNote.textContent = recipe.retryNote;
     }
   }
 
