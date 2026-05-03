@@ -4078,7 +4078,7 @@ function renderRtlRecoveryInfo(info) {
   if (rtlRecoveryVidPidCommand) rtlRecoveryVidPidCommand.textContent = info?.usbreset_vid_pid_command || "-";
   if (rtlRecoveryAvailability) {
     rtlRecoveryAvailability.textContent = usbresetInstalled
-      ? "Use this only when preview or scan stays stuck after restart and the waterfall keeps waiting for frames."
+      ? "Use this only when preview or scan stays stuck and the waterfall keeps waiting for frames."
       : "The RTL USB node was detected, but the usbreset utility is not installed on the server.";
   }
   if (rtlRecoverySequence) {
