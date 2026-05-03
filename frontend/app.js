@@ -345,6 +345,7 @@ const summaryMatrixTable = document.getElementById("summaryMatrixTable");
 const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
 const eventsCardTitle = document.getElementById("eventsCardTitle");
 const eventsCardTitleText = document.getElementById("eventsCardTitleText");
+const eventsCardColumn = eventsCardTitle?.closest(".col-events-custom") || null;
 const propagationScore = document.getElementById("propagationScore");
 const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
@@ -690,6 +691,7 @@ const aprsMapArea = document.getElementById("aprsMapArea");
 const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
 const propagationCard = document.getElementById("propagationCard");
+const propagationColumn = propagationCard?.closest(".col-propmap-custom") || null;
 const aprsMapFullscreenBtn = document.getElementById("aprsMapFullscreenBtn");
 
 // ── Beacon Monitor panel ────────────────────────────────────────────────
@@ -790,6 +792,8 @@ async function _checkAprsConnectivity() {
 function setBeaconAreaVisible(show) {
   if (beaconArea) beaconArea.hidden = !show;
   if (waterfallArea) waterfallArea.hidden = show;
+  if (eventsCardColumn) eventsCardColumn.hidden = show;
+  if (propagationColumn) propagationColumn.classList.toggle("w-100", show);
   // Keep propagation card visible in BEACON mode — it complements the
   // beacon matrix with band activity and the QTH-centric globe.
   // Hide Go-to-MHz / SNR / DSP status — irrelevant in BEACON mode
