@@ -69,6 +69,54 @@
   let _lastData     = null;
   let _inlineContainerId = "propagationMap";
   let _beaconRefreshTimer = null;
+  const _viewStateByContainer = new Map();
+
+  function getViewState(containerId) {
+    if (!_viewStateByContainer.has(containerId)) {
+      _viewStateByContainer.set(containerId, {
+        rotation: null,
+        zoomScale: 1,
+        pointerInside: false,
+        interactionActive: false,
+        interactionTimer: null,
+        pendingPayload: null,
+      });
+    }
+    return _viewStateByContainer.get(containerId);
+  }
+
+  function isInteractionBlocked(viewState) {
+    return Boolean(viewState?.pointerInside || viewState?.interactionActive);
+  }
+
+  function queuePendingPayload(containerId, payload) {
+    const viewState = getViewState(containerId);
+    viewState.pendingPayload = payload;
+  }
+
+  function scheduleInteractionRelease(containerId) {
+    const viewState = getViewState(containerId);
+    clearTimeout(viewState.interactionTimer);
+    viewState.interactionActive = true;
+    viewState.interactionTimer = setTimeout(() => {
+      viewState.interactionActive = false;
+      flushPendingRender(containerId);
+    }, 350);
+  }
+
+  async function flushPendingRender(containerId) {
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState) || !viewState.pendingPayload) {
+      return;
+    }
+    const payload = viewState.pendingPayload;
+    viewState.pendingPayload = null;
+    if (!payload.data) {
+      await render(payload.containerId, payload.windowMinutes, payload.isModal);
+      return;
+    }
+    await drawResolvedData(payload.containerId, payload.windowMinutes, payload.isModal, payload.data);
+  }
 
   // ── World atlas ──────────────────────────────────────────────────────────
   async function loadWorld() {
@@ -100,17 +148,21 @@
     const isBeaconMap = isBeaconMapData(data);
     const sLat = station.lat ?? 39.5;
     const sLon = station.lon ?? -8.0;
+    const viewState = getViewState(container.id);
 
     container.innerHTML = "";
 
     // Per-container gradient id so inline + modal can coexist
     const gradId = "oceanGrad_" + container.id;
     const baseScale = Math.min(W, H) * 0.44;
-    let kScale = 1;                          // current zoom multiplier
+    let kScale = Math.max(0.25, Math.min(12, Number(viewState.zoomScale) || 1));
+    const initialRotation = Array.isArray(viewState.rotation) && viewState.rotation.length === 3
+      ? viewState.rotation
+      : [-sLon, -sLat, 0];
 
     const proj = d3.geoOrthographic()
-      .rotate([-sLon, -sLat])
-      .scale(baseScale)
+      .rotate(initialRotation)
+      .scale(baseScale * kScale)
       .translate([W / 2, H / 2])
       .clipAngle(90);                        // only visible hemisphere
 
@@ -170,6 +222,11 @@
 
     const tip = getTooltip();
 
+    function persistViewState() {
+      viewState.rotation = proj.rotate().slice();
+      viewState.zoomScale = Math.max(0.25, Math.min(12, proj.scale() / baseScale));
+    }
+
     // ── redraw: called on every rotate/zoom interaction ───────────────────
     function redraw() {
       spherePath.attr("d", path);
@@ -226,20 +283,38 @@
 
       // Update gradient radius to match current scale
       grad.attr("r", proj.scale());
+      persistViewState();
     }
 
     redraw();
 
+    svg
+      .on("mouseenter", () => {
+        viewState.pointerInside = true;
+      })
+      .on("mouseleave", async () => {
+        viewState.pointerInside = false;
+        tip.style.display = "none";
+        await flushPendingRender(container.id);
+      });
+
     // ── Drag = rotate globe ───────────────────────────────────────────────
     svg.call(
       d3.drag()
-        .on("start", () => svg.style("cursor", "grabbing"))
+        .on("start", () => {
+          viewState.interactionActive = true;
+          svg.style("cursor", "grabbing");
+        })
         .on("drag", (event) => {
           const [rx, ry, rz] = proj.rotate();
           proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
           redraw();
         })
-        .on("end", () => svg.style("cursor", "grab"))
+        .on("end", async () => {
+          viewState.interactionActive = false;
+          svg.style("cursor", "grab");
+          await flushPendingRender(container.id);
+        })
     );
 
     // ── Ctrl/⌘ + scroll wheel = zoom; plain wheel = page scroll ──────────
@@ -250,6 +325,7 @@
       kScale = Math.max(0.25, Math.min(12, kScale * factor));
       proj.scale(baseScale * kScale);
       redraw();
+      scheduleInteractionRelease(container.id);
     }, { passive: false });
 
     // ── Double-click = reset view ─────────────────────────────────────────
@@ -257,13 +333,14 @@
       proj.rotate([-sLon, -sLat]).scale(baseScale);
       kScale = 1;
       redraw();
+      scheduleInteractionRelease(container.id);
     });
 
     // ── Programmatic controls ─────────────────────────────────────────────
     const controls = {
-      zoomIn:  () => { kScale = Math.min(kScale * 1.6, 12);   proj.scale(baseScale * kScale); redraw(); },
-      zoomOut: () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); },
-      reset:   () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); },
+      zoomIn:  () => { kScale = Math.min(kScale * 1.6, 12);   proj.scale(baseScale * kScale); redraw(); scheduleInteractionRelease(container.id); },
+      zoomOut: () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); scheduleInteractionRelease(container.id); },
+      reset:   () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); scheduleInteractionRelease(container.id); },
     };
 
     return { controls };
@@ -316,16 +393,40 @@
   }
 
   // ── Render into a container ───────────────────────────────────────────────
-  async function render(containerId, windowMinutes, isModal) {
+  async function drawResolvedData(containerId, windowMinutes, isModal, data) {
     if (!window.d3 || !window.topojson) return;
+    if (!data) return;
     const container = document.getElementById(containerId);
     if (!container) return;
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data });
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const W = rect.width  || (isModal ? window.innerWidth  - 48 : 420);
     const H = isModal
       ? Math.max(window.innerHeight - 150, 300)
       : (rect.height > 80 ? rect.height : Math.min(W * 1.1, 680));
+
+    const world = await loadWorld();
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data });
+      return;
+    }
+
+    const { controls } = drawGlobe(container, W, H, data, world);
+    addControls(container, controls, !isModal);
+  }
+
+  async function render(containerId, windowMinutes, isModal) {
+    if (!window.d3 || !window.topojson) return;
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data: null });
+      return;
+    }
 
     let data;
     try {
@@ -336,9 +437,7 @@
       return;
     }
 
-    const world = await loadWorld();
-    const { controls } = drawGlobe(container, W, H, data, world);
-    addControls(container, controls, !isModal);
+    await drawResolvedData(containerId, windowMinutes, isModal, data);
   }
 
   // ── Read selected window from UI dropdown ─────────────────────────────────
@@ -364,20 +463,15 @@
     async renderModal() {
       const c = document.getElementById("propagationMapModal");
       if (!c) return;
-      const W = c.clientWidth  || window.innerWidth  - 48;
-      const H = Math.max(window.innerHeight - 150, 300);
-      const world = await loadWorld();
       const win = getWindowMinutes();
 
       if (_lastData) {
-        const { controls } = drawGlobe(c, W, H, _lastData, world);
-        addControls(c, controls, false);
+        await drawResolvedData(c.id, win, true, _lastData);
       }
       try {
         const fresh = await fetchData(win);
         _lastData = fresh;
-        const { controls } = drawGlobe(c, W, H, fresh, world);
-        addControls(c, controls, false);
+        await drawResolvedData(c.id, win, true, fresh);
       } catch {
         // Silently ignore fetch errors in modal
       }
