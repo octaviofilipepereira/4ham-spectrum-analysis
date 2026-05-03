@@ -2114,19 +2114,19 @@ h1,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   margin-top: 1px;
   flex: 0 0 auto;
   padding: 0;
-  border: 1px solid rgba(147, 197, 253, 0.46);
+  border: 1px solid #ffc107;
   border-radius: 999px;
-  background: radial-gradient(circle at 35% 30%, rgba(125, 211, 252, 0.28), rgba(30, 41, 59, 0.94));
-  color: #eff6ff;
-  font-size: 0.98rem;
+  background: #ffc107;
+  color: #000;
+  font-size: 1.08rem;
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.34), 0 4px 10px rgba(2, 6, 23, 0.24);
+  box-shadow: 0 0 0 1px rgba(120, 53, 15, 0.18), 0 4px 10px rgba(255, 193, 7, 0.22);
 }
 
 .beacon-history-info-btn span {
@@ -2136,9 +2136,9 @@ h1,
 
 .beacon-history-info-btn:hover,
 .beacon-history-info-btn:focus-visible {
-  background: radial-gradient(circle at 35% 30%, rgba(96, 165, 250, 0.44), rgba(30, 64, 175, 0.92));
-  border-color: rgba(191, 219, 254, 0.82);
-  color: #ffffff;
+  background: #ffcd39;
+  border-color: #ffcd39;
+  color: #000;
 }
 
 .beacon-history-info-modal .modal-dialog {
