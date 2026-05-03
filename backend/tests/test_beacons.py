@@ -14,6 +14,7 @@ import math
 import sys
 import os
 from datetime import datetime, timezone
+from statistics import median
 
 import numpy as np
 import pytest
@@ -43,6 +44,7 @@ from app.beacons.matched_filter import (
     _combined_detect_score,
 )
 from app.api import beacons as beacon_api
+from app.beacons.propagation import build_beacon_map_contacts, build_beacon_propagation_summary
 from app.beacons.public_payloads import public_beacon_heatmap_cell, public_beacon_observation
 
 
@@ -188,6 +190,78 @@ def test_beacon_public_api_routes_strip_internal_diagnostics(monkeypatch):
     assert "id_confirmed" not in observation
     assert "id_confidence" not in observation
     assert "drift_ms" not in observation
+
+
+def test_build_beacon_map_contacts_keeps_latest_detection_per_callsign():
+    settings = {"station": {"callsign": "CT7BFV", "locator": "IM58sm"}}
+    rows = [
+        {
+            "slot_start_utc": "2026-05-03T10:00:00+00:00",
+            "beacon_callsign": "YV5B",
+            "beacon_index": 17,
+            "band_name": "20m",
+            "detected": True,
+            "dash_levels_detected": 1,
+            "snr_db_100w": 4.2,
+        },
+        {
+            "slot_start_utc": "2026-05-03T10:15:00+00:00",
+            "beacon_callsign": "YV5B",
+            "beacon_index": 17,
+            "band_name": "17m",
+            "detected": True,
+            "dash_levels_detected": 2,
+            "snr_db_100w": 6.1,
+        },
+    ]
+
+    payload = build_beacon_map_contacts(rows, settings, window_minutes=60)
+
+    assert payload["kind"] == "beacon"
+    assert payload["contact_count"] == 1
+    assert payload["contacts"][0]["callsign"] == "YV5B"
+    assert payload["contacts"][0]["band"] == "17m"
+    assert payload["contacts"][0]["dash_levels_detected"] == 2
+
+
+def test_build_beacon_propagation_summary_uses_median_global_score():
+    rows = [
+        {
+            "slot_start_utc": "2026-05-03T10:00:00+00:00",
+            "beacon_callsign": "CS3B",
+            "beacon_index": 14,
+            "band_name": "20m",
+            "detected": True,
+            "dash_levels_detected": 3,
+            "snr_db_100w": 8.0,
+        },
+        {
+            "slot_start_utc": "2026-05-03T10:10:00+00:00",
+            "beacon_callsign": "YV5B",
+            "beacon_index": 17,
+            "band_name": "17m",
+            "detected": False,
+            "dash_levels_detected": 0,
+            "snr_db_100w": 2.4,
+        },
+        {
+            "slot_start_utc": "2026-05-03T10:20:00+00:00",
+            "beacon_callsign": "JA2IGY",
+            "beacon_index": 6,
+            "band_name": "15m",
+            "detected": True,
+            "dash_levels_detected": 2,
+            "snr_db_100w": 5.0,
+        },
+    ]
+
+    payload = build_beacon_propagation_summary(rows, window_minutes=60)
+    monitored_scores = [entry["score"] for entry in payload["bands"] if entry["events"] > 0]
+    weak_band = next(entry for entry in payload["bands"] if entry["band"] == "17m")
+
+    assert payload["kind"] == "beacon"
+    assert weak_band["weak_beacons"] == 1
+    assert payload["overall"]["score"] == round(median(monitored_scores), 1)
 
 
 class TestScheduleFormula:

@@ -11,6 +11,8 @@ GET  /api/beacons/catalog         → all 18 beacons with current status
 GET  /api/beacons/matrix          → 18×5 matrix of current-cycle observations
 GET  /api/beacons/heatmap         → 18×5 aggregated activity over last N hours
 GET  /api/beacons/observations    → paginated observation history (SQLite)
+GET  /api/beacons/map/contacts    → beacon-native propagation map contacts
+GET  /api/beacons/propagation_summary → beacon-native propagation score summary
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.dependencies import state
 from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_cycle_window, current_slot_index
+from app.beacons.propagation import build_beacon_map_contacts, build_beacon_propagation_summary
 from app.beacons.public_payloads import public_beacon_heatmap_cell, public_beacon_observation
 
 router = APIRouter()
@@ -592,3 +595,32 @@ async def beacon_observations(
     )
     public_rows = [row for row in (public_beacon_observation(row) for row in rows) if row is not None]
     return {"observations": public_rows, "count": len(public_rows), "offset": offset}
+
+
+@router.get("/map/contacts")
+async def beacon_map_contacts(
+    window_minutes: int = Query(default=60, ge=10, le=1440),
+    limit: int = Query(default=10000, ge=100, le=10000),
+) -> dict[str, Any]:
+    """Return Beacon detections as map contacts without affecting the generic map API."""
+    rows = state.db.get_beacon_observations(
+        limit=limit,
+        hours=max(0.1, window_minutes / 60.0),
+        detected_only=True,
+    )
+    settings = state.db.get_settings()
+    return build_beacon_map_contacts(rows, settings, window_minutes)
+
+
+@router.get("/propagation_summary")
+async def beacon_propagation_summary(
+    window_minutes: int = Query(default=60, ge=10, le=1440),
+    limit: int = Query(default=10000, ge=100, le=10000),
+) -> dict[str, Any]:
+    """Return Beacon-native propagation scores per band plus a global median score."""
+    rows = state.db.get_beacon_observations(
+        limit=limit,
+        hours=max(0.1, window_minutes / 60.0),
+        detected_only=False,
+    )
+    return build_beacon_propagation_summary(rows, window_minutes)

@@ -232,6 +232,39 @@ function _backendMode(uiMode) {
 let selectedDecoderMode = null;
 let latestScanState = null;
 let bandUiReady = false;
+let beaconSummaryRefreshTimer = null;
+
+function isBeaconPropagationMode() {
+  return String(selectedDecoderMode || "").trim().toUpperCase() === "BEACON";
+}
+
+function formatPropagationUtcTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value || "-");
+  }
+  return date.toISOString().replace(".000Z", " UTC").replace("T", " ");
+}
+
+function schedulePropagationWidgetsRefresh() {
+  requestAnimationFrame(() => {
+    fetchPropagationSummary();
+    if (window.PropMap && typeof window.PropMap.refresh === "function") {
+      window.PropMap.refresh("propagationMap");
+    }
+    const modalEl = document.getElementById("mapFullscreenModal");
+    if (
+      modalEl &&
+      modalEl.classList.contains("show") &&
+      window.PropMap &&
+      typeof window.PropMap.renderModal === "function"
+    ) {
+      window.PropMap.renderModal();
+    }
+  });
+}
+
+window._getPropagationViewMode = () => (isBeaconPropagationMode() ? "BEACON" : "GENERIC");
 
 if (bandSelect) {
   const persistedBand = localStorage.getItem("4ham_active_band") || "";
@@ -805,6 +838,7 @@ function setBeaconAreaVisible(show) {
     // Hide VFO beacon label when exiting mode
     if (vfoBeaconLabel) vfoBeaconLabel.hidden = true;
   }
+  schedulePropagationWidgetsRefresh();
 }
 
 /** Fetch recent APRS events from the API and populate the map. */
@@ -1970,21 +2004,28 @@ function renderPropagationSummary(data, options = {}) {
   if (!propagationScore || !propagationBands) {
     return;
   }
+  const isBeaconSummary = String(data?.kind || "").trim().toLowerCase() === "beacon";
   const overallScore = Number(data?.overall?.score ?? 0).toFixed(1);
   const overallState = String(data?.overall?.state || "Unknown");
   const eventCount = Number(data?.event_count || 0);
   const windowMinutes = Number(data?.window_minutes || 30);
   const sourceNote = options?.sourceNote ? ` | ${options.sourceNote}` : "";
-  propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min${sourceNote}`;
+  const eventLabel = isBeaconSummary ? "slots" : "events";
+  const scoreLabel = isBeaconSummary ? "Median score" : "Score";
+  propagationScore.textContent = `${scoreLabel}: ${overallScore}/100 (${overallState}) | ${eventLabel}=${eventCount} | window=${windowMinutes} min${sourceNote}`;
   propagationScore.className = "";
-  const stateColorClass = { "Excellent": "text-success", "Good": "text-success", "Fair": "text-warning", "Poor": "text-danger" }[overallState] || "text-secondary";
+  const stateColorClass = { "Excellent": "text-success", "Good": "text-success", "Fair": "text-warning", "Poor": "text-danger", "No data": "text-secondary" }[overallState] || "text-secondary";
   propagationScore.classList.add("fw-semibold", stateColorClass);
 
-  const bands = Array.isArray(data?.bands) ? data.bands.slice(0, 5) : [];
+  const bands = Array.isArray(data?.bands)
+    ? (isBeaconSummary ? data.bands.slice(0, 5) : data.bands.slice(0, 5))
+    : [];
   propagationBands.innerHTML = "";
   if (!bands.length) {
     const li = document.createElement("li");
-    li.textContent = "No propagation data yet. Start/continue scan to build propagation statistics.";
+    li.textContent = isBeaconSummary
+      ? "No Beacon propagation data yet. Start/continue Beacon monitoring to build the band scores."
+      : "No propagation data yet. Start/continue scan to build propagation statistics.";
     propagationBands.appendChild(li);
     return;
   }
@@ -1997,6 +2038,18 @@ function renderPropagationSummary(data, options = {}) {
     const events = Number(item?.events || 0);
     const maxSNR = item?.max_snr_db;
     const snrLabel = maxSNR === null || maxSNR === undefined ? "-" : `${Number(maxSNR).toFixed(1)} dB`;
+    if (isBeaconSummary) {
+      const detectedBeacons = Number(item?.detected_beacons || 0);
+      const weakBeacons = Number(item?.weak_beacons || 0);
+      const detectionRate = Number(item?.detection_rate || 0);
+      const weakRate = Number(item?.weak_rate || 0);
+      const latestDetected = item?.latest_detected_utc
+        ? ` | last=${formatPropagationUtcTimestamp(item.latest_detected_utc)}`
+        : "";
+      li.textContent = `${bandName}: ${score}/100 (${state}) | slots=${events} | copy=${detectedBeacons} (${(detectionRate * 100).toFixed(0)}%) | weak=${weakBeacons} (${(weakRate * 100).toFixed(0)}%) | max SNR=${snrLabel}${latestDetected}`;
+      propagationBands.appendChild(li);
+      return;
+    }
     const callsigns = item?.unique_callsigns;
     const callsignLabel = callsigns !== null && callsigns !== undefined ? ` | callsigns=${callsigns}` : "";
     const decodeRate = item?.decode_rate;
@@ -2008,7 +2061,10 @@ function renderPropagationSummary(data, options = {}) {
 }
 
 async function requestPropagationSummary(windowMinutes, limit) {
-  const resp = await fetch(`/api/propagation/summary?window_minutes=${windowMinutes}&limit=${limit}`, {
+  const endpoint = isBeaconPropagationMode()
+    ? "/api/beacons/propagation_summary"
+    : "/api/propagation/summary";
+  const resp = await fetch(`${endpoint}?window_minutes=${windowMinutes}&limit=${limit}`, {
     headers: { ...getAuthHeader() }
   });
   if (!resp.ok) {
@@ -2043,6 +2099,16 @@ async function fetchPropagationSummary() {
     return;
   }
 }
+
+window.addEventListener("beacon-observation", () => {
+  if (!isBeaconPropagationMode()) {
+    return;
+  }
+  clearTimeout(beaconSummaryRefreshTimer);
+  beaconSummaryRefreshTimer = setTimeout(() => {
+    fetchPropagationSummary();
+  }, 250);
+});
 
 async function fetchLogs() {
   try {

@@ -23,10 +23,52 @@
     return u && p ? { Authorization: "Basic " + btoa(u + ":" + p) } : {};
   };
 
+  const getPropagationViewMode = () => {
+    if (typeof window._getPropagationViewMode === "function") {
+      return String(window._getPropagationViewMode() || "GENERIC").trim().toUpperCase();
+    }
+    return "GENERIC";
+  };
+
+  const isBeaconMapData = (data) => String(data?.kind || "").trim().toLowerCase() === "beacon";
+
+  function formatWindowLabel(windowMinutes) {
+    return windowMinutes >= 1440 ? `${Math.round(windowMinutes / 1440)}d` : `${windowMinutes}min`;
+  }
+
+  function formatUtcTimestamp(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value || "-");
+    }
+    return date.toISOString().replace(".000Z", " UTC").replace("T", " ");
+  }
+
+  function renderTooltipHtml(contact, isBeaconMap) {
+    const snrValue = Number(contact?.snr_db);
+    const snrLabel = Number.isFinite(snrValue) ? `${snrValue.toFixed(1)} dB` : "-";
+    const distanceValue = Number(contact?.distance_km);
+    const distanceLabel = Number.isFinite(distanceValue) ? `${distanceValue.toLocaleString()} km` : "-";
+
+    if (isBeaconMap) {
+      const dashValue = Number(contact?.dash_levels_detected);
+      const dashLabel = Number.isFinite(dashValue) ? `${dashValue}/4` : "-";
+      const whenLabel = formatUtcTimestamp(contact?.last_detection_utc || contact?.timestamp);
+      return `<strong>${contact.callsign}</strong> · ${contact.location}<br>`
+        + `${contact.band} · ${contact.state} · 100 W ${snrLabel} · dashes ${dashLabel}<br>`
+        + `Last detection ${whenLabel} · ${distanceLabel}`;
+    }
+
+    return `<strong>${contact.callsign}</strong> · ${contact.country}<br>`
+      + `${contact.band} · ${contact.mode} · SNR ${snrLabel} · ${distanceLabel}`;
+  }
+
   // ── State ────────────────────────────────────────────────────────────────
   let _worldData    = null;
   let _refreshTimer = null;
   let _lastData     = null;
+  let _inlineContainerId = "propagationMap";
+  let _beaconRefreshTimer = null;
 
   // ── World atlas ──────────────────────────────────────────────────────────
   async function loadWorld() {
@@ -55,6 +97,7 @@
   function drawGlobe(container, W, H, data, world) {
     const station  = data.station  || {};
     const contacts = data.contacts || [];
+    const isBeaconMap = isBeaconMapData(data);
     const sLat = station.lat ?? 39.5;
     const sLon = station.lon ?? -8.0;
 
@@ -123,7 +166,7 @@
       .attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
       .attr("fill", "#64748b").attr("font-size", "14px").attr("font-family", "monospace")
       .attr("pointer-events", "none")
-      .text(`${contacts.length} contacts · ${win >= 1440 ? Math.round(win / 1440) + "d" : win + "min"}`);
+      .text(`${contacts.length} ${isBeaconMap ? "detections" : "contacts"} · ${formatWindowLabel(win)}`);
 
     const tip = getTooltip();
 
@@ -142,8 +185,8 @@
           .attr("d", path)
           .attr("fill", "none")
           .attr("stroke", bandColor(c.band))
-          .attr("stroke-width", 1.8)
-          .attr("stroke-opacity", 0.85);
+          .attr("stroke-width", isBeaconMap ? 2.2 : 1.8)
+          .attr("stroke-opacity", isBeaconMap ? 0.92 : 0.85);
       });
 
       // Dots — only on visible hemisphere (geoDistance < 90°)
@@ -154,15 +197,12 @@
         if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
         const pp = proj([c.lon, c.lat]);
         if (!pp) return;
-        const snrStr  = c.snr_db      != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
-        const distStr = c.distance_km != null ? `${c.distance_km.toLocaleString()} km` : "—";
         dotG.append("circle")
-          .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
+          .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", isBeaconMap ? 5.2 : 4.5)
           .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
           .attr("opacity", 0.92).style("cursor", "pointer")
           .on("mousemove", (evt) => {
-            tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country}<br>`
-              + `${c.band} · ${c.mode} · SNR ${snrStr} · ${distStr}`;
+            tip.innerHTML = renderTooltipHtml(c, isBeaconMap);
             tip.style.display = "block";
             tip.style.left = evt.clientX + 14 + "px";
             tip.style.top  = evt.clientY - 34 + "px";
@@ -264,8 +304,11 @@
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchData(windowMinutes) {
+    const endpoint = getPropagationViewMode() === "BEACON"
+      ? "/api/beacons/map/contacts"
+      : "/api/map/contacts";
     const r = await fetch(
-      `/api/map/contacts?window_minutes=${windowMinutes}&limit=2000`,
+      `${endpoint}?window_minutes=${windowMinutes}&limit=2000`,
       { headers: authHeader() }
     );
     if (!r.ok) throw new Error(r.status);
@@ -308,6 +351,7 @@
   const PropMap = {
     init(containerId, windowMinutes) {
       windowMinutes = windowMinutes || getWindowMinutes();
+      _inlineContainerId = containerId || _inlineContainerId;
       render(containerId, windowMinutes, false);
       if (_refreshTimer) clearInterval(_refreshTimer);
       _refreshTimer = setInterval(() => render(containerId, getWindowMinutes(), false), 60000);
@@ -341,6 +385,20 @@
   };
 
   window.PropMap = PropMap;
+
+  window.addEventListener("beacon-observation", () => {
+    if (getPropagationViewMode() !== "BEACON") {
+      return;
+    }
+    clearTimeout(_beaconRefreshTimer);
+    _beaconRefreshTimer = setTimeout(() => {
+      PropMap.refresh(_inlineContainerId, getWindowMinutes());
+      const modalEl = document.getElementById("mapFullscreenModal");
+      if (modalEl && modalEl.classList.contains("show")) {
+        PropMap.renderModal();
+      }
+    }, 250);
+  });
 
   document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("propagationMap")) {

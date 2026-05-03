@@ -640,6 +640,9 @@ class BeaconController {
     if (obs.detected) {
       this._loadHistory();
     }
+    try {
+      window.dispatchEvent(new CustomEvent("beacon-observation", { detail: { ...obs } }));
+    } catch (_) {}
   }
 
   // ── Matrix rendering ───────────────────────────────────────────────────────
