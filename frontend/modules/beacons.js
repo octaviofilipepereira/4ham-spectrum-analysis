@@ -927,7 +927,7 @@ function renderBeaconCellTitle(obs) {
 }
 
 function renderHistoryInfoButton(detailKey, detail) {
-  return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}"><span aria-hidden="true">&#128712;</span></button>`;
+  return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${escapeHtml(detailKey)}" title="More details for ${escapeHtml(detail.callsign)} ${escapeHtml(detail.band)}" aria-label="More details for ${escapeHtml(detail.callsign)} on ${escapeHtml(detail.band)}"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" style="display:block"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg></button>`;
 }
 
 function renderHistoryInfoStats(detail, observations) {
