@@ -708,6 +708,10 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-6">
                 <label class="form-label">Device</label>
                 <select id="deviceSelect" class="form-select form-select-sm"></select>
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
+                  <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
+                </div>
               </div>
               <div class="col-6">
                 <label class="form-label">Band</label>
@@ -803,12 +807,6 @@ Last update: 2026-02-22 16:27:19 UTC
 sudo usbreset &lt;bus/device&gt;
 bash scripts/server_control.sh start</pre>
                   </div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="form-check mt-1">
-                  <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
-                  <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
                 </div>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
