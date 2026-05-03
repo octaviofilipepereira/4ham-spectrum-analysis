@@ -233,9 +233,55 @@ let selectedDecoderMode = null;
 let latestScanState = null;
 let bandUiReady = false;
 let beaconSummaryRefreshTimer = null;
+const BEACON_UI_SESSION_KEY = "4ham_beacon_ui_active";
 
 function isBeaconPropagationMode() {
   return String(selectedDecoderMode || "").trim().toUpperCase() === "BEACON";
+}
+
+function rememberBeaconUiMode(active) {
+  try {
+    if (active) {
+      sessionStorage.setItem(BEACON_UI_SESSION_KEY, "1");
+    } else {
+      sessionStorage.removeItem(BEACON_UI_SESSION_KEY);
+    }
+  } catch (_) {}
+}
+
+function shouldRestoreBeaconUiMode() {
+  try {
+    return sessionStorage.getItem(BEACON_UI_SESSION_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+async function restoreBeaconUiModeFromSession() {
+  if (!shouldRestoreBeaconUiMode()) {
+    return;
+  }
+  if (String(selectedDecoderMode || "").trim()) {
+    return;
+  }
+  if (latestScanState?.state === "running") {
+    return;
+  }
+  if (!beaconController || beaconController.isBeaconModeActive()) {
+    return;
+  }
+
+  await beaconController.start();
+  setAprsMapVisible(false);
+  setBeaconAreaVisible(true);
+  selectedDecoderMode = "BEACON";
+  wfc.selectedDecoderMode = "BEACON";
+  refreshModeButtons();
+  if (eventsSearchModeInput && eventsSearchModeInput.value !== "BEACON") {
+    eventsSearchModeInput.value = "BEACON";
+    fetchEvents();
+    fetchTotal();
+  }
 }
 
 function formatPropagationUtcTimestamp(value) {
@@ -3718,6 +3764,7 @@ async function fetchDecoderStatus() {
       setBeaconAreaVisible(true);
       selectedDecoderMode = "BEACON";
       wfc.selectedDecoderMode = "BEACON";
+      rememberBeaconUiMode(true);
       refreshModeButtons();
       if (eventsSearchModeInput && eventsSearchModeInput.value !== "BEACON") {
         eventsSearchModeInput.value = "BEACON";
@@ -5186,6 +5233,7 @@ if (quickModeButtons.length) {
         }
         if (beaconController?.isBeaconModeActive()) {
           // Toggle off
+          rememberBeaconUiMode(false);
           await beaconController.stop();
           setBeaconAreaVisible(false);
           selectedDecoderMode = null;
@@ -5199,6 +5247,7 @@ if (quickModeButtons.length) {
           await beaconController?.start();
           setBeaconAreaVisible(true);
           selectedDecoderMode = "BEACON";
+          rememberBeaconUiMode(true);
           refreshModeButtons();
           logLine("Beacon Monitor mode aberto — clica 'Start monitoring' para iniciar scheduler.");
         }
@@ -5207,6 +5256,7 @@ if (quickModeButtons.length) {
 
       // If beacon mode was active, exit it when switching to another mode
       if (beaconController?.isBeaconModeActive()) {
+        rememberBeaconUiMode(false);
         await beaconController.stop();
         setBeaconAreaVisible(false);
       }
@@ -5383,6 +5433,8 @@ async function startApplication() {
   if (!beaconController) {
     beaconController = new BeaconController();
   }
+
+  await restoreBeaconUiModeFromSession();
 
   fetchDecoderStatus();
   setInterval(fetchDecoderStatus, 20000);
