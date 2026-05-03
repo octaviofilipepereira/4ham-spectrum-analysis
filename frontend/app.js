@@ -552,13 +552,16 @@ function refreshQuickBandButtons() {
 function refreshModeButtons() {
   if (quickModeButtons.length) {
     const beaconLock = !!beaconController?.isBeaconModeActive();
+    const beaconScanRunning = !!beaconController?.isSchedulerRunning?.();
     quickModeButtons.forEach((button) => {
       const buttonMode = String(button.dataset.quickMode || "").trim();
       const isActive = selectedDecoderMode === buttonMode;
       // While BEACON mode is active, lock all mode buttons EXCEPT the BEACON
-      // one (so the user can still click it to leave the mode).
+      // one (so the user can still click it to leave the mode). Exception:
+      // when Beacon Analysis is actively scanning, the BEACON button itself
+      // must stay locked until the user clicks Stop monitoring first.
       const isBeaconBtn = buttonMode === "BEACON";
-      button.disabled = (beaconLock && !isBeaconBtn) || scanActionInFlight;
+      button.disabled = (beaconLock && (!isBeaconBtn || beaconScanRunning)) || scanActionInFlight;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
@@ -573,6 +576,8 @@ function refreshModeButtons() {
   }
   renderScanContextSummary(latestScanState);
 }
+
+window.refreshModeButtons = refreshModeButtons;
 
 function resolveActiveBandName(scanState) {
   const stateBand = String(scanState?.scan?.band || "").trim();
@@ -5105,6 +5110,10 @@ if (quickModeButtons.length) {
 
       // ── BEACON mode: special handling — takes over scan engine ────────────
       if (mode === "BEACON") {
+        if (beaconController?.isBeaconModeActive() && beaconController?.isSchedulerRunning?.()) {
+          showToast("Stop Beacon Analysis first, then disable Beacon Monitor.");
+          return;
+        }
         if (beaconController?.isBeaconModeActive()) {
           // Toggle off
           await beaconController.stop();

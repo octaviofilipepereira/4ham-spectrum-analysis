@@ -374,6 +374,9 @@ class BeaconController {
       this._statusBadge.className = "btn btn-sm btn-secondary";
     }
     this._statusBadge.disabled = true;
+    if (typeof window.refreshModeButtons === "function") {
+      try { window.refreshModeButtons(); } catch (_) {}
+    }
     if (this._startBtn) {
       this._startBtn.disabled = this._schedulerRunning;
       // Restore the original label once the scheduler is running (or stopped),
@@ -445,6 +448,10 @@ class BeaconController {
 
   isBeaconModeActive() {
     return this._beaconModeActive;
+  }
+
+  isSchedulerRunning() {
+    return this._schedulerRunning;
   }
 
   get currentFreqHz() {
