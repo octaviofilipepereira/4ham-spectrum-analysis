@@ -980,24 +980,31 @@ function renderHistoryRhythmChart(observations) {
   if (!observations.length) {
     return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
   }
-  const detected = observations.filter((obs) => obs.detected).length;
-  const noCopy = observations.length - detected;
+  const counts = { detected: 0, weak: 0, nocopy: 0 };
+  observations.forEach((obs) => {
+    counts[getHistoryObservationState(obs).key] += 1;
+  });
+  const detected = counts.detected;
+  const weakTrace = counts.weak;
+  const noCopy = counts.nocopy;
   const detectionRate = observations.length > 0 ? `${Math.round((detected / observations.length) * 100)}%` : "0%";
   const bars = observations.slice().reverse().map((obs) => {
-    const cls = obs.detected ? "detected" : "nocopy";
-    const height = obs.detected ? 82 : 26;
-    const title = `${formatUtcTimestamp(obs.slot_start_utc)} | ${obs.detected ? "Detected slot" : "No copy"}`;
+    const state = getHistoryObservationState(obs);
+    const cls = state.key;
+    const height = state.key === "detected" ? 82 : (state.key === "weak" ? 44 : 26);
+    const title = `${formatUtcTimestamp(obs.slot_start_utc)} | ${state.label}`;
     return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${escapeHtml(title)}"></span>`;
   }).join("");
   return `<div class="beacon-history-rhythm">
     <div class="beacon-history-chart__stats">
       ${renderHistoryChartStat("Rows", `${observations.length}`)}
       ${renderHistoryChartStat("Detected", `${detected}`)}
+      ${renderHistoryChartStat("Weak trace", `${weakTrace}`)}
       ${renderHistoryChartStat("No copy", `${noCopy}`)}
       ${renderHistoryChartStat("Detection rate", detectionRate)}
     </div>
     <div class="beacon-history-rhythm__bars">${bars}</div>
-    <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, amber = monitored with no copy.</div>
+    <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, gold = sub-threshold trace, amber = monitored with no copy.</div>
   </div>`;
 }
 
@@ -1061,10 +1068,20 @@ function formatHistoryMetricValue(value, kind) {
   return `${Math.max(0, Math.min(4, Math.round(Number(value))))}/4`;
 }
 
+function getHistoryObservationState(obs) {
+  if (obs?.detected) {
+    return { key: "detected", label: "Detected" };
+  }
+  const leadSnr = Number(obs?.snr_db_100w);
+  if (Number.isFinite(leadSnr) && leadSnr > 0) {
+    return { key: "weak", label: "Weak trace" };
+  }
+  return { key: "nocopy", label: "No copy" };
+}
+
 function renderHistoryStateBadge(obs) {
-  const text = obs.detected ? "Detected" : "No copy";
-  const cls = obs.detected ? "detected" : "nocopy";
-  return `<span class="beacon-history-state-chip beacon-history-state-chip--${cls}">${escapeHtml(text)}</span>`;
+  const state = getHistoryObservationState(obs);
+  return `<span class="beacon-history-state-chip beacon-history-state-chip--${state.key}">${escapeHtml(state.label)}</span>`;
 }
 
 function renderHistoryRowMetric(obs, kind) {

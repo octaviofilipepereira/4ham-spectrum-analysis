@@ -2299,6 +2299,7 @@ h1,
 }
 
 .beacon-history-rhythm__bar--detected { background: linear-gradient(180deg, #60a5fa, #1d4ed8); }
+.beacon-history-rhythm__bar--weak { background: linear-gradient(180deg, #facc15, #ca8a04); }
 .beacon-history-rhythm__bar--nocopy { background: linear-gradient(180deg, #f59e0b, #92400e); }
 
 .beacon-history-metric__bar--live { background: linear-gradient(180deg, #38bdf8, #1d4ed8); }
@@ -2329,6 +2330,7 @@ h1,
 }
 
 .beacon-history-state-chip--detected { background: rgba(37, 99, 235, 0.18); color: #bfdbfe; }
+.beacon-history-state-chip--weak { background: rgba(202, 138, 4, 0.18); color: #fde047; }
 .beacon-history-state-chip--nocopy { background: rgba(180, 83, 9, 0.18); color: #fde68a; }
 
 .beacon-history-drift-chip { background: rgba(148, 163, 184, 0.14); color: rgba(226, 232, 240, 0.88); }
