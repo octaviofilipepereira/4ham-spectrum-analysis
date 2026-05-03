@@ -2,7 +2,7 @@
 © 2026 Octávio Filipe Gonçalves
 Callsign: CT7BFV
 License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
-Last update: 2026-04-21 UTC
+Last update: 2026-05-03 UTC
 -->
 
 # 4ham-spectrum-analysis
@@ -17,6 +17,7 @@ It is designed to run on Linux PC and Raspberry Pi (Ubuntu 20.04+, Debian 11+, L
 - Band scanning with occupancy detection (adaptive power/threshold).
 - Real-time waterfall and history.
 - Automatic callsign identification for FT8/FT4, APRS, CW, and SSB (voice).
+- Beacon Analysis for the NCDXF/IARU network, with UTC-aligned monitoring of 18 fixed beacons across 5 HF bands.
 - **Propagation scoring from confirmed decodes:** only events with a verified callsign contribute to propagation scoring, regardless of mode. A confirmed decode provides a callsign and SNR — the reliable basis for ionospheric path assessment. Events without a callsign are recorded as **band occupancy** (band is active) but do not contribute to propagation scores.
 - Modern, clean, and responsive web UI.
 - Language: English (Portuguese and Spanish planned for a future release).
@@ -33,6 +34,13 @@ Note: installation instructions are in [docs/install.md](docs/install.md), inclu
 - Propagation scoring reference (EN): [docs/propagation_scoring_reference.md](docs/propagation_scoring_reference.md)
 - Propagation scoring reference (PT): [docs/propagation_scoring_reference_pt.md](docs/propagation_scoring_reference_pt.md)
 - Service packaging (systemd): [docs/ops_packaging.md](docs/ops_packaging.md)
+
+## Beacon Analysis - NCDXF/IARU
+4ham includes a dedicated Beacon Analysis mode for the NCDXF International Beacon Network. It monitors 18 fixed beacons on the 20 m, 17 m, 15 m, 12 m, and 10 m bands using strict 10-second UTC slots, with a live 18x5 matrix for the current monitored pass and a separate recent-activity heatmap for historical observation.
+
+Beacon Analysis uses its own UTC-aligned scheduler, so the normal scan engine is intentionally locked while the module is running. Before startup, 4ham validates host time quality. `healthy` allows startup; `degraded` and `offline` block startup to avoid false observations. The operating system timezone itself does not need to be UTC; what matters is correct absolute time and an active synchronization source.
+
+Verification and recovery commands are documented in [docs/install.md](docs/install.md), [docs/installation_manual.md](docs/installation_manual.md), [docs/user_manual.md](docs/user_manual.md), and [docs/user_manual_en.md](docs/user_manual_en.md).
 
 ## Screenshots
 
