@@ -9,6 +9,7 @@ Unit tests for the NCDXF Beacon Analysis backend:
 
 from __future__ import annotations
 
+import asyncio
 import math
 import sys
 import os
@@ -42,6 +43,7 @@ from app.beacons.matched_filter import (
     _combined_detect_score,
 )
 from app.api import beacons as beacon_api
+from app.beacons.public_payloads import public_beacon_heatmap_cell, public_beacon_observation
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +85,109 @@ class TestCatalogIntegrity:
         active = all_active_beacons()
         assert all(b.status == "active" for b in active)
         assert len(active) <= 18
+
+
+def test_public_beacon_payload_helpers_strip_internal_diagnostics():
+    observation = public_beacon_observation({
+        "slot_start_utc": "2026-05-03T12:00:00+00:00",
+        "detected": True,
+        "id_confirmed": True,
+        "id_confidence": 0.33,
+        "drift_ms": 128.0,
+        "dash_levels_detected": 3,
+    })
+    heatmap = public_beacon_heatmap_cell({
+        "beacon_index": 14,
+        "band_name": "20m",
+        "detections": 3,
+        "id_confirmed": 1,
+        "best_id_confirmed": 1,
+        "best_dashes": 3,
+    })
+
+    assert observation is not None
+    assert "id_confirmed" not in observation
+    assert "id_confidence" not in observation
+    assert "drift_ms" not in observation
+    assert observation["dash_levels_detected"] == 3
+
+    assert heatmap is not None
+    assert "id_confirmed" not in heatmap
+    assert "best_id_confirmed" not in heatmap
+    assert heatmap["best_dashes"] == 3
+
+
+def test_beacon_public_api_routes_strip_internal_diagnostics(monkeypatch):
+    slot_start = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    class DummyDb:
+        def get_beacon_observations(self, **kwargs):
+            return [{
+                "id": 42,
+                "slot_start_utc": slot_start,
+                "slot_index": 14,
+                "beacon_callsign": "CS3B",
+                "beacon_index": 14,
+                "beacon_location": "Madeira, Portugal",
+                "beacon_status": "active",
+                "band_name": "20m",
+                "freq_hz": 14100000,
+                "detected": True,
+                "id_confirmed": True,
+                "id_confidence": 0.21,
+                "drift_ms": 115.0,
+                "dash_levels_detected": 4,
+                "snr_db_100w": 2.7,
+                "snr_db_10w": 1.4,
+                "snr_db_1w": 0.6,
+                "snr_db_100mw": -0.2,
+                "recorded_at": slot_start,
+            }]
+
+        def get_beacon_heatmap(self, **kwargs):
+            return [{
+                "beacon_index": 14,
+                "band_name": "20m",
+                "total_slots": 4,
+                "detections": 3,
+                "id_confirmed": 1,
+                "best_snr_db": 2.7,
+                "best_dashes": 4,
+                "best_id_confirmed": 1,
+                "best_detected_utc": slot_start,
+                "latest_detected_utc": slot_start,
+            }]
+
+    monkeypatch.setattr(beacon_api.state, "db", DummyDb())
+
+    matrix_payload = asyncio.run(beacon_api.beacon_matrix())
+    matrix_cell = matrix_payload["matrix"][14][0]
+    assert matrix_cell is not None
+    assert "id_confirmed" not in matrix_cell
+    assert "id_confidence" not in matrix_cell
+    assert "drift_ms" not in matrix_cell
+
+    heatmap_payload = asyncio.run(beacon_api.beacon_heatmap(hours=12.0))
+    heatmap_cell = heatmap_payload["matrix"][14][0]
+    assert heatmap_cell is not None
+    assert "id_confirmed" not in heatmap_cell
+    assert "best_id_confirmed" not in heatmap_cell
+
+    observations_payload = asyncio.run(
+        beacon_api.beacon_observations(
+            limit=10,
+            offset=0,
+            band=None,
+            callsign=None,
+            detected_only=False,
+            hours=None,
+        )
+    )
+    observation = observations_payload["observations"][0]
+    assert observations_payload["count"] == 1
+    assert "id_confirmed" not in observation
+    assert "id_confidence" not in observation
+    assert "drift_ms" not in observation
 
 
 class TestScheduleFormula:

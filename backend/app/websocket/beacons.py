@@ -7,7 +7,7 @@ Streams two event types:
                    { type, callsign, freq_hz, slot_index, slot_start_utc,
                      band_name, beacon_index, beacon_location }
   observation    — emitted after SlotDetector finishes (end of slot)
-                   { type, ...full observation dict }
+                                     { type, ...public observation payload }
 
 The scheduler calls broadcast_slot_start() / broadcast_observation()
 which are wired up in main.py via on_slot_start / on_observation callbacks.
@@ -24,6 +24,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.dependencies import state
 from app.beacons.catalog import BEACONS, BANDS, beacon_at
+from app.beacons.public_payloads import public_beacon_observation
 
 router = APIRouter()
 _log = logging.getLogger("uvicorn.error")
@@ -103,7 +104,10 @@ async def broadcast_observation(obs: dict[str, Any]) -> None:
     """Called by BeaconScheduler.on_observation — broadcast observation event."""
     if not _connections:
         return
-    msg = json.dumps({"type": "observation", **obs})
+    public_obs = public_beacon_observation(obs)
+    if public_obs is None:
+        return
+    msg = json.dumps({"type": "observation", **public_obs})
     await _broadcast(msg)
 
 

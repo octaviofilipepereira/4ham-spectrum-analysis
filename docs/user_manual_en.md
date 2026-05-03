@@ -254,11 +254,61 @@ Important:
 
 - **Status badge**: shows whether the scheduler is stopped, validating host time, starting, or running.
 - **Live 18×5 matrix**: each row is a beacon and each column is a band.
-- **Confirmed**: indicates that the CW callsign was matched.
 - **Top meter**: 100 W reference dash strength, with SNR shown on the right.
 - **Bottom meter**: ordered dash sequence heard, from 0 to 4.
 - **No copy**: means the slot was monitored but no reliable copy was obtained.
-- **Recent activity**: shows the best coherent pass in the selected historical window; it is not the current live slot state.
+- **Recent activity**: always uses a rolling 12-hour window and shows the best detected pass per cell; it is not the current live slot state.
+
+### Public Beacon semantics
+
+The public reading of the Beacon module is based on the known UTC schedule of the NCDXF/IARU network. 4ham already knows which beacon should be active in each slot and on each band; therefore, a slot shown publicly as **Detected** means there was enough evidence compatible with the scheduled beacon in that monitored slot.
+
+Internal engineering diagnostics still exist in the system, but they do not enter the public Beacon interpretation or the future export model for this module.
+
+| Term | Public meaning |
+|---|---|
+| `Window` | Rolling history window. In the **Recent activity** panel it is always 12 hours. |
+| `Coverage` | Number of slots actually monitored inside the window. |
+| `Detected` | Number of monitored slots with a valid observation of the scheduled beacon. |
+| `No copy` | Number of monitored slots without a usable observation. In the public interpretation it is `Coverage - Detected`. |
+| `100 W SNR` | Strength of the 100 W reference dash in the observed slot. |
+| `Best pass` | Best detected pass in the window, ranked first by ordered dash sequence and then by 100 W dash SNR. |
+
+### Planned Propagation Score model
+
+The **Beacon Propagation Score** is defined for future Beacon analytics/export and is not yet part of the current Beacon panel.
+
+| Symbol | Meaning |
+|---|---|
+| `W` | window in minutes |
+| `E(W)` | expected slots per cell in that window |
+| `M` | observed coverage (`Coverage`) |
+| `D` | detected slots (`Detected`) |
+| `C` | coverage confidence factor |
+| `R` | positive observation rate |
+| `S` | normalised median `100 W SNR` across detected slots |
+| `B` | best detected-pass quality |
+
+```text
+E(W) = W / 15
+
+C = sqrt(min(1, M / E(W)))
+
+R = D / M
+
+S = clip((median_snr_100W + 3) / 9, 0, 1)
+
+B = 0.5 * (best_dashes / 4)
+   + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+
+P = 0                                  if D = 0
+P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  if D > 0
+```
+
+Notes:
+- `clip(x, 0, 1)` limits the value to the `[0, 1]` range.
+- `median_snr_100W` uses detected slots only.
+- `No copy` is shown publicly but is not added to the score again, because it is already represented by `R = D / M`.
 
 ### Time validation before startup
 

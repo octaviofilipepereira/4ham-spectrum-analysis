@@ -25,6 +25,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.dependencies import state
 from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_cycle_window, current_slot_index
+from app.beacons.public_payloads import public_beacon_heatmap_cell, public_beacon_observation
 
 router = APIRouter()
 
@@ -512,7 +513,9 @@ async def beacon_matrix() -> dict[str, Any]:
             b_idx = (row.get("slot_index") or 0) % 18
         key = (b_idx, row["band_name"])
         if key not in cell:
-            cell[key] = row
+            public_row = public_beacon_observation(row)
+            if public_row is not None:
+                cell[key] = public_row
 
     # Build 18×5 matrix
     matrix: list[list[dict | None]] = []
@@ -550,7 +553,9 @@ async def beacon_heatmap(
         b_idx = row.get("beacon_index")
         if b_idx is None:
             continue
-        cell[(int(b_idx), row["band_name"])] = row
+        public_row = public_beacon_heatmap_cell(row)
+        if public_row is not None:
+            cell[(int(b_idx), row["band_name"])] = public_row
 
     matrix: list[list[dict | None]] = []
     for s in range(18):
@@ -585,4 +590,5 @@ async def beacon_observations(
         detected_only=detected_only,
         hours=hours,
     )
-    return {"observations": rows, "count": len(rows), "offset": offset}
+    public_rows = [row for row in (public_beacon_observation(row) for row in rows) if row is not None]
+    return {"observations": public_rows, "count": len(public_rows), "offset": offset}

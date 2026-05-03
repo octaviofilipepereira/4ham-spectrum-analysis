@@ -218,7 +218,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <ul>
       <li>Uses a UTC-aligned scheduler instead of the normal scan sweep.</li>
       <li>Shows a live 18×5 matrix with one row per beacon and one column per band.</li>
-      <li>Shows a separate <strong>Recent activity</strong> heatmap for the last 30 minutes to 24 hours.</li>
+      <li>Shows a separate <strong>Recent activity</strong> heatmap for a fixed rolling 12-hour window.</li>
       <li>Blocks startup when host time cannot be validated safely enough for exact slot alignment.</li>
     </ul>
 
@@ -239,10 +239,61 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <ul>
       <li><strong>Status badge</strong> — shows whether the Beacon scheduler is stopped, validating host time, starting, or running.</li>
       <li><strong>Live matrix</strong> — each cell represents the latest monitored pass for one beacon on one band.</li>
-      <li><strong>Confirmed</strong> — a green confirmed indication means the CW callsign was matched.</li>
       <li><strong>Meter rows</strong> — top row is the 100 W reference dash strength; bottom row is the ordered dash sequence heard from 0 to 4.</li>
       <li><strong>No copy</strong> — the orange no-copy bar means that slot was monitored but no reliable copy was obtained.</li>
-      <li><strong>Recent activity</strong> — the lower table shows the best coherent detected pass in the selected historical window, not the current live slot state.</li>
+      <li><strong>Recent activity</strong> — the lower table is always a rolling 12-hour view and shows the best detected pass per cell, not the current live slot state.</li>
+    </ul>
+
+    <h3 class="sub-title">Public Beacon Semantics</h3>
+    <p>
+      The public reading of Beacon Analysis is schedule-driven. 4ham already knows which beacon should be active in each UTC slot and on each band.
+      A slot shown publicly as <strong>Detected</strong> therefore means that the monitored slot contained enough evidence compatible with the scheduled beacon.
+      Internal engineering diagnostics remain in the system, but they do not enter the public Beacon interpretation or the future export model for this module.
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Term</th><th>Public meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Window</strong></td><td>Rolling history window. In <strong>Recent activity</strong> it is always 12 hours.</td></tr>
+        <tr><td><strong>Coverage</strong></td><td>Number of slots actually monitored inside the window.</td></tr>
+        <tr><td><strong>Detected</strong></td><td>Number of monitored slots with a valid observation of the scheduled beacon.</td></tr>
+        <tr><td><strong>No copy</strong></td><td>Number of monitored slots without a usable observation. Publicly, this is <code>Coverage - Detected</code>.</td></tr>
+        <tr><td><strong>100 W SNR</strong></td><td>Strength of the 100 W reference dash in the observed slot.</td></tr>
+        <tr><td><strong>Best pass</strong></td><td>Best detected pass in the window, ranked first by ordered dash sequence and then by 100 W dash SNR.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Planned Beacon Propagation Score</h3>
+    <p>The Beacon Propagation Score is defined for future Beacon analytics/export and is not yet part of the current Beacon panel.</p>
+    <table class="manual-table">
+      <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>W</code></td><td>Window in minutes</td></tr>
+        <tr><td><code>E(W)</code></td><td>Expected slots per cell in that window</td></tr>
+        <tr><td><code>M</code></td><td>Observed coverage (<strong>Coverage</strong>)</td></tr>
+        <tr><td><code>D</code></td><td>Detected slots (<strong>Detected</strong>)</td></tr>
+        <tr><td><code>C</code></td><td>Coverage confidence factor</td></tr>
+        <tr><td><code>R</code></td><td>Positive observation rate</td></tr>
+        <tr><td><code>S</code></td><td>Normalised median <code>100 W SNR</code> across detected slots</td></tr>
+        <tr><td><code>B</code></td><td>Best detected-pass quality</td></tr>
+      </tbody>
+    </table>
+    <pre class="small border rounded px-2 py-2 mb-3">E(W) = W / 15
+
+C = sqrt(min(1, M / E(W)))
+
+R = D / M
+
+S = clip((median_snr_100W + 3) / 9, 0, 1)
+
+B = 0.5 * (best_dashes / 4)
+  + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+
+P = 0                                  if D = 0
+P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  if D &gt; 0</pre>
+    <ul>
+      <li><code>clip(x, 0, 1)</code> limits the value to the <code>[0, 1]</code> range.</li>
+      <li><code>median_snr_100W</code> uses detected slots only.</li>
+      <li><strong>No copy</strong> is shown publicly but is not added to the score again, because it is already represented by <code>R = D / M</code>.</li>
     </ul>
 
     <h3 class="sub-title">Time Validation Before Startup</h3>

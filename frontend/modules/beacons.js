@@ -371,7 +371,6 @@ class BeaconController {
     }
     const det   = Number(cell.detections || 0);
     const total = Number(cell.total_slots || 0);
-    const confirmed = Number(cell.id_confirmed || 0);
     if (det <= 0) {
       const title = `Monitored ${total} slot(s) in window\n0 detected passes\nHistorical summary counts detected passes only; weak live telemetry below threshold is excluded.`;
       return `<td class="beacon-cell beacon-cell--history-monitored text-center" title="${title}">
@@ -390,16 +389,14 @@ class BeaconController {
     const bestPass = {
       dash_levels_detected: bestDashes,
       snr_db_100w: cell.best_snr_db,
-      id_confirmed: Number(cell.best_id_confirmed || 0) > 0,
     };
     const title = [
       `Detected ${det}/${total} monitored slots in window`,
-      `Confirmed IDs: ${confirmed}`,
       `Best detected pass: 100 W ${bestSnr} dB, sequence ${bestDashes}/4, at ${cell.best_detected_utc || "?"}`,
       `Latest detected pass: ${cell.latest_detected_utc || "?"}`,
       "Historical summary counts detected passes only; weak live telemetry below threshold is excluded.",
     ].join("\n");
-    const summary = confirmed > 0 ? `✓${confirmed} · ${det}/${total} mon` : `${det}/${total} mon`;
+    const summary = `${det}/${total} mon`;
     return `<td class="beacon-cell beacon-cell--history-hit text-center" title="${title}">
       <small class="beacon-history-cell text-white">
         ${renderBeaconTelemetry(bestPass)}
@@ -418,21 +415,21 @@ class BeaconController {
     }
     const cell = detail.cell;
     if (!cell || !cell.total_slots) {
-      this._historyInfoSummary.textContent = "No monitored slots were recorded for this beacon/band cell in the selected window.";
+      this._historyInfoSummary.textContent = "No monitored slots were recorded for this beacon/band cell in the rolling history window.";
       return;
     }
     const total = Number(cell.total_slots || 0);
     const detections = Number(cell.detections || 0);
-    const confirmed = Number(cell.id_confirmed || 0);
+    const noCopy = Math.max(total - detections, 0);
     const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
     const bestSeq = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
     const latest = formatUtcTimestamp(cell.latest_detected_utc);
     if (detections <= 0) {
-      this._historyInfoSummary.textContent = `Monitored ${total} slot(s) in the selected window. No detected passes were recorded for this cell.`;
+      this._historyInfoSummary.textContent = `Monitored ${total} slot(s) in the rolling 12-hour window. No detected passes were recorded for this cell.`;
       this._renderHistoryInfoVisuals(detail, []);
       return;
     }
-    this._historyInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). Confirmed CW IDs: ${confirmed}. Best pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
+    this._historyInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). No copy: ${noCopy}. Best detected pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
     this._renderHistoryInfoVisuals(detail, []);
   }
 
@@ -469,7 +466,7 @@ class BeaconController {
     }
     if (!detail.cell?.total_slots) {
       if (this._historyInfoRecords) {
-        this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows exist for this cell in the selected window.</div>';
+        this._historyInfoRecords.innerHTML = '<div class="text-muted">No observation rows exist for this cell in the rolling history window.</div>';
       }
       return;
     }
@@ -512,16 +509,11 @@ class BeaconController {
       return;
     }
     const rows = observations.map((obs) => {
-      const snr = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
-      const dashes = `${Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))))}/4`;
-      const drift = Number.isFinite(Number(obs.drift_ms)) ? `${Math.round(Number(obs.drift_ms))} ms` : "n/a";
       return `<tr>
         <td>${escapeHtml(formatUtcTimestamp(obs.slot_start_utc))}</td>
         <td>${renderHistoryStateBadge(obs)}</td>
-        <td>${renderHistoryConfirmBadge(obs)}</td>
         <td>${renderHistoryRowMetric(obs, "snr")}</td>
         <td>${renderHistoryRowMetric(obs, "dash")}</td>
-        <td><span class="beacon-history-drift-chip">${escapeHtml(drift)}</span></td>
       </tr>`;
     });
     this._historyInfoRecords.innerHTML = `<div class="table-responsive beacon-history-info-table-wrap">
@@ -529,11 +521,9 @@ class BeaconController {
         <thead>
           <tr>
             <th>UTC slot</th>
-            <th>Copy</th>
-            <th>CW ID</th>
+            <th>Observation</th>
             <th>100 W profile</th>
             <th>Sequence profile</th>
-            <th>Drift</th>
           </tr>
         </thead>
         <tbody>${rows.join("")}</tbody>
@@ -677,7 +667,7 @@ class BeaconController {
       if (obs.detected) {
         const title = renderBeaconCellTitle(obs);
         inner = `<small class="beacon-cell__reading" title="${title}">${renderBeaconTelemetry(obs)}</small>`;
-        cls += obs.id_confirmed ? " beacon-cell--confirmed" : " beacon-cell--detected";
+        cls += " beacon-cell--detected";
       } else {
         inner = `<span title="Latest monitored pass: no copy">${renderBeaconMeter(0, "nocopy")}</span>`;
         cls += " beacon-cell--absent";
@@ -911,12 +901,10 @@ function referenceMeterLevel(snrDb) {
 function renderBeaconTelemetry(obs) {
   const dashCount = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
   const snrLabel = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
-  const confirmedMark = obs.id_confirmed ? '<span class="text-success" title="CW ID confirmed">✓</span>' : "";
   return `<span class="beacon-cell__telemetry">
     <span class="beacon-meter-row" title="100 W reference dash: ${snrLabel}">
       ${renderBeaconMeter(referenceMeterLevel(obs.snr_db_100w))}
       <span class="beacon-meter-value">${snrLabel}</span>
-      ${confirmedMark}
     </span>
     <span class="beacon-meter-row" title="Ordered dash sequence heard: ${dashCount}/4">
       ${renderBeaconMeter(dashCount)}
@@ -928,14 +916,10 @@ function renderBeaconTelemetry(obs) {
 function renderBeaconCellTitle(obs) {
   const dashCount = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
   const snrLabel = Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a";
-  const lines = [
+  return [
     `100 W reference dash: ${snrLabel}`,
     `Ordered dash sequence heard: ${dashCount}/4`,
-  ];
-  if (obs.id_confirmed) {
-    lines.push("CW ID confirmed");
-  }
-  return lines.join("\n");
+  ].join("\n");
 }
 
 function renderHistoryInfoButton(detailKey, detail) {
@@ -946,16 +930,17 @@ function renderHistoryInfoStats(detail, observations) {
   const cell = detail.cell || {};
   const total = Number(cell.total_slots || 0);
   const detections = Number(cell.detections || 0);
-  const confirmed = Number(cell.id_confirmed || 0);
+  const noCopy = Math.max(total - detections, 0);
   const detectionRate = total > 0 ? `${Math.round((detections / total) * 100)}%` : "0%";
-  const confirmationRate = detections > 0 ? `${Math.round((confirmed / detections) * 100)}%` : "0%";
+  const noCopyRate = total > 0 ? `${Math.round((noCopy / total) * 100)}%` : "0%";
   const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
   const bestSeq = `${Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))))}/4`;
   const latest = formatUtcTimestamp(cell.latest_detected_utc);
   const cards = [
     { label: "Window", value: formatHistoryWindow(detail.hours), note: "Fixed rolling view" },
-    { label: "Coverage", value: `${total} slot(s)`, note: `${detectionRate} with copy` },
-    { label: "CW ID quality", value: `${confirmed} confirmed`, note: `${confirmationRate} of detected passes` },
+    { label: "Coverage", value: `${total} slot(s)`, note: "Monitored in rolling view" },
+    { label: "Detected", value: `${detections} slot(s)`, note: `${detectionRate} of monitored coverage` },
+    { label: "No copy", value: `${noCopy} slot(s)`, note: `${noCopyRate} of monitored coverage` },
     { label: "Best pass", value: `${bestSnr} · ${bestSeq}`, note: formatUtcTimestamp(cell.best_detected_utc) },
     { label: "Latest detected", value: latest, note: `${observations.length} latest monitored rows loaded` },
   ];
@@ -974,18 +959,14 @@ function renderHistoryMixChart(cell) {
     return '<div class="beacon-history-chart__empty">No monitored slots in the rolling 12-hour window.</div>';
   }
   const detections = Math.max(0, Number(cell.detections || 0));
-  const confirmed = Math.max(0, Number(cell.id_confirmed || 0));
-  const detectedOnly = Math.max(detections - confirmed, 0);
   const noCopy = Math.max(total - detections, 0);
   return `<div class="beacon-history-mix">
     <div class="beacon-history-mix__bar" role="img" aria-label="Copy mix across the rolling 12-hour window">
-      <span class="beacon-history-mix__seg beacon-history-mix__seg--confirmed" style="width:${pct(confirmed, total)}%"></span>
-      <span class="beacon-history-mix__seg beacon-history-mix__seg--detected" style="width:${pct(detectedOnly, total)}%"></span>
+      <span class="beacon-history-mix__seg beacon-history-mix__seg--observed" style="width:${pct(detections, total)}%"></span>
       <span class="beacon-history-mix__seg beacon-history-mix__seg--nocopy" style="width:${pct(noCopy, total)}%"></span>
     </div>
     <div class="beacon-history-mix__legend">
-      ${renderMixLegendItem("Confirmed", confirmed, total, "confirmed")}
-      ${renderMixLegendItem("Detected only", detectedOnly, total, "detected")}
+      ${renderMixLegendItem("Detected", detections, total, "observed")}
       ${renderMixLegendItem("No copy", noCopy, total, "nocopy")}
     </div>
   </div>`;
@@ -995,24 +976,24 @@ function renderHistoryRhythmChart(observations) {
   if (!observations.length) {
     return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
   }
-  const confirmed = observations.filter((obs) => obs.id_confirmed).length;
-  const detectedOnly = observations.filter((obs) => obs.detected && !obs.id_confirmed).length;
-  const noCopy = observations.length - confirmed - detectedOnly;
+  const detected = observations.filter((obs) => obs.detected).length;
+  const noCopy = observations.length - detected;
+  const detectionRate = observations.length > 0 ? `${Math.round((detected / observations.length) * 100)}%` : "0%";
   const bars = observations.slice().reverse().map((obs) => {
-    const cls = obs.id_confirmed ? "confirmed" : (obs.detected ? "detected" : "nocopy");
-    const height = obs.id_confirmed ? 100 : (obs.detected ? 72 : 26);
-    const title = `${formatUtcTimestamp(obs.slot_start_utc)} | ${obs.id_confirmed ? "CW ID confirmed" : (obs.detected ? "Detected copy" : "No copy")}`;
+    const cls = obs.detected ? "detected" : "nocopy";
+    const height = obs.detected ? 82 : 26;
+    const title = `${formatUtcTimestamp(obs.slot_start_utc)} | ${obs.detected ? "Detected slot" : "No copy"}`;
     return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${escapeHtml(title)}"></span>`;
   }).join("");
   return `<div class="beacon-history-rhythm">
     <div class="beacon-history-chart__stats">
       ${renderHistoryChartStat("Rows", `${observations.length}`)}
-      ${renderHistoryChartStat("Confirmed", `${confirmed}`)}
-      ${renderHistoryChartStat("Detected", `${detectedOnly}`)}
+      ${renderHistoryChartStat("Detected", `${detected}`)}
       ${renderHistoryChartStat("No copy", `${noCopy}`)}
+      ${renderHistoryChartStat("Detection rate", detectionRate)}
     </div>
     <div class="beacon-history-rhythm__bars">${bars}</div>
-    <div class="beacon-history-chart__caption">Older on the left, newer on the right. Green = confirmed, blue = detected, amber = monitored with no copy.</div>
+    <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, amber = monitored with no copy.</div>
   </div>`;
 }
 
@@ -1077,16 +1058,9 @@ function formatHistoryMetricValue(value, kind) {
 }
 
 function renderHistoryStateBadge(obs) {
-  const text = obs.id_confirmed ? "Confirmed" : (obs.detected ? "Detected" : "No copy");
-  const cls = obs.id_confirmed ? "confirmed" : (obs.detected ? "detected" : "nocopy");
+  const text = obs.detected ? "Detected" : "No copy";
+  const cls = obs.detected ? "detected" : "nocopy";
   return `<span class="beacon-history-state-chip beacon-history-state-chip--${cls}">${escapeHtml(text)}</span>`;
-}
-
-function renderHistoryConfirmBadge(obs) {
-  if (!obs.id_confirmed) {
-    return '<span class="beacon-history-confirm-chip beacon-history-confirm-chip--no">No CW ID</span>';
-  }
-  return `<span class="beacon-history-confirm-chip beacon-history-confirm-chip--yes">CW ID ${escapeHtml(formatConfidence(obs.id_confidence))}</span>`;
 }
 
 function renderHistoryRowMetric(obs, kind) {
@@ -1122,7 +1096,7 @@ function pct(value, total) {
 
 function formatHistoryWindow(hours) {
   const value = Number(hours);
-  if (!Number.isFinite(value) || value <= 0) return "selected window";
+  if (!Number.isFinite(value) || value <= 0) return "rolling window";
   if (value < 1) return `${Math.round(value * 60)} min`;
   const wholeHours = Number.isInteger(value) ? String(value) : value.toFixed(1);
   return `${wholeHours} h`;

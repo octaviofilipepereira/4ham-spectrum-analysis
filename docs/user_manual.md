@@ -254,11 +254,61 @@ Importante:
 
 - **Status badge**: mostra se o scheduler está parado, a validar tempo, a arrancar ou em execução.
 - **Matriz live 18×5**: cada linha é um beacon; cada coluna é uma banda.
-- **Confirmed**: indica que o indicativo CW foi confirmado.
 - **Top meter**: intensidade da dash de referência a 100 W, com o SNR à direita.
 - **Bottom meter**: sequência ordenada de dashes ouvidas, de 0 a 4.
 - **No copy**: significa que o slot foi monitorizado mas não houve cópia fiável.
-- **Recent activity**: mostra o melhor passe coerente dentro da janela temporal seleccionada; não representa o slot live actual.
+- **Recent activity**: usa sempre uma janela rolling de 12 horas e mostra o melhor passe detectado por célula; não representa o slot live actual.
+
+### Semântica pública do Beacon
+
+A leitura pública do módulo Beacon é baseada no calendário UTC conhecido da rede NCDXF/IARU. O 4ham já sabe qual beacon deveria estar activo em cada slot e em cada banda; por isso, um slot marcado publicamente como **Detected** significa que houve evidência suficiente compatível com o beacon agendado nesse slot monitorizado.
+
+Diagnósticos internos de engenharia continuam a existir no sistema, mas não entram na interpretação pública do Beacon nem no modelo futuro de exportação deste módulo.
+
+| Termo | Significado público |
+|---|---|
+| `Window` | Janela rolling usada pelo histórico. No painel **Recent activity** é sempre 12 horas. |
+| `Coverage` | Número de slots efectivamente monitorizados dentro da janela. |
+| `Detected` | Número de slots monitorizados com observação válida do beacon agendado. |
+| `No copy` | Número de slots monitorizados sem observação útil. Na leitura pública equivale a `Coverage - Detected`. |
+| `100 W SNR` | Intensidade da dash de referência a 100 W no slot observado. |
+| `Best pass` | Melhor passe detectado na janela, ordenado primeiro pela sequência de dashes ouvidas e depois pelo SNR da dash de 100 W. |
+
+### Modelo planeado de Propagation Score
+
+O **Beacon Propagation Score** está definido para analytics/export futuros do módulo Beacon e ainda não faz parte do painel Beacon actual.
+
+| Símbolo | Significado |
+|---|---|
+| `W` | janela em minutos |
+| `E(W)` | número esperado de slots por célula nessa janela |
+| `M` | cobertura observada (`Coverage`) |
+| `D` | slots detectados (`Detected`) |
+| `C` | factor de confiança da cobertura |
+| `R` | taxa de observação positiva |
+| `S` | mediana normalizada do `100 W SNR` dos slots detectados |
+| `B` | qualidade do melhor passe detectado |
+
+```text
+E(W) = W / 15
+
+C = sqrt(min(1, M / E(W)))
+
+R = D / M
+
+S = clip((median_snr_100W + 3) / 9, 0, 1)
+
+B = 0.5 * (best_dashes / 4)
+   + 0.5 * clip((best_snr_100W + 3) / 9, 0, 1)
+
+P = 0                                  se D = 0
+P = 100 * C * (0.70 * R + 0.20 * S + 0.10 * B)  se D > 0
+```
+
+Notas:
+- `clip(x, 0, 1)` limita o valor ao intervalo `[0, 1]`.
+- `median_snr_100W` usa apenas slots detectados.
+- `No copy` é mostrado publicamente mas não entra duas vezes no score, porque já está reflectido em `R = D / M`.
 
 ### Validação temporal antes do arranque
 

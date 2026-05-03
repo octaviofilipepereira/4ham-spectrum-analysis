@@ -27,7 +27,7 @@ Slot internal timing (the same for every beacon, every band):
     t ≈ 5.9 s .. 10.0 s      silence (guard)
 
 Detected dash count (highest sensitivity reached) is the canonical
-FAROS-style propagation indicator: if the 100 mW dash is detected,
+propagation indicator for this module: if the 100 mW dash is detected,
 SNR on the path is ≥ ~30 dB above the noise floor.
 """
 
