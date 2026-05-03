@@ -4,6 +4,7 @@
 # Last update: 2026-02-24 12:00:00 UTC
 
 import asyncio
+import gc
 import os
 import time
 from typing import Optional, Dict, Any, BinaryIO
@@ -91,6 +92,16 @@ class ScanEngine:
             self.controller.close(device, stream)
         except Exception:
             pass
+        finally:
+            try:
+                del stream
+            except Exception:
+                pass
+            try:
+                del device
+            except Exception:
+                pass
+            gc.collect()
 
     async def _open_device_with_timeout(
         self,
@@ -155,6 +166,7 @@ class ScanEngine:
             return False
 
         self._release_device()
+        await asyncio.sleep(0.25)
         try:
             self.device, self.stream = await self._open_device_with_timeout(
                 device_id=self.preview_device_id,
