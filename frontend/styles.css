@@ -1357,6 +1357,60 @@ h1,
   color: var(--muted);
 }
 
+.beacon-time-sync-modal .modal-content {
+  border-color: rgba(255, 107, 107, 0.28);
+}
+
+.beacon-time-sync-modal__hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 107, 107, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(90, 22, 30, 0.34), rgba(40, 12, 20, 0.18));
+}
+
+.beacon-time-sync-modal__icon {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 160, 160, 0.98), rgba(255, 107, 107, 0.92) 45%, rgba(158, 31, 48, 0.96) 100%);
+  box-shadow: 0 10px 24px rgba(120, 22, 37, 0.35);
+  color: #fff7f7;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.beacon-time-sync-modal__copy {
+  min-width: 0;
+}
+
+.beacon-time-sync-modal__copy p {
+  color: var(--text);
+}
+
+.beacon-time-sync-modal__note {
+  color: rgba(245, 247, 255, 0.72);
+}
+
+@media (max-width: 575px) {
+  .beacon-time-sync-modal__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .beacon-time-sync-modal__icon {
+    width: 52px;
+    height: 52px;
+  }
+}
+
 .app-modal .admin-config-helper-text {
   color: rgba(245, 247, 255, 0.8);
 }
@@ -1396,11 +1450,12 @@ h1,
 }
 
 .app-modal .btn-close {
-  filter: invert(1) brightness(1.2);
+  filter: invert(1) grayscale(1) brightness(180%);
   opacity: 0.85;
 }
 
-.app-modal .btn-close:hover {
+.app-modal .btn-close:hover,
+.app-modal .btn-close:focus {
   opacity: 1;
 }
 

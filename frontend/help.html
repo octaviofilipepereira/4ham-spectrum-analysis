@@ -1064,6 +1064,17 @@ sudo bash scripts/enable_aprs.sh</pre>
       <li>The backend is running — check <strong>Server logs</strong>.</li>
     </ul>
 
+    <h3 class="sub-title">Beacon Analysis start is blocked</h3>
+    <p>
+      Beacon Analysis (NCDXF/IARU) now validates the host UTC time before starting the scheduler.
+      If 4ham cannot confirm a healthy UTC sync state, startup is blocked and a modal explains the reason.
+    </p>
+    <ul>
+      <li>Check <code>timedatectl status</code> — <strong>System clock synchronized</strong> should be <code>yes</code>.</li>
+      <li>Check <code>timedatectl timesync-status</code> or <code>chronyc tracking</code> — the host should have an active time source.</li>
+      <li>Large offsets or missing NTP sync can shift the 10-second UTC slots and produce false beacon observations.</li>
+    </ul>
+
     <h3 class="sub-title">FT8/FT4 markers appear and then disappear</h3>
     <p>
       This is expected behaviour. Markers expire after 3 decode-window periods of inactivity (FT8: 45 s, FT4: 23 s).

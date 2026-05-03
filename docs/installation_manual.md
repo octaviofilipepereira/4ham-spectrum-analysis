@@ -41,6 +41,7 @@ This manual provides a complete setup for Linux (Ubuntu 20.04+ / Debian 11+ / Li
 - Python 3.10+
 - Basic build tools (Linux)
 - Accurate system time (NTP) for FT8/FT4
+- Beacon Analysis (NCDXF/IARU) additionally requires a healthy host UTC sync state; 4ham blocks scheduler start when that validation fails.
 
 ## Quick Start (graphical installer)
 

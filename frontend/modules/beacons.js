@@ -47,6 +47,7 @@ class BeaconController {
     this._activeBand = null;
     this._countdownTimer = null;
     this._schedulerRunning = false;
+    this._startValidationInFlight = false;
     this._currentFreqHz = null;      // current slot frequency for VFO label
     this._currentCallsign = null;    // current slot beacon callsign
     this._cycleStartMs = null;       // latest 3-minute UTC cycle boundary seen on the wire
@@ -56,6 +57,12 @@ class BeaconController {
     this._countdown   = document.getElementById("beaconCountdown");
     this._startBtn    = document.getElementById("beaconStartBtn");
     this._stopBtn     = document.getElementById("beaconStopBtn");
+    this._timeSyncModalEl = document.getElementById("beaconTimeSyncModal");
+    this._timeSyncModalMessage = document.getElementById("beaconTimeSyncModalMessage");
+    this._timeSyncModalReason = document.getElementById("beaconTimeSyncModalReason");
+    this._timeSyncModalSource = document.getElementById("beaconTimeSyncModalSource");
+    this._timeSyncModalServer = document.getElementById("beaconTimeSyncModalServer");
+    this._timeSyncModalMetrics = document.getElementById("beaconTimeSyncModalMetrics");
     this._historyBody    = document.getElementById("beaconHistoryBody");
     this._historyHours   = document.getElementById("beaconHistoryHours");
     this._historyRefresh = document.getElementById("beaconHistoryRefresh");
@@ -115,6 +122,92 @@ class BeaconController {
     if (cycleStartMs != null) {
       this._cycleStartMs = cycleStartMs;
     }
+  }
+
+  _formatMetricMs(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    if (Math.abs(num) < 1.0) return `${num.toFixed(3)} ms`;
+    return `${num.toFixed(1)} ms`;
+  }
+
+  _formatTimeSyncReason(code) {
+    const map = {
+      ok: "Host UTC time validated",
+      not_synchronized: "System clock is not synchronized",
+      ntp_inactive: "NTP service is not active",
+      no_active_server: "No active NTP server detected",
+      offset_too_high: "Clock offset too high",
+      root_distance_too_high: "Time source distance too high",
+      leap_not_normal: "Non-normal leap state reported",
+      probe_partial: "Time sync probe incomplete",
+      probe_unavailable: "Time sync probe unavailable",
+    };
+    return map[String(code || "").trim()] || "Time sync validation failed";
+  }
+
+  _renderTimeSyncModal(timeSync, message) {
+    if (!this._timeSyncModalEl) return;
+    const sync = timeSync && typeof timeSync === "object" ? timeSync : {};
+    const serverBits = [];
+    if (sync.server_name) serverBits.push(sync.server_name);
+    if (sync.server_address) serverBits.push(sync.server_address);
+    const metrics = [];
+    const offset = this._formatMetricMs(sync.offset_ms);
+    const jitter = this._formatMetricMs(sync.jitter_ms);
+    const rootDistance = this._formatMetricMs(sync.root_distance_ms);
+    if (offset) metrics.push(`offset ${offset}`);
+    if (jitter) metrics.push(`jitter ${jitter}`);
+    if (rootDistance) metrics.push(`root distance ${rootDistance}`);
+    if (this._timeSyncModalMessage) {
+      this._timeSyncModalMessage.textContent =
+        message || sync.message || "Beacon Analysis start was blocked because 4ham could not validate the host UTC time with enough confidence.";
+    }
+    if (this._timeSyncModalReason) {
+      this._timeSyncModalReason.textContent = this._formatTimeSyncReason(sync.reason_code);
+    }
+    if (this._timeSyncModalSource) {
+      this._timeSyncModalSource.textContent = sync.source || "unknown";
+    }
+    if (this._timeSyncModalServer) {
+      this._timeSyncModalServer.textContent = serverBits.join(" | ") || "No active server reported";
+    }
+    if (this._timeSyncModalMetrics) {
+      const leap = sync.leap_status ? `leap ${sync.leap_status}` : null;
+      this._timeSyncModalMetrics.textContent = [...metrics, leap].filter(Boolean).join(" | ") || "No detailed metrics reported";
+    }
+  }
+
+  _showTimeSyncModal(timeSync, message) {
+    this._renderTimeSyncModal(timeSync, message);
+    if (this._timeSyncModalEl && window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(this._timeSyncModalEl).show();
+    }
+  }
+
+  _setStartValidationUi() {
+    if (this._startBtn) {
+      this._startBtn.disabled = true;
+      this._startBtn.textContent = "Validating UTC time\u2026";
+    }
+    if (this._statusBadge) {
+      this._statusBadge.textContent = "\u23F3 Checking UTC\u2026";
+      this._statusBadge.className = "btn btn-sm btn-warning";
+    }
+    if (this._countdown) {
+      this._countdown.textContent = "Checking host UTC time\u2026";
+    }
+    if (this._stopBtn) {
+      this._stopBtn.disabled = true;
+    }
+  }
+
+  _restoreStoppedUi() {
+    this._startValidationInFlight = false;
+    this._schedulerRunning = false;
+    clearInterval(this._countdownTimer);
+    if (this._countdown) this._countdown.textContent = "";
+    this._refreshStatusBadge();
   }
 
   _resetLiveMatrix() {
@@ -366,6 +459,14 @@ class BeaconController {
 
   _refreshStatusBadge() {
     if (!this._statusBadge) return;
+    if (this._startValidationInFlight && !this._schedulerRunning) {
+      this._setStartValidationUi();
+      this._statusBadge.disabled = true;
+      if (typeof window.refreshModeButtons === "function") {
+        try { window.refreshModeButtons(); } catch (_) {}
+      }
+      return;
+    }
     if (this._schedulerRunning) {
       this._statusBadge.textContent = "● Running";
       this._statusBadge.className = "btn btn-sm btn-success";
@@ -471,29 +572,50 @@ class BeaconController {
 
     // Start/stop buttons inside the inline panel
     this._startBtn?.addEventListener("click", async () => {
-      this._resetLiveMatrix();
-      this._renderMatrix();
-
-      // Optimistic UI: give immediate feedback while the backend aligns to
-      // the next UTC 10-second boundary and warms up the SDR (can take up
-      // to ~10 s before the first slot_start arrives).
-      if (this._startBtn) {
-        this._startBtn.disabled = true;
-        this._startBtn.textContent = "Starting\u2026 Please wait";
+      if (this._startValidationInFlight || this._schedulerRunning) {
+        return;
       }
-      if (this._statusBadge) {
-        this._statusBadge.textContent = "\u23F3 Starting\u2026";
-        this._statusBadge.className = "btn btn-sm btn-warning";
-      }
-      if (this._countdown) {
-        this._countdown.textContent = "Aligning to next UTC slot\u2026";
-      }
+      this._startValidationInFlight = true;
+      this._setStartValidationUi();
       try {
-        await fetch("/api/beacons/start", {
+        const response = await fetch("/api/beacons/start", {
           method: "POST",
           headers: this._authHeaders(),
         });
-      } catch (_) {}
+        if (!response.ok) {
+          let payload = null;
+          try {
+            payload = await response.json();
+          } catch (_) {}
+          const detail = payload?.detail;
+          if (response.status === 412 && detail?.code === "beacon_time_sync_unhealthy") {
+            this._restoreStoppedUi();
+            this._showTimeSyncModal(detail.time_sync || {}, detail.message || "Beacon Analysis start is blocked until host UTC time is healthy.");
+            return;
+          }
+          this._restoreStoppedUi();
+          return;
+        }
+
+        this._startValidationInFlight = false;
+        this._resetLiveMatrix();
+        this._renderMatrix();
+
+        // Optimistic UI only after the backend accepted the start request.
+        if (this._startBtn) {
+          this._startBtn.disabled = true;
+          this._startBtn.textContent = "Starting\u2026 Please wait";
+        }
+        if (this._statusBadge) {
+          this._statusBadge.textContent = "\u23F3 Starting\u2026";
+          this._statusBadge.className = "btn btn-sm btn-warning";
+        }
+        if (this._countdown) {
+          this._countdown.textContent = "Aligning to next UTC slot\u2026";
+        }
+      } catch (_) {
+        this._restoreStoppedUi();
+      }
     });
     this._stopBtn?.addEventListener("click", async () => {
       // Optimistic UI: update state immediately so the user sees feedback,

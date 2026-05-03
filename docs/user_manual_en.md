@@ -234,6 +234,7 @@ The Propagation Score provides a **holistic view of propagation quality** on eac
 - Operating system: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - NTP time synchronisation (mandatory for FT8/FT4)
+- Beacon Analysis (NCDXF/IARU): startup is blocked if 4ham cannot validate a healthy UTC state on the host
 
 ### Quick installation (graphical installer)
 Starting with v0.7.1, the project includes an interactive TUI installer:

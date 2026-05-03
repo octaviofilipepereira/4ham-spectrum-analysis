@@ -82,6 +82,7 @@ Frontend routes after install:
 
 ## Time Sync
 - Enable NTP for FT8/FT4 decoding.
+- Beacon Analysis also depends on reliable UTC timing. If 4ham cannot validate a healthy host time-sync state, Beacon Analysis startup is blocked to avoid false observations.
 
 ## Production service (Linux/systemd)
 Use the service installer script for end-user production runs:

@@ -234,6 +234,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 - Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - Sincronização de tempo NTP (obrigatório para FT8/FT4)
+- Beacon Analysis (NCDXF/IARU): o arranque é bloqueado se o 4ham não conseguir validar um estado UTC saudável no host
 
 ### Instalação rápida (instalador gráfico)
 A partir da v0.7.1, o projeto inclui um instalador TUI interativo:

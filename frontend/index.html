@@ -481,6 +481,38 @@ Last update: 2026-02-22 16:27:19 UTC
       </div>
     </div>
 
+    <div class="modal fade app-modal beacon-time-sync-modal" id="beaconTimeSyncModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconTimeSyncModalLabel">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="beaconTimeSyncModalLabel">Beacon Analysis blocked</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="beacon-time-sync-modal__hero mb-3">
+              <div class="beacon-time-sync-modal__icon" aria-hidden="true">!</div>
+              <div class="beacon-time-sync-modal__copy">
+                <p id="beaconTimeSyncModalMessage" class="mb-2">Beacon Analysis start was blocked because 4ham could not validate the host UTC time with enough confidence.</p>
+                <p class="small mb-0 beacon-time-sync-modal__note">This module depends on exact 10-second UTC slots. 4ham blocks startup here to avoid false observations.</p>
+              </div>
+            </div>
+            <div class="small mb-1"><strong>Reason:</strong> <span id="beaconTimeSyncModalReason">-</span></div>
+            <div class="small mb-1"><strong>Detected source:</strong> <span id="beaconTimeSyncModalSource">-</span></div>
+            <div class="small mb-1"><strong>Selected server:</strong> <span id="beaconTimeSyncModalServer">-</span></div>
+            <div class="small mb-3"><strong>Metrics:</strong> <span id="beaconTimeSyncModalMetrics">-</span></div>
+            <div class="small fw-semibold mb-1">Check on the host</div>
+            <pre id="beaconTimeSyncModalChecks" class="small border rounded px-2 py-2 mb-0">timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v</pre>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Fullscreen Propagation Map modal -->
     <div class="modal fade" id="mapFullscreenModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-fullscreen">

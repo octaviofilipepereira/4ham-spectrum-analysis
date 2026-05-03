@@ -15,6 +15,10 @@ GET  /api/beacons/observations    → paginated observation history (SQLite)
 
 from __future__ import annotations
 
+import os
+import re
+import subprocess
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -23,6 +27,332 @@ from app.dependencies import state
 from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_cycle_window, current_slot_index
 
 router = APIRouter()
+
+_TIME_SYNC_OFFSET_HEALTHY_MS = 500.0
+_TIME_SYNC_OFFSET_OFFLINE_MS = 2000.0
+_TIME_SYNC_ROOT_DISTANCE_HEALTHY_MS = 1000.0
+_TIME_SYNC_ROOT_DISTANCE_OFFLINE_MS = 5000.0
+_TIME_SYNC_PROBE_TIMEOUT_S = 3.0
+_IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+_DURATION_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*(us|ms|s|min|h|d)")
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _command_output(args: list[str]) -> str | None:
+    env = dict(os.environ)
+    env["LC_ALL"] = "C"
+    env["LANG"] = "C"
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=_TIME_SYNC_PROBE_TIMEOUT_S,
+            env=env,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    output = (result.stdout or "").strip()
+    return output or None
+
+
+def _duration_to_ms(value: str | None) -> float | None:
+    if value is None:
+        return None
+    base = str(value).split("(", 1)[0].replace(",", "").strip()
+    if not base:
+        return None
+    sign = -1.0 if base.startswith("-") else 1.0
+    if base[:1] in "+-":
+        base = base[1:].strip()
+    matches = _DURATION_RE.findall(base)
+    if not matches:
+        try:
+            return sign * float(base)
+        except ValueError:
+            return None
+    scale = {
+        "us": 0.001,
+        "ms": 1.0,
+        "s": 1000.0,
+        "min": 60_000.0,
+        "h": 3_600_000.0,
+        "d": 86_400_000.0,
+    }
+    total = 0.0
+    for number, unit in matches:
+        total += float(number) * scale[unit]
+    return sign * total
+
+
+def _split_server_descriptor(value: str | None) -> tuple[str | None, str | None]:
+    if not value:
+        return None, None
+    candidate = value.strip()
+    match = re.match(r"(.+?)\s+\((.+)\)$", candidate)
+    if match:
+        left = match.group(1).strip()
+        right = match.group(2).strip()
+        if _IPV4_RE.match(left) and not _IPV4_RE.match(right):
+            return right, left
+        if _IPV4_RE.match(right) and not _IPV4_RE.match(left):
+            return left, right
+        return left, right
+    if _IPV4_RE.match(candidate):
+        return None, candidate
+    return candidate, None
+
+
+def _parse_timedatectl_status(text: str, info: dict[str, Any]) -> None:
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "system clock synchronized":
+            info["synchronized"] = value.lower() == "yes"
+        elif key == "ntp service":
+            info["ntp_service"] = value.lower()
+        elif key == "time zone":
+            info["timezone"] = value.split()[0]
+
+
+def _parse_timedatectl_timesync_status(text: str, info: dict[str, Any]) -> None:
+    info["source"] = "timedatectl"
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "server":
+            name, address = _split_server_descriptor(value)
+            if name:
+                info["server_name"] = name
+            if address:
+                info["server_address"] = address
+        elif key == "offset":
+            info["offset_ms"] = _duration_to_ms(value)
+        elif key == "jitter":
+            info["jitter_ms"] = _duration_to_ms(value)
+        elif key == "root distance":
+            info["root_distance_ms"] = _duration_to_ms(value)
+        elif key == "leap":
+            info["leap_status"] = value.lower()
+
+
+def _parse_chrony_tracking(text: str, info: dict[str, Any]) -> None:
+    info["source"] = "chrony"
+    root_delay_ms = None
+    root_dispersion_ms = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "reference id":
+            name, address = _split_server_descriptor(value)
+            if name:
+                info["server_name"] = name
+            if address:
+                info["server_address"] = address
+        elif key == "last offset":
+            info["offset_ms"] = _duration_to_ms(value)
+        elif key == "rms offset" and info.get("jitter_ms") is None:
+            info["jitter_ms"] = _duration_to_ms(value)
+        elif key == "root delay":
+            root_delay_ms = _duration_to_ms(value)
+        elif key == "root dispersion":
+            root_dispersion_ms = _duration_to_ms(value)
+        elif key == "leap status":
+            info["leap_status"] = value.lower()
+    if root_delay_ms is not None or root_dispersion_ms is not None:
+        info["root_distance_ms"] = max(
+            root_delay_ms if root_delay_ms is not None else 0.0,
+            root_dispersion_ms if root_dispersion_ms is not None else 0.0,
+        )
+
+
+def _parse_chrony_sources(text: str, info: dict[str, Any]) -> None:
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("^*"):
+            continue
+        parts = line[2:].split()
+        if not parts:
+            continue
+        name, address = _split_server_descriptor(parts[0])
+        if name:
+            info["server_name"] = name
+        if address:
+            info["server_address"] = address
+        return
+
+
+def _time_sync_result(reason_code: str, message: str, state_name: str, info: dict[str, Any]) -> dict[str, Any]:
+    result = dict(info)
+    result["state"] = state_name
+    result["can_start"] = state_name == "healthy"
+    result["reason_code"] = reason_code
+    result["message"] = message
+    return result
+
+
+def _classify_time_sync(info: dict[str, Any]) -> dict[str, Any]:
+    result = {
+        "checked_at_utc": info.get("checked_at_utc") or _now_iso(),
+        "source": info.get("source") or "unknown",
+        "synchronized": info.get("synchronized"),
+        "ntp_service": info.get("ntp_service") or "unknown",
+        "timezone": info.get("timezone") or "",
+        "server_name": info.get("server_name") or "",
+        "server_address": info.get("server_address") or "",
+        "offset_ms": info.get("offset_ms"),
+        "jitter_ms": info.get("jitter_ms"),
+        "root_distance_ms": info.get("root_distance_ms"),
+        "leap_status": info.get("leap_status") or "unknown",
+    }
+
+    leap = str(result["leap_status"] or "unknown").strip().lower()
+    offset_ms = result.get("offset_ms")
+    root_distance_ms = result.get("root_distance_ms")
+    ntp_service = str(result.get("ntp_service") or "unknown").strip().lower()
+    synchronized = result.get("synchronized")
+    has_server = bool(result.get("server_name") or result.get("server_address"))
+    has_quality_metrics = offset_ms is not None or root_distance_ms is not None
+
+    if synchronized is False:
+        return _time_sync_result(
+            "not_synchronized",
+            "System clock is not synchronized.",
+            "offline",
+            result,
+        )
+
+    if ntp_service in {"inactive", "failed", "disabled", "no"}:
+        return _time_sync_result(
+            "ntp_inactive",
+            "NTP service is not active.",
+            "offline",
+            result,
+        )
+
+    if leap not in {"unknown", "normal"}:
+        return _time_sync_result(
+            "leap_not_normal",
+            "Time source reported a non-normal leap state.",
+            "offline",
+            result,
+        )
+
+    if offset_ms is not None:
+        if abs(offset_ms) > _TIME_SYNC_OFFSET_OFFLINE_MS:
+            return _time_sync_result(
+                "offset_too_high",
+                "Clock offset is too high for reliable 10-second UTC slots.",
+                "offline",
+                result,
+            )
+        if abs(offset_ms) > _TIME_SYNC_OFFSET_HEALTHY_MS:
+            return _time_sync_result(
+                "offset_too_high",
+                "Clock offset is degraded for reliable 10-second UTC slots.",
+                "degraded",
+                result,
+            )
+
+    if root_distance_ms is not None:
+        if root_distance_ms > _TIME_SYNC_ROOT_DISTANCE_OFFLINE_MS:
+            return _time_sync_result(
+                "root_distance_too_high",
+                "Time source distance is too high for reliable UTC slot alignment.",
+                "offline",
+                result,
+            )
+        if root_distance_ms > _TIME_SYNC_ROOT_DISTANCE_HEALTHY_MS:
+            return _time_sync_result(
+                "root_distance_too_high",
+                "Time source distance is degraded for reliable UTC slot alignment.",
+                "degraded",
+                result,
+            )
+
+    if synchronized is True and ntp_service == "active" and has_server and has_quality_metrics:
+        return _time_sync_result(
+            "ok",
+            "Host UTC time validated. Beacon Analysis can start.",
+            "healthy",
+            result,
+        )
+
+    if synchronized is True and ntp_service == "active" and not has_server:
+        return _time_sync_result(
+            "no_active_server",
+            "No active NTP server was detected.",
+            "degraded",
+            result,
+        )
+
+    if synchronized is True and ntp_service == "active":
+        return _time_sync_result(
+            "probe_partial",
+            "Time sync probe is incomplete. Beacon Analysis start is blocked.",
+            "degraded",
+            result,
+        )
+
+    return _time_sync_result(
+        "probe_unavailable",
+        "Time sync probe is unavailable on this host. Beacon Analysis start is blocked.",
+        "offline",
+        result,
+    )
+
+
+def _probe_time_sync() -> dict[str, Any]:
+    info: dict[str, Any] = {
+        "checked_at_utc": _now_iso(),
+        "source": "unknown",
+        "synchronized": None,
+        "ntp_service": "unknown",
+        "timezone": "",
+        "server_name": "",
+        "server_address": "",
+        "offset_ms": None,
+        "jitter_ms": None,
+        "root_distance_ms": None,
+        "leap_status": "unknown",
+    }
+
+    timedatectl_status = _command_output(["timedatectl", "status"])
+    if timedatectl_status:
+        _parse_timedatectl_status(timedatectl_status, info)
+        info["source"] = "timedatectl"
+
+    timedatectl_timesync = _command_output(["timedatectl", "timesync-status"])
+    if timedatectl_timesync:
+        _parse_timedatectl_timesync_status(timedatectl_timesync, info)
+        return _classify_time_sync(info)
+
+    chrony_tracking = _command_output(["chronyc", "tracking"])
+    if chrony_tracking:
+        _parse_chrony_tracking(chrony_tracking, info)
+        chrony_sources = _command_output(["chronyc", "sources", "-v"])
+        if chrony_sources:
+            _parse_chrony_sources(chrony_sources, info)
+
+    return _classify_time_sync(info)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -44,6 +374,7 @@ async def beacon_status() -> dict[str, Any]:
     """Return scheduler snapshot and a brief catalog summary."""
     sched = _scheduler()
     snapshot = sched.snapshot() if sched else {"running": False}
+    time_sync = _probe_time_sync()
     return {
         "scheduler": snapshot,
         "catalog": {
@@ -51,6 +382,7 @@ async def beacon_status() -> dict[str, Any]:
             "bands": len(BANDS),
             "active_beacons": sum(1 for b in BEACONS if b.status == "active"),
         },
+        "time_sync": time_sync,
     }
 
 
@@ -71,6 +403,17 @@ async def beacon_start(
 
     if sched._running:
         return {"ok": False, "detail": "already_running", **sched.snapshot()}
+
+    time_sync = _probe_time_sync()
+    if not time_sync.get("can_start"):
+        raise HTTPException(
+            status_code=412,
+            detail={
+                "code": "beacon_time_sync_unhealthy",
+                "message": time_sync.get("message") or "Time sync validation failed.",
+                "time_sync": time_sync,
+            },
+        )
 
     requested_bands = bands if isinstance(bands, list) else None
 

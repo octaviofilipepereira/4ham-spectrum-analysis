@@ -379,8 +379,10 @@ class _DummyBeaconScheduler:
         self._band_index = 1 if len(self._bands) > 1 else 0
         self._slots_on_band = 7
         self._running = False
+        self.start_calls = 0
 
     async def start(self) -> bool:
+        self.start_calls += 1
         self._running = True
         return True
 
@@ -407,6 +409,16 @@ class TestBeaconApiStartBands:
         monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
         monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
         monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+        monkeypatch.setattr(
+            beacon_api,
+            "_probe_time_sync",
+            lambda: {
+                "state": "healthy",
+                "can_start": True,
+                "reason_code": "ok",
+                "message": "Host UTC time validated. Beacon Analysis can start.",
+            },
+        )
 
         result = await beacon_api.beacon_start()
 
@@ -422,6 +434,16 @@ class TestBeaconApiStartBands:
         monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
         monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
         monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+        monkeypatch.setattr(
+            beacon_api,
+            "_probe_time_sync",
+            lambda: {
+                "state": "healthy",
+                "can_start": True,
+                "reason_code": "ok",
+                "message": "Host UTC time validated. Beacon Analysis can start.",
+            },
+        )
 
         result = await beacon_api.beacon_start(["20m", "17m"])
 
@@ -430,3 +452,120 @@ class TestBeaconApiStartBands:
         assert [band.name for band in sched._bands] == ["20m", "17m"]
         assert sched._band_index == 0
         assert sched._slots_on_band == 0
+
+
+class TestBeaconTimeSyncGuard:
+    def test_classify_time_sync_healthy(self):
+        result = beacon_api._classify_time_sync(
+            {
+                "synchronized": True,
+                "ntp_service": "active",
+                "server_name": "ntp.ubuntu.com",
+                "server_address": "91.189.91.157",
+                "offset_ms": 0.175,
+                "jitter_ms": 3.006,
+                "root_distance_ms": 22.140,
+                "leap_status": "normal",
+            }
+        )
+
+        assert result["state"] == "healthy"
+        assert result["can_start"] is True
+        assert result["reason_code"] == "ok"
+
+    def test_classify_time_sync_degraded_offset(self):
+        result = beacon_api._classify_time_sync(
+            {
+                "synchronized": True,
+                "ntp_service": "active",
+                "server_name": "ntp.ubuntu.com",
+                "offset_ms": 750.0,
+                "root_distance_ms": 22.140,
+                "leap_status": "normal",
+            }
+        )
+
+        assert result["state"] == "degraded"
+        assert result["can_start"] is False
+        assert result["reason_code"] == "offset_too_high"
+
+    def test_classify_time_sync_offline_not_synchronized(self):
+        result = beacon_api._classify_time_sync(
+            {
+                "synchronized": False,
+                "ntp_service": "active",
+            }
+        )
+
+        assert result["state"] == "offline"
+        assert result["can_start"] is False
+        assert result["reason_code"] == "not_synchronized"
+
+    @pytest.mark.asyncio
+    async def test_beacon_status_includes_time_sync(self, monkeypatch):
+        sched = _DummyBeaconScheduler(BANDS)
+        monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
+        monkeypatch.setattr(
+            beacon_api,
+            "_probe_time_sync",
+            lambda: {
+                "state": "healthy",
+                "can_start": True,
+                "reason_code": "ok",
+                "message": "Host UTC time validated. Beacon Analysis can start.",
+            },
+        )
+
+        result = await beacon_api.beacon_status()
+
+        assert result["time_sync"]["state"] == "healthy"
+        assert result["time_sync"]["can_start"] is True
+
+    @pytest.mark.asyncio
+    async def test_start_blocks_when_time_sync_is_degraded(self, monkeypatch):
+        sched = _DummyBeaconScheduler(BANDS)
+        monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
+        monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
+        monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+        monkeypatch.setattr(
+            beacon_api,
+            "_probe_time_sync",
+            lambda: {
+                "state": "degraded",
+                "can_start": False,
+                "reason_code": "offset_too_high",
+                "message": "Clock offset is degraded for reliable 10-second UTC slots.",
+            },
+        )
+
+        with pytest.raises(beacon_api.HTTPException) as exc_info:
+            await beacon_api.beacon_start()
+
+        assert exc_info.value.status_code == 412
+        assert exc_info.value.detail["code"] == "beacon_time_sync_unhealthy"
+        assert exc_info.value.detail["time_sync"]["state"] == "degraded"
+        assert sched.start_calls == 0
+
+    @pytest.mark.asyncio
+    async def test_start_blocks_when_time_sync_is_offline(self, monkeypatch):
+        sched = _DummyBeaconScheduler(BANDS)
+        monkeypatch.setattr(beacon_api.state, "beacon_scheduler", sched, raising=False)
+        monkeypatch.setattr(beacon_api.state, "scan_engine", None, raising=False)
+        monkeypatch.setattr(beacon_api.state, "beacon_iq_queue", None, raising=False)
+        monkeypatch.setattr(
+            beacon_api,
+            "_probe_time_sync",
+            lambda: {
+                "state": "offline",
+                "can_start": False,
+                "reason_code": "not_synchronized",
+                "message": "System clock is not synchronized.",
+            },
+        )
+
+        with pytest.raises(beacon_api.HTTPException) as exc_info:
+            await beacon_api.beacon_start()
+
+        assert exc_info.value.status_code == 412
+        assert exc_info.value.detail["time_sync"]["state"] == "offline"
+        assert sched.start_calls == 0
