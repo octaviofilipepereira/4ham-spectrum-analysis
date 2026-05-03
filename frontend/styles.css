@@ -2214,6 +2214,35 @@ h1,
   color: rgba(226, 232, 240, 0.68);
 }
 
+.beacon-history-chart__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.beacon-history-chart__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.beacon-history-chart__stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(191, 219, 254, 0.72);
+}
+
+.beacon-history-chart__stat-value {
+  font-size: 0.84rem;
+  color: #f8fbff;
+}
+
 .beacon-history-mix__bar {
   display: flex;
   overflow: hidden;
@@ -2256,15 +2285,31 @@ h1,
   display: flex;
   align-items: end;
   gap: 4px;
-  min-height: 108px;
+  position: relative;
+  height: 132px;
+  padding: 10px 8px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    repeating-linear-gradient(
+      to top,
+      rgba(148, 163, 184, 0.12) 0,
+      rgba(148, 163, 184, 0.12) 1px,
+      transparent 1px,
+      transparent 32px
+    );
 }
 
 .beacon-history-rhythm__bar,
 .beacon-history-metric__bar {
+  display: block;
+  align-self: end;
   flex: 1 1 0;
   min-width: 6px;
   border-radius: 999px 999px 2px 2px;
   background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .beacon-history-rhythm__bar--confirmed { background: linear-gradient(180deg, #4ade80, #166534); }
@@ -2343,6 +2388,10 @@ h1,
 @media (max-width: 991.98px) {
   .beacon-history-info-modal__charts {
     grid-template-columns: 1fr;
+  }
+
+  .beacon-history-chart__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

@@ -995,6 +995,9 @@ function renderHistoryRhythmChart(observations) {
   if (!observations.length) {
     return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
   }
+  const confirmed = observations.filter((obs) => obs.id_confirmed).length;
+  const detectedOnly = observations.filter((obs) => obs.detected && !obs.id_confirmed).length;
+  const noCopy = observations.length - confirmed - detectedOnly;
   const bars = observations.slice().reverse().map((obs) => {
     const cls = obs.id_confirmed ? "confirmed" : (obs.detected ? "detected" : "nocopy");
     const height = obs.id_confirmed ? 100 : (obs.detected ? 72 : 26);
@@ -1002,6 +1005,12 @@ function renderHistoryRhythmChart(observations) {
     return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${escapeHtml(title)}"></span>`;
   }).join("");
   return `<div class="beacon-history-rhythm">
+    <div class="beacon-history-chart__stats">
+      ${renderHistoryChartStat("Rows", `${observations.length}`)}
+      ${renderHistoryChartStat("Confirmed", `${confirmed}`)}
+      ${renderHistoryChartStat("Detected", `${detectedOnly}`)}
+      ${renderHistoryChartStat("No copy", `${noCopy}`)}
+    </div>
     <div class="beacon-history-rhythm__bars">${bars}</div>
     <div class="beacon-history-chart__caption">Older on the left, newer on the right. Green = confirmed, blue = detected, amber = monitored with no copy.</div>
   </div>`;
@@ -1012,6 +1021,12 @@ function renderHistoryMetricChart(observations, kind) {
     return '<div class="beacon-history-chart__empty">No monitored rows loaded yet for this chart.</div>';
   }
   const reversed = observations.slice().reverse();
+  const values = reversed.map((obs) => {
+    if (kind === "snr") {
+      return Number.isFinite(Number(obs.snr_db_100w)) ? Number(obs.snr_db_100w) : null;
+    }
+    return Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+  }).filter((value) => value !== null);
   const maxValue = kind === "snr"
     ? Math.max(6, ...reversed.map((obs) => Math.max(0, Number(obs.snr_db_100w || 0))))
     : 4;
@@ -1029,10 +1044,36 @@ function renderHistoryMetricChart(observations, kind) {
   const caption = kind === "snr"
     ? "100 W reference-dash intensity across the latest monitored passes."
     : "Ordered dash-copy quality across the same pass history.";
+  const latestValue = values.length ? values[values.length - 1] : null;
+  const bestValue = values.length ? Math.max(...values) : null;
+  const avgValue = values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length) : null;
   return `<div class="beacon-history-metric">
+    <div class="beacon-history-chart__stats">
+      ${renderHistoryChartStat("Rows", `${observations.length}`)}
+      ${renderHistoryChartStat("Latest", formatHistoryMetricValue(latestValue, kind))}
+      ${renderHistoryChartStat("Best", formatHistoryMetricValue(bestValue, kind))}
+      ${renderHistoryChartStat("Average", formatHistoryMetricValue(avgValue, kind))}
+    </div>
     <div class="beacon-history-metric__bars">${bars}</div>
     <div class="beacon-history-chart__caption">${escapeHtml(caption)}</div>
   </div>`;
+}
+
+function renderHistoryChartStat(label, value) {
+  return `<div class="beacon-history-chart__stat">
+    <span class="beacon-history-chart__stat-label">${escapeHtml(label)}</span>
+    <strong class="beacon-history-chart__stat-value">${escapeHtml(value)}</strong>
+  </div>`;
+}
+
+function formatHistoryMetricValue(value, kind) {
+  if (!Number.isFinite(Number(value))) {
+    return "n/a";
+  }
+  if (kind === "snr") {
+    return `${Number(value).toFixed(1)} dB`;
+  }
+  return `${Math.max(0, Math.min(4, Math.round(Number(value))))}/4`;
 }
 
 function renderHistoryStateBadge(obs) {
