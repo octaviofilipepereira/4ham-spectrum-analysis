@@ -49,6 +49,11 @@ Each shim is a 5-line PHP file that calls
 Optional `?mirror=<name>` query parameter selects a specific mirror when
 multiple home stations push to the same receiver.
 
+Beacon extension note: the planned Beacon Academic Analytics tab and its
+replication contract are specified in `docs/beacon_academic_analytics_spec.md`.
+The current receiver bundle does not yet ingest a mirrored Beacon observation
+stream.
+
 `status.php`, `events.php` and the `api/*` shims are all read-only; if
 you want them private, front them with HTTP Basic auth at the web-server
 level.

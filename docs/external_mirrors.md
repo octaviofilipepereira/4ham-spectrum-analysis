@@ -241,6 +241,11 @@ The Apache `api/.htaccess` rewrites extension-less requests
 (`/api/scan/status`) onto the matching `.php` shim. The shim files are
 ~5 lines each — `require lib/snapshot.php` + `fourham_snapshot_serve(KEY)`.
 
+> Beacon note: the Beacon Academic Analytics extension is specified in
+> `docs/beacon_academic_analytics_spec.md`. The current receiver does not yet
+> mirror `beacon_observations`; Beacon replication requires a new mirrored
+> Beacon stream plus MySQL storage on the receiver side.
+
 **What the public mirror does NOT have:**
 - No WebSocket / live IQ / live spectrum (push model only).
 - No admin endpoints, no auth, no mutating endpoints.
