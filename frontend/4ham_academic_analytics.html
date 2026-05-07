@@ -1314,6 +1314,154 @@ Last update: 2026-04-03 UTC
         font-weight: 600;
       }
 
+      .beacon-view {
+        display: none;
+      }
+
+      .beacon-note {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border: 1px solid rgba(251, 191, 36, 0.35);
+        border-radius: 12px;
+        background: rgba(251, 191, 36, 0.08);
+        color: #fde68a;
+        font-size: 0.88rem;
+      }
+
+      .beacon-scroll {
+        overflow-x: auto;
+      }
+
+      .beacon-activity-table,
+      .beacon-observations-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 640px;
+      }
+
+      .beacon-activity-table th,
+      .beacon-activity-table td,
+      .beacon-observations-table th,
+      .beacon-observations-table td {
+        border-bottom: 1px solid rgba(40, 68, 90, 0.65);
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 0.82rem;
+      }
+
+      .beacon-activity-table thead th,
+      .beacon-observations-table thead th {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-activity-table tbody th {
+        min-width: 86px;
+      }
+
+      .beacon-activity-table td {
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .beacon-cell-sub {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .beacon-empty {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        padding: 8px 2px;
+      }
+
+      .beacon-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .beacon-list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border: 1px solid rgba(40, 68, 90, 0.55);
+        border-radius: 10px;
+        background: rgba(9, 17, 24, 0.4);
+      }
+
+      .beacon-list-label {
+        font-weight: 600;
+      }
+
+      .beacon-list-detail {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        text-align: right;
+      }
+
+      .beacon-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 84px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-badge.aligned,
+      .beacon-badge.good,
+      .beacon-badge.excellent {
+        background: rgba(52, 211, 153, 0.16);
+        color: #86efac;
+      }
+
+      .beacon-badge.mixed,
+      .beacon-badge.fair,
+      .beacon-badge.marginal {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fde68a;
+      }
+
+      .beacon-badge.divergent,
+      .beacon-badge.poor,
+      .beacon-badge.closed,
+      .beacon-badge.absorbed {
+        background: rgba(239, 68, 68, 0.14);
+        color: #fca5a5;
+      }
+
+      .beacon-badge.unknown,
+      .beacon-badge.no-data {
+        background: rgba(159, 180, 200, 0.12);
+        color: var(--text-muted);
+      }
+
+      .beacon-summary {
+        margin: 0 0 12px;
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.5;
+      }
+
+      .beacon-meta-inline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+
       @media (max-width: 1100px) {
         .aprs-cards {
           grid-template-columns: repeat(3, 1fr);
@@ -1351,6 +1499,7 @@ Last update: 2026-04-03 UTC
         <div class="view-selector-row">
           <div class="view-selector" id="viewSelector">
             <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
+            <button type="button" class="view-btn" data-view="beacon" data-i18n="view_beacon">Beacon Analysis - NCDXF/IARU</button>
             <button type="button" class="view-btn" data-view="aprs" data-i18n="view_aprs">APRS Network Topology &amp; Coverage</button>
           </div>
           <div id="scanRuntimeInfo" class="scan-runtime-status unavailable" role="status" aria-live="polite">Scan status unavailable</div>
@@ -1718,6 +1867,95 @@ Last update: 2026-04-03 UTC
         </section>
       </section>
       </div><!-- /aprsView -->
+
+      <div id="beaconView" class="beacon-view">
+      <section class="panel">
+        <p class="beacon-note" data-i18n="beacon_history_note">Historical analysis only — not the current slot state.</p>
+
+        <div class="cards">
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_global_score">Global score</span>
+            <div class="value" id="beaconKpiGlobalScore">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_best_band">Best band</span>
+            <div class="value" id="beaconKpiBestBand">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_detected_slots">Detected slots</span>
+            <div class="value" id="beaconKpiDetectedSlots">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_detected_beacons">Beacons heard</span>
+            <div class="value" id="beaconKpiDetectedBeacons">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_noaa">NOAA Kp / SFI</span>
+            <div class="value" id="beaconKpiNoaa">--</div>
+          </div>
+          <div class="card">
+            <span class="label" data-i18n="beacon_kpi_freshness">Freshness</span>
+            <div class="value" id="beaconKpiFreshness">--</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="chart-panel span-8">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_recent_activity">Recent activity - last 12 h</h3>
+            </div>
+            <p data-i18n="beacon_recent_activity_desc">Historical matrix by scheduled beacon slot and band.</p>
+            <div class="beacon-scroll">
+              <table class="beacon-activity-table" id="beaconRecentActivityTable"></table>
+            </div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_reading">Beacon + NOAA reading</h3>
+            </div>
+            <p class="beacon-summary" id="beaconReadingSummary">--</p>
+            <div class="beacon-list" id="beaconReadingBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_nowcast">Nowcast</h3>
+            </div>
+            <p class="beacon-summary" id="beaconNowcastSummary">--</p>
+            <div class="beacon-list" id="beaconNowcastBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_propagation_bands">Propagation by band</h3>
+            </div>
+            <div class="beacon-list" id="beaconPropagationBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_ionospheric_context">Ionospheric context</h3>
+            </div>
+            <div class="beacon-list" id="beaconIonosphericContext"></div>
+          </article>
+
+          <article class="chart-panel span-12">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_observations">Recent observations</h3>
+            </div>
+            <p data-i18n="beacon_observations_desc">Latest Beacon observations from the selected historical window.</p>
+            <div class="beacon-scroll">
+              <table class="beacon-observations-table" id="beaconObservationsTable"></table>
+            </div>
+            <div class="beacon-meta-inline">
+              <span id="beaconGeneratedAt">--</span>
+              <span id="beaconObservationCount">--</span>
+            </div>
+          </article>
+        </div>
+      </section>
+      </div><!-- /beaconView -->
     </div>
 
     <div class="chart-help-layer" id="chartHelpLayer" role="status" aria-live="polite">
@@ -1820,6 +2058,7 @@ Last update: 2026-04-03 UTC
         if (typeof refreshPropMap === "function") refreshPropMap();
         if (lastResolvedRange) renderFromCurrentRange();
         if (aprsDataLoaded && aprsView && aprsView.style.display !== "none") aprsRenderAll();
+        if (beaconDataLoaded && beaconView && beaconView.style.display !== "none") renderBeaconDashboard();
         const queryAt = new Date();
         if (apiLastFetchInfo) apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
       }
@@ -1872,6 +2111,12 @@ Last update: 2026-04-03 UTC
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
       let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+      let activeAcademicView = localStorage.getItem("academic_active_view") || "hf";
+      let beaconDataLoaded = false;
+      let beaconOverview = null;
+      let beaconObservations = [];
+      const BEACON_WINDOW_HOURS = 12;
+      const BEACON_OBSERVATION_LIMIT = 20;
 
       updateMetaUpdateFrequency();
 
@@ -1916,7 +2161,7 @@ Last update: 2026-04-03 UTC
         manualRefreshBtn.classList.add("spinning");
         try {
           nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
-          await loadAndRender();
+          await refreshActiveAcademicView();
         } finally {
           manualRefreshBtn.classList.remove("spinning");
           manualRefreshBtn.disabled = false;
@@ -2439,6 +2684,241 @@ Last update: 2026-04-03 UTC
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
         }
+      }
+
+      function beaconEscapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function beaconFormatScore(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(1) : "--";
+      }
+
+      function beaconFormatUtc(value) {
+        if (!value) return "--";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "--" : fmtDateUtc(date);
+      }
+
+      function beaconBadgeClass(value) {
+        const normalized = String(value || "unknown").trim().toLowerCase().replace(/\s+/g, "-");
+        return normalized || "unknown";
+      }
+
+      function renderBeaconRowList(targetId, rows, emptyText) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        if (!rows.length) {
+          target.innerHTML = `<div class="beacon-empty">${beaconEscapeHtml(emptyText)}</div>`;
+          return;
+        }
+        target.innerHTML = rows.join("");
+      }
+
+      function renderBeaconRecentActivityTable(recentActivity) {
+        const table = document.getElementById("beaconRecentActivityTable");
+        if (!table) return;
+        const bands = Array.isArray(recentActivity?.bands) ? recentActivity.bands : [];
+        const beacons = Array.isArray(recentActivity?.beacons) ? recentActivity.beacons : [];
+        const matrix = Array.isArray(recentActivity?.matrix) ? recentActivity.matrix : [];
+        if (!bands.length || !beacons.length || !matrix.length) {
+          table.innerHTML = `<tbody><tr><td class="beacon-empty">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          return;
+        }
+        const head = `<thead><tr><th>${beaconEscapeHtml(t("beacon_col_beacon"))}</th>${bands.map((band) => `<th>${beaconEscapeHtml(band)}</th>`).join("")}</tr></thead>`;
+        const body = beacons.map((callsign, rowIndex) => {
+          const row = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
+          const cells = bands.map((band, colIndex) => {
+            const cell = row[colIndex];
+            if (!cell) {
+              return `<td>-</td>`;
+            }
+            const totalSlots = Number(cell.total_slots || 0);
+            const detections = Number(cell.detections || 0);
+            const ratio = totalSlots > 0 ? Math.max(0, Math.min(1, detections / totalSlots)) : 0;
+            const title = `${callsign} ${band}: ${detections}/${totalSlots}`;
+            return `<td title="${beaconEscapeHtml(title)}" style="background: rgba(52, 211, 153, ${0.10 + ratio * 0.45});">${detections}<span class="beacon-cell-sub">/${totalSlots}</span></td>`;
+          }).join("");
+          return `<tr><th>${beaconEscapeHtml(callsign)}</th>${cells}</tr>`;
+        }).join("");
+        table.innerHTML = `${head}<tbody>${body}</tbody>`;
+      }
+
+      function renderBeaconObservationsTable(rows) {
+        const table = document.getElementById("beaconObservationsTable");
+        if (!table) return;
+        if (!rows.length) {
+          table.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          return;
+        }
+        const head = `
+          <thead>
+            <tr>
+              <th>${beaconEscapeHtml(t("beacon_col_beacon"))}</th>
+              <th>${beaconEscapeHtml(t("beacon_col_band"))}</th>
+              <th>${beaconEscapeHtml(t("beacon_col_detected"))}</th>
+              <th>${beaconEscapeHtml(t("beacon_col_dashes"))}</th>
+              <th>${beaconEscapeHtml(t("beacon_col_snr"))}</th>
+              <th>${beaconEscapeHtml(t("beacon_col_recorded"))}</th>
+            </tr>
+          </thead>`;
+        const body = rows.map((row) => {
+          const detected = row.detected ? "yes" : "no";
+          const detectedClass = row.detected ? "good" : "no-data";
+          return `
+            <tr>
+              <td>${beaconEscapeHtml(row.beacon_callsign || "--")}</td>
+              <td>${beaconEscapeHtml(row.band_name || "--")}</td>
+              <td><span class="beacon-badge ${detectedClass}">${beaconEscapeHtml(detected)}</span></td>
+              <td>${beaconEscapeHtml(String(row.dash_levels_detected ?? 0))}</td>
+              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_100w))}</td>
+              <td>${beaconEscapeHtml(beaconFormatUtc(row.recorded_at || row.slot_start_utc))}</td>
+            </tr>`;
+        }).join("");
+        table.innerHTML = `${head}<tbody>${body}</tbody>`;
+      }
+
+      function renderBeaconDashboard() {
+        const payload = beaconOverview;
+        const kpis = payload?.kpis || {};
+        const bestBand = kpis.best_band || null;
+        const iono = payload?.ionospheric || {};
+        const freshness = payload?.freshness || {};
+
+        const setText = (id, value) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        };
+
+        setText("beaconKpiGlobalScore", payload ? `${beaconFormatScore(kpis.global_score)} · ${kpis.global_state || "--"}` : "--");
+        setText("beaconKpiBestBand", bestBand ? `${bestBand.band} · ${beaconFormatScore(bestBand.score)}` : "--");
+        setText("beaconKpiDetectedSlots", payload ? String(kpis.detected_slots ?? "--") : "--");
+        setText("beaconKpiDetectedBeacons", payload ? String(kpis.detected_beacons ?? "--") : "--");
+        setText("beaconKpiNoaa", payload ? `Kp ${beaconFormatScore(iono.kp)} · SFI ${beaconFormatScore(iono.sfi)}` : "--");
+        setText("beaconKpiFreshness", payload ? `${freshness.label || "--"} · ${payload.staleness_seconds ?? 0}s` : "--");
+
+        renderBeaconRecentActivityTable(payload?.recent_activity || null);
+
+        const reading = payload?.reading || {};
+        setText("beaconReadingSummary", reading.summary || t("beacon_no_data"));
+        renderBeaconRowList(
+          "beaconReadingBands",
+          Array.isArray(reading.bands) ? reading.bands.map((row) => `
+            <div class="beacon-list-row">
+              <div>
+                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.observed_state || "--"} vs ${row.expected_state || "--"}`)}</div>
+              </div>
+              <span class="beacon-badge ${beaconBadgeClass(row.agreement)}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
+            </div>`)
+          : [],
+          t("beacon_no_data")
+        );
+
+        const forecast = payload?.forecast || {};
+        setText("beaconNowcastSummary", forecast.summary || t("beacon_no_data"));
+        renderBeaconRowList(
+          "beaconNowcastBands",
+          Array.isArray(forecast.bands) ? forecast.bands.map((row) => `
+            <div class="beacon-list-row">
+              <div>
+                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(row.confidence || "low")}</div>
+              </div>
+              <span class="beacon-badge ${beaconBadgeClass(row.forecast_state)}">${beaconEscapeHtml(row.forecast_state || "No data")}</span>
+            </div>`)
+          : [],
+          t("beacon_no_data")
+        );
+
+        const propagation = payload?.propagation || {};
+        renderBeaconRowList(
+          "beaconPropagationBands",
+          Array.isArray(propagation.bands) ? propagation.bands.map((row) => `
+            <div class="beacon-list-row">
+              <div>
+                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.events ?? 0} events`)}</div>
+              </div>
+              <span class="beacon-badge ${beaconBadgeClass(row.state)}">${beaconEscapeHtml(`${beaconFormatScore(row.score)} · ${row.state || "No data"}`)}</span>
+            </div>`)
+          : [],
+          t("beacon_no_data")
+        );
+
+        const ionoRows = payload ? [
+          `<div class="beacon-list-row"><div class="beacon-list-label">Kp</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.kp)} · ${iono.kp_condition || "--"}`)}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">SFI</div><div class="beacon-list-detail">${beaconEscapeHtml(beaconFormatScore(iono.sfi))}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">foF2</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.fof2_estimated_mhz)} MHz`)}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">20m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["20m"] || {}).status) || "--")}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["17m"] || {}).status) || "--")}</div></div>`
+        ] : [];
+        renderBeaconRowList("beaconIonosphericContext", ionoRows, t("beacon_no_data"));
+
+        renderBeaconObservationsTable(Array.isArray(beaconObservations) ? beaconObservations : []);
+        setText("beaconGeneratedAt", payload ? `Generated: ${beaconFormatUtc(payload.generated_at_utc)}` : "--");
+        setText("beaconObservationCount", `${beaconObservations.length} rows`);
+      }
+
+      async function beaconLoadAndRender() {
+        if (isLoading) {
+          return;
+        }
+        isLoading = true;
+        const overlay = document.getElementById("loadingOverlay");
+        overlay?.classList.add("active");
+        const queryAt = new Date();
+        try {
+          const overviewParams = new URLSearchParams({
+            heatmap_hours: String(BEACON_WINDOW_HOURS),
+            propagation_window_minutes: "180",
+            forecast_window_minutes: "180",
+          });
+          const obsParams = new URLSearchParams({
+            hours: String(BEACON_WINDOW_HOURS),
+            limit: String(BEACON_OBSERVATION_LIMIT),
+          });
+          const [overviewResp, obsResp] = await Promise.all([
+            fetch(`${_BASE}api/beacons/analytics/overview?${overviewParams.toString()}`),
+            fetch(`${_BASE}api/beacons/observations?${obsParams.toString()}`),
+            fetchScanRuntimeStatus(),
+          ]);
+          updateApiLastFetchInfo(queryAt);
+          if (!overviewResp.ok || !obsResp.ok) {
+            throw new Error("Beacon analytics request failed");
+          }
+          beaconOverview = await overviewResp.json();
+          const obsPayload = await obsResp.json();
+          beaconObservations = Array.isArray(obsPayload?.observations) ? obsPayload.observations : [];
+          beaconDataLoaded = true;
+          renderBeaconDashboard();
+        } catch (_err) {
+          beaconOverview = null;
+          beaconObservations = [];
+          beaconDataLoaded = false;
+          renderBeaconDashboard();
+        } finally {
+          isLoading = false;
+          overlay?.classList.remove("active");
+        }
+      }
+
+      async function refreshActiveAcademicView() {
+        if (activeAcademicView === "aprs") {
+          await aprsLoadAndRender();
+          return;
+        }
+        if (activeAcademicView === "beacon") {
+          await beaconLoadAndRender();
+          return;
+        }
+        await loadAndRender();
       }
 
       async function _checkHfStaleBanner(start, end) {
@@ -3412,6 +3892,10 @@ Last update: 2026-04-03 UTC
         if (!nextRefreshText) {
           return;
         }
+        if (activeAcademicView === "aprs") {
+          nextRefreshText.textContent = t("next_refresh", { time: "--" });
+          return;
+        }
         if (!nextRefreshDeadlineMs) {
           nextRefreshText.textContent = t("next_refresh", { time: "--" });
           return;
@@ -3422,7 +3906,7 @@ Last update: 2026-04-03 UTC
           if (!isLoading) {
             nextRefreshText.textContent = t("refreshing");
             nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
-            loadAndRender();
+            refreshActiveAcademicView();
           }
           return;
         }
@@ -4386,12 +4870,14 @@ Last update: 2026-04-03 UTC
       const viewSelector = document.getElementById("viewSelector");
       const hfView = document.getElementById("hfView");
       const aprsView = document.getElementById("aprsView");
+      const beaconView = document.getElementById("beaconView");
 
       if (viewSelector) {
         viewSelector.addEventListener("click", (e) => {
           const btn = e.target.closest(".view-btn");
           if (!btn) return;
           const view = btn.dataset.view;
+          activeAcademicView = view;
           viewSelector.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
 
@@ -4400,6 +4886,7 @@ Last update: 2026-04-03 UTC
 
           if (view === "aprs") {
             hfView.style.display = "none";
+            if (beaconView) beaconView.style.display = "none";
             aprsView.style.display = "block";
             if (!aprsDataLoaded) {
               aprsLoadAndRender();
@@ -4410,9 +4897,21 @@ Last update: 2026-04-03 UTC
               if (!aprsRefreshTimer) aprsStartAutoRefresh();
               requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
             }
+          } else if (view === "beacon") {
+            hfView.style.display = "none";
+            aprsView.style.display = "none";
+            aprsStopAutoRefresh();
+            if (beaconView) beaconView.style.display = "block";
+            if (!beaconDataLoaded) {
+              beaconLoadAndRender();
+            } else {
+              renderBeaconDashboard();
+              requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
+            }
           } else {
             hfView.style.display = "block";
             aprsView.style.display = "none";
+            if (beaconView) beaconView.style.display = "none";
             aprsStopAutoRefresh();
             requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
           }
@@ -4421,16 +4920,26 @@ Last update: 2026-04-03 UTC
       }
 
       // Restore last active view (default: hf)
-      const savedView = localStorage.getItem("academic_active_view") || "hf";
+      const savedView = activeAcademicView;
       if (savedView === "aprs" && aprsView) {
         hfView.style.display = "none";
         aprsView.style.display = "block";
+        if (beaconView) beaconView.style.display = "none";
         viewSelector?.querySelectorAll(".view-btn").forEach(b => {
           b.classList.toggle("active", b.dataset.view === "aprs");
         });
         if (!aprsDataLoaded) aprsLoadAndRender();
+      } else if (savedView === "beacon" && beaconView) {
+        hfView.style.display = "none";
+        if (aprsView) aprsView.style.display = "none";
+        beaconView.style.display = "block";
+        viewSelector?.querySelectorAll(".view-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.view === "beacon");
+        });
+        if (!beaconDataLoaded) beaconLoadAndRender();
       } else {
         if (aprsView) aprsView.style.display = "none";
+        if (beaconView) beaconView.style.display = "none";
       }
 
       // ── APRS period presets ───────────────────────────────────────────

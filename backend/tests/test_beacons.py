@@ -192,6 +192,104 @@ def test_beacon_public_api_routes_strip_internal_diagnostics(monkeypatch):
     assert "drift_ms" not in observation
 
 
+def test_beacon_analytics_overview_aggregates_existing_surfaces(monkeypatch):
+    slot_start = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    class DummyDb:
+        def get_settings(self):
+            return {"station": {"locator": "IM58sm", "callsign": "CT7BFV"}}
+
+        def get_beacon_heatmap(self, **kwargs):
+            assert kwargs["hours"] == 12.0
+            return [{
+                "beacon_index": 14,
+                "band_name": "20m",
+                "total_slots": 6,
+                "detections": 4,
+                "id_confirmed": 2,
+                "best_snr_db": 8.5,
+                "best_dashes": 4,
+                "best_id_confirmed": 1,
+                "best_detected_utc": slot_start,
+                "latest_detected_utc": slot_start,
+            }]
+
+        def get_beacon_observations(self, **kwargs):
+            assert kwargs["detected_only"] is False
+            assert kwargs["hours"] == pytest.approx(3.0)
+            return [{
+                "id": 42,
+                "slot_start_utc": slot_start,
+                "slot_index": 14,
+                "beacon_callsign": "CS3B",
+                "beacon_index": 14,
+                "beacon_location": "Madeira, Portugal",
+                "beacon_status": "active",
+                "band_name": "20m",
+                "freq_hz": 14100000,
+                "detected": True,
+                "id_confirmed": True,
+                "id_confidence": 0.98,
+                "drift_ms": 21.4,
+                "dash_levels_detected": 4,
+                "snr_db_100w": 17.2,
+                "snr_db_10w": 10.4,
+                "snr_db_1w": 6.3,
+                "snr_db_100mw": 2.1,
+                "recorded_at": slot_start,
+            }]
+
+    monkeypatch.setattr(beacon_api.state, "db", DummyDb())
+
+    class DummyIonosphericCache:
+        def get_summary(self, latitude, longitude):
+            assert latitude == pytest.approx(38.0, abs=1.0)
+            assert longitude == pytest.approx(-9.0, abs=2.0)
+            return {
+                "kp": 2.3,
+                "kp_condition": "Unsettled",
+                "sfi": 158.0,
+                "fof2_estimated_mhz": 9.6,
+                "qth": {"lat": latitude, "lon": longitude},
+                "bands": {
+                    "20m": {"status": "Open", "open": True, "skip_km": 800, "muf_at_3000km": 22.0},
+                    "17m": {"status": "Marginal", "open": True, "skip_km": 1200, "muf_at_3000km": 18.0},
+                    "15m": {"status": "Closed", "open": False, "skip_km": 0, "muf_at_3000km": 12.0},
+                    "12m": {"status": "Closed", "open": False, "skip_km": 0, "muf_at_3000km": 12.0},
+                    "10m": {"status": "Closed", "open": False, "skip_km": 0, "muf_at_3000km": 12.0},
+                },
+                "last_update": slot_start,
+                "source": "NOAA SWPC",
+            }
+
+    monkeypatch.setattr(beacon_api, "ionospheric_cache", DummyIonosphericCache())
+
+    payload = asyncio.run(
+        beacon_api.beacon_analytics_overview(
+            heatmap_hours=12.0,
+            propagation_window_minutes=180,
+            forecast_window_minutes=180,
+            limit=10000,
+        )
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["kind"] == "beacon_analytics"
+    assert payload["source_kind"] == "live"
+    assert payload["kpis"]["monitored_slots"] == 6
+    assert payload["kpis"]["detected_slots"] == 4
+    assert payload["kpis"]["detected_beacons"] == 1
+    assert payload["kpis"]["best_band"]["band"] == "20m"
+    assert payload["recent_activity"]["bands"] == ["20m", "17m", "15m", "12m", "10m"]
+    assert payload["recent_activity"]["beacons"][14] == "CS3B"
+    assert payload["recent_activity"]["matrix"][14][0]["detections"] == 4
+    assert payload["propagation"]["overall"]["state"] == "Excellent"
+    assert payload["reading"]["state"] == "aligned"
+    assert payload["reading"]["bands"][0]["expected_state"] == "Open"
+    assert payload["forecast"]["kind"] == "nowcast"
+    assert payload["forecast"]["valid_for_minutes"] == 180
+
+
 def test_build_beacon_map_contacts_keeps_latest_detection_per_callsign():
     settings = {"station": {"callsign": "CT7BFV", "locator": "IM58sm"}}
     rows = [

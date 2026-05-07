@@ -25,7 +25,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.ionospheric import ionospheric_cache
 from app.dependencies import state
+from app.dependencies.helpers import callsign_to_dxcc, maidenhead_to_latlon
 from app.beacons.catalog import BANDS, BEACONS, beacon_at, current_cycle_window, current_slot_index
 from app.beacons.propagation import build_beacon_map_contacts, build_beacon_propagation_summary
 from app.beacons.public_payloads import public_beacon_heatmap_cell, public_beacon_observation
@@ -64,6 +66,206 @@ def _command_output(args: list[str]) -> str | None:
         return None
     output = (result.stdout or "").strip()
     return output or None
+
+
+def _resolve_station_coords() -> tuple[float, float]:
+    settings = state.db.get_settings()
+    station = settings.get("station") or {}
+    locator = str(station.get("locator") or "").strip().upper()
+    station_callsign = str(station.get("callsign") or "").strip().upper()
+
+    station_lat: float | None = None
+    station_lon: float | None = None
+    if locator:
+        pos = maidenhead_to_latlon(locator)
+        if pos:
+            station_lat, station_lon = pos
+    if station_lat is None and station_callsign:
+        dxcc = callsign_to_dxcc(station_callsign)
+        if dxcc:
+            station_lat = dxcc.get("lat")
+            station_lon = dxcc.get("lon")
+    if station_lat is None or station_lon is None:
+        station_lat, station_lon = 39.5, -8.0
+    return float(station_lat), float(station_lon)
+
+
+def _expected_band_state(ionospheric: dict[str, Any], band_name: str) -> str:
+    band_payload = ((ionospheric or {}).get("bands") or {}).get(band_name) or {}
+    return str(band_payload.get("status") or "Unknown")
+
+
+def _band_agreement(observed_state: str, expected_state: str) -> str:
+    observed = str(observed_state or "").strip()
+    expected = str(expected_state or "").strip()
+    if observed in {"", "No data"} or expected in {"", "Unknown"}:
+        return "unknown"
+    if observed in {"Excellent", "Good"} and expected == "Open":
+        return "aligned"
+    if observed == "Fair" and expected in {"Open", "Marginal"}:
+        return "mixed"
+    if observed == "Poor" and expected in {"Closed", "Absorbed"}:
+        return "aligned"
+    if observed == "Poor" and expected == "Marginal":
+        return "mixed"
+    if observed in {"Excellent", "Good"} and expected in {"Marginal", "Closed", "Absorbed"}:
+        return "divergent"
+    if observed == "Fair" and expected in {"Closed", "Absorbed"}:
+        return "divergent"
+    return "mixed"
+
+
+def _score_to_confidence(score: float) -> str:
+    if score >= 70.0:
+        return "high"
+    if score >= 40.0:
+        return "moderate"
+    return "low"
+
+
+def _build_beacon_reading(propagation: dict[str, Any], ionospheric: dict[str, Any]) -> dict[str, Any]:
+    band_rows: list[dict[str, Any]] = []
+    agreements: list[str] = []
+    for entry in propagation.get("bands") or []:
+        band_name = str(entry.get("band") or "").strip()
+        if band_name not in {band.name for band in BANDS}:
+            continue
+        observed_state = str(entry.get("state") or "No data")
+        expected_state = _expected_band_state(ionospheric, band_name)
+        agreement = _band_agreement(observed_state, expected_state)
+        band_rows.append({
+            "band": band_name,
+            "observed_state": observed_state,
+            "expected_state": expected_state,
+            "agreement": agreement,
+        })
+        if agreement != "unknown":
+            agreements.append(agreement)
+
+    if agreements and all(item == "aligned" for item in agreements):
+        state_name = "aligned"
+    elif any(item == "divergent" for item in agreements):
+        state_name = "divergent"
+    elif agreements:
+        state_name = "mixed"
+    else:
+        state_name = "unknown"
+
+    overall_score = float(((propagation.get("overall") or {}).get("score") or 0.0))
+    confidence = _score_to_confidence(overall_score)
+    if state_name == "aligned":
+        summary = "Beacon observations broadly align with the current ionospheric estimate."
+    elif state_name == "divergent":
+        summary = "Beacon observations diverge from the current ionospheric estimate on one or more bands."
+    elif state_name == "mixed":
+        summary = "Beacon observations are mixed versus the current ionospheric estimate."
+    else:
+        summary = "Not enough Beacon or ionospheric context is available to assess agreement."
+
+    return {
+        "state": state_name,
+        "confidence": confidence,
+        "summary": summary,
+        "bands": band_rows,
+    }
+
+
+def _forecast_state_from_expected(expected_state: str) -> str:
+    if expected_state == "Open":
+        return "Good"
+    if expected_state == "Marginal":
+        return "Fair"
+    if expected_state in {"Closed", "Absorbed"}:
+        return "Poor"
+    return "No data"
+
+
+def _build_beacon_nowcast(
+    propagation: dict[str, Any],
+    ionospheric: dict[str, Any],
+    forecast_window_minutes: int,
+) -> dict[str, Any]:
+    bands: list[dict[str, Any]] = []
+    for entry in propagation.get("bands") or []:
+        band_name = str(entry.get("band") or "").strip()
+        expected_state = _expected_band_state(ionospheric, band_name)
+        observed_state = str(entry.get("state") or "No data")
+        forecast_state = observed_state if observed_state != "No data" else _forecast_state_from_expected(expected_state)
+        confidence = "moderate" if expected_state in {"Open", "Marginal", "Closed", "Absorbed"} else "low"
+        bands.append({
+            "band": band_name,
+            "forecast_state": forecast_state,
+            "confidence": confidence,
+        })
+
+    overall_state = str(((propagation.get("overall") or {}).get("state") or "No data"))
+    if overall_state in {"Excellent", "Good"}:
+        summary = "Recent Beacon activity suggests current conditions are likely to hold in the short term."
+    elif overall_state == "Fair":
+        summary = "Recent Beacon activity suggests mixed short-term conditions across the monitored bands."
+    else:
+        summary = "Recent Beacon activity suggests weak short-term conditions across the monitored bands."
+
+    return {
+        "kind": "nowcast",
+        "valid_for_minutes": max(30, int(forecast_window_minutes or 180)),
+        "confidence": _score_to_confidence(float(((propagation.get("overall") or {}).get("score") or 0.0))),
+        "summary": summary,
+        "bands": bands,
+    }
+
+
+def _build_recent_activity_summary(rows: list[dict[str, Any]], hours: float) -> dict[str, Any]:
+    cell: dict[tuple[int, str], dict[str, Any]] = {}
+    for row in rows:
+        b_idx = row.get("beacon_index")
+        if b_idx is None:
+            continue
+        public_row = public_beacon_heatmap_cell(row)
+        if public_row is not None:
+            cell[(int(b_idx), row["band_name"])] = public_row
+
+    matrix: list[list[dict[str, Any] | None]] = []
+    for slot_idx in range(18):
+        row_data: list[dict[str, Any] | None] = []
+        for band in BANDS:
+            row_data.append(cell.get((slot_idx, band.name)))
+        matrix.append(row_data)
+
+    return {
+        "hours": hours,
+        "bands": [band.name for band in BANDS],
+        "beacons": [beacon.callsign for beacon in BEACONS],
+        "matrix": matrix,
+    }
+
+
+def _build_kpis(heatmap_rows: list[dict[str, Any]], propagation: dict[str, Any]) -> dict[str, Any]:
+    monitored_slots = sum(int(row.get("total_slots") or 0) for row in heatmap_rows)
+    detected_slots = sum(int(row.get("detections") or 0) for row in heatmap_rows)
+    detected_beacons = len({
+        int(row.get("beacon_index"))
+        for row in heatmap_rows
+        if int(row.get("detections") or 0) > 0 and row.get("beacon_index") is not None
+    })
+    best_band = None
+    monitored_bands = [row for row in (propagation.get("bands") or []) if int(row.get("events") or 0) > 0]
+    if monitored_bands:
+        top_band = max(monitored_bands, key=lambda row: float(row.get("score") or 0.0))
+        best_band = {
+            "band": top_band.get("band"),
+            "score": float(top_band.get("score") or 0.0),
+            "state": top_band.get("state") or "No data",
+        }
+    overall = propagation.get("overall") or {}
+    return {
+        "monitored_slots": monitored_slots,
+        "detected_slots": detected_slots,
+        "detected_beacons": detected_beacons,
+        "best_band": best_band,
+        "global_score": float(overall.get("score") or 0.0),
+        "global_state": overall.get("state") or "No data",
+    }
 
 
 def _duration_to_ms(value: str | None) -> float | None:
@@ -595,6 +797,51 @@ async def beacon_observations(
     )
     public_rows = [row for row in (public_beacon_observation(row) for row in rows) if row is not None]
     return {"observations": public_rows, "count": len(public_rows), "offset": offset}
+
+
+@router.get("/analytics/overview")
+async def beacon_analytics_overview(
+    heatmap_hours: float = Query(default=12.0, ge=1.0, le=72.0),
+    propagation_window_minutes: int = Query(default=180, ge=30, le=1440),
+    forecast_window_minutes: int = Query(default=180, ge=30, le=360),
+    limit: int = Query(default=10000, ge=100, le=10000),
+) -> dict[str, Any]:
+    heatmap_rows = state.db.get_beacon_heatmap(hours=heatmap_hours)
+    propagation_rows = state.db.get_beacon_observations(
+        limit=limit,
+        hours=max(0.1, propagation_window_minutes / 60.0),
+        detected_only=False,
+    )
+    propagation = build_beacon_propagation_summary(propagation_rows, propagation_window_minutes)
+    station_lat, station_lon = _resolve_station_coords()
+    ionospheric = ionospheric_cache.get_summary(latitude=station_lat, longitude=station_lon)
+    reading = _build_beacon_reading(propagation, ionospheric)
+    forecast = _build_beacon_nowcast(propagation, ionospheric, forecast_window_minutes)
+
+    return {
+        "status": "ok",
+        "kind": "beacon_analytics",
+        "source_kind": "live",
+        "generated_at_utc": _now_iso(),
+        "snapshot_captured_at_utc": None,
+        "staleness_seconds": 0,
+        "windows": {
+            "heatmap_hours": heatmap_hours,
+            "propagation_window_minutes": propagation_window_minutes,
+            "forecast_window_minutes": forecast_window_minutes,
+        },
+        "freshness": {
+            "label": "fresh",
+            "push_interval_seconds": None,
+            "warning": None,
+        },
+        "kpis": _build_kpis(heatmap_rows, propagation),
+        "recent_activity": _build_recent_activity_summary(heatmap_rows, heatmap_hours),
+        "propagation": propagation,
+        "ionospheric": ionospheric,
+        "reading": reading,
+        "forecast": forecast,
+    }
 
 
 @router.get("/map/contacts")
