@@ -3206,7 +3206,7 @@ Last update: 2026-04-03 UTC
               <h3 data-i18n="beacon_reading">Beacon + NOAA reading</h3>
             </div>
             <div class="beacon-reading-hero">
-              <div class="beacon-reading-kicker">Quick read</div>
+              <div class="beacon-reading-kicker" data-i18n="beacon_reading_kicker">Quick read</div>
               <p class="beacon-reading-summary" id="beaconReadingSummary">--</p>
             </div>
             <div class="beacon-reading-grid" id="beaconReadingBands"></div>
@@ -3236,10 +3236,10 @@ Last update: 2026-04-03 UTC
 
           <article class="chart-panel span-12 beacon-propmap-card">
             <div class="chart-header">
-              <h3>Beacon Detection Map — NCDXF/IARU</h3>
+              <h3 data-i18n="beacon_detection_map">Beacon Detection Map — NCDXF/IARU</h3>
               <button type="button" class="helper-icon" aria-label="Explain Beacon Detection Map" data-help-title="Beacon Detection Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured dots &amp; arcs&lt;/strong&gt; — NCDXF/IARU beacons with at least one confirmed detection in the analysis window, coloured by band (20 m / 17 m / 15 m / 12 m / 10 m).&lt;br&gt;&lt;strong&gt;Grey dots&lt;/strong&gt; — Beacons monitored but not detected in the window.&lt;br&gt;&lt;br&gt;Hover a dot to see callsign, location and detected bands.&lt;br&gt;Drag to rotate · CTRL+Scroll to zoom · Double-click to reset.">i</button>
             </div>
-            <p>Arcos QTH → beacons detectados na janela de análise. Pontos cinzentos = monitorados sem cópia.</p>
+            <p data-i18n="beacon_detection_map_desc">QTH → arcs to detected beacons in the analysis window. Grey dots = monitored without copy.</p>
             <div class="propmap-wrap" id="beaconPropMapWrap"></div>
           </article>
         </div>
@@ -4885,14 +4885,14 @@ Last update: 2026-04-03 UTC
                 <article class="beacon-reading-band beacon-reading-band--${toneClass}">
                   <div class="beacon-reading-band-top">
                     <div class="beacon-reading-band-id">
-                      <span class="beacon-reading-band-label">Band</span>
+                      <span class="beacon-reading-band-label">${t("beacon_band_label")}</span>
                       <div class="beacon-reading-band-name">${beaconEscapeHtml(row.band || "--")}</div>
                     </div>
                     <span class="beacon-badge ${toneClass}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
                   </div>
                   <div class="beacon-reading-band-flow">
                     <div class="beacon-reading-chip">
-                      <span class="beacon-reading-chip-label">Observed</span>
+                      <span class="beacon-reading-chip-label">${t("beacon_observed_label")}</span>
                       <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.observed_state || "--")}</div>
                     </div>
                     <div class="beacon-reading-flow-arrow" aria-hidden="true">&rarr;</div>
@@ -4929,7 +4929,7 @@ Last update: 2026-04-03 UTC
             <div class="beacon-list-row">
               <div>
                 <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
-                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.events ?? 0} events`)}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.events ?? 0} ${t("beacon_events_unit")}`)}</div>
               </div>
               <span class="beacon-badge ${beaconBadgeClass(row.state)}">${beaconEscapeHtml(`${beaconFormatScore(row.score)} · ${row.state || "No data"}`)}</span>
             </div>`)
