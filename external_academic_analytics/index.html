@@ -1933,7 +1933,7 @@ Last update: 2026-04-03 UTC
           },
         };
       })();
-      // Auto-formatar HH:MM nos inputs de hora
+      // Auto-formatar HH:MM nos inputs de hora + roda do rato
       function _bindTimeFmt(id) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -1942,6 +1942,21 @@ Last update: 2026-04-03 UTC
           if (v.length > 2) v = v.slice(0, 2) + ":" + v.slice(2);
           this.value = v;
         });
+        el.addEventListener("wheel", function (e) {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 1 : -1;
+          const pos = this.selectionStart;
+          const parts = (this.value || "00:00").split(":");
+          let hh = parseInt(parts[0], 10) || 0;
+          let mm = parseInt(parts[1], 10) || 0;
+          if (pos > 2) {
+            mm = (mm + delta + 60) % 60;
+          } else {
+            hh = (hh + delta + 24) % 24;
+          }
+          const pad = n => String(n).padStart(2, "0");
+          this.value = `${pad(hh)}:${pad(mm)}`;
+        }, { passive: false });
       }
       _bindTimeFmt("startInputTime");
       _bindTimeFmt("endInputTime");
