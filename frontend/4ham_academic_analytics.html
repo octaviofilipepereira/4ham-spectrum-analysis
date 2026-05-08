@@ -5054,24 +5054,28 @@ Last update: 2026-04-03 UTC
             const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
 
             if (info.detected) {
-              // Um arco por banda — separados visualmente por padrão de linha e espessura
-              // 20m: sólido grosso | 17m: traço longo | 15m: traço curto | 12m: ponto-traço | 10m: ponteado
-              const arcStyles = [
-                { w: 3.0, dash: null },
-                { w: 2.4, dash: "10,4" },
-                { w: 2.0, dash: "5,4" },
-                { w: 1.6, dash: "8,3,2,3" },
-                { w: 1.4, dash: "2,4" },
-              ];
+              // Um arco por banda — cada arco deslocado perpendicularmente à linha QTH→beacon
+              // (translate em coordenadas de ecrã, perpendicular ao vector projetado)
+              const n = detectedBands.length;
+              const arcSpacing = 5; // px de separação entre arcos
+              const ps = proj([sLon, sLat]);
+              const pb = proj([bLon, bLat]);
+              let perpX = 0, perpY = 0;
+              if (ps && pb) {
+                const dx = pb[0] - ps[0];
+                const dy = pb[1] - ps[1];
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) { perpX = -dy / len; perpY = dx / len; }
+              }
               detectedBands.forEach((band, i) => {
-                const s = arcStyles[i] ?? { w: 1.4, dash: "2,4" };
-                const arc = arcG.append("path")
+                const offset = (i - (n - 1) / 2) * arcSpacing;
+                arcG.append("path")
                   .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
                   .attr("d", path).attr("fill", "none")
                   .attr("stroke", _pmColor(band))
-                  .attr("stroke-width", s.w)
-                  .attr("stroke-opacity", 0.9);
-                if (s.dash) arc.attr("stroke-dasharray", s.dash);
+                  .attr("stroke-width", 2.0)
+                  .attr("stroke-opacity", 0.9)
+                  .attr("transform", `translate(${perpX * offset},${perpY * offset})`);
               });
             }
 
