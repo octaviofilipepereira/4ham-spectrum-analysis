@@ -21,6 +21,7 @@ Last update: 2026-04-03 UTC
     <title>4ham Academic Analytics</title>
     <link rel="icon" href="favicon.ico" type="image/x-icon" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="lib/flatpickr.min.css" />
     <style>
       :root {
         --bg: #0b1118;
@@ -377,6 +378,29 @@ Last update: 2026-04-03 UTC
         width: 7.5rem;
         flex: none;
       }
+
+      /* flatpickr dark overrides */
+      .flatpickr-calendar {
+        background: #1e293b;
+        border: 1px solid #334155;
+        box-shadow: 0 4px 24px rgba(0,0,0,.5);
+        color: #e2e8f0;
+      }
+      .flatpickr-months .flatpickr-month,
+      .flatpickr-weekdays,
+      span.flatpickr-weekday { background: #1e293b; color: #94a3b8; }
+      .flatpickr-day { color: #e2e8f0; border-radius: 6px; }
+      .flatpickr-day:hover { background: #334155; border-color: #334155; }
+      .flatpickr-day.selected,
+      .flatpickr-day.selected:hover { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+      .flatpickr-day.today { border-color: #3b82f6; }
+      .flatpickr-day.flatpickr-disabled { color: #475569; }
+      .flatpickr-prev-month, .flatpickr-next-month { fill: #94a3b8; }
+      .flatpickr-prev-month:hover svg, .flatpickr-next-month:hover svg { fill: #e2e8f0; }
+      .numInputWrapper:hover { background: #334155; }
+      .numInputWrapper span { border-color: #334155; }
+      .numInputWrapper span:hover { background: #475569; }
+      .cur-month, .cur-year { color: #e2e8f0 !important; font-weight: 600; }
 
       .cards {
         display: grid;
@@ -1784,6 +1808,8 @@ Last update: 2026-04-03 UTC
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
     <script src="lib/xlsx.mini.min.js"></script>
+    <script src="lib/flatpickr.min.js"></script>
+    <script src="lib/flatpickr.pt.js"></script>
     <script src="vendor/leaflet/leaflet.js"></script>
     <script>
       const BANDS = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m"];
@@ -1870,63 +1896,44 @@ Last update: 2026-04-03 UTC
 
       const presetRow = document.getElementById("presetRow");
       const customRange = document.getElementById("customRange");
-      // Helpers: convert between ISO date (YYYY-MM-DD) and display (DD/MM/YYYY)
-      function _parseDMY(s) {
-        const m = s && s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
-      }
-      function _fmtYMD(s) {
-        const m = s && s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
-      }
-      // Auto-format DD/MM/AAAA as user types
-      function _bindDateFmt(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("input", function () {
-          const sel = this.selectionStart;
-          let v = this.value.replace(/\D/g, "");
-          if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
-          if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5);
-          this.value = v.slice(0, 10);
-        });
+
+      // ── Flatpickr date pickers (locale pt, formato DD/MM/AAAA) ──────
+      const _fpOpts = { locale: "pt", dateFormat: "d/m/Y", allowInput: true, disableMobile: false };
+      const _fpStart     = flatpickr(document.getElementById("startInputDate"), _fpOpts);
+      const _fpEnd       = flatpickr(document.getElementById("endInputDate"),   _fpOpts);
+      const _fpAprsStart = flatpickr(document.getElementById("aprsCustomStartDate"), _fpOpts);
+      const _fpAprsEnd   = flatpickr(document.getElementById("aprsCustomEndDate"),   _fpOpts);
+
+      function _fpGetISO(fpInst) {
+        const d = fpInst.selectedDates[0];
+        if (!d) return "";
+        const pad = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
       }
       const startInput = (() => {
-        const d = document.getElementById("startInputDate");
-        const t = document.getElementById("startInputTime");
+        const tEl = document.getElementById("startInputTime");
         return {
-          get value() {
-            const iso = _parseDMY(d.value);
-            return iso ? `${iso}T${t.value || "00:00"}` : "";
-          },
+          get value() { const iso = _fpGetISO(_fpStart); return iso ? `${iso}T${tEl.value||"00:00"}` : ""; },
           set value(v) {
-            if (!v) { d.value = ""; t.value = ""; return; }
+            if (!v) { _fpStart.clear(); tEl.value = ""; return; }
             const [date, time] = v.split("T");
-            d.value = _fmtYMD(date || "");
-            t.value = (time || "00:00").slice(0, 5);
+            _fpStart.setDate(date, false);
+            tEl.value = (time||"00:00").slice(0,5);
           },
         };
       })();
       const endInput = (() => {
-        const d = document.getElementById("endInputDate");
-        const t = document.getElementById("endInputTime");
+        const tEl = document.getElementById("endInputTime");
         return {
-          get value() {
-            const iso = _parseDMY(d.value);
-            return iso ? `${iso}T${t.value || "00:00"}` : "";
-          },
+          get value() { const iso = _fpGetISO(_fpEnd); return iso ? `${iso}T${tEl.value||"00:00"}` : ""; },
           set value(v) {
-            if (!v) { d.value = ""; t.value = ""; return; }
+            if (!v) { _fpEnd.clear(); tEl.value = ""; return; }
             const [date, time] = v.split("T");
-            d.value = _fmtYMD(date || "");
-            t.value = (time || "00:00").slice(0, 5);
+            _fpEnd.setDate(date, false);
+            tEl.value = (time||"00:00").slice(0,5);
           },
         };
       })();
-      _bindDateFmt("startInputDate");
-      _bindDateFmt("endInputDate");
-      _bindDateFmt("aprsCustomStartDate");
-      _bindDateFmt("aprsCustomEndDate");
       const bandFilter = document.getElementById("bandFilter");
       const modeFilter = document.getElementById("modeFilter");
       const applyBtn = document.getElementById("applyBtn");
@@ -4629,14 +4636,12 @@ Last update: 2026-04-03 UTC
           case "6h":  start = new Date(now - 6 * 3600e3); break;
           case "24h": start = new Date(now - 24 * 3600e3); break;
           case "custom": {
-            const _asd = document.getElementById("aprsCustomStartDate")?.value;
+            const _asd = _fpGetISO(_fpAprsStart);
             const _ast = document.getElementById("aprsCustomStartTime")?.value;
-            const _aed = document.getElementById("aprsCustomEndDate")?.value;
+            const _aed = _fpGetISO(_fpAprsEnd);
             const _aet = document.getElementById("aprsCustomEndTime")?.value;
-            const si = _parseDMY(_asd);
-            const ei = _parseDMY(_aed);
-            const s = si ? `${si}T${_ast || "00:00"}` : "";
-            const e = ei ? `${ei}T${_aet || "00:00"}` : "";
+            const s = _asd ? `${_asd}T${_ast || "00:00"}` : "";
+            const e = _aed ? `${_aed}T${_aet || "00:00"}` : "";
             return {
               start: s ? new Date(s) : new Date(now - 30 * 60e3),
               end:   e ? new Date(e) : now
