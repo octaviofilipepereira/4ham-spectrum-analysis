@@ -6,6 +6,20 @@
 (function () {
   "use strict";
 
+  // ── NCDXF/IARU beacon coordinates [lon, lat] (D3 GeoJSON convention) ────────
+  const NCDXF_BANDS = Object.freeze(["20m", "17m", "15m", "12m", "10m"]);
+  const BEACON_COORDS = Object.freeze({
+    "4U1UN":  [ -73.98,  40.75], "VE8AT":  [ -85.96,  79.99],
+    "W6WX":   [-121.90,  37.16], "KH6RS":  [-156.45,  20.77],
+    "ZL6B":   [ 175.66, -40.95], "VK6RBP": [ 116.02, -32.11],
+    "JA2IGY": [ 136.94,  35.07], "RR9O":   [  83.09,  54.85],
+    "VR2B":   [ 114.17,  22.32], "4S7B":   [  79.86,   6.90],
+    "ZS6DN":  [  28.19, -25.74], "5Z4B":   [  36.82,  -1.29],
+    "4X6TU":  [  34.78,  32.07], "OH2B":   [  24.10,  60.26],
+    "CS3B":   [ -16.93,  32.65], "LU4AA":  [ -58.38, -34.62],
+    "OA4B":   [ -77.06, -12.05], "YV5B":   [ -67.87,  10.49],
+  });
+
   // ── Band colour palette ────────────────────────────────────────────────────
   const BAND_COLORS = {
     "160m": "#ff0000", "80m": "#ff1493", "40m": "#ffa500",
@@ -267,39 +281,121 @@
 
       // Great-circle arcs as GeoJSON LineString — D3+orthographic clips automatically
       arcG.selectAll("path").remove();
-      if (showArcs) {
-        contacts.forEach((c) => {
-          if (c.lat == null || c.lon == null) return;
-          arcG.append("path")
-            .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
-            .attr("d", path)
-            .attr("fill", "none")
-            .attr("stroke", bandColor(c.band))
-            .attr("stroke-width", isBeaconMap ? 2.2 : 1.8)
-            .attr("stroke-opacity", isBeaconMap ? 0.92 : 0.85);
-        });
-      }
-
-      // Dots — only on visible hemisphere (geoDistance < 90°)
       dotG.selectAll("*").remove();
       const center = proj.invert([W / 2, H / 2]);
-      contacts.forEach((c) => {
-        if (c.lat == null || c.lon == null) return;
-        if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
-        const pp = proj([c.lon, c.lat]);
-        if (!pp) return;
-        dotG.append("circle")
-          .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", isBeaconMap ? 5.2 : 4.5)
-          .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
-          .attr("opacity", 0.92).style("cursor", "pointer")
-          .on("mousemove", (evt) => {
-            tip.innerHTML = renderTooltipHtml(c, isBeaconMap);
-            tip.style.display = "block";
-            tip.style.left = evt.clientX + 14 + "px";
-            tip.style.top  = evt.clientY - 34 + "px";
-          })
-          .on("mouseleave", () => { tip.style.display = "none"; });
-      });
+
+      if (isBeaconMap) {
+        // ── NCDXF beacon overlay: arcos separados por banda + anéis concêntricos ──
+        // Agrupar detecções por callsign → bandas
+        const detMap = {};
+        contacts.forEach((c) => {
+          if (!c.callsign) return;
+          if (!detMap[c.callsign]) detMap[c.callsign] = { detected: false, bands: new Set(), contact: c };
+          if (c.band) { detMap[c.callsign].detected = true; detMap[c.callsign].bands.add(c.band); }
+        });
+
+        Object.entries(BEACON_COORDS).forEach(([cs, [bLon, bLat]]) => {
+          const info = detMap[cs] || { detected: false, bands: new Set(), contact: null };
+          const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
+
+          // Arcos — um por banda, deslocados perpendicularmente
+          if (info.detected && showArcs) {
+            const n = detectedBands.length;
+            const ps = proj([sLon, sLat]);
+            const pb = proj([bLon, bLat]);
+            let perpX = 0, perpY = 0;
+            if (ps && pb) {
+              const dx = pb[0] - ps[0], dy = pb[1] - ps[1];
+              const len = Math.sqrt(dx * dx + dy * dy);
+              if (len > 0) { perpX = -dy / len; perpY = dx / len; }
+            }
+            detectedBands.forEach((band, i) => {
+              const offset = (i - (n - 1) / 2) * 5;
+              arcG.append("path")
+                .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                .attr("d", path).attr("fill", "none")
+                .attr("stroke", bandColor(band)).attr("stroke-width", 2.0).attr("stroke-opacity", 0.9)
+                .attr("transform", `translate(${perpX * offset},${perpY * offset})`);
+            });
+          }
+
+          // Pontos — só no hemisfério visível
+          if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) return;
+          const pp = proj([bLon, bLat]);
+          if (!pp) return;
+
+          if (info.detected) {
+            const bandList = detectedBands.join(", ");
+            const baseR = 6, step = 5;
+            [...detectedBands].reverse().forEach((band, ri) => {
+              const r = baseR + (detectedBands.length - 1 - ri) * step;
+              dotG.append("circle")
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
+                .attr("fill", "none").attr("stroke", bandColor(band))
+                .attr("stroke-width", 2.5).attr("opacity", 0.95)
+                .style("cursor", "pointer")
+                .on("mousemove", (evt) => {
+                  tip.innerHTML = `<strong>${cs}</strong><br>Detectado em: <strong>${bandList}</strong>`;
+                  tip.style.display = "block";
+                  tip.style.left = evt.clientX + 14 + "px";
+                  tip.style.top  = evt.clientY - 34 + "px";
+                })
+                .on("mouseleave", () => { tip.style.display = "none"; });
+            });
+            const outerR = baseR + (detectedBands.length - 1) * step;
+            dotG.append("text")
+              .attr("x", pp[0] + outerR + 5).attr("y", pp[1] + 5)
+              .attr("fill", bandColor(detectedBands[0])).attr("font-size", "12px")
+              .attr("font-weight", "bold").attr("font-family", "monospace")
+              .attr("pointer-events", "none").text(cs);
+          } else {
+            dotG.append("circle")
+              .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5)
+              .attr("fill", "none").attr("stroke", "#6b7280")
+              .attr("stroke-width", 1.4).attr("opacity", 0.75)
+              .style("cursor", "pointer")
+              .on("mousemove", (evt) => {
+                tip.innerHTML = `<strong>${cs}</strong><br><span style="color:#9ca3af">Monitorado — sem cópia</span>`;
+                tip.style.display = "block";
+                tip.style.left = evt.clientX + 14 + "px";
+                tip.style.top  = evt.clientY - 34 + "px";
+              })
+              .on("mouseleave", () => { tip.style.display = "none"; });
+            dotG.append("text")
+              .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+              .attr("fill", "#6b7280").attr("font-size", "11px")
+              .attr("font-family", "monospace").attr("pointer-events", "none").text(cs);
+          }
+        });
+      } else {
+        // ── Modo normal: arcos + dots por contacto ───────────────────────────
+        if (showArcs) {
+          contacts.forEach((c) => {
+            if (c.lat == null || c.lon == null) return;
+            arcG.append("path")
+              .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
+              .attr("d", path).attr("fill", "none")
+              .attr("stroke", bandColor(c.band)).attr("stroke-width", 1.8).attr("stroke-opacity", 0.85);
+          });
+        }
+        contacts.forEach((c) => {
+          if (c.lat == null || c.lon == null) return;
+          if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
+          const pp = proj([c.lon, c.lat]);
+          if (!pp) return;
+          dotG.append("circle")
+            .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
+            .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
+            .attr("opacity", 0.92).style("cursor", "pointer")
+            .on("mousemove", (evt) => {
+              tip.innerHTML = renderTooltipHtml(c, false);
+              tip.style.display = "block";
+              tip.style.left = evt.clientX + 14 + "px";
+              tip.style.top  = evt.clientY - 34 + "px";
+            })
+            .on("mouseleave", () => { tip.style.display = "none"; });
+        });
+      }
 
       // Home marker
       homeG.selectAll("*").remove();
