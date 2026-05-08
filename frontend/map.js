@@ -16,6 +16,11 @@
   };
   const DEFAULT_COLOR = "#9ca3af";
   const bandColor = (b) => BAND_COLORS[(b || "").toLowerCase()] || DEFAULT_COLOR;
+  const MAP_BAND_FILTER_STORAGE_KEY = "4ham_map_band_filter";
+  const MAP_ARCS_TOGGLE_STORAGE_KEY = "4ham_map_arcs_toggle";
+  const MAP_ALLOWED_BAND_FILTERS = new Set([
+    "all", "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm",
+  ]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   const authHeader = () => {
@@ -462,12 +467,45 @@
 
   function getBandFilter() {
     const sel = document.getElementById("mapBandFilter");
-    return sel ? String(sel.value || "all").trim().toLowerCase() : "all";
+    const raw = sel ? String(sel.value || "all").trim().toLowerCase() : "all";
+    return MAP_ALLOWED_BAND_FILTERS.has(raw) ? raw : "all";
   }
 
   function getArcsEnabled() {
     const toggle = document.getElementById("mapArcsToggle");
     return toggle ? Boolean(toggle.checked) : true;
+  }
+
+  function restoreMapUiPreferences() {
+    const bandSel = document.getElementById("mapBandFilter");
+    if (bandSel) {
+      let savedBand = "all";
+      try {
+        savedBand = String(localStorage.getItem(MAP_BAND_FILTER_STORAGE_KEY) || "all").trim().toLowerCase();
+      } catch (_) {}
+      bandSel.value = MAP_ALLOWED_BAND_FILTERS.has(savedBand) ? savedBand : "all";
+    }
+
+    const arcsToggle = document.getElementById("mapArcsToggle");
+    if (arcsToggle) {
+      let savedArcs = "1";
+      try {
+        savedArcs = String(localStorage.getItem(MAP_ARCS_TOGGLE_STORAGE_KEY) || "1").trim();
+      } catch (_) {}
+      arcsToggle.checked = savedArcs !== "0";
+    }
+  }
+
+  function persistMapBandFilterPreference() {
+    try {
+      localStorage.setItem(MAP_BAND_FILTER_STORAGE_KEY, getBandFilter());
+    } catch (_) {}
+  }
+
+  function persistMapArcsPreference() {
+    try {
+      localStorage.setItem(MAP_ARCS_TOGGLE_STORAGE_KEY, getArcsEnabled() ? "1" : "0");
+    } catch (_) {}
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -520,6 +558,8 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("propagationMap")) {
+      restoreMapUiPreferences();
+
       // Double rAF ensures flex layout AND paint have completed before measuring
       requestAnimationFrame(() => {
         requestAnimationFrame(() => PropMap.init("propagationMap"));
@@ -542,13 +582,19 @@
       // Re-render immediately when user changes the selected band filter
       const bandSel = document.getElementById("mapBandFilter");
       if (bandSel) {
-        bandSel.addEventListener("change", refreshInlineAndModal);
+        bandSel.addEventListener("change", () => {
+          persistMapBandFilterPreference();
+          refreshInlineAndModal();
+        });
       }
 
       // Re-render immediately when user toggles map arcs
       const arcsToggle = document.getElementById("mapArcsToggle");
       if (arcsToggle) {
-        arcsToggle.addEventListener("change", refreshInlineAndModal);
+        arcsToggle.addEventListener("change", () => {
+          persistMapArcsPreference();
+          refreshInlineAndModal();
+        });
       }
     }
 
