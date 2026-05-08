@@ -354,6 +354,25 @@ Last update: 2026-04-03 UTC
         margin-top: 10px;
       }
 
+      .dt-pair {
+        display: flex;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .dt-pair input[type="date"],
+      .dt-pair input[type="time"] {
+        min-width: 0;
+        flex: 1;
+        padding: 4px 6px;
+        border-radius: 6px;
+        border: 1px solid #334155;
+        background: #1a2035;
+        color: #e2e8f0;
+        font-size: 0.82rem;
+        color-scheme: dark;
+      }
+
       .cards {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
@@ -1389,8 +1408,14 @@ Last update: 2026-04-03 UTC
               <button class="preset-btn" data-preset="custom" data-i18n="custom_period">Custom Period</button>
             </div>
             <div class="custom-range" id="customRange" style="display:none;">
-              <input type="datetime-local" id="startInput" />
-              <input type="datetime-local" id="endInput" />
+              <div class="dt-pair">
+                <input type="date" id="startInputDate" lang="pt-PT" />
+                <input type="time" id="startInputTime" lang="pt-PT" />
+              </div>
+              <div class="dt-pair">
+                <input type="date" id="endInputDate" lang="pt-PT" />
+                <input type="time" id="endInputTime" lang="pt-PT" />
+              </div>
             </div>
           </div>
 
@@ -1589,11 +1614,13 @@ Last update: 2026-04-03 UTC
             <div id="aprsCustomRange" style="display:none;margin-top:8px;flex-direction:column;gap:6px;width:100%;">
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">From</label>
-                <input type="datetime-local" id="aprsCustomStart" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+                <input type="date" id="aprsCustomStartDate" lang="pt-PT" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="time" id="aprsCustomStartTime" lang="pt-PT" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
               </div>
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">To</label>
-                <input type="datetime-local" id="aprsCustomEnd" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+                <input type="date" id="aprsCustomEndDate" lang="pt-PT" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="time" id="aprsCustomEndTime" lang="pt-PT" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
               </div>
               <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="align-self:flex-start;margin-top:2px">Apply Filters</button>
             </div>
@@ -1838,8 +1865,32 @@ Last update: 2026-04-03 UTC
 
       const presetRow = document.getElementById("presetRow");
       const customRange = document.getElementById("customRange");
-      const startInput = document.getElementById("startInput");
-      const endInput = document.getElementById("endInput");
+      const startInput = (() => {
+        const d = document.getElementById("startInputDate");
+        const t = document.getElementById("startInputTime");
+        return {
+          get value() { return d.value ? `${d.value}T${t.value || "00:00"}` : ""; },
+          set value(v) {
+            if (!v) { d.value = ""; t.value = ""; return; }
+            const [date, time] = v.split("T");
+            d.value = date || "";
+            t.value = (time || "00:00").slice(0, 5);
+          },
+        };
+      })();
+      const endInput = (() => {
+        const d = document.getElementById("endInputDate");
+        const t = document.getElementById("endInputTime");
+        return {
+          get value() { return d.value ? `${d.value}T${t.value || "00:00"}` : ""; },
+          set value(v) {
+            if (!v) { d.value = ""; t.value = ""; return; }
+            const [date, time] = v.split("T");
+            d.value = date || "";
+            t.value = (time || "00:00").slice(0, 5);
+          },
+        };
+      })();
       const bandFilter = document.getElementById("bandFilter");
       const modeFilter = document.getElementById("modeFilter");
       const applyBtn = document.getElementById("applyBtn");
@@ -4538,8 +4589,12 @@ Last update: 2026-04-03 UTC
           case "6h":  start = new Date(now - 6 * 3600e3); break;
           case "24h": start = new Date(now - 24 * 3600e3); break;
           case "custom": {
-            const s = document.getElementById("aprsCustomStart")?.value;
-            const e = document.getElementById("aprsCustomEnd")?.value;
+            const _asd = document.getElementById("aprsCustomStartDate")?.value;
+            const _ast = document.getElementById("aprsCustomStartTime")?.value;
+            const _aed = document.getElementById("aprsCustomEndDate")?.value;
+            const _aet = document.getElementById("aprsCustomEndTime")?.value;
+            const s = _asd ? `${_asd}T${_ast || "00:00"}` : "";
+            const e = _aed ? `${_aed}T${_aet || "00:00"}` : "";
             return {
               start: s ? new Date(s) : new Date(now - 30 * 60e3),
               end:   e ? new Date(e) : now
