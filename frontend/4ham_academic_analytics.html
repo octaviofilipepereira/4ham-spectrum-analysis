@@ -2344,8 +2344,10 @@ Last update: 2026-04-03 UTC
               <div class="value snr-gauge-value" id="kpiPropScore">--</div>
               <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
             </div>
-            <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
-            <div id="kpiPropNote" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;" data-i18n-html="kpi_prop_note">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
+            <div class="prop-state">
+              <span id="kpiPropState" class="badge">--</span>
+              <button type="button" class="helper-icon" style="font-size:10px;width:16px;height:16px;line-height:14px;padding:0;margin-left:5px;vertical-align:middle;" aria-label="Explain propagation score" data-help-title="Global Propagation Score" data-help-text="Confirmed decodes only (verified callsign).&#10;No callsign = band occupancy.">i</button>
+            </div>
           </div>
           <div class="card">
             <span class="label" data-i18n="kpi_best_band">Best band</span>
