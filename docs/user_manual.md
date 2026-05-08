@@ -228,6 +228,17 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ## Beacon Analysis — NCDXF/IARU
 
+> **Novidades v0.15.0** — o painel Beacon do Academic Analytics passou
+> a ter uma vista *nativa* (deixou de ser uma cópia da vista HF):
+> KPIs próprios, leitura combinada Beacon + NOAA, *nowcast*, propagação
+> por banda, contexto ionosférico, matriz de actividade recente das
+> últimas 12 h e modal `Events` com 4 gráficos (rhythm, mix, SNR trend,
+> dash trend). Quando o scheduler beacon está activo, o globo principal
+> de propagação passa também a mostrar um *overlay* multi-banda dos
+> beacons NCDXF (arcos por banda, anéis concêntricos no QTH, paleta
+> distinta por banda) em paralelo com os contactos normais. Tudo está
+> espelhado no mirror público (cs5arc.pt).
+
 ### O que faz este módulo?
 
 O **Beacon Analysis** é um módulo dedicado à rede internacional **NCDXF/IARU Beacon Network**. Os 18 radiofaróis fixos transmitem em **slots UTC exactos de 10 segundos** nas bandas de **20, 17, 15, 12 e 10 metros**.
