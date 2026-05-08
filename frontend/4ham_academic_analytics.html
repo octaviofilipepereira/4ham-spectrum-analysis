@@ -5,7 +5,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 Last update: 2026-04-03 UTC
 -->
 <!DOCTYPE html>
-<html lang="en" translate="no">
+<html lang="pt-PT" translate="no">
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
@@ -2358,7 +2358,7 @@ Last update: 2026-04-03 UTC
                 <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
               </svg>
               <div class="value snr-gauge-value" id="kpiEvents">--</div>
-              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>5k</span><span>10k+</span></div>
+              <div class="snr-gauge-scale" id="kpiEventsScale" aria-hidden="true"><span>0</span><span>5k</span><span>10k+</span></div>
             </div>
           </div>
           <div class="card card-snr-gauge is-empty" id="kpiCallsignsCard">
@@ -5411,7 +5411,18 @@ Last update: 2026-04-03 UTC
           "CW", "CW_CANDIDATE", "CW_TRAFFIC",
           "SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION",
         ]);
-        const totalEvents = d3.sum(seriesRows, (d) => d.count);
+
+        // Compute total events from the full API-returned series (no client-side time filter).
+        // filteredSeries uses row.ts (bucket start) which may precede the exact period start,
+        // causing under-count for non-boundary-aligned periods.  synthetic.series is already
+        // time-bounded by the server; only the band/mode filters need to be applied here.
+        const { band: _fb, mode: _fm } = lastFilters;
+        const totalEvents = d3.sum(
+          synthetic.series.filter(d =>
+            (_fb === "ALL" || d.band === _fb) && (_fm === "ALL" || d.mode === _fm)
+          ),
+          d => d.count
+        );
 
         const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
         const anaRows = seriesRows.filter((d) => ANALOG_KPI.has(d.mode));
@@ -5441,11 +5452,23 @@ Last update: 2026-04-03 UTC
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
-        updateKpiGauge(kpiEventsNeedle, kpiEventsCard, kpiEvents, totalEvents, 0, EVENTS_GAUGE_MAX, (v) => formatInt(v));
         updateKpiGauge(kpiCallsignsNeedle, kpiCallsignsCard, kpiCallsigns, uniqueCallsigns, 0, CALLSIGNS_GAUGE_MAX, (v) => formatInt(v));
         updateDigitalSnrGauge(snrDigital);
         updateKpiGauge(kpiSnrAnalogNeedle, kpiSnrAnalogCard, kpiSnrAnalog, snrAnalog,
           ANALOG_SNR_GAUGE_MIN_DB, ANALOG_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
+
+        // Events gauge: auto-scale so needle is never pegged when real count > static max.
+        const eventsGaugeMax = totalEvents > EVENTS_GAUGE_MAX
+          ? Math.ceil(totalEvents / 10000) * 10000
+          : EVENTS_GAUGE_MAX;
+        const kpiEventsScaleEl = document.getElementById("kpiEventsScale");
+        if (kpiEventsScaleEl) {
+          const mid = eventsGaugeMax / 2;
+          const midLabel = mid >= 1000 ? `${Math.round(mid / 1000)}k` : String(mid);
+          const maxLabel = `${Math.round(eventsGaugeMax / 1000)}k+`;
+          kpiEventsScaleEl.innerHTML = `<span>0</span><span>${midLabel}</span><span>${maxLabel}</span>`;
+        }
+        updateKpiGauge(kpiEventsNeedle, kpiEventsCard, kpiEvents, totalEvents, 0, eventsGaugeMax, (v) => formatInt(v));
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
       }
@@ -6273,7 +6296,7 @@ Last update: 2026-04-03 UTC
       }
 
       function formatInt(value) {
-        return new Intl.NumberFormat("en-GB").format(Math.round(value || 0));
+        return new Intl.NumberFormat("pt-PT").format(Math.round(value || 0));
       }
 
       function fmtDateUtc(date) {

@@ -5,7 +5,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 Last update: 2026-04-03 UTC
 -->
 <!DOCTYPE html>
-<html lang="en" translate="no">
+<html lang="pt-PT" translate="no">
   <head>
     <meta charset="UTF-8" />
     <!-- Force browser to revalidate this HTML on every visit so users get
@@ -3474,7 +3474,15 @@ Last update: 2026-04-03 UTC
           "CW", "CW_CANDIDATE", "CW_TRAFFIC",
           "SSB", "SSB_TRAFFIC", "AM", "VOICE_DETECTION",
         ]);
-        const totalEvents = d3.sum(seriesRows, (d) => d.count);
+
+        // Compute total events from the full API-returned series (no client-side time filter).
+        const { band: _fb, mode: _fm } = lastFilters;
+        const totalEvents = d3.sum(
+          synthetic.series.filter(d =>
+            (_fb === "ALL" || d.band === _fb) && (_fm === "ALL" || d.mode === _fm)
+          ),
+          d => d.count
+        );
 
         const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
         const anaRows = seriesRows.filter((d) => ANALOG_KPI.has(d.mode));
@@ -4304,7 +4312,7 @@ Last update: 2026-04-03 UTC
       }
 
       function formatInt(value) {
-        return new Intl.NumberFormat("en-GB").format(Math.round(value || 0));
+        return new Intl.NumberFormat("pt-PT").format(Math.round(value || 0));
       }
 
       function fmtDateUtc(date) {
