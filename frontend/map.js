@@ -74,6 +74,7 @@
   let _refreshTimer = null;
   let _lastData     = null;
   let _inlineContainerId = "propagationMap";
+  const _modalContainerId = "propagationMapModal";
   let _beaconRefreshTimer = null;
   const _viewStateByContainer = new Map();
 
@@ -93,6 +94,20 @@
 
   function isInteractionBlocked(viewState) {
     return Boolean(viewState?.pointerInside || viewState?.interactionActive);
+  }
+
+  function syncCameraState(sourceContainerId, targetContainerId) {
+    const source = _viewStateByContainer.get(sourceContainerId);
+    if (!source) {
+      return;
+    }
+    const target = getViewState(targetContainerId);
+    if (Array.isArray(source.rotation) && source.rotation.length === 3) {
+      target.rotation = source.rotation.slice();
+    }
+    if (Number.isFinite(Number(source.zoomScale)) && Number(source.zoomScale) > 0) {
+      target.zoomScale = Number(source.zoomScale);
+    }
   }
 
   function queuePendingPayload(containerId, payload) {
@@ -523,9 +538,12 @@
     },
 
     async renderModal() {
-      const c = document.getElementById("propagationMapModal");
+      const c = document.getElementById(_modalContainerId);
       if (!c) return;
       const win = getWindowMinutes();
+
+      // Keep fullscreen view aligned with the latest inline camera state.
+      syncCameraState(_inlineContainerId, _modalContainerId);
 
       if (_lastData) {
         await drawResolvedData(c.id, win, true, _lastData);
@@ -604,6 +622,14 @@
       modalEl.addEventListener("hide.bs.modal", () => {
         const tip = document.getElementById("mapTooltip");
         if (tip) tip.style.display = "none";
+      });
+      modalEl.addEventListener("hidden.bs.modal", async () => {
+        syncCameraState(_modalContainerId, _inlineContainerId);
+        if (_lastData) {
+          await drawResolvedData(_inlineContainerId, getWindowMinutes(), false, _lastData);
+        } else {
+          PropMap.refresh(_inlineContainerId, getWindowMinutes());
+        }
       });
     }
   });
