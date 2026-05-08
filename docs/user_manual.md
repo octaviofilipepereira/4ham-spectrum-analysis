@@ -326,6 +326,47 @@ Notas:
 - `age_latest_meaningful` mede a idade da última observação útil (`Detected` ou `Weak trace`) dentro da janela.
 - `No copy` continua visível publicamente, mas entra no score apenas de forma indirecta ao baixar `D_r` e `W_r`.
 
+### Indicadores NOAA no painel de instrumentos
+
+O painel Beacon inclui dois velocímetros NOAA lado a lado: **Kp** e **SFI**. São actualizados a partir da mesma fonte ionosférica utilizada pelo mapa de propagação e pela barra lateral de clima espacial.
+
+#### O que é o Kp?
+
+O **Kp** (Índice Geomagnético Planetário) mede a perturbação no campo magnético terrestre causada pelo vento solar. Escala de 0 a 9.
+
+| Kp | Estado | Impacto na propagação HF |
+|---|---|---|
+| 0–2 | Calmo | Condições ideais — todas as bandas ao seu melhor |
+| 3–4 | Instável | Degradação ligeira nos percursos polares / auroral |
+| 5–6 | Tempestade activa | Degradação notável; percursos de alta latitude afectados |
+| ≥ 7 | Tempestade severa | Risco de apagão HF; percursos polares muito penalizados |
+
+> Um Kp mais baixo favorece especialmente os percursos DX que passam pela zona auroral (ex. Europa → América do Norte pela rota polar).
+
+#### O que é o SFI?
+
+O **SFI** (Solar Flux Index, 10,7 cm) é um indicador da radiação UV e raios-X do sol — a principal responsável por ionizar a camada F2. Um SFI mais alto significa uma ionosfera mais densa e mais bandas abertas para longa distância.
+
+| SFI | Estado | Efeito prático |
+|---|---|---|
+| < 80 | Baixo | Condições pobres — 15 m e 10 m provavelmente fechadas |
+| 80–120 | Moderado | 20 m fiável; 15 m marginal; 10 m fechada |
+| 120–200 | Bom | 20 m e 15 m abertas de dia; 10 m com aberturas possíveis |
+| > 200 | Excelente | 10 m, 12 m, 15 m com grande probabilidade de abertura |
+
+#### Kp × SFI → prioridade de banda
+
+| Banda | Sensibilidade ao Kp | Dependência do SFI | Com Kp ≤ 3 e SFI ≥ 150 (dia) |
+|---|---|---|---|
+| **80 m** | Baixa (regional) | Muito baixa | Fiável à noite para NVIS / percursos curtos |
+| **40 m** | Baixa–média | Baixa | Banda de referência, dia e noite |
+| **20 m** | Média | Média–alta | Principal banda DX; multi-hop para qualquer continente |
+| **15 m** | Média | Alta (SFI > 100) | Excelente DX diurno; transcontinental provável |
+| **10 m** | Baixa (ionosférica) | Muito alta (SFI > 120) | Abertura diurna provável; sporadic-E também contribui |
+
+**Ordem de prioridade diurna com Kp ≤ 3 e SFI ≥ 150:** 20 m → 15 m → 10 m → 40 m → 80 m.  
+**De noite:** 40 m → 80 m → 20 m.
+
 ### Validação temporal antes do arranque
 
 O Beacon Analysis depende de slots UTC exactos de 10 segundos. Por isso, o 4ham valida o tempo do host antes de permitir o arranque do scheduler.
@@ -746,6 +787,19 @@ A barra lateral estreita à direita do globo (1/4 da largura da página) mostra 
 | **Marginal** | 🟠 Âmbar | Condições limite — apenas NVIS ou salto curto; pouco fiável para DX |
 | **Closed** | 🔴 Carmesim | Frequência da banda abaixo do foF2 — sem propagação por salto |
 | **Absorbed** | ⚫ Cinzento | Absorção da camada D demasiado elevada — normalmente 40 m / 80 m em pleno dia sob alta atividade solar |
+
+### Kp × SFI — prioridade de banda prática
+
+Use esta tabela para escolher a melhor banda para uma combinação de condições de clima espacial:
+
+| Condições | Bandas (prioridade) | Notas |
+|---|---|---|
+| Kp 0–2, SFI > 150 | 20 m → 15 m → 10 m → 40 m | DX diurno excelente; 10 m provavelmente aberta |
+| Kp 0–2, SFI 80–120 | 20 m → 40 m → 15 m → 80 m | Condições moderadas; 15 m e 10 m marginais ou fechadas |
+| Kp 3–4, SFI > 120 | 20 m → 15 m → 40 m → 10 m | Actividade geomagnética ligeira; percursos polares ligeiramente degradados |
+| Kp 5–6, qualquer SFI | 40 m → 20 m → 80 m | Tempestade — percursos auroral/polar não fiáveis |
+| Kp ≥ 7, qualquer SFI | 40 m → 80 m (se aberta) | Tempestade severa — apagão HF possível; bandas baixas mais resilientes |
+| Noite, qualquer Kp/SFI | 40 m → 80 m → 20 m | F2 mais fraca à noite; NVIS em 40/80 m para regional |
 
 Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC.
 

@@ -317,6 +317,46 @@ GlobalScore = median(BandScore_i across bands with monitored slots)</pre>
       <li><strong>No copy</strong> remains visible publicly, but enters the score only indirectly by lowering <code>D_r</code> and <code>W_r</code>.</li>
     </ul>
 
+    <h3 class="sub-title">NOAA Gauges &mdash; Kp &amp; SFI</h3>
+    <p>
+      The instrument panel at the top of the Beacon tab shows two NOAA-sourced gauges side by side.
+      Understanding what they measure helps correlate Beacon detection rates with solar and geomagnetic conditions.
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Gauge</th><th>What it measures</th><th>Scale</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Kp</strong></td>
+          <td>Planetary geomagnetic activity index. Reflects the disturbance in Earth's magnetic field caused by solar wind. Lower = quieter = better HF, especially on polar paths.</td>
+          <td>0–9<br>0–2: quiet (ideal); 3–4: unsettled; 5–6: active storm; ≥ 7: severe — HF blackout possible</td>
+        </tr>
+        <tr>
+          <td><strong>SFI</strong></td>
+          <td>Solar Flux Index at 10.7 cm — proxy for solar UV/X-ray ionising radiation. Higher SFI = denser F2 layer = more bands open for long-distance skip.</td>
+          <td>60–300+<br>&lt; 80: poor; 80–120: moderate; 120–200: good (15/10 m opening likely); &gt; 200: excellent</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Kp and SFI combined &mdash; band priority guide:</strong></p>
+    <table class="manual-table">
+      <thead><tr><th>Band</th><th>Kp sensitivity</th><th>SFI dependency</th><th>With Kp ≤ 3 + SFI ≥ 150 (daytime)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>80 m</strong></td><td>Low (regional, not auroral)</td><td>Very low — works at any SFI</td><td>Reliable at night for NVIS / short regional paths</td></tr>
+        <tr><td><strong>40 m</strong></td><td>Low–medium</td><td>Low — open day and night under most conditions</td><td>Reliable workhorse for short to medium DX</td></tr>
+        <tr><td><strong>20 m</strong></td><td>Medium (polar paths degrade first)</td><td>Medium–high — best with SFI &gt; 100</td><td>Prime DX band; multi-hop to any continent likely open</td></tr>
+        <tr><td><strong>15 m</strong></td><td>Medium</td><td>High — needs SFI &gt; 100 for daytime opening</td><td>Excellent daytime DX; intercontinental paths achievable</td></tr>
+        <tr><td><strong>10 m</strong></td><td>Low (ionospheric, not auroral)</td><td>Very high — needs SFI &gt; 120 for reliable opening</td><td>Good chance of daytime opening; sporadic-E also contributes</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>Daytime DX priority with Kp ≤ 3, SFI ≥ 150:</strong> 20 m &rarr; 15 m &rarr; 10 m &rarr; 40 m &rarr; 80 m.<br>
+      At night, 40 m and 80 m take priority for regional and medium-distance contacts.
+    </p>
+    <p>
+      When Kp rises above 5, polar and sub-polar paths (e.g. Europe to North America via the auroral zone) degrade first.
+      Mid-latitude and equatorial paths are less affected. Under Kp ≥ 7 a complete HF blackout on high-latitude bearings is possible.
+    </p>
+
     <h3 class="sub-title">Time Validation Before Startup</h3>
     <p>
       Beacon Analysis depends on exact 10-second UTC slots. The application therefore validates host time before allowing the scheduler to start.
@@ -1091,6 +1131,20 @@ chronyc sources -v</pre>
         <tr><td><strong>Marginal</strong></td><td style="color:#ff9800">■ Amber</td><td>Borderline conditions — NVIS or short skip only (typical for 40 m at mid-day, or higher bands under low SFI).</td></tr>
         <tr><td><strong>Closed</strong></td><td style="color:#e53935">■ Crimson</td><td>Band frequency is below foF2 — no skip propagation. Signals are absorbed by the ionosphere.</td></tr>
         <tr><td><strong>Absorbed</strong></td><td style="color:#9e9e9e">■ Grey</td><td>D-layer absorption is too high for useful propagation — typically 40 m and below during peak daylight under high solar activity.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Kp &times; SFI &mdash; band priority quick reference</h3>
+    <p>Use this table to pick the best band for a given set of space weather conditions:</p>
+    <table class="manual-table">
+      <thead><tr><th>Conditions</th><th>Best bands (priority order)</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Kp 0–2, SFI &gt; 150</td><td>20 m → 15 m → 10 m → 40 m</td><td>Excellent daytime DX; 10 m likely open</td></tr>
+        <tr><td>Kp 0–2, SFI 80–120</td><td>20 m → 40 m → 15 m → 80 m</td><td>Moderate conditions; 15 m marginal; 10 m closed</td></tr>
+        <tr><td>Kp 3–4, SFI &gt; 120</td><td>20 m → 15 m → 40 m → 10 m</td><td>Minor geomagnetic activity; polar paths slightly degraded</td></tr>
+        <tr><td>Kp 5–6, any SFI</td><td>40 m → 20 m → 80 m</td><td>Active storm — polar / auroral paths unreliable</td></tr>
+        <tr><td>Kp ≥ 7, any SFI</td><td>40 m → 80 m (if open)</td><td>Severe storm — HF blackout possible; lower bands most resilient</td></tr>
+        <tr><td>Night, any Kp / SFI</td><td>40 m → 80 m → 20 m</td><td>F2 weaker at night; 40/80 m NVIS for regional; 20 m still viable</td></tr>
       </tbody>
     </table>
 
