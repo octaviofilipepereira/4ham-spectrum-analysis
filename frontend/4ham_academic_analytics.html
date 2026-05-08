@@ -1516,6 +1516,179 @@ Last update: 2026-04-03 UTC
         line-height: 1.4;
       }
 
+      .beacon-history-info-btn {
+        min-width: 0;
+        min-height: 24px;
+        margin-top: 1px;
+        flex: 0 0 auto;
+        padding: 0.14rem 0.45rem;
+        font-size: 0.7rem;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        border: 1px solid rgba(56, 189, 248, 0.65);
+        border-radius: 6px;
+        background: rgba(56, 189, 248, 0.12);
+        color: #bae6fd;
+        cursor: pointer;
+      }
+
+      .beacon-history-info-btn:hover {
+        border-color: rgba(56, 189, 248, 0.9);
+        background: rgba(56, 189, 248, 0.2);
+        color: #e0f2fe;
+      }
+
+      .beacon-history-info-btn:focus-visible {
+        outline: 2px solid rgba(56, 189, 248, 0.85);
+        outline-offset: 1px;
+      }
+
+      .beacon-events-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 2300;
+        display: none;
+      }
+
+      .beacon-events-modal.visible {
+        display: block;
+      }
+
+      .beacon-events-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(2, 6, 12, 0.72);
+        backdrop-filter: blur(2px);
+      }
+
+      .beacon-events-modal__dialog {
+        position: relative;
+        width: min(980px, calc(100vw - 20px));
+        max-height: calc(100vh - 24px);
+        margin: 12px auto;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #0f1d2a 0%, #0a141e 100%);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .beacon-events-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.22);
+      }
+
+      .beacon-events-modal__title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .beacon-events-modal__close {
+        border: 1px solid rgba(159, 180, 200, 0.45);
+        border-radius: 8px;
+        background: rgba(15, 28, 40, 0.72);
+        color: #dbe7f3;
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+
+      .beacon-events-modal__close:hover {
+        border-color: rgba(56, 189, 248, 0.75);
+        color: #f8fbff;
+      }
+
+      .beacon-events-modal__window {
+        margin: 0;
+        padding: 10px 16px;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.14);
+      }
+
+      .beacon-events-modal__stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px 16px;
+      }
+
+      .beacon-events-stat {
+        border: 1px solid rgba(40, 68, 90, 0.65);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: rgba(9, 17, 24, 0.52);
+      }
+
+      .beacon-events-stat .k {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .beacon-events-stat .v {
+        display: block;
+        margin-top: 3px;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .beacon-events-modal__table-wrap {
+        padding: 0 16px 16px;
+        overflow: auto;
+      }
+
+      .beacon-events-modal__table {
+        width: 100%;
+        min-width: 720px;
+        border-collapse: collapse;
+      }
+
+      .beacon-events-modal__table th,
+      .beacon-events-modal__table td {
+        border-bottom: 1px solid rgba(40, 68, 90, 0.65);
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 0.8rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .beacon-events-modal__table thead th {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.72rem;
+      }
+
+      body.beacon-events-modal-open {
+        overflow: hidden;
+      }
+
+      @media (max-width: 900px) {
+        .beacon-events-modal__stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .beacon-events-modal__dialog {
+          width: calc(100vw - 8px);
+          max-height: calc(100vh - 8px);
+          margin: 4px auto;
+        }
+
+        .beacon-events-modal__stats {
+          grid-template-columns: 1fr;
+        }
+      }
+
       .beacon-observations-table {
         width: 100%;
         border-collapse: collapse;
@@ -2133,6 +2306,21 @@ Last update: 2026-04-03 UTC
       <div class="chart-value-toast-body" id="chartValueToastText"></div>
     </div>
 
+    <div class="beacon-events-modal" id="beaconEventsModal" aria-hidden="true">
+      <div class="beacon-events-modal__backdrop" data-beacon-events-close="true"></div>
+      <section class="beacon-events-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="beaconEventsModalTitle">
+        <div class="beacon-events-modal__header">
+          <h3 class="beacon-events-modal__title" id="beaconEventsModalTitle">Beacon recent activity details</h3>
+          <button type="button" class="beacon-events-modal__close" data-beacon-events-close="true">Close</button>
+        </div>
+        <p class="beacon-events-modal__window" id="beaconEventsModalWindow">--</p>
+        <div class="beacon-events-modal__stats" id="beaconEventsModalStats"></div>
+        <div class="beacon-events-modal__table-wrap">
+          <table class="beacon-events-modal__table" id="beaconEventsModalTable"></table>
+        </div>
+      </section>
+    </div>
+
     <script>
       // Detect base path for proxy-safe resource loading
       const _BASE = (() => {
@@ -2303,6 +2491,13 @@ Last update: 2026-04-03 UTC
         "YV5B": "Caracas, Venezuela",
       });
       const beaconHistoryNote = document.getElementById("beaconHistoryNote");
+      const beaconEventsModal = document.getElementById("beaconEventsModal");
+      const beaconEventsModalTitle = document.getElementById("beaconEventsModalTitle");
+      const beaconEventsModalWindow = document.getElementById("beaconEventsModalWindow");
+      const beaconEventsModalStats = document.getElementById("beaconEventsModalStats");
+      const beaconEventsModalTable = document.getElementById("beaconEventsModalTable");
+      const beaconHistoryCellDetails = new Map();
+      let beaconEventsRequestSeq = 0;
 
       updateMetaUpdateFrequency();
 
@@ -2370,6 +2565,35 @@ Last update: 2026-04-03 UTC
         if (!btn) return;
         exportMenu.classList.remove("open");
         runExport(btn.dataset.fmt);
+      });
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-beacon-history-events]");
+        if (!button) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const detailKey = button.getAttribute("data-beacon-history-events") || "";
+        if (!detailKey) {
+          return;
+        }
+        void openBeaconEventsModal(detailKey);
+      });
+
+      beaconEventsModal?.addEventListener("click", (event) => {
+        if (event.target.closest("[data-beacon-events-close]")) {
+          closeBeaconEventsModal();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") {
+          return;
+        }
+        if (beaconEventsModal?.classList.contains("visible")) {
+          closeBeaconEventsModal();
+        }
       });
 
       function buildExportRows() {
@@ -3014,6 +3238,119 @@ Last update: 2026-04-03 UTC
           </span>`;
       }
 
+      function renderBeaconHistoryEventsButton(detailKey, label) {
+        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-events="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(label)}">Events</button>`;
+      }
+
+      function closeBeaconEventsModal() {
+        if (!beaconEventsModal) {
+          return;
+        }
+        beaconEventsModal.classList.remove("visible");
+        beaconEventsModal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("beacon-events-modal-open");
+      }
+
+      function renderBeaconEventsModalStats(detail) {
+        if (!beaconEventsModalStats) {
+          return;
+        }
+        const stats = [
+          { k: "Window", v: `${detail.hours} h` },
+          { k: "Detected/Monitored", v: `${detail.detections}/${detail.totalSlots}` },
+          { k: "Best pass", v: `${beaconFormatScore(detail.bestSnrDb)} dB · ${detail.bestDashes}/4` },
+          { k: "Latest detected", v: beaconFormatUtc(detail.latestDetectedUtc) },
+        ];
+        beaconEventsModalStats.innerHTML = stats.map((item) =>
+          `<div class="beacon-events-stat"><span class="k">${beaconEscapeHtml(item.k)}</span><span class="v">${beaconEscapeHtml(item.v)}</span></div>`
+        ).join("");
+      }
+
+      function renderBeaconEventsModalTable(rows) {
+        if (!beaconEventsModalTable) {
+          return;
+        }
+        if (!Array.isArray(rows) || !rows.length) {
+          beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          return;
+        }
+        const head = `
+          <thead>
+            <tr>
+              <th>Slot UTC</th>
+              <th>Detected</th>
+              <th>Dashes</th>
+              <th>100W SNR</th>
+              <th>10W SNR</th>
+              <th>1W SNR</th>
+            </tr>
+          </thead>`;
+        const body = rows.map((row) => {
+          const detected = row.detected ? "yes" : "no";
+          const detectedClass = row.detected ? "good" : "no-data";
+          return `
+            <tr>
+              <td>${beaconEscapeHtml(beaconFormatUtc(row.slot_start_utc || row.recorded_at))}</td>
+              <td><span class="beacon-badge ${detectedClass}">${beaconEscapeHtml(detected)}</span></td>
+              <td>${beaconEscapeHtml(String(row.dash_levels_detected ?? 0))}/4</td>
+              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_100w))}</td>
+              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_10w))}</td>
+              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_1w))}</td>
+            </tr>`;
+        }).join("");
+        beaconEventsModalTable.innerHTML = `${head}<tbody>${body}</tbody>`;
+      }
+
+      async function openBeaconEventsModal(detailKey) {
+        const detail = beaconHistoryCellDetails.get(detailKey);
+        if (!detail || !beaconEventsModal) {
+          return;
+        }
+
+        if (beaconEventsModalTitle) {
+          beaconEventsModalTitle.textContent = `${detail.callsign} · ${detail.band} events`;
+        }
+        if (beaconEventsModalWindow) {
+          beaconEventsModalWindow.textContent = `${detail.callsign} - ${detail.location || "Unknown location"} - Rolling ${detail.hours} h window`;
+        }
+        renderBeaconEventsModalStats(detail);
+        if (beaconEventsModalTable) {
+          beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">Loading...</td></tr></tbody>`;
+        }
+
+        beaconEventsModal.classList.add("visible");
+        beaconEventsModal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("beacon-events-modal-open");
+
+        const reqSeq = ++beaconEventsRequestSeq;
+        try {
+          const params = new URLSearchParams({
+            hours: String(detail.hours),
+            limit: "24",
+            callsign: detail.callsign,
+            band: detail.band,
+            detected_only: "true",
+          });
+          const resp = await fetch(`${_BASE}api/beacons/observations?${params.toString()}`);
+          if (!resp.ok) {
+            throw new Error("beacon cell events request failed");
+          }
+          const payload = await resp.json();
+          if (reqSeq !== beaconEventsRequestSeq) {
+            return;
+          }
+          const rows = Array.isArray(payload?.observations) ? payload.observations : [];
+          renderBeaconEventsModalTable(rows);
+        } catch (_err) {
+          if (reqSeq !== beaconEventsRequestSeq) {
+            return;
+          }
+          if (beaconEventsModalTable) {
+            beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          }
+        }
+      }
+
       function renderBeaconRowList(targetId, rows, emptyText) {
         const target = document.getElementById(targetId);
         if (!target) return;
@@ -3027,6 +3364,7 @@ Last update: 2026-04-03 UTC
       function renderBeaconRecentActivityTable(recentActivity) {
         const table = document.getElementById("beaconRecentActivityTable");
         if (!table) return;
+        beaconHistoryCellDetails.clear();
         const bands = Array.isArray(recentActivity?.bands) ? recentActivity.bands : [];
         const beacons = Array.isArray(recentActivity?.beacons) ? recentActivity.beacons : [];
         const matrix = Array.isArray(recentActivity?.matrix) ? recentActivity.matrix : [];
@@ -3058,13 +3396,27 @@ Last update: 2026-04-03 UTC
             const bestDashes = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
             const bestSnrValue = Number(cell.best_snr_db);
             const bestSnrLabel = Number.isFinite(bestSnrValue) ? `${bestSnrValue.toFixed(1)} dB` : "n/a";
+            const detailKey = `${callsign}|${band}|${rowIndex}|${colIndex}`;
+            beaconHistoryCellDetails.set(detailKey, {
+              callsign,
+              location,
+              band,
+              hours: BEACON_WINDOW_HOURS,
+              totalSlots,
+              detections,
+              bestDashes,
+              bestSnrDb: bestSnrValue,
+              bestDetectedUtc: cell.best_detected_utc || null,
+              latestDetectedUtc: cell.latest_detected_utc || null,
+            });
             const hitTitle = [
               `${callsign} ${band}`,
               `Detected ${detections}/${totalSlots} monitored slots in window`,
               `Best detected pass: 100 W ${bestSnrLabel}, sequence ${bestDashes}/4`,
               `Latest detected pass: ${cell.latest_detected_utc || "n/a"}`,
             ].join("\n");
-            return `<td class="beacon-cell beacon-cell--history-hit" title="${beaconEscapeHtml(hitTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body">${renderBeaconHistoryTelemetry(bestSnrValue, bestDashes)}<span class="beacon-history-meta">${detections}/${totalSlots} mon</span></span></small></td>`;
+            const eventsButton = renderBeaconHistoryEventsButton(detailKey, `${callsign} ${band}`);
+            return `<td class="beacon-cell beacon-cell--history-hit" title="${beaconEscapeHtml(hitTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body">${renderBeaconHistoryTelemetry(bestSnrValue, bestDashes)}<span class="beacon-history-meta">${detections}/${totalSlots} mon</span></span>${eventsButton}</small></td>`;
           }).join("");
           const rowTitle = location ? `${callsign} — ${location}` : callsign;
           const rowLabel = location
