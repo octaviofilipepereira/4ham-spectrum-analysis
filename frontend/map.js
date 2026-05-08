@@ -286,12 +286,13 @@
 
       if (isBeaconMap) {
         // ── NCDXF beacon overlay: arcos separados por banda + anéis concêntricos ──
-        // Agrupar detecções por callsign → bandas
+        // Agrupar detecções por callsign → bandas (usa campo `bands` se disponível, fallback para `band`)
         const detMap = {};
         contacts.forEach((c) => {
           if (!c.callsign) return;
           if (!detMap[c.callsign]) detMap[c.callsign] = { detected: false, bands: new Set(), contact: c };
-          if (c.band) { detMap[c.callsign].detected = true; detMap[c.callsign].bands.add(c.band); }
+          const bandList = Array.isArray(c.bands) && c.bands.length ? c.bands : (c.band ? [c.band] : []);
+          bandList.forEach((b) => { detMap[c.callsign].detected = true; detMap[c.callsign].bands.add(b); });
         });
 
         Object.entries(BEACON_COORDS).forEach(([cs, [bLon, bLat]]) => {

@@ -125,6 +125,7 @@ def build_beacon_map_contacts(
 ) -> dict[str, Any]:
     station = _resolve_station(settings)
     latest_by_callsign: dict[str, dict[str, Any]] = {}
+    bands_by_callsign: dict[str, set[str]] = {}
 
     for row in rows:
         if not bool(row.get("detected")):
@@ -135,6 +136,13 @@ def build_beacon_map_contacts(
         slot_start = _parse_iso_timestamp(row.get("slot_start_utc"))
         if slot_start is None:
             continue
+        band_name = str(row.get("band_name") or "").strip()
+
+        # Agregar todas as bandas detectadas na janela
+        if beacon.callsign not in bands_by_callsign:
+            bands_by_callsign[beacon.callsign] = set()
+        if band_name:
+            bands_by_callsign[beacon.callsign].add(band_name)
 
         current = latest_by_callsign.get(beacon.callsign)
         if current is not None and slot_start <= current["_slot_start"]:
@@ -145,7 +153,7 @@ def build_beacon_map_contacts(
             "location": beacon.location,
             "lat": beacon.lat,
             "lon": beacon.lon,
-            "band": str(row.get("band_name") or ""),
+            "band": band_name,
             "mode": "BEACON",
             "snr_db": _safe_float(row.get("snr_db_100w")),
             "dash_levels_detected": max(0, min(4, int(row.get("dash_levels_detected") or 0))),
@@ -160,6 +168,9 @@ def build_beacon_map_contacts(
     contacts = sorted(latest_by_callsign.values(), key=lambda item: item["timestamp"], reverse=True)
     for item in contacts:
         item.pop("_slot_start", None)
+        cs = item["callsign"]
+        # Incluir lista ordenada de todas as bandas detectadas na janela
+        item["bands"] = sorted(bands_by_callsign.get(cs, set()), key=lambda b: ["20m","17m","15m","12m","10m"].index(b) if b in ["20m","17m","15m","12m","10m"] else 99)
 
     return {
         "status": "ok",
