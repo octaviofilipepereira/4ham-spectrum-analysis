@@ -486,6 +486,83 @@ Last update: 2026-04-03 UTC
         letter-spacing: 0.02em;
       }
 
+      .beacon-cards > .card {
+        min-height: 226px;
+      }
+
+      .beacon-cards > .card > .label {
+        display: block;
+        text-align: center;
+      }
+
+      .beacon-kpi-card {
+        justify-content: flex-start;
+      }
+
+      .beacon-kpi-detail {
+        min-height: 1.15rem;
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        text-align: center;
+        line-height: 1.35;
+      }
+
+      .beacon-kpi-detail strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .beacon-noaa-card {
+        gap: 8px;
+      }
+
+      .beacon-noaa-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      .beacon-noaa-mini {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+      }
+
+      .beacon-noaa-mini .label {
+        display: block;
+        text-align: center;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .snr-gauge--mini {
+        margin-top: 0;
+        gap: 1px;
+      }
+
+      .snr-gauge--mini .snr-gauge-svg,
+      .snr-gauge--mini .snr-gauge-scale {
+        max-width: 136px;
+      }
+
+      .snr-gauge--mini .snr-gauge-value {
+        font-size: clamp(0.9rem, 0.85rem + 0.35vw, 1.1rem);
+      }
+
+      .snr-gauge--mini .snr-gauge-scale {
+        font-size: 0.58rem;
+      }
+
+      .beacon-noaa-mini .beacon-kpi-detail {
+        margin-top: 3px;
+        font-size: 0.7rem;
+        min-height: 1rem;
+      }
+
       .grid {
         display: grid;
         grid-template-columns: repeat(12, 1fr);
@@ -1104,6 +1181,10 @@ Last update: 2026-04-03 UTC
           grid-template-columns: repeat(3, 1fr);
         }
 
+        .beacon-view .cards.beacon-cards {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         .span-8,
         .span-7,
         .span-5,
@@ -1149,6 +1230,10 @@ Last update: 2026-04-03 UTC
           grid-template-columns: 1fr;
         }
 
+        .beacon-view .cards.beacon-cards {
+          grid-template-columns: 1fr;
+        }
+
         .controls,
         .controls.controls-aprs {
           grid-template-columns: 1fr;
@@ -1160,6 +1245,10 @@ Last update: 2026-04-03 UTC
 
         .meta-grid {
           grid-template-columns: 1fr;
+        }
+
+        .beacon-noaa-grid {
+          grid-template-columns: 1fr 1fr;
         }
 
         .preset-row,
@@ -2786,25 +2875,136 @@ Last update: 2026-04-03 UTC
         <p id="beaconHistoryNote" class="beacon-note" data-i18n="beacon_history_note">Historical analysis only — not the current slot state.</p>
 
         <div class="cards beacon-cards">
-          <div class="card">
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiGlobalScoreCard">
             <span class="label" data-i18n="beacon_kpi_global_score">Global score</span>
-            <div class="value" id="beaconKpiGlobalScore">--</div>
+            <div class="snr-gauge" role="img" aria-label="Global beacon score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiGlobalScoreGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiGlobalScoreGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiGlobalScoreNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiGlobalScore">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiGlobalState">--</div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiBestBandCard">
             <span class="label" data-i18n="beacon_kpi_best_band">Best band</span>
-            <div class="value" id="beaconKpiBestBand">--</div>
+            <div class="snr-gauge" role="img" aria-label="Best beacon band score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiBestBandGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#38bdf8" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiBestBandGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiBestBandNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiBestBand">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiBestBandMeta">--</div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiDetectedSlotsCard">
             <span class="label" data-i18n="beacon_kpi_detected_slots">Detected slots</span>
-            <div class="value" id="beaconKpiDetectedSlots">--</div>
+            <div class="snr-gauge" role="img" aria-label="Detected beacon slots ratio gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiDetectedSlotsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiDetectedSlotsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiDetectedSlotsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiDetectedSlots">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiDetectedSlotsMeta">--</div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiDetectedBeaconsCard">
             <span class="label" data-i18n="beacon_kpi_detected_beacons">Beacons heard</span>
-            <div class="value" id="beaconKpiDetectedBeacons">--</div>
+            <div class="snr-gauge" role="img" aria-label="Detected beacons gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiDetectedBeaconsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#334155" />
+                    <stop offset="45%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiDetectedBeaconsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiDetectedBeaconsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiDetectedBeacons">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>9</span><span>18</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiDetectedBeaconsMeta">--</div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge beacon-kpi-card beacon-noaa-card" id="beaconKpiNoaaCard">
             <span class="label" data-i18n="beacon_kpi_noaa">NOAA Kp / SFI</span>
-            <div class="value" id="beaconKpiNoaa">--</div>
+            <div class="beacon-noaa-grid">
+              <div class="beacon-noaa-mini card-snr-gauge is-empty" id="beaconKpiKpCard">
+                <span class="label">Kp</span>
+                <div class="snr-gauge snr-gauge--mini" role="img" aria-label="Kp index gauge">
+                  <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                    <defs>
+                      <linearGradient id="beaconKpiKpGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#22c55e" />
+                        <stop offset="52%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiKpGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <line id="beaconKpiKpNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                    <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+                  </svg>
+                  <div class="value snr-gauge-value" id="beaconKpiKp">--</div>
+                  <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>4.5</span><span>9</span></div>
+                </div>
+                <div class="beacon-kpi-detail" id="beaconKpiKpDetail">--</div>
+              </div>
+              <div class="beacon-noaa-mini card-snr-gauge is-empty" id="beaconKpiSfiCard">
+                <span class="label">SFI</span>
+                <div class="snr-gauge snr-gauge--mini" role="img" aria-label="Solar flux index gauge">
+                  <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                    <defs>
+                      <linearGradient id="beaconKpiSfiGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#ef4444" />
+                        <stop offset="52%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#22c55e" />
+                      </linearGradient>
+                    </defs>
+                    <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiSfiGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <line id="beaconKpiSfiNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                    <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+                  </svg>
+                  <div class="value snr-gauge-value" id="beaconKpiSfi">--</div>
+                  <div class="snr-gauge-scale" id="beaconKpiSfiScale" aria-hidden="true"><span>60</span><span>155</span><span>250</span></div>
+                </div>
+                <div class="beacon-kpi-detail" id="beaconKpiSfiDetail">--</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3188,8 +3388,40 @@ Last update: 2026-04-03 UTC
       const beaconHistoryInfoSnrChart = document.getElementById("beaconHistoryInfoSnrChart");
       const beaconHistoryInfoDashChart = document.getElementById("beaconHistoryInfoDashChart");
       const beaconHistoryInfoRecords = document.getElementById("beaconHistoryInfoRecords");
+      const beaconKpiGlobalScore = document.getElementById("beaconKpiGlobalScore");
+      const beaconKpiGlobalScoreNeedle = document.getElementById("beaconKpiGlobalScoreNeedle");
+      const beaconKpiGlobalScoreCard = document.getElementById("beaconKpiGlobalScoreCard");
+      const beaconKpiGlobalState = document.getElementById("beaconKpiGlobalState");
+      const beaconKpiBestBand = document.getElementById("beaconKpiBestBand");
+      const beaconKpiBestBandNeedle = document.getElementById("beaconKpiBestBandNeedle");
+      const beaconKpiBestBandCard = document.getElementById("beaconKpiBestBandCard");
+      const beaconKpiBestBandMeta = document.getElementById("beaconKpiBestBandMeta");
+      const beaconKpiDetectedSlots = document.getElementById("beaconKpiDetectedSlots");
+      const beaconKpiDetectedSlotsNeedle = document.getElementById("beaconKpiDetectedSlotsNeedle");
+      const beaconKpiDetectedSlotsCard = document.getElementById("beaconKpiDetectedSlotsCard");
+      const beaconKpiDetectedSlotsMeta = document.getElementById("beaconKpiDetectedSlotsMeta");
+      const beaconKpiDetectedBeacons = document.getElementById("beaconKpiDetectedBeacons");
+      const beaconKpiDetectedBeaconsNeedle = document.getElementById("beaconKpiDetectedBeaconsNeedle");
+      const beaconKpiDetectedBeaconsCard = document.getElementById("beaconKpiDetectedBeaconsCard");
+      const beaconKpiDetectedBeaconsMeta = document.getElementById("beaconKpiDetectedBeaconsMeta");
+      const beaconKpiKp = document.getElementById("beaconKpiKp");
+      const beaconKpiKpNeedle = document.getElementById("beaconKpiKpNeedle");
+      const beaconKpiKpCard = document.getElementById("beaconKpiKpCard");
+      const beaconKpiKpDetail = document.getElementById("beaconKpiKpDetail");
+      const beaconKpiSfi = document.getElementById("beaconKpiSfi");
+      const beaconKpiSfiNeedle = document.getElementById("beaconKpiSfiNeedle");
+      const beaconKpiSfiCard = document.getElementById("beaconKpiSfiCard");
+      const beaconKpiSfiDetail = document.getElementById("beaconKpiSfiDetail");
+      const beaconKpiSfiScale = document.getElementById("beaconKpiSfiScale");
       const beaconHistoryCellDetails = new Map();
       let beaconEventsRequestSeq = 0;
+      const BEACON_CATALOG_SIZE = 18;
+      const BEACON_SCORE_GAUGE_MIN = 0;
+      const BEACON_SCORE_GAUGE_MAX = 100;
+      const BEACON_KP_GAUGE_MIN = 0;
+      const BEACON_KP_GAUGE_MAX = 9;
+      const BEACON_SFI_GAUGE_MIN = 60;
+      const BEACON_SFI_GAUGE_MAX = 250;
       const DIGITAL_SNR_GAUGE_MIN_DB = -30;
       const DIGITAL_SNR_GAUGE_MAX_DB = 15;
       const ANALOG_SNR_GAUGE_MIN_DB = -10;
@@ -4384,18 +4616,90 @@ Last update: 2026-04-03 UTC
         const kpis = payload?.kpis || {};
         const bestBand = kpis.best_band || null;
         const iono = payload?.ionospheric || {};
-        const freshness = payload?.freshness || {};
 
         const setText = (id, value) => {
           const el = document.getElementById(id);
           if (el) el.textContent = value;
         };
 
-        setText("beaconKpiGlobalScore", payload ? `${beaconFormatScore(kpis.global_score)} · ${kpis.global_state || "--"}` : "--");
-        setText("beaconKpiBestBand", bestBand ? `${bestBand.band} · ${beaconFormatScore(bestBand.score)}` : "--");
-        setText("beaconKpiDetectedSlots", payload ? String(kpis.detected_slots ?? "--") : "--");
-        setText("beaconKpiDetectedBeacons", payload ? String(kpis.detected_beacons ?? "--") : "--");
-        setText("beaconKpiNoaa", payload ? `Kp ${beaconFormatScore(iono.kp)} · SFI ${beaconFormatScore(iono.sfi)}` : "--");
+        const monitoredSlots = Number(kpis.monitored_slots || 0);
+        const detectedSlots = Number(kpis.detected_slots || 0);
+        const detectedBeacons = Number(kpis.detected_beacons || 0);
+        const slotsPct = monitoredSlots > 0 ? (detectedSlots / monitoredSlots) * 100 : Number.NaN;
+        const sfiValue = Number(iono.sfi);
+        const sfiGaugeMax = Number.isFinite(sfiValue) && sfiValue > BEACON_SFI_GAUGE_MAX
+          ? Math.ceil(sfiValue / 50) * 50
+          : BEACON_SFI_GAUGE_MAX;
+
+        updateKpiGauge(
+          beaconKpiGlobalScoreNeedle,
+          beaconKpiGlobalScoreCard,
+          beaconKpiGlobalScore,
+          payload ? Number(kpis.global_score) : Number.NaN,
+          BEACON_SCORE_GAUGE_MIN,
+          BEACON_SCORE_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiGlobalState", payload ? (kpis.global_state || "--") : "--");
+
+        updateKpiGauge(
+          beaconKpiBestBandNeedle,
+          beaconKpiBestBandCard,
+          beaconKpiBestBand,
+          bestBand ? Number(bestBand.score) : Number.NaN,
+          BEACON_SCORE_GAUGE_MIN,
+          BEACON_SCORE_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiBestBandMeta", bestBand ? `${bestBand.band || "--"} · ${bestBand.state || "--"}` : "--");
+
+        updateKpiGauge(
+          beaconKpiDetectedSlotsNeedle,
+          beaconKpiDetectedSlotsCard,
+          beaconKpiDetectedSlots,
+          slotsPct,
+          0,
+          100,
+          (v) => `${Math.round(v)}%`
+        );
+        setText("beaconKpiDetectedSlotsMeta", payload ? `${detectedSlots}/${monitoredSlots || 0} monitored` : "--");
+
+        updateKpiGauge(
+          beaconKpiDetectedBeaconsNeedle,
+          beaconKpiDetectedBeaconsCard,
+          beaconKpiDetectedBeacons,
+          payload ? detectedBeacons : Number.NaN,
+          0,
+          BEACON_CATALOG_SIZE,
+          (v) => `${Math.round(v)}`
+        );
+        setText("beaconKpiDetectedBeaconsMeta", payload ? `${detectedBeacons}/${BEACON_CATALOG_SIZE} global beacons` : "--");
+
+        updateKpiGauge(
+          beaconKpiKpNeedle,
+          beaconKpiKpCard,
+          beaconKpiKp,
+          payload ? Number(iono.kp) : Number.NaN,
+          BEACON_KP_GAUGE_MIN,
+          BEACON_KP_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiKpDetail", payload ? (iono.kp_condition || "--") : "--");
+
+        if (beaconKpiSfiScale) {
+          const sfiMid = Math.round((BEACON_SFI_GAUGE_MIN + sfiGaugeMax) / 2);
+          beaconKpiSfiScale.innerHTML = `<span>${BEACON_SFI_GAUGE_MIN}</span><span>${sfiMid}</span><span>${sfiGaugeMax}</span>`;
+        }
+        updateKpiGauge(
+          beaconKpiSfiNeedle,
+          beaconKpiSfiCard,
+          beaconKpiSfi,
+          payload ? sfiValue : Number.NaN,
+          BEACON_SFI_GAUGE_MIN,
+          sfiGaugeMax,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiSfiDetail", payload ? `foF2 ${beaconFormatScore(iono.fof2_estimated_mhz)} MHz` : "--");
 
         renderBeaconRecentActivityTable(payload?.recent_activity || null);
 
