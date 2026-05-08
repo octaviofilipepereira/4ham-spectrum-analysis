@@ -4645,13 +4645,16 @@ Last update: 2026-04-03 UTC
         updateKpiGauge(
           beaconKpiBestBandNeedle,
           beaconKpiBestBandCard,
-          beaconKpiBestBand,
+          null,
           bestBand ? Number(bestBand.score) : Number.NaN,
           BEACON_SCORE_GAUGE_MIN,
           BEACON_SCORE_GAUGE_MAX,
           (v) => beaconFormatScore(v)
         );
-        setText("beaconKpiBestBandMeta", bestBand ? `${bestBand.band || "--"} · ${bestBand.state || "--"}` : "--");
+        if (beaconKpiBestBand) beaconKpiBestBand.textContent = bestBand ? (bestBand.band || "--") : "--";
+        setText("beaconKpiBestBandMeta", bestBand
+          ? `${bestBand.state || "--"} · score ${beaconFormatScore(Number(bestBand.score))}`
+          : "--");
 
         updateKpiGauge(
           beaconKpiDetectedSlotsNeedle,
