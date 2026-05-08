@@ -2243,13 +2243,43 @@ Last update: 2026-04-03 UTC
         </div>
 
         <div class="cards">
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiEventsCard">
             <span class="label" data-i18n="kpi_total_events">Total events</span>
-            <div class="value" id="kpiEvents">--</div>
+            <div class="snr-gauge" role="img" aria-label="Total events gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiEventsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#3b82f6" />
+                    <stop offset="100%" stop-color="#22d3ee" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiEventsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiEventsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiEvents">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>5k</span><span>10k+</span></div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiCallsignsCard">
             <span class="label" data-i18n="kpi_unique_callsigns">Unique callsigns</span>
-            <div class="value" id="kpiCallsigns">--</div>
+            <div class="snr-gauge" role="img" aria-label="Unique callsigns gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiCallsignsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#6366f1" />
+                    <stop offset="100%" stop-color="#38bdf8" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiCallsignsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiCallsignsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiCallsigns">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>500</span><span>1k+</span></div>
+            </div>
           </div>
           <div class="card card-snr-gauge is-empty" id="kpiSnrDigitalCard">
             <span class="label" data-i18n="kpi_avg_snr_digital">Avg SNR FT4/FT8/WSPR</span>
@@ -2275,13 +2305,45 @@ Last update: 2026-04-03 UTC
               </div>
             </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiSnrAnalogCard">
             <span class="label" data-i18n="kpi_avg_snr_analog">Avg SNR CW/SSB</span>
-            <div class="value" id="kpiSnrAnalog">--</div>
+            <div class="snr-gauge" role="img" aria-label="Average SNR gauge for CW and SSB">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiSnrAnalogGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiSnrAnalogGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiSnrAnalogNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiSnrAnalog">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>-10</span><span>+10</span><span>+30 dB</span></div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiPropScoreCard">
             <span class="label" data-i18n="kpi_overall_prop">Global Propagation</span>
-            <div class="value" id="kpiPropScore">--</div>
+            <div class="snr-gauge" role="img" aria-label="Global propagation score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiPropScoreGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="50%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiPropScoreGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiPropScoreNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiPropScore">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
             <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
             <div id="kpiPropNote" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;" data-i18n-html="kpi_prop_note">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
           </div>
@@ -2818,7 +2880,15 @@ Last update: 2026-04-03 UTC
       const kpiSnrDigital = document.getElementById("kpiSnrDigital");
       const kpiSnrDigitalNeedle = document.getElementById("kpiSnrDigitalNeedle");
       const kpiSnrDigitalCard = document.getElementById("kpiSnrDigitalCard");
+      const kpiEventsNeedle = document.getElementById("kpiEventsNeedle");
+      const kpiEventsCard = document.getElementById("kpiEventsCard");
+      const kpiCallsignsNeedle = document.getElementById("kpiCallsignsNeedle");
+      const kpiCallsignsCard = document.getElementById("kpiCallsignsCard");
       const kpiSnrAnalog = document.getElementById("kpiSnrAnalog");
+      const kpiSnrAnalogNeedle = document.getElementById("kpiSnrAnalogNeedle");
+      const kpiSnrAnalogCard = document.getElementById("kpiSnrAnalogCard");
+      const kpiPropScoreNeedle = document.getElementById("kpiPropScoreNeedle");
+      const kpiPropScoreCard = document.getElementById("kpiPropScoreCard");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
       const kpiBestBand = document.getElementById("kpiBestBand");
@@ -2894,6 +2964,10 @@ Last update: 2026-04-03 UTC
       let beaconEventsRequestSeq = 0;
       const DIGITAL_SNR_GAUGE_MIN_DB = -30;
       const DIGITAL_SNR_GAUGE_MAX_DB = 15;
+      const ANALOG_SNR_GAUGE_MIN_DB = -10;
+      const ANALOG_SNR_GAUGE_MAX_DB = 30;
+      const EVENTS_GAUGE_MAX = 10000;
+      const CALLSIGNS_GAUGE_MAX = 1000;
 
       updateMetaUpdateFrequency();
 
@@ -5111,7 +5185,7 @@ Last update: 2026-04-03 UTC
                 band: row.band,
                 mode: row.mode,
                 count: Number(row.count || 0),
-                snr: Number(row.snr || 0),
+                snr: row.snr != null ? Number(row.snr) : null,
                 snrCount: Number(row.snr_count != null ? row.snr_count : row.count || 0),
               }))
               .filter((row) => !Number.isNaN(row.ts.getTime())),
@@ -5248,31 +5322,28 @@ Last update: 2026-04-03 UTC
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
-        kpiEvents.textContent = formatInt(totalEvents);
-        kpiCallsigns.textContent = formatInt(uniqueCallsigns);
+        updateKpiGauge(kpiEventsNeedle, kpiEventsCard, kpiEvents, totalEvents, 0, EVENTS_GAUGE_MAX, (v) => formatInt(v));
+        updateKpiGauge(kpiCallsignsNeedle, kpiCallsignsCard, kpiCallsigns, uniqueCallsigns, 0, CALLSIGNS_GAUGE_MAX, (v) => formatInt(v));
         updateDigitalSnrGauge(snrDigital);
-        kpiSnrAnalog.textContent = snrAnalog != null ? `${snrAnalog.toFixed(1)} dB` : "--";
+        updateKpiGauge(kpiSnrAnalogNeedle, kpiSnrAnalogCard, kpiSnrAnalog, snrAnalog,
+          ANALOG_SNR_GAUGE_MIN_DB, ANALOG_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
       }
 
-      function updateDigitalSnrGauge(valueDb) {
-        const hasValue = Number.isFinite(valueDb);
-        const span = DIGITAL_SNR_GAUGE_MAX_DB - DIGITAL_SNR_GAUGE_MIN_DB;
-        const normalized = hasValue && span > 0
-          ? clamp((valueDb - DIGITAL_SNR_GAUGE_MIN_DB) / span, 0, 1)
-          : 0;
+      function updateKpiGauge(needleEl, cardEl, labelEl, value, minVal, maxVal, formatter) {
+        const hasValue = Number.isFinite(value);
+        const span = maxVal - minVal;
+        const normalized = hasValue && span > 0 ? clamp((value - minVal) / span, 0, 1) : 0;
         const angleDeg = -90 + (normalized * 180);
+        if (needleEl) needleEl.style.transform = `rotate(${angleDeg.toFixed(2)}deg)`;
+        if (cardEl) cardEl.classList.toggle("is-empty", !hasValue);
+        if (labelEl) labelEl.textContent = hasValue ? formatter(value) : "--";
+      }
 
-        if (kpiSnrDigitalNeedle) {
-          kpiSnrDigitalNeedle.style.transform = `rotate(${angleDeg.toFixed(2)}deg)`;
-        }
-        if (kpiSnrDigitalCard) {
-          kpiSnrDigitalCard.classList.toggle("is-empty", !hasValue);
-        }
-        if (kpiSnrDigital) {
-          kpiSnrDigital.textContent = hasValue ? `${valueDb.toFixed(1)} dB` : "--";
-        }
+      function updateDigitalSnrGauge(valueDb) {
+        updateKpiGauge(kpiSnrDigitalNeedle, kpiSnrDigitalCard, kpiSnrDigital, valueDb,
+          DIGITAL_SNR_GAUGE_MIN_DB, DIGITAL_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
       }
 
       function computePropagationAnalytics(seriesRows, callsignRows, start, end) {
@@ -5375,7 +5446,7 @@ Last update: 2026-04-03 UTC
         const score = propagation.overallScore || 0;
         const state = propagationState(score);
 
-        kpiPropScore.textContent = `${score.toFixed(1)}`;
+        updateKpiGauge(kpiPropScoreNeedle, kpiPropScoreCard, kpiPropScore, score, 0, 100, (v) => `${v.toFixed(1)}`);
         kpiPropState.textContent = state.label;
         kpiPropState.className = `badge ${state.className}`;
 
