@@ -408,6 +408,10 @@ Last update: 2026-04-03 UTC
         margin-bottom: 16px;
       }
 
+      .beacon-view .cards.beacon-cards {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
       .card {
         border: 1px solid var(--line);
         border-radius: 14px;
@@ -424,6 +428,148 @@ Last update: 2026-04-03 UTC
         font-size: clamp(1.2rem, 1.1rem + 0.8vw, 1.9rem);
         margin-top: 4px;
         font-weight: 700;
+      }
+
+      .card-snr-gauge {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .snr-gauge {
+        margin-top: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .snr-gauge-svg {
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+      }
+
+      .snr-gauge-arc {
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+      }
+
+      .snr-gauge-arc--track {
+        stroke: rgba(159, 180, 200, 0.22);
+      }
+
+      .snr-gauge-arc--range {
+        stroke-width: 9;
+      }
+
+      .snr-gauge-needle {
+        stroke: #e2e8f0;
+        stroke-width: 3;
+        stroke-linecap: round;
+        transform-origin: 80px 80px;
+        transform: rotate(-90deg);
+        transition: transform 0.38s ease-out, opacity 0.2s ease;
+      }
+
+      .card-snr-gauge.is-empty .snr-gauge-needle {
+        opacity: 0.35;
+      }
+
+      .snr-gauge-hub {
+        fill: #e2e8f0;
+      }
+
+      .snr-gauge-value {
+        margin-top: -2px;
+        font-size: clamp(1.05rem, 1rem + 0.65vw, 1.5rem);
+      }
+
+      .snr-gauge-scale {
+        width: 100%;
+        max-width: 220px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--text-muted);
+        font-size: 0.66rem;
+        letter-spacing: 0.02em;
+      }
+
+      .beacon-cards > .card {
+        min-height: 226px;
+      }
+
+      .beacon-cards > .card > .label {
+        display: block;
+        text-align: center;
+      }
+
+      .beacon-kpi-card {
+        justify-content: flex-start;
+      }
+
+      .beacon-kpi-detail {
+        min-height: 1.15rem;
+        margin-top: 8px;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        text-align: center;
+        line-height: 1.35;
+      }
+
+      .beacon-kpi-detail strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .beacon-noaa-card {
+        gap: 8px;
+      }
+
+      .beacon-noaa-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      .beacon-noaa-mini {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+      }
+
+      .beacon-noaa-mini .label {
+        display: block;
+        text-align: center;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .snr-gauge--mini {
+        margin-top: 0;
+        gap: 1px;
+      }
+
+      .snr-gauge--mini .snr-gauge-svg,
+      .snr-gauge--mini .snr-gauge-scale {
+        max-width: 136px;
+      }
+
+      .snr-gauge--mini .snr-gauge-value {
+        font-size: clamp(0.9rem, 0.85rem + 0.35vw, 1.1rem);
+      }
+
+      .snr-gauge--mini .snr-gauge-scale {
+        font-size: 0.58rem;
+      }
+
+      .beacon-noaa-mini .beacon-kpi-detail {
+        margin-top: 3px;
+        font-size: 0.7rem;
+        min-height: 1rem;
       }
 
       .grid {
@@ -608,6 +754,14 @@ Last update: 2026-04-03 UTC
         grid-column: span 6;
       }
 
+      .span-8 {
+        grid-column: span 8;
+      }
+
+      .span-4 {
+        grid-column: span 4;
+      }
+
       .span-9 {
         grid-column: span 9;
       }
@@ -708,7 +862,8 @@ Last update: 2026-04-03 UTC
       }
 
       .prop-state {
-        display: inline-flex;
+        display: flex;
+        justify-content: center;
         align-items: center;
         gap: 6px;
         font-size: 0.84rem;
@@ -723,10 +878,87 @@ Last update: 2026-04-03 UTC
         border: 1px solid transparent;
       }
 
-      #kpiBestBandScore {
-        font-size: 0.68rem;
-        white-space: nowrap;
-        line-height: 1.1;
+      .top-bands-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 10px;
+        width: 100%;
+      }
+
+      .card-top-bands {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .card-top-bands .top-bands-list {
+        margin-top: 8px;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .top-band-row {
+        display: grid;
+        grid-template-columns: 2.1rem 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 0;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: linear-gradient(120deg, rgba(30, 58, 138, 0.22), rgba(30, 41, 59, 0.22));
+      }
+
+      .top-band-row:nth-child(1) {
+        border-color: rgba(245, 158, 11, 0.45);
+        background: linear-gradient(120deg, rgba(245, 158, 11, 0.30), rgba(146, 64, 14, 0.15));
+      }
+
+      .top-band-row:nth-child(2) {
+        border-color: rgba(203, 213, 225, 0.46);
+        background: linear-gradient(120deg, rgba(203, 213, 225, 0.30), rgba(100, 116, 139, 0.18));
+      }
+
+      .top-band-row:nth-child(3) {
+        border-color: rgba(196, 181, 253, 0.35);
+        background: linear-gradient(120deg, rgba(167, 139, 250, 0.22), rgba(59, 130, 246, 0.14));
+      }
+
+      .top-band-row.is-empty {
+        opacity: 0.64;
+        border-style: dashed;
+      }
+
+      .top-band-row .rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 999px;
+        font-size: 1.08rem;
+        background: rgba(2, 6, 23, 0.38);
+      }
+
+      .top-band-row .band-name {
+        font-weight: 800;
+        font-size: 1rem;
+        flex: 1;
+        letter-spacing: 0.02em;
+      }
+
+      .top-band-row .band-score {
+        color: #e2e8f0;
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(2, 6, 23, 0.36);
       }
 
       .prop-state .badge.excellent {
@@ -958,9 +1190,15 @@ Last update: 2026-04-03 UTC
           grid-template-columns: repeat(3, 1fr);
         }
 
+        .beacon-view .cards.beacon-cards {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .span-8,
         .span-7,
         .span-5,
         .span-6,
+        .span-4,
         .span-9,
         .span-3 {
           grid-column: span 12;
@@ -1001,6 +1239,10 @@ Last update: 2026-04-03 UTC
           grid-template-columns: 1fr;
         }
 
+        .beacon-view .cards.beacon-cards {
+          grid-template-columns: 1fr;
+        }
+
         .controls,
         .controls.controls-aprs {
           grid-template-columns: 1fr;
@@ -1014,11 +1256,36 @@ Last update: 2026-04-03 UTC
           grid-template-columns: 1fr;
         }
 
+        .beacon-noaa-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+
         .preset-row,
         .legend,
         .aprs-source-legend,
         .aprs-filter-row {
           flex-wrap: wrap;
+        }
+
+        .top-band-row {
+          grid-template-columns: 1.9rem 1fr auto;
+          padding: 8px 10px;
+          gap: 8px;
+        }
+
+        .top-band-row .rank {
+          width: 1.8rem;
+          height: 1.8rem;
+          font-size: 0.98rem;
+        }
+
+        .top-band-row .band-name {
+          font-size: 0.92rem;
+        }
+
+        .top-band-row .band-score {
+          font-size: 0.82rem;
+          padding: 3px 8px;
         }
 
         .view-selector-row {
@@ -1299,7 +1566,7 @@ Last update: 2026-04-03 UTC
         border: 1px solid #334155;
         box-shadow: 0 1px 4px rgba(0,0,0,.4);
       }
-      /* Official APRS sprite icon (24×24) — served from jsdelivr CDN. */
+      /* Official APRS sprite icon (24×24) — ships under vendor/aprs-symbols/. */
       .aprs-symbol, .aprs-symbol-stack {
         display: inline-block; width: 24px; height: 24px;
         vertical-align: middle; flex: 0 0 24px; image-rendering: pixelated;
@@ -1316,9 +1583,8 @@ Last update: 2026-04-03 UTC
       .aprs-popup__table td:first-child { white-space: nowrap; color: #475569; width: 85px; }
       .aprs-source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; vertical-align: middle; margin-left: 4px; }
       .aprs-source-rf { background: #dcfce7; color: #166534; }
-      .aprs-source-rfgated { background: #fef3c7; color: #78350f; }
+      .aprs-source-rfgated { background: #fef3c7; color: #92400e; }
       .aprs-source-is { background: #dbeafe; color: #1e40af; }
-      .aprs-source-lora { background: #fce7f3; color: #9d174d; }
       /* Marker source colours — must match the legend swatches below */
       .aprs-marker-rf   .aprs-station-label   { color: #f97316; border-color: #f97316; }
       .aprs-marker-rf   .aprs-station-leader,
@@ -1371,6 +1637,921 @@ Last update: 2026-04-03 UTC
         font-weight: 600;
       }
 
+      .beacon-view {
+        display: none;
+      }
+
+      .beacon-note {
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border: 1px solid rgba(251, 191, 36, 0.35);
+        border-radius: 12px;
+        background: rgba(251, 191, 36, 0.08);
+        color: #fde68a;
+        font-size: 0.88rem;
+      }
+
+      .beacon-scroll {
+        overflow-x: auto;
+      }
+
+      .beacon-matrix {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: calc(0.78rem + 2px);
+      }
+
+      .beacon-matrix th,
+      .beacon-matrix td {
+        padding: 4px 6px;
+        vertical-align: middle;
+        text-align: center;
+        border: 1px solid rgba(40, 68, 90, 0.75);
+      }
+
+      .beacon-matrix th {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-matrix td.beacon-callsign,
+      .beacon-matrix th.beacon-callsign-header {
+        text-align: left;
+      }
+
+      .beacon-matrix td:not(.beacon-callsign),
+      .beacon-matrix th:not(.beacon-callsign-header) {
+        width: calc((100% - 14rem) / 5);
+      }
+
+      .beacon-callsign {
+        width: 14rem;
+        max-width: 14rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.88rem;
+      }
+
+      .beacon-callsign .beacon-loc {
+        margin-left: 0.4rem;
+        color: var(--text-muted);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        font-size: 0.74rem;
+      }
+
+      .beacon-callsign-header {
+        width: 14rem;
+      }
+
+      .beacon-cell {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .beacon-cell__telemetry {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .beacon-history-cell {
+        display: inline-flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+        line-height: 1.05;
+      }
+
+      .beacon-history-cell__body {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .beacon-history-meta {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.62rem;
+        color: rgba(255, 255, 255, 0.82);
+        white-space: nowrap;
+      }
+
+      .beacon-meter-row {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+
+      .beacon-meter-value {
+        min-width: 2.3rem;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+        color: #f8fbff;
+      }
+
+      .beacon-meter {
+        display: inline-flex;
+        gap: 2px;
+        vertical-align: middle;
+        height: 10px;
+        margin-right: 4px;
+      }
+
+      .beacon-meter-row .beacon-meter {
+        margin-right: 0;
+      }
+
+      .beacon-history-cell .beacon-meter-value {
+        min-width: 2.1rem;
+        font-size: 0.72rem;
+      }
+
+      .beacon-cell--history-hit {
+        background: rgba(34, 197, 94, 0.10);
+      }
+
+      .beacon-cell--history-monitored {
+        background: rgba(217, 119, 6, 0.10);
+      }
+
+      .beacon-cell--history-unsampled {
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .beacon-meter__seg {
+        width: 7px;
+        height: 100%;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+
+      .beacon-meter__seg--on-1 {
+        background: #146e14;
+        border-color: #146e14;
+      }
+
+      .beacon-meter__seg--on-2 {
+        background: #29a829;
+        border-color: #29a829;
+      }
+
+      .beacon-meter__seg--on-3 {
+        background: #5edc5e;
+        border-color: #5edc5e;
+      }
+
+      .beacon-meter__seg--on-4 {
+        background: #b6f5b6;
+        border-color: #b6f5b6;
+      }
+
+      .beacon-meter__seg--nocopy,
+      .beacon-meter__seg--fail {
+        background: rgba(217, 119, 6, 0.96);
+        border-color: #fbbf24;
+        box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.18);
+      }
+
+      .beacon-history-footnote {
+        margin: 8px 4px 0;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        line-height: 1.4;
+      }
+
+      .beacon-history-info-btn {
+        min-width: 0;
+        min-height: 24px;
+        margin-top: 1px;
+        flex: 0 0 auto;
+        padding: 0.14rem 0.45rem;
+        font-size: 0.7rem;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        border: 1px solid rgba(56, 189, 248, 0.65);
+        border-radius: 6px;
+        background: rgba(56, 189, 248, 0.12);
+        color: #bae6fd;
+        cursor: pointer;
+      }
+
+      .beacon-history-info-btn:hover {
+        border-color: rgba(56, 189, 248, 0.9);
+        background: rgba(56, 189, 248, 0.2);
+        color: #e0f2fe;
+      }
+
+      .beacon-history-info-btn:focus-visible {
+        outline: 2px solid rgba(56, 189, 248, 0.85);
+        outline-offset: 1px;
+      }
+
+      .beacon-events-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 2300;
+        display: none;
+      }
+
+      .beacon-events-modal.visible {
+        display: block;
+      }
+
+      .beacon-events-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(2, 6, 12, 0.72);
+        backdrop-filter: blur(2px);
+      }
+
+      .beacon-events-modal__dialog {
+        position: relative;
+        width: min(1186px, calc(100vw - 20px));
+        max-height: calc(100vh - 24px);
+        margin: 12px auto;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #0f1d2a 0%, #0a141e 100%);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .beacon-events-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.22);
+      }
+
+      .beacon-events-modal__title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .beacon-events-modal__close {
+        border: 1px solid rgba(159, 180, 200, 0.45);
+        border-radius: 8px;
+        background: rgba(15, 28, 40, 0.72);
+        color: #dbe7f3;
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+
+      .beacon-events-modal__close:hover {
+        border-color: rgba(56, 189, 248, 0.75);
+        color: #f8fbff;
+      }
+
+      .beacon-events-modal__body {
+        overflow: auto;
+        padding: 14px 16px 16px;
+      }
+
+      .beacon-history-info-modal__hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 38%),
+          linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(12, 18, 32, 0.92));
+      }
+
+      .beacon-history-info-modal__window {
+        margin: 0;
+        color: #7dd3fc;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .beacon-history-info-modal__summary {
+        margin: 6px 0 0;
+        color: #f8fbff;
+        font-size: 0.82rem;
+      }
+
+      .beacon-history-info-modal__stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .beacon-history-info-stat {
+        padding: 14px 14px 12px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.92));
+      }
+
+      .beacon-history-info-stat__label {
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: rgba(191, 219, 254, 0.74);
+      }
+
+      .beacon-history-info-stat__value {
+        margin-top: 6px;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #f8fbff;
+      }
+
+      .beacon-history-info-stat__note {
+        margin-top: 4px;
+        font-size: 0.75rem;
+        color: rgba(226, 232, 240, 0.68);
+      }
+
+      .beacon-history-info-modal__charts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .beacon-history-info-panel {
+        padding: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.92));
+      }
+
+      .beacon-history-info-panel__heading {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #f8fbff;
+      }
+
+      .beacon-history-info-panel__subtext {
+        margin-top: 4px;
+        margin-bottom: 14px;
+        font-size: 0.76rem;
+        color: rgba(226, 232, 240, 0.66);
+      }
+
+      .beacon-history-chart__empty,
+      .beacon-history-chart__caption {
+        font-size: 0.76rem;
+        color: rgba(226, 232, 240, 0.68);
+      }
+
+      .beacon-history-chart__stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .beacon-history-chart__stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.42);
+      }
+
+      .beacon-history-chart__stat-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: rgba(191, 219, 254, 0.72);
+      }
+
+      .beacon-history-chart__stat-value {
+        font-size: 0.84rem;
+        color: #f8fbff;
+      }
+
+      .beacon-history-mix__bar {
+        display: flex;
+        overflow: hidden;
+        height: 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .beacon-history-mix__seg--observed {
+        background: linear-gradient(90deg, #2563eb, #60a5fa);
+      }
+
+      .beacon-history-mix__seg--nocopy {
+        background: linear-gradient(90deg, #b45309, #f59e0b);
+      }
+
+      .beacon-history-mix__legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .beacon-history-mix__legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #f8fbff;
+      }
+
+      .beacon-history-mix__legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .beacon-history-mix__legend-dot--observed {
+        background: #60a5fa;
+      }
+
+      .beacon-history-mix__legend-dot--nocopy {
+        background: #f59e0b;
+      }
+
+      .beacon-history-rhythm__bars,
+      .beacon-history-metric__bars {
+        display: flex;
+        align-items: end;
+        gap: 4px;
+        position: relative;
+        height: 132px;
+        padding: 10px 8px 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+          repeating-linear-gradient(
+            to top,
+            rgba(148, 163, 184, 0.12) 0,
+            rgba(148, 163, 184, 0.12) 1px,
+            transparent 1px,
+            transparent 32px
+          );
+      }
+
+      .beacon-history-rhythm__bar,
+      .beacon-history-metric__bar {
+        display: block;
+        align-self: end;
+        flex: 1 1 0;
+        min-width: 6px;
+        border-radius: 999px 999px 2px 2px;
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      }
+
+      .beacon-history-rhythm__bar--detected {
+        background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+      }
+
+      .beacon-history-rhythm__bar--weak {
+        background: linear-gradient(180deg, #facc15, #ca8a04);
+      }
+
+      .beacon-history-rhythm__bar--nocopy {
+        background: linear-gradient(180deg, #f59e0b, #92400e);
+      }
+
+      .beacon-history-metric__bar--live {
+        background: linear-gradient(180deg, #38bdf8, #1d4ed8);
+      }
+
+      .beacon-history-metric__bar--muted {
+        background: rgba(148, 163, 184, 0.24);
+      }
+
+      .beacon-history-info-table-wrap {
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 14px;
+        overflow: auto;
+      }
+
+      .beacon-history-info-table {
+        width: 100%;
+        min-width: 720px;
+        border-collapse: collapse;
+      }
+
+      .beacon-history-info-table thead th {
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(191, 219, 254, 0.78);
+      }
+
+      .beacon-history-info-table th,
+      .beacon-history-info-table td {
+        border-bottom: 1px solid rgba(40, 68, 90, 0.65);
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 0.8rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .beacon-history-state-chip,
+      .beacon-history-drift-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .beacon-history-state-chip--detected {
+        background: rgba(37, 99, 235, 0.18);
+        color: #bfdbfe;
+      }
+
+      .beacon-history-state-chip--weak {
+        background: rgba(202, 138, 4, 0.18);
+        color: #fde047;
+      }
+
+      .beacon-history-state-chip--nocopy {
+        background: rgba(180, 83, 9, 0.18);
+        color: #fde68a;
+      }
+
+      .beacon-history-rowmetric {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 160px;
+      }
+
+      .beacon-history-rowmetric__bar {
+        position: relative;
+        flex: 1 1 auto;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.18);
+        overflow: hidden;
+      }
+
+      .beacon-history-rowmetric__fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: linear-gradient(90deg, #38bdf8, #2563eb);
+        border-radius: inherit;
+      }
+
+      .beacon-history-rowmetric--sequence {
+        min-width: 145px;
+      }
+
+      .beacon-history-rowmetric__label {
+        font-size: 0.76rem;
+        color: #f8fbff;
+        white-space: nowrap;
+      }
+
+      #beaconHistoryInfoRecords {
+        margin-top: 12px;
+      }
+
+      @media (max-width: 991.98px) {
+        .beacon-history-info-modal__charts {
+          grid-template-columns: 1fr;
+        }
+
+        .beacon-history-chart__stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .beacon-history-info-modal__stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      body.beacon-events-modal-open {
+        overflow: hidden;
+      }
+
+      @media (max-width: 640px) {
+        .beacon-events-modal__dialog {
+          width: calc(100vw - 8px);
+          max-height: calc(100vh - 8px);
+          margin: 4px auto;
+        }
+
+        .beacon-history-info-modal__stats {
+          grid-template-columns: 1fr;
+        }
+
+        .beacon-events-modal__body {
+          padding: 10px;
+        }
+      }
+
+      .beacon-observations-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 640px;
+      }
+
+      .beacon-observations-table th,
+      .beacon-observations-table td {
+        border-bottom: 1px solid rgba(40, 68, 90, 0.65);
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 0.82rem;
+      }
+
+      .beacon-observations-table thead th {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-empty {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        padding: 8px 2px;
+      }
+
+      .beacon-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .beacon-list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border: 1px solid rgba(40, 68, 90, 0.55);
+        border-radius: 10px;
+        background: rgba(9, 17, 24, 0.4);
+      }
+
+      .beacon-list-label {
+        font-weight: 600;
+      }
+
+      .beacon-list-detail {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        text-align: right;
+      }
+
+      .beacon-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 84px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-badge.aligned,
+      .beacon-badge.good,
+      .beacon-badge.excellent {
+        background: rgba(52, 211, 153, 0.16);
+        color: #86efac;
+      }
+
+      .beacon-badge.mixed,
+      .beacon-badge.fair,
+      .beacon-badge.marginal {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fde68a;
+      }
+
+      .beacon-badge.divergent,
+      .beacon-badge.poor,
+      .beacon-badge.closed,
+      .beacon-badge.absorbed {
+        background: rgba(239, 68, 68, 0.14);
+        color: #fca5a5;
+      }
+
+      .beacon-badge.unknown,
+      .beacon-badge.no-data {
+        background: rgba(159, 180, 200, 0.12);
+        color: var(--text-muted);
+      }
+
+      .beacon-summary {
+        margin: 0 0 12px;
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.5;
+      }
+
+      .beacon-reading-panel {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.13), transparent 40%),
+          linear-gradient(180deg, rgba(8, 16, 24, 0.82), rgba(9, 17, 24, 0.58));
+      }
+
+      .beacon-reading-panel > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .beacon-reading-hero {
+        margin: 0 4px 12px;
+        padding: 18px;
+        border-radius: 16px;
+        border: 1px solid rgba(85, 150, 196, 0.28);
+        background:
+          linear-gradient(140deg, rgba(8, 28, 44, 0.88), rgba(13, 42, 58, 0.62)),
+          radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 48%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .beacon-reading-kicker {
+        margin-bottom: 6px;
+        color: #7dd3fc;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-summary {
+        margin: 0;
+        color: #f8fbff;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+
+      .beacon-reading-grid {
+        display: grid;
+        flex: 1 1 auto;
+        min-height: 0;
+        gap: 10px;
+        grid-auto-rows: minmax(0, 1fr);
+        align-content: stretch;
+      }
+
+      .beacon-reading-band {
+        height: 100%;
+        padding: 14px;
+        border: 1px solid rgba(40, 68, 90, 0.72);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(12, 21, 30, 0.84), rgba(9, 16, 24, 0.54));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .beacon-reading-band--aligned,
+      .beacon-reading-band--good,
+      .beacon-reading-band--excellent {
+        border-color: rgba(52, 211, 153, 0.3);
+        box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band--mixed,
+      .beacon-reading-band--fair,
+      .beacon-reading-band--marginal {
+        border-color: rgba(251, 191, 36, 0.28);
+        box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band--divergent,
+      .beacon-reading-band--poor,
+      .beacon-reading-band--closed,
+      .beacon-reading-band--absorbed {
+        border-color: rgba(239, 68, 68, 0.3);
+        box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .beacon-reading-band-id {
+        display: grid;
+        gap: 4px;
+      }
+
+      .beacon-reading-band-label {
+        color: #7f9bb5;
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-band-name {
+        color: #ffffff;
+        font-size: 1.12rem;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .beacon-reading-band-flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 8px;
+        align-items: center;
+        flex: 1 1 auto;
+      }
+
+      .beacon-reading-chip {
+        min-height: 78px;
+        height: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(67, 100, 126, 0.34);
+        background: rgba(255, 255, 255, 0.04);
+        display: grid;
+        align-content: center;
+        gap: 4px;
+      }
+
+      .beacon-reading-chip--ghost {
+        background: rgba(125, 211, 252, 0.06);
+      }
+
+      .beacon-reading-chip-label {
+        color: #9ab4c9;
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-chip-value {
+        color: #f8fbff;
+        font-size: 0.92rem;
+        font-weight: 700;
+        text-transform: capitalize;
+        line-height: 1.2;
+      }
+
+      .beacon-reading-flow-arrow {
+        color: #7dd3fc;
+        font-size: 1.15rem;
+        font-weight: 800;
+        opacity: 0.9;
+      }
+
+      .beacon-reading-empty {
+        height: 100%;
+        padding: 16px 12px;
+        border: 1px dashed rgba(86, 118, 145, 0.38);
+        border-radius: 14px;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        text-align: center;
+        display: grid;
+        place-items: center;
+      }
+
+      .beacon-meta-inline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+
       @media (max-width: 1100px) {
         .aprs-cards {
           grid-template-columns: repeat(3, 1fr);
@@ -1408,6 +2589,7 @@ Last update: 2026-04-03 UTC
         <div class="view-selector-row">
           <div class="view-selector" id="viewSelector">
             <button type="button" class="view-btn active" data-view="hf" data-i18n="view_hf">HF Propagation &amp; Digital Mode Analysis</button>
+            <button type="button" class="view-btn" data-view="beacon" data-i18n="view_beacon">Beacon Analysis - NCDXF/IARU</button>
             <button type="button" class="view-btn" data-view="aprs" data-i18n="view_aprs">APRS Network Topology &amp; Coverage</button>
           </div>
           <div id="scanRuntimeInfo" class="scan-runtime-status unavailable" role="status" aria-live="polite">Scan status unavailable</div>
@@ -1488,32 +2670,118 @@ Last update: 2026-04-03 UTC
         </div>
 
         <div class="cards">
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiEventsCard">
             <span class="label" data-i18n="kpi_total_events">Total events</span>
-            <div class="value" id="kpiEvents">--</div>
+            <div class="snr-gauge" role="img" aria-label="Total events gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiEventsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#3b82f6" />
+                    <stop offset="100%" stop-color="#22d3ee" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiEventsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiEventsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiEvents">--</div>
+              <div class="snr-gauge-scale" id="kpiEventsScale" aria-hidden="true"><span>0</span><span>5k</span><span>10k+</span></div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiCallsignsCard">
             <span class="label" data-i18n="kpi_unique_callsigns">Unique callsigns</span>
-            <div class="value" id="kpiCallsigns">--</div>
+            <div class="snr-gauge" role="img" aria-label="Unique callsigns gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiCallsignsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#fb923c" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiCallsignsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiCallsignsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiCallsigns">--</div>
+              <div class="snr-gauge-scale" id="kpiCallsignsScale" aria-hidden="true"><span>0</span><span>500</span><span>1k+</span></div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiSnrDigitalCard">
             <span class="label" data-i18n="kpi_avg_snr_digital">Avg SNR FT4/FT8/WSPR</span>
-            <div class="value" id="kpiSnrDigital">--</div>
+            <div class="snr-gauge" role="img" aria-label="Average SNR gauge for FT4 FT8 and WSPR">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiSnrDigitalGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiSnrDigitalGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiSnrDigitalNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiSnrDigital">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true">
+                <span>-30</span>
+                <span>-7.5</span>
+                <span>+15 dB</span>
+              </div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiSnrAnalogCard">
             <span class="label" data-i18n="kpi_avg_snr_analog">Avg SNR CW/SSB</span>
-            <div class="value" id="kpiSnrAnalog">--</div>
+            <div class="snr-gauge" role="img" aria-label="Average SNR gauge for CW and SSB">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiSnrAnalogGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiSnrAnalogGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiSnrAnalogNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiSnrAnalog">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>-10</span><span>+10</span><span>+30 dB</span></div>
+            </div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiPropScoreCard">
             <span class="label" data-i18n="kpi_overall_prop">Global Propagation</span>
-            <div class="value" id="kpiPropScore">--</div>
-            <div class="prop-state"><span id="kpiPropState" class="badge">--</span></div>
-            <div id="kpiPropNote" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;" data-i18n-html="kpi_prop_note">Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.</div>
+            <div class="snr-gauge" role="img" aria-label="Global propagation score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiPropScoreGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="50%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiPropScoreGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiPropScoreNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiPropScore">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+            <div class="prop-state">
+              <span id="kpiPropState" class="badge"><span id="kpiPropLabel">--</span><button type="button" class="helper-icon" style="font-size:10px;width:14px;height:14px;line-height:12px;padding:0;margin-left:5px;vertical-align:middle;" aria-label="Explain propagation score" data-help-title="Global Propagation Score" data-help-text="Confirmed decodes only (verified callsign).&#10;No callsign = band occupancy.">i</button></span>
+            </div>
           </div>
-          <div class="card">
-            <span class="label" data-i18n="kpi_best_band">Best band</span>
-            <div class="value" id="kpiBestBand">--</div>
-            <div class="prop-state"><span id="kpiBestBandScore">--</span></div>
+          <div class="card card-top-bands" id="kpiTopBandsCard">
+            <span class="label" data-i18n="kpi_top_bands">Top 3 Bands</span>
+            <div id="kpiTopBands" class="top-bands-list">
+              <div class="top-band-row is-empty"><span class="rank">🥇</span><span class="band-name">--</span><span class="band-score">--</span></div>
+              <div class="top-band-row is-empty"><span class="rank">🥈</span><span class="band-name">--</span><span class="band-score">--</span></div>
+              <div class="top-band-row is-empty"><span class="rank">🥉</span><span class="band-name">--</span><span class="band-score">--</span></div>
+            </div>
           </div>
         </div>
 
@@ -1702,7 +2970,7 @@ Last update: 2026-04-03 UTC
             <p data-i18n="aprs_chart_map_desc">All stations with position in the selected period — RF (orange), APRS-IS (green) and LoRa APRS (magenta).</p>
             <div class="aprs-source-legend">
               <span><span class="swatch" style="background:#f97316;"></span> 📻 RF (Direwolf)</span>
-              <span><span class="swatch" style="background:#a16207;"></span> 🔁 RF-gated (3rd-party)</span>
+              <span><span class="swatch" style="background:#a16207;"></span> 🔁 RF-gated (3rd-party / TCPIP)</span>
               <span><span class="swatch" style="background:#22c55e;"></span> 🌐 APRS-IS (TCP)</span>
               <span><span class="swatch" style="background:#ec4899;"></span> 📡 LoRa APRS</span>
               <span><span class="swatch" style="background:#3b82f6;"></span> QTH</span>
@@ -1783,6 +3051,200 @@ Last update: 2026-04-03 UTC
         </section>
       </section>
       </div><!-- /aprsView -->
+
+      <div id="beaconView" class="beacon-view">
+      <section class="panel">
+        <p id="beaconHistoryNote" class="beacon-note" data-i18n="beacon_history_note">Historical analysis only — not the current slot state.</p>
+
+        <div class="cards beacon-cards">
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiGlobalScoreCard">
+            <span class="label" data-i18n="beacon_kpi_global_score">Global score</span>
+            <div class="snr-gauge" role="img" aria-label="Global beacon score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiGlobalScoreGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiGlobalScoreGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiGlobalScoreNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiGlobalScore">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiGlobalState">--</div>
+          </div>
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiBestBandCard">
+            <span class="label" data-i18n="beacon_kpi_best_band">Best band</span>
+            <div class="snr-gauge" role="img" aria-label="Best beacon band score gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiBestBandGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#38bdf8" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiBestBandGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiBestBandNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiBestBand">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiBestBandMeta">--</div>
+          </div>
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiDetectedSlotsCard">
+            <span class="label" data-i18n="beacon_kpi_detected_slots">Detected slots</span>
+            <div class="snr-gauge" role="img" aria-label="Detected beacon slots ratio gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiDetectedSlotsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiDetectedSlotsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiDetectedSlotsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiDetectedSlots">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiDetectedSlotsMeta">--</div>
+          </div>
+          <div class="card card-snr-gauge beacon-kpi-card is-empty" id="beaconKpiDetectedBeaconsCard">
+            <span class="label" data-i18n="beacon_kpi_detected_beacons">Beacons heard</span>
+            <div class="snr-gauge" role="img" aria-label="Detected beacons gauge">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="beaconKpiDetectedBeaconsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#334155" />
+                    <stop offset="45%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiDetectedBeaconsGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="beaconKpiDetectedBeaconsNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="beaconKpiDetectedBeacons">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>9</span><span>18</span></div>
+            </div>
+            <div class="beacon-kpi-detail" id="beaconKpiDetectedBeaconsMeta">--</div>
+          </div>
+          <div class="card card-snr-gauge beacon-kpi-card beacon-noaa-card" id="beaconKpiNoaaCard">
+            <span class="label" data-i18n="beacon_kpi_noaa">NOAA Kp / SFI</span>
+            <div class="beacon-noaa-grid">
+              <div class="beacon-noaa-mini card-snr-gauge is-empty" id="beaconKpiKpCard">
+                <span class="label">Kp</span>
+                <div class="snr-gauge snr-gauge--mini" role="img" aria-label="Kp index gauge">
+                  <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                    <defs>
+                      <linearGradient id="beaconKpiKpGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#22c55e" />
+                        <stop offset="52%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiKpGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <line id="beaconKpiKpNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                    <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+                  </svg>
+                  <div class="value snr-gauge-value" id="beaconKpiKp">--</div>
+                  <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>4.5</span><span>9</span></div>
+                </div>
+                <div class="beacon-kpi-detail" id="beaconKpiKpDetail">--</div>
+              </div>
+              <div class="beacon-noaa-mini card-snr-gauge is-empty" id="beaconKpiSfiCard">
+                <span class="label">SFI</span>
+                <div class="snr-gauge snr-gauge--mini" role="img" aria-label="Solar flux index gauge">
+                  <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                    <defs>
+                      <linearGradient id="beaconKpiSfiGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#ef4444" />
+                        <stop offset="52%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#22c55e" />
+                      </linearGradient>
+                    </defs>
+                    <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#beaconKpiSfiGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                    <line id="beaconKpiSfiNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                    <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+                  </svg>
+                  <div class="value snr-gauge-value" id="beaconKpiSfi">--</div>
+                  <div class="snr-gauge-scale" id="beaconKpiSfiScale" aria-hidden="true"><span>60</span><span>155</span><span>250</span></div>
+                </div>
+                <div class="beacon-kpi-detail" id="beaconKpiSfiDetail">--</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="chart-panel span-8">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_recent_activity">Recent activity - last 12 h</h3>
+            </div>
+            <div class="beacon-scroll">
+              <table class="beacon-matrix" id="beaconRecentActivityTable"></table>
+            </div>
+            <p class="beacon-history-footnote" data-i18n="beacon_recent_activity_desc">Historical matrix by scheduled beacon slot and band.</p>
+          </article>
+
+          <article class="chart-panel span-4 beacon-reading-panel">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_reading">Beacon + NOAA reading</h3>
+            </div>
+            <div class="beacon-reading-hero">
+              <div class="beacon-reading-kicker">Quick read</div>
+              <p class="beacon-reading-summary" id="beaconReadingSummary">--</p>
+            </div>
+            <div class="beacon-reading-grid" id="beaconReadingBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_nowcast">Nowcast</h3>
+            </div>
+            <p class="beacon-summary" id="beaconNowcastSummary">--</p>
+            <div class="beacon-list" id="beaconNowcastBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_propagation_bands">Propagation by band</h3>
+            </div>
+            <div class="beacon-list" id="beaconPropagationBands"></div>
+          </article>
+
+          <article class="chart-panel span-4">
+            <div class="chart-header">
+              <h3 data-i18n="beacon_ionospheric_context">Ionospheric context</h3>
+            </div>
+            <div class="beacon-list" id="beaconIonosphericContext"></div>
+          </article>
+
+          <article class="chart-panel span-12 beacon-propmap-card">
+            <div class="chart-header">
+              <h3>Beacon Detection Map — NCDXF/IARU</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Beacon Detection Map" data-help-title="Beacon Detection Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured dots &amp; arcs&lt;/strong&gt; — NCDXF/IARU beacons with at least one confirmed detection in the analysis window, coloured by band (20 m / 17 m / 15 m / 12 m / 10 m).&lt;br&gt;&lt;strong&gt;Grey dots&lt;/strong&gt; — Beacons monitored but not detected in the window.&lt;br&gt;&lt;br&gt;Hover a dot to see callsign, location and detected bands.&lt;br&gt;Drag to rotate · CTRL+Scroll to zoom · Double-click to reset.">i</button>
+            </div>
+            <p>Arcos QTH → beacons detectados na janela de análise. Pontos cinzentos = monitorados sem cópia.</p>
+            <div class="propmap-wrap" id="beaconPropMapWrap"></div>
+          </article>
+        </div>
+      </section>
+      </div><!-- /beaconView -->
     </div>
 
     <div class="chart-help-layer" id="chartHelpLayer" role="status" aria-live="polite">
@@ -1794,6 +3256,55 @@ Last update: 2026-04-03 UTC
 
     <div class="chart-value-toast" id="chartValueToast" role="status" aria-live="polite">
       <div class="chart-value-toast-body" id="chartValueToastText"></div>
+    </div>
+
+    <div class="beacon-events-modal" id="beaconEventsModal" aria-hidden="true">
+      <div class="beacon-events-modal__backdrop" data-beacon-history-close="true"></div>
+      <section class="beacon-events-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="beaconEventsModalTitle">
+        <div class="beacon-events-modal__header">
+          <h3 class="beacon-events-modal__title" id="beaconEventsModalTitle">Beacon recent activity details</h3>
+          <button type="button" class="beacon-events-modal__close" data-beacon-history-close="true">Close</button>
+        </div>
+        <div class="beacon-events-modal__body">
+          <div class="beacon-history-info-modal__hero">
+            <div>
+              <div id="beaconHistoryInfoWindow" class="beacon-history-info-modal__window">-</div>
+              <p id="beaconHistoryInfoSummary" class="beacon-history-info-modal__summary">-</p>
+            </div>
+          </div>
+
+          <div id="beaconHistoryInfoStats" class="beacon-history-info-modal__stats"></div>
+
+          <div class="beacon-history-info-modal__charts">
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Copy mix</div>
+              <div class="beacon-history-info-panel__subtext">Rolling 12-hour split between detected and no-copy monitored slots.</div>
+              <div id="beaconHistoryInfoMixChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Recent rhythm</div>
+              <div class="beacon-history-info-panel__subtext">Older to newer monitored passes, colour-coded by copy quality.</div>
+              <div id="beaconHistoryInfoDetectionChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">100 W SNR trend</div>
+              <div class="beacon-history-info-panel__subtext">Reference-dash strength across the latest monitored passes in this cell.</div>
+              <div id="beaconHistoryInfoSnrChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Dash sequence trend</div>
+              <div class="beacon-history-info-panel__subtext">Ordered dash copy from 0/4 to 4/4 across the same pass history.</div>
+              <div id="beaconHistoryInfoDashChart"></div>
+            </section>
+          </div>
+
+          <div class="beacon-history-info-panel">
+            <div class="beacon-history-info-panel__heading">Latest monitored passes</div>
+            <div class="beacon-history-info-panel__subtext">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
+            <div id="beaconHistoryInfoRecords">Loading details...</div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script>
@@ -1888,6 +3399,7 @@ Last update: 2026-04-03 UTC
         if (typeof refreshPropMap === "function") refreshPropMap();
         if (lastResolvedRange) renderFromCurrentRange();
         if (aprsDataLoaded && aprsView && aprsView.style.display !== "none") aprsRenderAll();
+        if (beaconDataLoaded && beaconView && beaconView.style.display !== "none") renderBeaconDashboard();
         const queryAt = new Date();
         if (apiLastFetchInfo) apiLastFetchInfo.textContent = t("last_api_query", { time: fmtDateUtc(queryAt) });
       }
@@ -1972,11 +3484,21 @@ Last update: 2026-04-03 UTC
       const kpiEvents = document.getElementById("kpiEvents");
       const kpiCallsigns = document.getElementById("kpiCallsigns");
       const kpiSnrDigital = document.getElementById("kpiSnrDigital");
+      const kpiSnrDigitalNeedle = document.getElementById("kpiSnrDigitalNeedle");
+      const kpiSnrDigitalCard = document.getElementById("kpiSnrDigitalCard");
+      const kpiEventsNeedle = document.getElementById("kpiEventsNeedle");
+      const kpiEventsCard = document.getElementById("kpiEventsCard");
+      const kpiCallsignsNeedle = document.getElementById("kpiCallsignsNeedle");
+      const kpiCallsignsCard = document.getElementById("kpiCallsignsCard");
       const kpiSnrAnalog = document.getElementById("kpiSnrAnalog");
+      const kpiSnrAnalogNeedle = document.getElementById("kpiSnrAnalogNeedle");
+      const kpiSnrAnalogCard = document.getElementById("kpiSnrAnalogCard");
+      const kpiPropScoreNeedle = document.getElementById("kpiPropScoreNeedle");
+      const kpiPropScoreCard = document.getElementById("kpiPropScoreCard");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
-      const kpiBestBand = document.getElementById("kpiBestBand");
-      const kpiBestBandScore = document.getElementById("kpiBestBandScore");
+      const kpiPropLabel = document.getElementById("kpiPropLabel");
+      const kpiTopBands = document.getElementById("kpiTopBands");
       const metaPeriod = document.getElementById("metaPeriod");
       const metaSnapshot = document.getElementById("metaSnapshot");
       const metaUpdateFrequency = document.getElementById("metaUpdateFrequency");
@@ -2007,6 +3529,106 @@ Last update: 2026-04-03 UTC
       let serverSnrDigital = null; // kpis.snr_avg_digital from API
       let serverSnrAnalog  = null; // kpis.snr_avg_analog  from API
       let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+      let lastBeaconRuntimeSnapshot = { kind: "unavailable", payload: null };
+      let activeAcademicView = localStorage.getItem("academic_active_view") || "hf";
+      let beaconDataLoaded = false;
+      let beaconOverview = null;
+      const BEACON_WINDOW_HOURS = 12;
+      const BEACON_HISTORY_MODAL_LIMIT = 24;
+      const BEACON_LOCATION_BY_CALLSIGN = Object.freeze({
+        "4U1UN": "New York, NY, USA",
+        "VE8AT": "Eureka, NU, Canada",
+        "W6WX": "Mt. Umunhum, CA, USA",
+        "KH6RS": "Maui, HI, USA",
+        "ZL6B": "Masterton, New Zealand",
+        "VK6RBP": "Rolystone, WA, Australia",
+        "JA2IGY": "Aichi, Japan",
+        "RR9O": "Novosibirsk, Russia",
+        "VR2B": "Hong Kong",
+        "4S7B": "Colombo, Sri Lanka",
+        "ZS6DN": "Pretoria, South Africa",
+        "5Z4B": "Nairobi, Kenya",
+        "4X6TU": "Tel Aviv, Israel",
+        "OH2B": "Lohja, Finland",
+        "CS3B": "Madeira, Portugal",
+        "LU4AA": "Buenos Aires, Argentina",
+        "OA4B": "Lima, Peru",
+        "YV5B": "Caracas, Venezuela",
+      });
+      // NCDXF/IARU bands (ordem de transmissão do ciclo)
+      const NCDXF_BANDS = Object.freeze(["20m", "17m", "15m", "12m", "10m"]);
+      // NCDXF/IARU beacon coordinates [lon, lat] (D3 GeoJSON convention)
+      const BEACON_COORDS_BY_CALLSIGN = Object.freeze({
+        "4U1UN":  [ -73.98,  40.75],
+        "VE8AT":  [ -85.96,  79.99],
+        "W6WX":   [-121.90,  37.16],
+        "KH6RS":  [-156.45,  20.77],
+        "ZL6B":   [ 175.66, -40.95],
+        "VK6RBP": [ 116.02, -32.11],
+        "JA2IGY": [ 136.94,  35.07],
+        "RR9O":   [  83.09,  54.85],
+        "VR2B":   [ 114.17,  22.32],
+        "4S7B":   [  79.86,   6.90],
+        "ZS6DN":  [  28.19, -25.74],
+        "5Z4B":   [  36.82,  -1.29],
+        "4X6TU":  [  34.78,  32.07],
+        "OH2B":   [  24.10,  60.26],
+        "CS3B":   [ -16.93,  32.65],
+        "LU4AA":  [ -58.38, -34.62],
+        "OA4B":   [ -77.06, -12.05],
+        "YV5B":   [ -67.87,  10.49],
+      });
+      const beaconHistoryNote = document.getElementById("beaconHistoryNote");
+      const beaconEventsModal = document.getElementById("beaconEventsModal");
+      const beaconEventsModalTitle = document.getElementById("beaconEventsModalTitle");
+      const beaconHistoryInfoWindow = document.getElementById("beaconHistoryInfoWindow");
+      const beaconHistoryInfoSummary = document.getElementById("beaconHistoryInfoSummary");
+      const beaconHistoryInfoStats = document.getElementById("beaconHistoryInfoStats");
+      const beaconHistoryInfoMixChart = document.getElementById("beaconHistoryInfoMixChart");
+      const beaconHistoryInfoDetectionChart = document.getElementById("beaconHistoryInfoDetectionChart");
+      const beaconHistoryInfoSnrChart = document.getElementById("beaconHistoryInfoSnrChart");
+      const beaconHistoryInfoDashChart = document.getElementById("beaconHistoryInfoDashChart");
+      const beaconHistoryInfoRecords = document.getElementById("beaconHistoryInfoRecords");
+      const beaconKpiGlobalScore = document.getElementById("beaconKpiGlobalScore");
+      const beaconKpiGlobalScoreNeedle = document.getElementById("beaconKpiGlobalScoreNeedle");
+      const beaconKpiGlobalScoreCard = document.getElementById("beaconKpiGlobalScoreCard");
+      const beaconKpiGlobalState = document.getElementById("beaconKpiGlobalState");
+      const beaconKpiBestBand = document.getElementById("beaconKpiBestBand");
+      const beaconKpiBestBandNeedle = document.getElementById("beaconKpiBestBandNeedle");
+      const beaconKpiBestBandCard = document.getElementById("beaconKpiBestBandCard");
+      const beaconKpiBestBandMeta = document.getElementById("beaconKpiBestBandMeta");
+      const beaconKpiDetectedSlots = document.getElementById("beaconKpiDetectedSlots");
+      const beaconKpiDetectedSlotsNeedle = document.getElementById("beaconKpiDetectedSlotsNeedle");
+      const beaconKpiDetectedSlotsCard = document.getElementById("beaconKpiDetectedSlotsCard");
+      const beaconKpiDetectedSlotsMeta = document.getElementById("beaconKpiDetectedSlotsMeta");
+      const beaconKpiDetectedBeacons = document.getElementById("beaconKpiDetectedBeacons");
+      const beaconKpiDetectedBeaconsNeedle = document.getElementById("beaconKpiDetectedBeaconsNeedle");
+      const beaconKpiDetectedBeaconsCard = document.getElementById("beaconKpiDetectedBeaconsCard");
+      const beaconKpiDetectedBeaconsMeta = document.getElementById("beaconKpiDetectedBeaconsMeta");
+      const beaconKpiKp = document.getElementById("beaconKpiKp");
+      const beaconKpiKpNeedle = document.getElementById("beaconKpiKpNeedle");
+      const beaconKpiKpCard = document.getElementById("beaconKpiKpCard");
+      const beaconKpiKpDetail = document.getElementById("beaconKpiKpDetail");
+      const beaconKpiSfi = document.getElementById("beaconKpiSfi");
+      const beaconKpiSfiNeedle = document.getElementById("beaconKpiSfiNeedle");
+      const beaconKpiSfiCard = document.getElementById("beaconKpiSfiCard");
+      const beaconKpiSfiDetail = document.getElementById("beaconKpiSfiDetail");
+      const beaconKpiSfiScale = document.getElementById("beaconKpiSfiScale");
+      const beaconHistoryCellDetails = new Map();
+      let beaconEventsRequestSeq = 0;
+      const BEACON_CATALOG_SIZE = 18;
+      const BEACON_SCORE_GAUGE_MIN = 0;
+      const BEACON_SCORE_GAUGE_MAX = 100;
+      const BEACON_KP_GAUGE_MIN = 0;
+      const BEACON_KP_GAUGE_MAX = 9;
+      const BEACON_SFI_GAUGE_MIN = 60;
+      const BEACON_SFI_GAUGE_MAX = 250;
+      const DIGITAL_SNR_GAUGE_MIN_DB = -30;
+      const DIGITAL_SNR_GAUGE_MAX_DB = 15;
+      const ANALOG_SNR_GAUGE_MIN_DB = -10;
+      const ANALOG_SNR_GAUGE_MAX_DB = 30;
+      const EVENTS_GAUGE_MAX = 10000;
+      const CALLSIGNS_GAUGE_MAX = 1000;
 
       updateMetaUpdateFrequency();
 
@@ -2051,7 +3673,7 @@ Last update: 2026-04-03 UTC
         manualRefreshBtn.classList.add("spinning");
         try {
           nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
-          await loadAndRender();
+          await refreshActiveAcademicView();
         } finally {
           manualRefreshBtn.classList.remove("spinning");
           manualRefreshBtn.disabled = false;
@@ -2074,6 +3696,35 @@ Last update: 2026-04-03 UTC
         if (!btn) return;
         exportMenu.classList.remove("open");
         runExport(btn.dataset.fmt);
+      });
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-beacon-history-info]");
+        if (!button) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const detailKey = button.getAttribute("data-beacon-history-info") || "";
+        if (!detailKey) {
+          return;
+        }
+        void openBeaconEventsModal(detailKey);
+      });
+
+      beaconEventsModal?.addEventListener("click", (event) => {
+        if (event.target.closest("[data-beacon-history-close]")) {
+          closeBeaconEventsModal();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") {
+          return;
+        }
+        if (beaconEventsModal?.classList.contains("visible")) {
+          closeBeaconEventsModal();
+        }
       });
 
       function buildExportRows() {
@@ -2441,6 +4092,40 @@ Last update: 2026-04-03 UTC
         return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1\u00A0$2");
       }
 
+      function formatScanFrequencyLabel(freqHz) {
+        const value = Number(freqHz);
+        if (!Number.isFinite(value) || value <= 0) {
+          return "";
+        }
+        return `${(value / 1e6).toFixed(3)}\u00A0MHz`;
+      }
+
+      function getBeaconSchedulerSnapshot() {
+        if (!lastBeaconRuntimeSnapshot || lastBeaconRuntimeSnapshot.kind !== "payload") {
+          return null;
+        }
+        const scheduler = lastBeaconRuntimeSnapshot.payload?.scheduler;
+        return scheduler && scheduler.running ? scheduler : null;
+      }
+
+      function hasActiveGenericScan() {
+        if (!lastScanRuntimeSnapshot || lastScanRuntimeSnapshot.kind !== "payload") {
+          return false;
+        }
+        const payload = lastScanRuntimeSnapshot.payload || {};
+        const state = String(payload.state || "").trim().toLowerCase();
+        return state === "preview" || state === "running" || Boolean(payload.rotation?.running);
+      }
+
+      function renderBeaconHistoryNote() {
+        if (!beaconHistoryNote) {
+          return;
+        }
+        const beaconRunning = Boolean(getBeaconSchedulerSnapshot());
+        const showHistoryNote = activeAcademicView === "beacon" && !beaconRunning && hasActiveGenericScan();
+        beaconHistoryNote.hidden = !showHistoryNote;
+      }
+
       function setScanRuntimeInfo(stateName, text) {
         if (!scanRuntimeInfo) {
           return;
@@ -2452,6 +4137,22 @@ Last update: 2026-04-03 UTC
 
       function renderScanRuntimeInfo() {
         if (!scanRuntimeInfo) {
+          return;
+        }
+
+        renderBeaconHistoryNote();
+
+        const beaconScheduler = activeAcademicView === "beacon" ? getBeaconSchedulerSnapshot() : null;
+        if (beaconScheduler) {
+          const details = [
+            formatScanBandLabel(beaconScheduler.current_band),
+            formatScanFrequencyLabel(beaconScheduler.current_freq_hz),
+          ].filter(Boolean).join(" · ");
+          let text = t("scan_status_beacon_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("running", text);
           return;
         }
 
@@ -2518,7 +4219,7 @@ Last update: 2026-04-03 UTC
         setScanRuntimeInfo("stopped", t("scan_status_stopped"));
       }
 
-      async function fetchScanRuntimeStatus() {
+      async function fetchScanRuntimeStatus({ deferRender = false } = {}) {
         try {
           const resp = await fetch(`${_BASE}api/scan/status`);
           if (!resp.ok) {
@@ -2532,8 +4233,30 @@ Last update: 2026-04-03 UTC
         } catch (_) {
           lastScanRuntimeSnapshot = { kind: "unavailable", payload: null, receivedAt: Date.now() };
         }
-        renderScanRuntimeInfo();
-        startScanRuntimeTicker();
+        if (!deferRender) {
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
+        }
+      }
+
+      async function fetchBeaconRuntimeStatus({ deferRender = false } = {}) {
+        try {
+          const resp = await fetch(`${_BASE}api/beacons/status`);
+          if (!resp.ok) {
+            throw new Error("beacon status request failed");
+          }
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {
+            throw new Error("beacon status payload invalid");
+          }
+          lastBeaconRuntimeSnapshot = { kind: "payload", payload, receivedAt: Date.now() };
+        } catch (_) {
+          lastBeaconRuntimeSnapshot = { kind: "unavailable", payload: null, receivedAt: Date.now() };
+        }
+        if (!deferRender) {
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
+        }
       }
 
       let scanRuntimeTicker = null;
@@ -2574,6 +4297,987 @@ Last update: 2026-04-03 UTC
           isLoading = false;
           document.getElementById("loadingOverlay").classList.remove("active");
         }
+      }
+
+      function beaconEscapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function beaconFormatScore(value) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(1) : "--";
+      }
+
+      function beaconFormatUtc(value) {
+        if (!value) return "--";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "--" : fmtDateUtc(date);
+      }
+
+      function beaconBadgeClass(value) {
+        const normalized = String(value || "unknown").trim().toLowerCase().replace(/\s+/g, "-");
+        return normalized || "unknown";
+      }
+
+      function beaconReferenceMeterLevel(snrDb) {
+        const value = Number(snrDb);
+        if (!Number.isFinite(value) || value < 0.0) return 0;
+        if (value < 1.5) return 1;
+        if (value < 3.0) return 2;
+        if (value < 4.5) return 3;
+        return 4;
+      }
+
+      function renderBeaconMeter(dashes, variant = "success") {
+        const level = Math.max(0, Math.min(4, Math.round(Number(dashes || 0))));
+        if (variant === "nocopy" || variant === "fail") {
+          return `
+            <span class="beacon-meter beacon-meter--nocopy" aria-label="latest monitored pass had no copy">
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+            </span>`;
+        }
+        return `
+          <span class="beacon-meter" aria-label="signal level ${level}/4">
+            <span class="beacon-meter__seg${level >= 1 ? " beacon-meter__seg--on-1" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 2 ? " beacon-meter__seg--on-2" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 3 ? " beacon-meter__seg--on-3" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 4 ? " beacon-meter__seg--on-4" : ""}"></span>
+          </span>`;
+      }
+
+      function renderBeaconHistoryTelemetry(bestSnrDb, bestDashes) {
+        const dashCount = Math.max(0, Math.min(4, Math.round(Number(bestDashes || 0))));
+        const snrLabel = Number.isFinite(Number(bestSnrDb)) ? `${Number(bestSnrDb).toFixed(1)} dB` : "n/a";
+        return `
+          <span class="beacon-cell__telemetry">
+            <span class="beacon-meter-row" title="100 W reference dash: ${beaconEscapeHtml(snrLabel)}">
+              ${renderBeaconMeter(beaconReferenceMeterLevel(bestSnrDb))}
+              <span class="beacon-meter-value">${beaconEscapeHtml(snrLabel)}</span>
+            </span>
+            <span class="beacon-meter-row" title="Ordered dash sequence heard: ${dashCount}/4">
+              ${renderBeaconMeter(dashCount)}
+              <span class="beacon-meter-value">${dashCount}/4</span>
+            </span>
+          </span>`;
+      }
+
+      function renderBeaconHistoryEventsButton(detailKey, detail) {
+        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(detail.callsign)} on ${beaconEscapeHtml(detail.band)}">Events</button>`;
+      }
+
+      function closeBeaconEventsModal() {
+        if (!beaconEventsModal) {
+          return;
+        }
+        beaconEventsModal.classList.remove("visible");
+        beaconEventsModal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("beacon-events-modal-open");
+      }
+
+      function beaconHistoryPct(value, total) {
+        if (!Number.isFinite(Number(total)) || Number(total) <= 0) {
+          return 0;
+        }
+        return Math.round((Number(value) / Number(total)) * 100);
+      }
+
+      function beaconFormatHistoryWindow(hours) {
+        const value = Number(hours);
+        if (!Number.isFinite(value) || value <= 0) {
+          return "rolling window";
+        }
+        if (value < 1) {
+          return `${Math.round(value * 60)} min`;
+        }
+        const wholeHours = Number.isInteger(value) ? String(value) : value.toFixed(1);
+        return `${wholeHours} h`;
+      }
+
+      function beaconFormatUtcTimestamp(value) {
+        if (!value) {
+          return "n/a";
+        }
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+          return String(value);
+        }
+        return parsed.toISOString().replace("T", " ").replace("Z", " UTC");
+      }
+
+      function beaconGetHistoryObservationState(obs) {
+        if (obs?.detected) {
+          return { key: "detected", label: "Detected" };
+        }
+        const leadSnr = Number(obs?.snr_db_100w);
+        if (Number.isFinite(leadSnr) && leadSnr > 0) {
+          return { key: "weak", label: "Weak trace" };
+        }
+        return { key: "nocopy", label: "No copy" };
+      }
+
+      function beaconRenderHistoryChartStat(label, value) {
+        return `<div class="beacon-history-chart__stat"><span class="beacon-history-chart__stat-label">${beaconEscapeHtml(label)}</span><strong class="beacon-history-chart__stat-value">${beaconEscapeHtml(value)}</strong></div>`;
+      }
+
+      function beaconRenderMixLegendItem(label, value, total, variant) {
+        return `<div class="beacon-history-mix__legend-item"><span class="beacon-history-mix__legend-dot beacon-history-mix__legend-dot--${variant}"></span><span>${beaconEscapeHtml(label)}</span><strong>${beaconEscapeHtml(`${value}`)}</strong><span>${beaconEscapeHtml(`${beaconHistoryPct(value, total)}%`)}</span></div>`;
+      }
+
+      function beaconRenderHistoryInfoStats(detail, observations) {
+        const cell = detail.cell || {};
+        const total = Number(cell.total_slots || 0);
+        const detections = Number(cell.detections || 0);
+        const noCopy = Math.max(total - detections, 0);
+        const detectionRate = total > 0 ? `${Math.round((detections / total) * 100)}%` : "0%";
+        const noCopyRate = total > 0 ? `${Math.round((noCopy / total) * 100)}%` : "0%";
+        const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+        const bestSeq = `${Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))))}/4`;
+        const latest = beaconFormatUtcTimestamp(cell.latest_detected_utc);
+        const cards = [
+          { label: "Window", value: beaconFormatHistoryWindow(detail.hours), note: "Fixed rolling view" },
+          { label: "Coverage", value: `${total} slot(s)`, note: "Monitored in rolling view" },
+          { label: "Detected", value: `${detections} slot(s)`, note: `${detectionRate} of monitored coverage` },
+          { label: "No copy", value: `${noCopy} slot(s)`, note: `${noCopyRate} of monitored coverage` },
+          { label: "Best pass", value: `${bestSnr} · ${bestSeq}`, note: beaconFormatUtcTimestamp(cell.best_detected_utc) },
+          { label: "Latest detected", value: latest, note: `${observations.length} latest monitored rows loaded` },
+        ];
+        return cards.map((card) => `
+          <div class="beacon-history-info-stat">
+            <div class="beacon-history-info-stat__label">${beaconEscapeHtml(card.label)}</div>
+            <div class="beacon-history-info-stat__value">${beaconEscapeHtml(card.value)}</div>
+            <div class="beacon-history-info-stat__note">${beaconEscapeHtml(card.note)}</div>
+          </div>
+        `).join("");
+      }
+
+      function beaconRenderHistoryMixChart(cell) {
+        const total = Number(cell.total_slots || 0);
+        if (total <= 0) {
+          return '<div class="beacon-history-chart__empty">No monitored slots in the rolling 12-hour window.</div>';
+        }
+        const detections = Math.max(0, Number(cell.detections || 0));
+        const noCopy = Math.max(total - detections, 0);
+        return `<div class="beacon-history-mix">
+          <div class="beacon-history-mix__bar" role="img" aria-label="Copy mix across the rolling 12-hour window">
+            <span class="beacon-history-mix__seg beacon-history-mix__seg--observed" style="width:${beaconHistoryPct(detections, total)}%"></span>
+            <span class="beacon-history-mix__seg beacon-history-mix__seg--nocopy" style="width:${beaconHistoryPct(noCopy, total)}%"></span>
+          </div>
+          <div class="beacon-history-mix__legend">
+            ${beaconRenderMixLegendItem("Detected", detections, total, "observed")}
+            ${beaconRenderMixLegendItem("No copy", noCopy, total, "nocopy")}
+          </div>
+        </div>`;
+      }
+
+      function beaconRenderHistoryRhythmChart(observations) {
+        if (!observations.length) {
+          return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
+        }
+        const counts = { detected: 0, weak: 0, nocopy: 0 };
+        observations.forEach((obs) => {
+          counts[beaconGetHistoryObservationState(obs).key] += 1;
+        });
+        const detected = counts.detected;
+        const weakTrace = counts.weak;
+        const noCopy = counts.nocopy;
+        const detectionRate = observations.length > 0 ? `${Math.round((detected / observations.length) * 100)}%` : "0%";
+        const bars = observations.slice().reverse().map((obs) => {
+          const state = beaconGetHistoryObservationState(obs);
+          const cls = state.key;
+          const height = state.key === "detected" ? 82 : (state.key === "weak" ? 44 : 26);
+          const title = `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | ${state.label}`;
+          return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${beaconEscapeHtml(title)}"></span>`;
+        }).join("");
+        return `<div class="beacon-history-rhythm">
+          <div class="beacon-history-chart__stats">
+            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
+            ${beaconRenderHistoryChartStat("Detected", `${detected}`)}
+            ${beaconRenderHistoryChartStat("Weak trace", `${weakTrace}`)}
+            ${beaconRenderHistoryChartStat("No copy", `${noCopy}`)}
+            ${beaconRenderHistoryChartStat("Detection rate", detectionRate)}
+          </div>
+          <div class="beacon-history-rhythm__bars">${bars}</div>
+          <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, gold = sub-threshold trace, amber = monitored with no copy.</div>
+        </div>`;
+      }
+
+      function beaconFormatHistoryMetricValue(value, kind) {
+        if (!Number.isFinite(Number(value))) {
+          return "n/a";
+        }
+        if (kind === "snr") {
+          return `${Number(value).toFixed(1)} dB`;
+        }
+        return `${Math.max(0, Math.min(4, Math.round(Number(value))))}/4`;
+      }
+
+      function beaconRenderHistoryMetricChart(observations, kind) {
+        if (!observations.length) {
+          return '<div class="beacon-history-chart__empty">No monitored rows loaded yet for this chart.</div>';
+        }
+        const reversed = observations.slice().reverse();
+        const values = reversed.map((obs) => {
+          if (kind === "snr") {
+            return Number.isFinite(Number(obs.snr_db_100w)) ? Number(obs.snr_db_100w) : null;
+          }
+          return Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+        }).filter((value) => value !== null);
+        const maxValue = kind === "snr"
+          ? Math.max(6, ...reversed.map((obs) => Math.max(0, Number(obs.snr_db_100w || 0))))
+          : 4;
+        const bars = reversed.map((obs) => {
+          const rawValue = kind === "snr"
+            ? Math.max(0, Number(obs.snr_db_100w || 0))
+            : Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+          const pctHeight = maxValue > 0 ? Math.max(8, Math.round((rawValue / maxValue) * 100)) : 8;
+          const title = kind === "snr"
+            ? `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | 100 W reference ${Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a"}`
+            : `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | Dash copy ${rawValue}/4`;
+          const cls = obs.detected ? "live" : "muted";
+          return `<span class="beacon-history-metric__bar beacon-history-metric__bar--${cls}" style="height:${pctHeight}%" title="${beaconEscapeHtml(title)}"></span>`;
+        }).join("");
+        const caption = kind === "snr"
+          ? "100 W reference-dash intensity across the latest monitored passes."
+          : "Ordered dash-copy quality across the same pass history.";
+        const latestValue = values.length ? values[values.length - 1] : null;
+        const bestValue = values.length ? Math.max(...values) : null;
+        const avgValue = values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+        return `<div class="beacon-history-metric">
+          <div class="beacon-history-chart__stats">
+            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
+            ${beaconRenderHistoryChartStat("Latest", beaconFormatHistoryMetricValue(latestValue, kind))}
+            ${beaconRenderHistoryChartStat("Best", beaconFormatHistoryMetricValue(bestValue, kind))}
+            ${beaconRenderHistoryChartStat("Average", beaconFormatHistoryMetricValue(avgValue, kind))}
+          </div>
+          <div class="beacon-history-metric__bars">${bars}</div>
+          <div class="beacon-history-chart__caption">${beaconEscapeHtml(caption)}</div>
+        </div>`;
+      }
+
+      function beaconRenderHistoryStateBadge(obs) {
+        const state = beaconGetHistoryObservationState(obs);
+        return `<span class="beacon-history-state-chip beacon-history-state-chip--${state.key}">${beaconEscapeHtml(state.label)}</span>`;
+      }
+
+      function beaconRenderHistoryRowMetric(obs, kind) {
+        if (kind === "snr") {
+          const value = Number(obs.snr_db_100w);
+          const width = Number.isFinite(value) ? Math.max(6, Math.min(100, Math.round((Math.max(0, value) / 6) * 100))) : 6;
+          const label = Number.isFinite(value) ? `${value.toFixed(1)} dB` : "n/a";
+          return `<div class="beacon-history-rowmetric">
+            <span class="beacon-history-rowmetric__bar"><span class="beacon-history-rowmetric__fill" style="width:${width}%"></span></span>
+            <span class="beacon-history-rowmetric__label">${beaconEscapeHtml(label)}</span>
+          </div>`;
+        }
+        const dashes = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+        return `<div class="beacon-history-rowmetric beacon-history-rowmetric--sequence">
+          ${renderBeaconMeter(dashes, dashes > 0 ? "success" : "nocopy")}
+          <span class="beacon-history-rowmetric__label">${beaconEscapeHtml(`${dashes}/4`)}</span>
+        </div>`;
+      }
+
+      function renderBeaconHistoryInfoRows(observations) {
+        if (!beaconHistoryInfoRecords) {
+          return;
+        }
+        if (!observations.length) {
+          beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">No observation rows matched this cell in the rolling 12-hour window.</div>';
+          return;
+        }
+        const rows = observations.map((obs) => `
+          <tr>
+            <td>${beaconEscapeHtml(beaconFormatUtcTimestamp(obs.slot_start_utc))}</td>
+            <td>${beaconRenderHistoryStateBadge(obs)}</td>
+            <td>${beaconRenderHistoryRowMetric(obs, "snr")}</td>
+            <td>${beaconRenderHistoryRowMetric(obs, "dash")}</td>
+          </tr>
+        `).join("");
+        beaconHistoryInfoRecords.innerHTML = `<div class="beacon-history-info-table-wrap"><table class="beacon-history-info-table"><thead><tr><th>UTC slot</th><th>Observation</th><th>100 W profile</th><th>Sequence profile</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+
+      function renderBeaconHistoryInfoVisuals(detail, observations) {
+        const cell = detail.cell || {};
+        if (beaconHistoryInfoStats) {
+          beaconHistoryInfoStats.innerHTML = beaconRenderHistoryInfoStats(detail, observations);
+        }
+        if (beaconHistoryInfoMixChart) {
+          beaconHistoryInfoMixChart.innerHTML = beaconRenderHistoryMixChart(cell);
+        }
+        if (beaconHistoryInfoDetectionChart) {
+          beaconHistoryInfoDetectionChart.innerHTML = beaconRenderHistoryRhythmChart(observations);
+        }
+        if (beaconHistoryInfoSnrChart) {
+          beaconHistoryInfoSnrChart.innerHTML = beaconRenderHistoryMetricChart(observations, "snr");
+        }
+        if (beaconHistoryInfoDashChart) {
+          beaconHistoryInfoDashChart.innerHTML = beaconRenderHistoryMetricChart(observations, "dash");
+        }
+      }
+
+      function renderBeaconHistoryInfoModal(detail) {
+        if (beaconHistoryInfoWindow) {
+          beaconHistoryInfoWindow.textContent = `${detail.callsign} - ${detail.location || "Unknown location"} · ${detail.band} · rolling ${beaconFormatHistoryWindow(detail.hours)}`;
+        }
+        if (!beaconHistoryInfoSummary) {
+          return;
+        }
+        const cell = detail.cell;
+        if (!cell || !cell.total_slots) {
+          beaconHistoryInfoSummary.textContent = "No monitored slots were recorded for this beacon/band cell in the rolling history window.";
+          renderBeaconHistoryInfoVisuals(detail, []);
+          return;
+        }
+        const total = Number(cell.total_slots || 0);
+        const detections = Number(cell.detections || 0);
+        const noCopy = Math.max(total - detections, 0);
+        const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+        const bestSeq = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+        const latest = beaconFormatUtcTimestamp(cell.latest_detected_utc);
+        if (detections <= 0) {
+          beaconHistoryInfoSummary.textContent = `Monitored ${total} slot(s) in the rolling 12-hour window. No detected passes were recorded for this cell.`;
+          renderBeaconHistoryInfoVisuals(detail, []);
+          return;
+        }
+        beaconHistoryInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). No copy: ${noCopy}. Best detected pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
+        renderBeaconHistoryInfoVisuals(detail, []);
+      }
+
+      async function openBeaconEventsModal(detailKey) {
+        const detail = beaconHistoryCellDetails.get(detailKey);
+        if (!detail || !beaconEventsModal) {
+          return;
+        }
+
+        if (beaconEventsModalTitle) {
+          beaconEventsModalTitle.textContent = `${detail.callsign} · ${detail.band} details`;
+        }
+
+        renderBeaconHistoryInfoModal(detail);
+        if (beaconHistoryInfoRecords) {
+          beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">Loading details...</div>';
+        }
+
+        beaconEventsModal.classList.add("visible");
+        beaconEventsModal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("beacon-events-modal-open");
+
+        if (!detail.cell?.total_slots) {
+          if (beaconHistoryInfoRecords) {
+            beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">No observation rows exist for this cell in the rolling history window.</div>';
+          }
+          return;
+        }
+
+        const reqSeq = ++beaconEventsRequestSeq;
+        try {
+          const params = new URLSearchParams({
+            callsign: detail.callsign,
+            band: detail.band,
+            hours: String(detail.hours),
+            limit: String(BEACON_HISTORY_MODAL_LIMIT),
+          });
+          const resp = await fetch(`${_BASE}api/beacons/observations?${params.toString()}`, { cache: "no-store" });
+          if (!resp.ok) {
+            throw new Error("history_detail_fetch_failed");
+          }
+          const payload = await resp.json();
+          if (reqSeq !== beaconEventsRequestSeq) {
+            return;
+          }
+          const observations = Array.isArray(payload?.observations) ? payload.observations : [];
+          renderBeaconHistoryInfoVisuals(detail, observations);
+          renderBeaconHistoryInfoRows(observations);
+        } catch (_err) {
+          if (reqSeq !== beaconEventsRequestSeq) {
+            return;
+          }
+          if (beaconHistoryInfoRecords) {
+            beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">Unable to load observation details for this cell.</div>';
+          }
+        }
+      }
+
+      function renderBeaconRowList(targetId, rows, emptyText) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        if (!rows.length) {
+          target.innerHTML = `<div class="beacon-empty">${beaconEscapeHtml(emptyText)}</div>`;
+          return;
+        }
+        target.innerHTML = rows.join("");
+      }
+
+      function renderBeaconRecentActivityTable(recentActivity) {
+        const table = document.getElementById("beaconRecentActivityTable");
+        if (!table) return;
+        beaconHistoryCellDetails.clear();
+        const bands = Array.isArray(recentActivity?.bands) ? recentActivity.bands : [];
+        const beacons = Array.isArray(recentActivity?.beacons) ? recentActivity.beacons : [];
+        const matrix = Array.isArray(recentActivity?.matrix) ? recentActivity.matrix : [];
+        const noDataColspan = Math.max(2, bands.length + 1);
+        if (!bands.length || !beacons.length || !matrix.length) {
+          table.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="${noDataColspan}">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          return;
+        }
+        const head = `<thead><tr><th class="beacon-callsign-header">${beaconEscapeHtml(t("beacon_col_beacon"))}</th>${bands.map((band) => `<th>${beaconEscapeHtml(band)}</th>`).join("")}</tr></thead>`;
+        const body = beacons.map((callsign, rowIndex) => {
+          const location = BEACON_LOCATION_BY_CALLSIGN[callsign] || "";
+          const row = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
+          const cells = bands.map((band, colIndex) => {
+            const cell = row[colIndex];
+            const detail = {
+              callsign,
+              location,
+              band,
+              hours: BEACON_WINDOW_HOURS,
+              cell: cell || null,
+            };
+            const detailKey = `${rowIndex}:${colIndex}:${BEACON_WINDOW_HOURS}`;
+            beaconHistoryCellDetails.set(detailKey, detail);
+            const eventsButton = renderBeaconHistoryEventsButton(detailKey, detail);
+
+            if (!cell || !Number(cell.total_slots || 0)) {
+              const noSampleTitle = `${callsign} ${band}: no monitored slots in window`;
+              return `<td class="beacon-cell beacon-cell--history-unsampled" title="${beaconEscapeHtml(noSampleTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span title="No monitored slots in window">·</span></span>${eventsButton}</small></td>`;
+            }
+            const totalSlots = Number(cell.total_slots || 0);
+            const detections = Number(cell.detections || 0);
+            if (detections <= 0) {
+              const noCopyTitle = [
+                `${callsign} ${band}`,
+                `Monitored ${totalSlots} slot(s) in window`,
+                "0 detected passes",
+              ].join("\n");
+              return `<td class="beacon-cell beacon-cell--history-monitored" title="${beaconEscapeHtml(noCopyTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span class="beacon-meter-row">${renderBeaconMeter(0, "nocopy")}<span class="beacon-meter-value">0</span></span><span class="beacon-history-meta">0/${totalSlots} mon</span></span>${eventsButton}</small></td>`;
+            }
+            const bestDashes = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+            const bestSnrValue = Number(cell.best_snr_db);
+            const bestSnrLabel = Number.isFinite(bestSnrValue) ? `${bestSnrValue.toFixed(1)} dB` : "n/a";
+            const hitTitle = [
+              `${callsign} ${band}`,
+              `Detected ${detections}/${totalSlots} monitored slots in window`,
+              `Best detected pass: 100 W ${bestSnrLabel}, sequence ${bestDashes}/4`,
+              `Latest detected pass: ${cell.latest_detected_utc || "n/a"}`,
+            ].join("\n");
+            return `<td class="beacon-cell beacon-cell--history-hit" title="${beaconEscapeHtml(hitTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body">${renderBeaconHistoryTelemetry(bestSnrValue, bestDashes)}<span class="beacon-history-meta">${detections}/${totalSlots} mon</span></span>${eventsButton}</small></td>`;
+          }).join("");
+          const rowTitle = location ? `${callsign} — ${location}` : callsign;
+          const rowLabel = location
+            ? `${beaconEscapeHtml(callsign)}<span class="beacon-loc">— ${beaconEscapeHtml(location)}</span>`
+            : beaconEscapeHtml(callsign);
+          return `<tr><td class="beacon-callsign" title="${beaconEscapeHtml(rowTitle)}">${rowLabel}</td>${cells}</tr>`;
+        }).join("");
+        table.innerHTML = `${head}<tbody>${body}</tbody>`;
+      }
+
+      function renderBeaconDashboard() {
+        const payload = beaconOverview;
+        const kpis = payload?.kpis || {};
+        const bestBand = kpis.best_band || null;
+        const iono = payload?.ionospheric || {};
+
+        const setText = (id, value) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = value;
+        };
+
+        const monitoredSlots = Number(kpis.monitored_slots || 0);
+        const detectedSlots = Number(kpis.detected_slots || 0);
+        const detectedBeacons = Number(kpis.detected_beacons || 0);
+        const slotsPct = monitoredSlots > 0 ? (detectedSlots / monitoredSlots) * 100 : Number.NaN;
+        const sfiValue = Number(iono.sfi);
+        const sfiGaugeMax = Number.isFinite(sfiValue) && sfiValue > BEACON_SFI_GAUGE_MAX
+          ? Math.ceil(sfiValue / 50) * 50
+          : BEACON_SFI_GAUGE_MAX;
+
+        updateKpiGauge(
+          beaconKpiGlobalScoreNeedle,
+          beaconKpiGlobalScoreCard,
+          beaconKpiGlobalScore,
+          payload ? Number(kpis.global_score) : Number.NaN,
+          BEACON_SCORE_GAUGE_MIN,
+          BEACON_SCORE_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiGlobalState", payload ? (kpis.global_state || "--") : "--");
+
+        updateKpiGauge(
+          beaconKpiBestBandNeedle,
+          beaconKpiBestBandCard,
+          null,
+          bestBand ? Number(bestBand.score) : Number.NaN,
+          BEACON_SCORE_GAUGE_MIN,
+          BEACON_SCORE_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        if (beaconKpiBestBand) beaconKpiBestBand.textContent = bestBand ? (bestBand.band || "--") : "--";
+        setText("beaconKpiBestBandMeta", bestBand
+          ? `${bestBand.state || "--"} · score ${beaconFormatScore(Number(bestBand.score))}`
+          : "--");
+
+        updateKpiGauge(
+          beaconKpiDetectedSlotsNeedle,
+          beaconKpiDetectedSlotsCard,
+          beaconKpiDetectedSlots,
+          slotsPct,
+          0,
+          100,
+          (v) => `${Math.round(v)}%`
+        );
+        setText("beaconKpiDetectedSlotsMeta", payload ? `${detectedSlots}/${monitoredSlots || 0} monitored` : "--");
+
+        updateKpiGauge(
+          beaconKpiDetectedBeaconsNeedle,
+          beaconKpiDetectedBeaconsCard,
+          beaconKpiDetectedBeacons,
+          payload ? detectedBeacons : Number.NaN,
+          0,
+          BEACON_CATALOG_SIZE,
+          (v) => `${Math.round(v)}`
+        );
+        setText("beaconKpiDetectedBeaconsMeta", payload ? `${detectedBeacons}/${BEACON_CATALOG_SIZE} global beacons` : "--");
+
+        updateKpiGauge(
+          beaconKpiKpNeedle,
+          beaconKpiKpCard,
+          beaconKpiKp,
+          payload ? Number(iono.kp) : Number.NaN,
+          BEACON_KP_GAUGE_MIN,
+          BEACON_KP_GAUGE_MAX,
+          (v) => beaconFormatScore(v)
+        );
+        setText("beaconKpiKpDetail", payload ? (iono.kp_condition || "--") : "--");
+
+        if (beaconKpiSfiScale) {
+          const sfiMid = Math.round((BEACON_SFI_GAUGE_MIN + sfiGaugeMax) / 2);
+          beaconKpiSfiScale.innerHTML = `<span>${BEACON_SFI_GAUGE_MIN}</span><span>${sfiMid}</span><span>${sfiGaugeMax}</span>`;
+        }
+        updateKpiGauge(
+          beaconKpiSfiNeedle,
+          beaconKpiSfiCard,
+          beaconKpiSfi,
+          payload ? sfiValue : Number.NaN,
+          BEACON_SFI_GAUGE_MIN,
+          sfiGaugeMax,
+          (v) => Math.round(v).toString()
+        );
+        setText("beaconKpiSfiDetail", payload ? `foF2 ${beaconFormatScore(iono.fof2_estimated_mhz)} MHz` : "--");
+
+        renderBeaconRecentActivityTable(payload?.recent_activity || null);
+
+        const reading = payload?.reading || {};
+        setText("beaconReadingSummary", reading.summary || t("beacon_no_data"));
+        const readingBandsEl = document.getElementById("beaconReadingBands");
+        if (readingBandsEl) {
+          const readingRows = Array.isArray(reading.bands) ? reading.bands : [];
+          readingBandsEl.innerHTML = readingRows.length
+            ? readingRows.map((row) => {
+              const toneClass = beaconBadgeClass(row.agreement);
+              return `
+                <article class="beacon-reading-band beacon-reading-band--${toneClass}">
+                  <div class="beacon-reading-band-top">
+                    <div class="beacon-reading-band-id">
+                      <span class="beacon-reading-band-label">Band</span>
+                      <div class="beacon-reading-band-name">${beaconEscapeHtml(row.band || "--")}</div>
+                    </div>
+                    <span class="beacon-badge ${toneClass}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
+                  </div>
+                  <div class="beacon-reading-band-flow">
+                    <div class="beacon-reading-chip">
+                      <span class="beacon-reading-chip-label">Observed</span>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.observed_state || "--")}</div>
+                    </div>
+                    <div class="beacon-reading-flow-arrow" aria-hidden="true">&rarr;</div>
+                    <div class="beacon-reading-chip beacon-reading-chip--ghost">
+                      <span class="beacon-reading-chip-label">NOAA</span>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.expected_state || "--")}</div>
+                    </div>
+                  </div>
+                </article>`;
+            }).join("")
+            : `<div class="beacon-reading-empty">${beaconEscapeHtml(t("beacon_no_data"))}</div>`;
+        }
+
+        const forecast = payload?.forecast || {};
+        setText("beaconNowcastSummary", forecast.summary || t("beacon_no_data"));
+        renderBeaconRowList(
+          "beaconNowcastBands",
+          Array.isArray(forecast.bands) ? forecast.bands.map((row) => `
+            <div class="beacon-list-row">
+              <div>
+                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(row.confidence || "low")}</div>
+              </div>
+              <span class="beacon-badge ${beaconBadgeClass(row.forecast_state)}">${beaconEscapeHtml(row.forecast_state || "No data")}</span>
+            </div>`)
+          : [],
+          t("beacon_no_data")
+        );
+
+        const propagation = payload?.propagation || {};
+        renderBeaconRowList(
+          "beaconPropagationBands",
+          Array.isArray(propagation.bands) ? propagation.bands.map((row) => `
+            <div class="beacon-list-row">
+              <div>
+                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
+                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.events ?? 0} events`)}</div>
+              </div>
+              <span class="beacon-badge ${beaconBadgeClass(row.state)}">${beaconEscapeHtml(`${beaconFormatScore(row.score)} · ${row.state || "No data"}`)}</span>
+            </div>`)
+          : [],
+          t("beacon_no_data")
+        );
+
+        const ionoRows = payload ? [
+          `<div class="beacon-list-row"><div class="beacon-list-label">Kp</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.kp)} · ${iono.kp_condition || "--"}`)}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">SFI</div><div class="beacon-list-detail">${beaconEscapeHtml(beaconFormatScore(iono.sfi))}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">foF2</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.fof2_estimated_mhz)} MHz`)}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">20m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["20m"] || {}).status) || "--")}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["17m"] || {}).status) || "--")}</div></div>`
+        ] : [];
+        renderBeaconRowList("beaconIonosphericContext", ionoRows, t("beacon_no_data"));
+
+        // Beacon detection globe
+        const _bgWrap = document.getElementById("beaconPropMapWrap");
+        if (_bgWrap && window.d3 && window.topojson) {
+          _pmLoadWorld().then((world) => {
+            drawBeaconGlobe(_bgWrap, world, payload?.recent_activity || null);
+          });
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // Beacon Detection Globe (NCDXF/IARU — orthographic D3 globe)
+      // ═══════════════════════════════════════════════════════════════════════
+      function drawBeaconGlobe(wrap, world, recentActivity) {
+        if (!wrap || !window.d3 || !window.topojson) return;
+        wrap.innerHTML = "";
+
+        // Build detection map: callsign → { detected: bool, bands: Set<string> }
+        const detectionMap = {};
+        if (recentActivity) {
+          const rBands   = Array.isArray(recentActivity.bands)   ? recentActivity.bands   : [];
+          const beacons  = Array.isArray(recentActivity.beacons) ? recentActivity.beacons : [];
+          const matrix   = Array.isArray(recentActivity.matrix)  ? recentActivity.matrix  : [];
+          beacons.forEach((cs, rIdx) => {
+            const row = Array.isArray(matrix[rIdx]) ? matrix[rIdx] : [];
+            const detected = new Set();
+            row.forEach((cell, cIdx) => {
+              if (cell && Number(cell.detections || 0) > 0) detected.add(rBands[cIdx]);
+            });
+            detectionMap[cs] = { detected: detected.size > 0, bands: detected };
+          });
+        }
+
+        const sLat = aprsQthLat || 39.5;
+        const sLon = aprsQthLon || -8.0;
+
+        const rect = wrap.getBoundingClientRect();
+        const W = rect.width || 800;
+        const H = rect.height || 520;
+        const baseScale = Math.min(W, H) * 0.44;
+        let kScale = 1;
+        let savedRot = null;
+        try {
+          const sv = JSON.parse(sessionStorage.getItem("beaconMapView"));
+          if (sv) { if (sv.k) kScale = sv.k; if (sv.rot) savedRot = sv.rot; }
+        } catch {}
+        function saveView() {
+          try { sessionStorage.setItem("beaconMapView", JSON.stringify({ k: kScale, rot: proj.rotate() })); } catch {}
+        }
+
+        const proj = d3.geoOrthographic()
+          .rotate(savedRot || [-sLon, -sLat])
+          .scale(baseScale * kScale)
+          .translate([W / 2, H / 2])
+          .clipAngle(90);
+        const path = d3.geoPath().projection(proj);
+        const graticule = d3.geoGraticule()();
+
+        const gradId = "beaconOcean";
+        const svg = d3.select(wrap).append("svg")
+          .attr("width", "100%").attr("height", "100%")
+          .attr("viewBox", `0 0 ${W} ${H}`)
+          .attr("preserveAspectRatio", "xMidYMid meet")
+          .style("background", "#0d1117").style("border-radius", "6px")
+          .style("cursor", "grab").style("display", "block");
+
+        const defs = svg.append("defs");
+        const grad = defs.append("radialGradient")
+          .attr("id", gradId).attr("gradientUnits", "userSpaceOnUse")
+          .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale);
+        grad.append("stop").attr("offset", "0%").attr("stop-color", "#0e3266");
+        grad.append("stop").attr("offset", "70%").attr("stop-color", "#0a1e3d");
+        grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
+
+        const spherePath = svg.append("path").datum({ type: "Sphere" })
+          .attr("fill", `url(#${gradId})`).attr("stroke", "#1e3a5f").attr("stroke-width", 0.6);
+        const gratPath = svg.append("path").datum(graticule)
+          .attr("fill", "none").attr("stroke", "#1a3a5c").attr("stroke-width", 0.3);
+        let countryPaths;
+        if (world) {
+          countryPaths = svg.append("g").selectAll("path")
+            .data(topojson.feature(world, world.objects.countries).features)
+            .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
+        }
+
+        const arcG  = svg.append("g");
+        const dotG  = svg.append("g");
+        const homeG = svg.append("g");
+
+        let tip = document.getElementById("beaconMapTooltip");
+        if (!tip) {
+          tip = document.createElement("div");
+          tip.id = "beaconMapTooltip";
+          tip.style.cssText = "position:fixed;background:#1e293b;color:#e2e8f0;padding:5px 9px;"
+            + "border-radius:5px;font-size:11px;pointer-events:none;display:none;"
+            + "z-index:10001;white-space:nowrap;border:1px solid #334155;";
+          document.body.appendChild(tip);
+        }
+
+        function redraw() {
+          spherePath.attr("d", path);
+          gratPath.attr("d", path);
+          if (countryPaths) countryPaths.attr("d", path);
+          grad.attr("r", proj.scale());
+          const center = proj.invert([W / 2, H / 2]);
+
+          arcG.selectAll("*").remove();
+          dotG.selectAll("*").remove();
+          homeG.selectAll("*").remove();
+
+          for (const [cs, coords] of Object.entries(BEACON_COORDS_BY_CALLSIGN)) {
+            const [bLon, bLat] = coords;
+            const info = detectionMap[cs] || { detected: false, bands: new Set() };
+
+            // Bandas detectadas por ordem NCDXF (20→10m)
+            const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
+
+            if (info.detected) {
+              // Um arco por banda — cada arco deslocado perpendicularmente à linha QTH→beacon
+              // (translate em coordenadas de ecrã, perpendicular ao vector projetado)
+              const n = detectedBands.length;
+              const arcSpacing = 5; // px de separação entre arcos
+              const ps = proj([sLon, sLat]);
+              const pb = proj([bLon, bLat]);
+              let perpX = 0, perpY = 0;
+              if (ps && pb) {
+                const dx = pb[0] - ps[0];
+                const dy = pb[1] - ps[1];
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) { perpX = -dy / len; perpY = dx / len; }
+              }
+              detectedBands.forEach((band, i) => {
+                const offset = (i - (n - 1) / 2) * arcSpacing;
+                arcG.append("path")
+                  .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                  .attr("d", path).attr("fill", "none")
+                  .attr("stroke", _pmColor(band))
+                  .attr("stroke-width", 2.0)
+                  .attr("stroke-opacity", 0.9)
+                  .attr("transform", `translate(${perpX * offset},${perpY * offset})`);
+              });
+            }
+
+            if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) continue;
+            const pp = proj([bLon, bLat]);
+            if (!pp) continue;
+
+            if (info.detected) {
+              const bandList = detectedBands.join(", ");
+              const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
+              // Anéis concêntricos — um por banda (mais externo=20m, mais interno=10m)
+              const baseR = 6;
+              const step  = 5;
+              // Desenhar do maior para o menor (maior fica atrás)
+              [...detectedBands].reverse().forEach((band, ri) => {
+                const r = baseR + (detectedBands.length - 1 - ri) * step;
+                dotG.append("circle")
+                  .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
+                  .attr("fill", "none")
+                  .attr("stroke", _pmColor(band))
+                  .attr("stroke-width", 2.5)
+                  .attr("opacity", 0.95)
+                  .style("cursor", "pointer")
+                  .on("mousemove", (evt) => {
+                    tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Detectado em: <strong>${bandList}</strong>`;
+                    tip.style.display = "block";
+                    tip.style.left = evt.clientX + 14 + "px";
+                    tip.style.top  = evt.clientY - 34 + "px";
+                  })
+                  .on("mouseleave", () => { tip.style.display = "none"; });
+              });
+              // Label com a cor da banda mais baixa (mais visível)
+              const labelColor = _pmColor(detectedBands[0]);
+              const outerR = baseR + (detectedBands.length - 1) * step;
+              dotG.append("text")
+                .attr("x", pp[0] + outerR + 5)
+                .attr("y", pp[1] + 5)
+                .attr("fill", labelColor).attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(cs);
+            } else {
+              const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
+              // Círculo cinzento oco — monitorado sem cópia
+              dotG.append("circle")
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5)
+                .attr("fill", "none").attr("stroke", "#6b7280").attr("stroke-width", 1.4).attr("opacity", 0.85)
+                .style("cursor", "pointer")
+                .on("mousemove", (evt) => {
+                  tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br><span style="color:#9ca3af">Monitorado — sem cópia na janela</span>`;
+                  tip.style.display = "block";
+                  tip.style.left = evt.clientX + 14 + "px";
+                  tip.style.top  = evt.clientY - 34 + "px";
+                })
+                .on("mouseleave", () => { tip.style.display = "none"; });
+              dotG.append("text")
+                .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+                .attr("fill", "#6b7280").attr("font-size", "11px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(cs);
+            }
+          }
+
+          // Home marker
+          if (d3.geoDistance([sLon, sLat], center) < Math.PI / 2) {
+            const home = proj([sLon, sLat]);
+            if (home) {
+              homeG.append("circle").attr("cx", home[0]).attr("cy", home[1]).attr("r", 7)
+                .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
+              homeG.append("text").attr("x", home[0] + 10).attr("y", home[1] + 5)
+                .attr("fill", "#facc15").attr("font-size", "11px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(aprsStationCallsign || "QTH");
+            }
+          }
+        }
+
+        redraw();
+
+        svg.call(d3.drag()
+          .on("start", () => svg.style("cursor", "grabbing"))
+          .on("drag", (event) => {
+            const [rx, ry, rz] = proj.rotate();
+            proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
+            redraw();
+          })
+          .on("end", () => { svg.style("cursor", "grab"); saveView(); })
+        );
+
+        svg.node().addEventListener("wheel", (event) => {
+          if (!event.ctrlKey) return;
+          event.preventDefault();
+          const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+          kScale = Math.max(0.25, Math.min(12, kScale * factor));
+          proj.scale(baseScale * kScale);
+          redraw(); saveView();
+        }, { passive: false });
+
+        svg.on("dblclick", () => {
+          proj.rotate([-sLon, -sLat]).scale(baseScale);
+          kScale = 1; redraw(); saveView();
+        });
+
+        const ctrl = document.createElement("div");
+        ctrl.className = "propmap-ctrl";
+        const mkBtn = (html, title, fn) => {
+          const b = document.createElement("button");
+          b.title = title; b.innerHTML = html;
+          b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+          return b;
+        };
+        ctrl.appendChild(mkBtn("+", t("pm_zoom_in"), () => { kScale = Math.min(kScale * 1.6, 12); proj.scale(baseScale * kScale); redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("−", t("pm_zoom_out"), () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("↻", t("pm_reset"), () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("⤢", t("pm_fullscreen"), () => {
+          wrap.classList.toggle("fullscreen");
+          if (wrap.classList.contains("fullscreen")) {
+            wrap.requestFullscreen && wrap.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen && document.exitFullscreen().catch(() => {});
+          }
+          setTimeout(() => drawBeaconGlobe(wrap, world, recentActivity), 200);
+        }));
+        wrap.appendChild(ctrl);
+
+        // Band colour legend
+        const legend = document.createElement("div");
+        legend.className = "propmap-band-filter";
+        legend.style.pointerEvents = "none";
+        for (const band of NCDXF_BANDS) {
+          const color = _pmColor(band);
+          const span = document.createElement("span");
+          span.className = "propmap-band-btn";
+          span.style.cssText = `background:${color}33;color:${color};border-color:${color};cursor:default;`;
+          span.innerHTML = `<span style="font-size:1.1em;vertical-align:middle;margin-right:3px;">●</span>${band} detectado`;
+          legend.appendChild(span);
+        }
+        const noDetSpan = document.createElement("span");
+        noDetSpan.className = "propmap-band-btn off";
+        noDetSpan.style.cssText = "cursor:default;color:#9ca3af;border-color:#6b7280;background:transparent;";
+        noDetSpan.innerHTML = `<span style="font-size:1.1em;vertical-align:middle;margin-right:3px;color:transparent;text-shadow:0 0 0 #6b7280;-webkit-text-stroke:1px #6b7280;">○</span>monitorado, sem cópia`;
+        legend.appendChild(noDetSpan);
+        wrap.appendChild(legend);
+      }
+
+      async function beaconLoadAndRender() {
+        if (isLoading) {
+          return;
+        }
+        isLoading = true;
+        const overlay = document.getElementById("loadingOverlay");
+        overlay?.classList.add("active");
+        const queryAt = new Date();
+        try {
+          const overviewParams = new URLSearchParams({
+            heatmap_hours: String(BEACON_WINDOW_HOURS),
+            propagation_window_minutes: "180",
+            forecast_window_minutes: "180",
+          });
+          const [overviewResp] = await Promise.all([
+            fetch(`${_BASE}api/beacons/analytics/overview?${overviewParams.toString()}`),
+            fetchScanRuntimeStatus({ deferRender: true }),
+            fetchBeaconRuntimeStatus({ deferRender: true }),
+          ]);
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
+          updateApiLastFetchInfo(queryAt);
+          if (!overviewResp.ok) {
+            throw new Error("Beacon analytics request failed");
+          }
+          beaconOverview = await overviewResp.json();
+          beaconDataLoaded = true;
+          renderBeaconDashboard();
+        } catch (_err) {
+          beaconOverview = null;
+          beaconDataLoaded = false;
+          renderBeaconDashboard();
+        } finally {
+          isLoading = false;
+          overlay?.classList.remove("active");
+        }
+      }
+
+      async function refreshActiveAcademicView() {
+        if (activeAcademicView === "aprs") {
+          await aprsLoadAndRender();
+          return;
+        }
+        if (activeAcademicView === "beacon") {
+          await beaconLoadAndRender();
+          return;
+        }
+        await loadAndRender();
       }
 
       async function _checkHfStaleBanner(start, end) {
@@ -2700,30 +5404,16 @@ Last update: 2026-04-03 UTC
           else if (kp >= 4) condClass = "iono-active";
           else if (kp >= 2) condClass = "iono-unsettled";
 
-          // Band status summary with color coding.
-          // Object.entries() keeps JSON insertion order, which the
-          // backend doesn't guarantee — sort by canonical wavelength
-          // (longest → shortest) so the widget always reads top-down
-          // 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m.
-          const _BAND_ORDER = [
-            "160m","80m","60m","40m","30m","20m","17m",
-            "15m","12m","10m","6m","2m","70cm",
-          ];
-          const _bandRank = (b) => {
-            const i = _BAND_ORDER.indexOf(String(b).toLowerCase());
-            return i === -1 ? 999 : i;
-          };
+          // Band status summary with color coding
           const bands = d.bands || {};
-          const bandTags = Object.entries(bands)
-            .sort(([a], [b]) => _bandRank(a) - _bandRank(b))
-            .map(([b, v]) => {
-              const st = v.status || (v.open ? "Open" : "Closed");
-              let cls = "iono-band-closed";
-              if (st === "Open") cls = "iono-band-open";
-              else if (st === "Marginal") cls = "iono-band-marginal";
-              else if (st === "Absorbed") cls = "iono-band-absorbed";
-              return `<span class="iono-band ${cls}" title="${st} — MUF ${v.muf_at_3000km || '?'} MHz">${b}</span>`;
-            }).join("");
+          const bandTags = Object.entries(bands).map(([b, v]) => {
+            const st = v.status || (v.open ? "Open" : "Closed");
+            let cls = "iono-band-closed";
+            if (st === "Open") cls = "iono-band-open";
+            else if (st === "Marginal") cls = "iono-band-marginal";
+            else if (st === "Absorbed") cls = "iono-band-absorbed";
+            return `<span class="iono-band ${cls}" title="${st} — MUF ${v.muf_at_3000km || '?'} MHz">${b}</span>`;
+          }).join("");
 
           el.innerHTML = [
             `<div style="display:flex;align-items:center;justify-content:space-between">`,
@@ -2761,8 +5451,8 @@ Last update: 2026-04-03 UTC
       // ═══════════════════════════════════════════════════════════════════════
       const PROPMAP_BAND_COLORS = {
         "160m": "#e01010", "80m": "#ff69b4", "60m": "#c060ff",
-        "40m": "#ffa500", "30m": "#facc15", "20m": "#40e0d0",
-        "17m": "#22c55e", "15m": "#ff4da6", "12m": "#06b6d4",
+        "40m": "#ffa500", "30m": "#facc15", "20m": "#3b82f6",
+        "17m": "#22c55e", "15m": "#ef4444", "12m": "#a855f7",
         "10m": "#f97316", "6m":  "#e8e820",
       };
       const _pmColor = (b) => PROPMAP_BAND_COLORS[(b || "").toLowerCase()] || "#9ca3af";
@@ -2868,9 +5558,18 @@ Last update: 2026-04-03 UTC
         return 60;
       }
 
+      function getPropMapHosts() {
+        return [
+          {
+            wrap: document.getElementById("propMapWrap"),
+            mobileLegendHost: document.getElementById("propMapMobileLegends"),
+          },
+        ].filter((host) => host.wrap);
+      }
+
       async function refreshPropMap() {
-        const wrap = document.getElementById("propMapWrap");
-        if (!wrap || !window.d3 || !window.topojson) return;
+        const hosts = getPropMapHosts();
+        if (!hosts.length || !window.d3 || !window.topojson) return;
 
         try {
           const [ionoResp, contactResp, world] = await Promise.all([
@@ -2891,18 +5590,20 @@ Last update: 2026-04-03 UTC
             }
           }
 
-          drawPropMap(wrap, world);
+          hosts.forEach(({ wrap, mobileLegendHost }) => {
+            drawPropMap(wrap, world, { mobileLegendHost });
+          });
         } catch (e) {
           console.warn("[propmap] fetch failed", e);
         }
       }
 
-      function drawPropMap(wrap, world) {
+      function drawPropMap(wrap, world, options = {}) {
         const iono = _pmIonoData;
         const cdata = _pmContactData;
         if (!iono || !cdata) return;
 
-        const mobileLegendHost = document.getElementById("propMapMobileLegends");
+        const mobileLegendHost = options.mobileLegendHost || null;
         if (mobileLegendHost) {
           mobileLegendHost.innerHTML = "";
         }
@@ -3274,7 +5975,7 @@ Last update: 2026-04-03 UTC
             document.exitFullscreen && document.exitFullscreen().catch(() => {});
           }
           setTimeout(() => {
-            drawPropMap(wrap, world);
+            drawPropMap(wrap, world, options);
           }, 200);
         }));
         wrap.appendChild(ctrl);
@@ -3284,7 +5985,7 @@ Last update: 2026-04-03 UTC
           if (!document.fullscreenElement && _pmIsFullscreen) {
             _pmIsFullscreen = false;
             wrap.classList.remove("fullscreen");
-            setTimeout(() => drawPropMap(wrap, world), 100);
+            setTimeout(() => drawPropMap(wrap, world, options), 100);
           }
         });
 
@@ -3484,7 +6185,7 @@ Last update: 2026-04-03 UTC
                 band: row.band,
                 mode: row.mode,
                 count: Number(row.count || 0),
-                snr: Number(row.snr || 0),
+                snr: row.snr != null ? Number(row.snr) : null,
                 snrCount: Number(row.snr_count != null ? row.snr_count : row.count || 0),
               }))
               .filter((row) => !Number.isNaN(row.ts.getTime())),
@@ -3522,10 +6223,14 @@ Last update: 2026-04-03 UTC
             const bestBand = bestBandData
               ? { band: bestBandData.band, score: Number(bestBandData.score), events: Number(bestBandData.events) }
               : null;
+            const topBands = propBands.slice(0, 3).map(r => ({
+              band: r.band, score: Number(r.score), events: Number(r.events)
+            }));
             serverPropagation = {
               overallScore,
               stability: Number(kpis.stability_pct || 0),
               bestBand,
+              topBands,
               byBand: byBandArray,
               trend,
             };
@@ -3568,6 +6273,10 @@ Last update: 2026-04-03 UTC
         if (!nextRefreshText) {
           return;
         }
+        if (activeAcademicView === "aprs") {
+          nextRefreshText.textContent = t("next_refresh", { time: "--" });
+          return;
+        }
         if (!nextRefreshDeadlineMs) {
           nextRefreshText.textContent = t("next_refresh", { time: "--" });
           return;
@@ -3578,7 +6287,7 @@ Last update: 2026-04-03 UTC
           if (!isLoading) {
             nextRefreshText.textContent = t("refreshing");
             nextRefreshDeadlineMs = Date.now() + AUTO_REFRESH_INTERVAL_MS;
-            loadAndRender();
+            refreshActiveAcademicView();
           }
           return;
         }
@@ -3598,6 +6307,9 @@ Last update: 2026-04-03 UTC
         ]);
 
         // Compute total events from the full API-returned series (no client-side time filter).
+        // filteredSeries uses row.ts (bucket start) which may precede the exact period start,
+        // causing under-count for non-boundary-aligned periods.  synthetic.series is already
+        // time-bounded by the server; only the band/mode filters need to be applied here.
         const { band: _fb, mode: _fm } = lastFilters;
         const totalEvents = d3.sum(
           synthetic.series.filter(d =>
@@ -3608,28 +6320,84 @@ Last update: 2026-04-03 UTC
 
         const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
         const anaRows = seriesRows.filter((d) => ANALOG_KPI.has(d.mode));
-        // Weight by snrCount (events that actually carry an SNR sample), not total
-        // count — otherwise buckets with many no-SNR events bias the average toward 0.
-        const _w = (d) => Number.isFinite(d.snrCount) ? d.snrCount : d.count;
-        const digSnrW = d3.sum(digRows, _w);
-        const anaSnrW = d3.sum(anaRows, _w);
-        const snrDigital = serverSnrDigital !== null ? serverSnrDigital
-          : (digSnrW > 0 ? d3.sum(digRows, (d) => _w(d) * d.snr) / digSnrW : null);
-        const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog
-          : (anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null);
+        // Use only buckets with a finite SNR and positive effective weight.
+        // This prevents artificial 0.0 dB values when some buckets have count>0
+        // but no real SNR sample.
+        const weightedSnrAvg = (rows) => {
+          let weightedSum = 0;
+          let weightSum = 0;
+          for (const row of rows) {
+            const snr = Number(row?.snr);
+            const rawWeight = Number.isFinite(Number(row?.snrCount))
+              ? Number(row.snrCount)
+              : Number(row?.count);
+            const weight = Number.isFinite(rawWeight) ? rawWeight : 0;
+            if (!Number.isFinite(snr) || weight <= 0) continue;
+            weightedSum += snr * weight;
+            weightSum += weight;
+          }
+          return weightSum > 0 ? (weightedSum / weightSum) : null;
+        };
 
+        // Prefer server-computed values (accurate, confirmed-events-only);
+        // fall back to client-side weighted average from filtered series.
+        const snrDigital = serverSnrDigital !== null ? serverSnrDigital : weightedSnrAvg(digRows);
+        const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog  : weightedSnrAvg(anaRows);
+
+        // Unique callsigns: use synthetic.callsigns filtered only by band/mode (no time filter).
+        // Bucket timestamps in callsigns can precede the period start (same issue as totalEvents);
+        // synthetic is already scoped to the requested period by the server.
         const uniqueCallsigns = new Set(
           synthetic.callsigns
             .filter(d => (_fb === "ALL" || d.band === _fb) && (_fm === "ALL" || d.mode === _fm))
             .map((d) => d.callsign)
         ).size;
 
-        kpiEvents.textContent = formatInt(totalEvents);
-        kpiCallsigns.textContent = formatInt(uniqueCallsigns);
-        kpiSnrDigital.textContent = snrDigital != null ? `${snrDigital.toFixed(1)} dB` : "--";
-        kpiSnrAnalog.textContent = snrAnalog != null ? `${snrAnalog.toFixed(1)} dB` : "--";
+        // Callsigns gauge: auto-scale so needle is never pegged.
+        const callsignsGaugeMax = uniqueCallsigns > CALLSIGNS_GAUGE_MAX
+          ? Math.ceil(uniqueCallsigns / 1000) * 1000
+          : CALLSIGNS_GAUGE_MAX;
+        const kpiCallsignsScaleEl = document.getElementById("kpiCallsignsScale");
+        if (kpiCallsignsScaleEl) {
+          const mid = callsignsGaugeMax / 2;
+          const midLabel = mid >= 1000 ? `${Math.round(mid / 1000)}k` : String(mid);
+          const maxLabel = callsignsGaugeMax >= 1000 ? `${Math.round(callsignsGaugeMax / 1000)}k+` : String(callsignsGaugeMax);
+          kpiCallsignsScaleEl.innerHTML = `<span>0</span><span>${midLabel}</span><span>${maxLabel}</span>`;
+        }
+        updateKpiGauge(kpiCallsignsNeedle, kpiCallsignsCard, kpiCallsigns, uniqueCallsigns, 0, callsignsGaugeMax, (v) => formatInt(v));
+        updateDigitalSnrGauge(snrDigital);
+        updateKpiGauge(kpiSnrAnalogNeedle, kpiSnrAnalogCard, kpiSnrAnalog, snrAnalog,
+          ANALOG_SNR_GAUGE_MIN_DB, ANALOG_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
+
+        // Events gauge: auto-scale so needle is never pegged when real count > static max.
+        const eventsGaugeMax = totalEvents > EVENTS_GAUGE_MAX
+          ? Math.ceil(totalEvents / 10000) * 10000
+          : EVENTS_GAUGE_MAX;
+        const kpiEventsScaleEl = document.getElementById("kpiEventsScale");
+        if (kpiEventsScaleEl) {
+          const mid = eventsGaugeMax / 2;
+          const midLabel = mid >= 1000 ? `${Math.round(mid / 1000)}k` : String(mid);
+          const maxLabel = `${Math.round(eventsGaugeMax / 1000)}k+`;
+          kpiEventsScaleEl.innerHTML = `<span>0</span><span>${midLabel}</span><span>${maxLabel}</span>`;
+        }
+        updateKpiGauge(kpiEventsNeedle, kpiEventsCard, kpiEvents, totalEvents, 0, eventsGaugeMax, (v) => formatInt(v));
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
+      }
+
+      function updateKpiGauge(needleEl, cardEl, labelEl, value, minVal, maxVal, formatter) {
+        const hasValue = Number.isFinite(value);
+        const span = maxVal - minVal;
+        const normalized = hasValue && span > 0 ? clamp((value - minVal) / span, 0, 1) : 0;
+        const angleDeg = -90 + (normalized * 180);
+        if (needleEl) needleEl.style.transform = `rotate(${angleDeg.toFixed(2)}deg)`;
+        if (cardEl) cardEl.classList.toggle("is-empty", !hasValue);
+        if (labelEl) labelEl.textContent = hasValue ? formatter(value) : "--";
+      }
+
+      function updateDigitalSnrGauge(valueDb) {
+        updateKpiGauge(kpiSnrDigitalNeedle, kpiSnrDigitalCard, kpiSnrDigital, valueDb,
+          DIGITAL_SNR_GAUGE_MIN_DB, DIGITAL_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
       }
 
       function computePropagationAnalytics(seriesRows, callsignRows, start, end) {
@@ -3735,17 +6503,19 @@ Last update: 2026-04-03 UTC
         const score = propagation.overallScore || 0;
         const state = propagationState(score);
 
-        kpiPropScore.textContent = `${score.toFixed(1)}`;
-        kpiPropState.textContent = state.label;
+        updateKpiGauge(kpiPropScoreNeedle, kpiPropScoreCard, kpiPropScore, score, 0, 100, (v) => `${v.toFixed(1)}`);
+        kpiPropLabel.textContent = state.label;
         kpiPropState.className = `badge ${state.className}`;
 
-        if (propagation.bestBand) {
-          kpiBestBand.textContent = propagation.bestBand.band;
-          kpiBestBandScore.textContent = `${propagation.bestBand.score.toFixed(1)} / 100 | stability ${propagation.stability.toFixed(1)}%`;
-        } else {
-          kpiBestBand.textContent = "--";
-          kpiBestBandScore.textContent = "--";
-        }
+        const MEDALS = ["🥇", "🥈", "🥉"];
+        const topBands = propagation.topBands || (propagation.bestBand ? [propagation.bestBand] : []);
+        const slots = Array.from({ length: 3 }, (_, i) => topBands[i] || null);
+        kpiTopBands.innerHTML = slots.map((entry, i) => {
+          const hasData = !!(entry && entry.band);
+          const bandName = hasData ? entry.band : "--";
+          const score = hasData && Number.isFinite(Number(entry.score)) ? Number(entry.score).toFixed(1) : "--";
+          return `<div class="top-band-row${hasData ? "" : " is-empty"}"><span class="rank">${MEDALS[i]}</span><span class="band-name">${bandName}</span><span class="band-score">${score}</span></div>`;
+        }).join("");
       }
 
       function propagationState(score) {
@@ -4559,12 +7329,14 @@ Last update: 2026-04-03 UTC
       const viewSelector = document.getElementById("viewSelector");
       const hfView = document.getElementById("hfView");
       const aprsView = document.getElementById("aprsView");
+      const beaconView = document.getElementById("beaconView");
 
       if (viewSelector) {
         viewSelector.addEventListener("click", (e) => {
           const btn = e.target.closest(".view-btn");
           if (!btn) return;
           const view = btn.dataset.view;
+          activeAcademicView = view;
           viewSelector.querySelectorAll(".view-btn").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
 
@@ -4573,37 +7345,47 @@ Last update: 2026-04-03 UTC
 
           if (view === "aprs") {
             hfView.style.display = "none";
+            if (beaconView) beaconView.style.display = "none";
             aprsView.style.display = "block";
-            if (!aprsDataLoaded) {
-              aprsLoadAndRender();
-            } else {
-              if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
-              // Only (re)start the auto-refresh if not already armed — avoids
-              // resetting the 5-min countdown each time the user toggles tabs.
-              if (!aprsRefreshTimer) aprsStartAutoRefresh();
-              requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
-            }
+            aprsLoadAndRender();
+          } else if (view === "beacon") {
+            hfView.style.display = "none";
+            aprsView.style.display = "none";
+            aprsStopAutoRefresh();
+            if (beaconView) beaconView.style.display = "block";
+            beaconLoadAndRender();
           } else {
             hfView.style.display = "block";
             aprsView.style.display = "none";
+            if (beaconView) beaconView.style.display = "none";
             aprsStopAutoRefresh();
-            requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
+            loadAndRender();
           }
           localStorage.setItem("academic_active_view", view);
         });
       }
 
       // Restore last active view (default: hf)
-      const savedView = localStorage.getItem("academic_active_view") || "hf";
+      const savedView = activeAcademicView;
       if (savedView === "aprs" && aprsView) {
         hfView.style.display = "none";
         aprsView.style.display = "block";
+        if (beaconView) beaconView.style.display = "none";
         viewSelector?.querySelectorAll(".view-btn").forEach(b => {
           b.classList.toggle("active", b.dataset.view === "aprs");
         });
         if (!aprsDataLoaded) aprsLoadAndRender();
+      } else if (savedView === "beacon" && beaconView) {
+        hfView.style.display = "none";
+        if (aprsView) aprsView.style.display = "none";
+        beaconView.style.display = "block";
+        viewSelector?.querySelectorAll(".view-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.view === "beacon");
+        });
+        if (!beaconDataLoaded) beaconLoadAndRender();
       } else {
         if (aprsView) aprsView.style.display = "none";
+        if (beaconView) beaconView.style.display = "none";
       }
 
       // ── APRS period presets ───────────────────────────────────────────
@@ -4874,8 +7656,7 @@ Last update: 2026-04-03 UTC
       // 16×6 grid of 24 px icons; index = code - 0x21. Three sheets:
       //   sheet 0 = primary table "/", sheet 1 = alternate "\\",
       //   sheet 2 = overlay glyphs (drawn on top of sheet 1).
-      // Served from jsdelivr CDN since this dashboard runs off-origin.
-      const APRS_SPRITE_BASE = "https://cdn.jsdelivr.net/gh/hessu/aprs-symbols@master/png";
+      const APRS_SPRITE_BASE = "vendor/aprs-symbols";
       function aprsSymbolHtml(table, code) {
         const sz = 24, cols = 16;
         function cell(c) {
@@ -4926,22 +7707,6 @@ Last update: 2026-04-03 UTC
         return parts.join("&nbsp;&nbsp;");
       }
 
-      // ── RF-gated detection (mirrors backend rule) ─────────────────────
-      // Backend marks rf_gated=True when (a) the outer was a 3rd-party '}'
-      // wrapper or (b) the inner path contains TCPIP / TCPXX. Legacy events
-      // stored before the migration have rf_gated=null in the DB; infer from
-      // path/raw to keep the badge accurate for those.
-      function aprsInferRfGated(ev) {
-        if (!ev) return false;
-        if (ev.rf_gated === true || ev.rf_gated === 1) return true;
-        if (ev.rf_gated === false || ev.rf_gated === 0) return false;
-        const p = String(ev.path || ev.via || "").toUpperCase();
-        if (/(^|,)\s*TCP(IP|XX)\b/.test(p)) return true;
-        const raw = String(ev.raw || "");
-        if (/:\}/.test(raw)) return true;
-        return false;
-      }
-
       // ── Build rich popup (matches main interface exactly) ────────────
       function aprsBuildPopup(e, perSource, seenRange) {
         const call = e.callsign || "—";
@@ -4957,10 +7722,10 @@ Last update: 2026-04-03 UTC
         const hasLoRa = ps.has("lora_aprs");
         const hasTCP = ps.has("aprs_is");
         let sourceBadge = "";
-        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf" title="Heard directly on RF">📻 RF</span>';
-        if (hasRFGated) sourceBadge += '<span class="aprs-source-badge aprs-source-rfgated" title="3rd-party packet re-broadcast on RF by a local iGate (inner station did not transmit on RF)">🔁 RF-gated</span>';
+        if (hasRF) sourceBadge += '<span class="aprs-source-badge aprs-source-rf" title="Heard directly on RF (144.800 MHz)">📻 RF</span>';
+        if (hasRFGated) sourceBadge += '<span class="aprs-source-badge aprs-source-rfgated" title="Originated on internet (TCPIP); a local iGate re-broadcast it on RF. The station did NOT transmit on RF.">🔁 RF-gated</span>';
         if (hasLoRa) sourceBadge += '<span class="aprs-source-badge aprs-source-lora">📡 LoRa</span>';
-        if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is" title="Received via APRS-IS internet feed">🌐 APRS-IS</span>';
+        if (hasTCP) sourceBadge += '<span class="aprs-source-badge aprs-source-is">🌐 APRS-IS</span>';
 
         let distText = "";
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -5153,10 +7918,23 @@ Last update: 2026-04-03 UTC
             if (resolved) e = { ...e, lat: resolved.lat, lon: resolved.lon };
           }
           const src = (e.source || "").toLowerCase();
-          // RF-gated: separate logical source so the popup badge does not
-          // falsely credit RF for packets that were re-broadcast from the
-          // internet by a local iGate (3rd-party '}' or TCPIP path token).
-          const evRfGated = aprsInferRfGated(e);
+          // RF-gated traffic (3rd-party `}` encapsulation or TCPIP path):
+          // the inner callsign did NOT transmit on RF — it was injected via
+          // internet and a local iGate re-broadcast it. Treat as a separate
+          // logical source so the badge does not falsely credit RF.
+          // Backwards-compat: events stored before the rf_gated migration
+          // have e.rf_gated === null; fall back to inferring from path/raw.
+          const inferRfGated = (ev) => {
+            if (ev.rf_gated === true || ev.rf_gated === 1) return true;
+            if (ev.rf_gated === false || ev.rf_gated === 0) return false;
+            const p = String(ev.path || ev.via || "").toUpperCase();
+            if (/(^|,)\s*TCP(IP|XX)\b/.test(p)) return true;
+            const raw = String(ev.raw || "");
+            // 3rd-party DTI: a colon followed by '}' marks encapsulation
+            if (/:\}/.test(raw)) return true;
+            return false;
+          };
+          const evRfGated = inferRfGated(e);
           const logicalSrc = (src === "direwolf" && evRfGated) ? "direwolf_gated" : src;
           if (!perSourceByCall.has(e.callsign)) perSourceByCall.set(e.callsign, new Map());
           if (logicalSrc) {
@@ -5186,9 +7964,10 @@ Last update: 2026-04-03 UTC
           const existingSrc = existing ? (existing.source || "").toLowerCase() : "";
           // Direct RF wins over RF-gated wins over APRS-IS for marker selection
           const isDirectRf = src === "direwolf" && !evRfGated;
-          const existingIsDirectRf = existingSrc === "direwolf" && existing && !aprsInferRfGated(existing);
+          const existingIsDirectRf = existingSrc === "direwolf" && existing && !inferRfGated(existing);
           const isRf = src === "direwolf" || src === "rf";
           const existingIsRf = existingSrc === "direwolf" || existingSrc === "rf";
+          // Direct RF wins; among same type, keep latest
           if (!existing
               || (isDirectRf && !existingIsDirectRf)
               || (isRf && !existingIsRf)
@@ -5203,7 +7982,10 @@ Last update: 2026-04-03 UTC
           const hasRfGated = perSource.has("direwolf_gated");
           const hasLoRa = perSource.has("lora_aprs");
           const hasIs = perSource.has("aprs_is");
-          // Marker priority: direct RF > APRS-IS > RF-gated.
+          // Marker priority reflects what the station ACTUALLY does on
+          // the air: direct RF first, then APRS-IS (the station's real
+          // origin when not heard on RF), then RF-gated as a last resort
+          // (rare: gate caught but we missed the original RF).
           const sourceClass = hasRf
             ? "aprs-marker-rf"
             : (hasIs ? "aprs-marker-is"

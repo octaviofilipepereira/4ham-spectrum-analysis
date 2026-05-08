@@ -43,6 +43,9 @@ ENDPOINT_ANALYTICS_ACADEMIC_1H = "analytics/academic/1h"
 ENDPOINT_ANALYTICS_ACADEMIC_24H = "analytics/academic/24h"
 ENDPOINT_ANALYTICS_ACADEMIC_7D = "analytics/academic/7d"
 ENDPOINT_ANALYTICS_ACADEMIC_30D = "analytics/academic/30d"
+ENDPOINT_BEACON_STATUS = "beacons/status"
+ENDPOINT_BEACON_ANALYTICS_OVERVIEW = "beacons/analytics/overview"
+ENDPOINT_BEACON_OBSERVATIONS = "beacons/observations"
 
 
 def _now_iso() -> str:
@@ -317,6 +320,96 @@ def _snapshot_analytics_academic_30d() -> Dict[str, Any]:
 RAW_EVENTS_CAP = 1500
 
 
+# ── Beacon snapshots ───────────────────────────────────────────────────────────
+
+def _snapshot_beacon_status() -> Dict[str, Any]:
+    """Mirrors GET /api/beacons/status — scheduler snapshot + catalog summary."""
+    from ..dependencies import state
+    from ..beacons.catalog import BANDS, BEACONS
+
+    sched = getattr(state, "beacon_scheduler", None)
+    snapshot = sched.snapshot() if sched is not None else {"running": False}
+    return {
+        "scheduler": snapshot,
+        "catalog": {
+            "beacons": len(BEACONS),
+            "bands": len(BANDS),
+            "active_beacons": sum(1 for b in BEACONS if b.status == "active"),
+        },
+        "time_sync": None,
+    }
+
+
+def _snapshot_beacon_analytics_overview() -> Dict[str, Any]:
+    """Mirrors GET /api/beacons/analytics/overview with default 12 h / 3 h windows."""
+    from ..dependencies import state
+    from ..beacons.catalog import BANDS, BEACONS
+    from ..beacons.propagation import build_beacon_propagation_summary
+    from ..beacons.public_payloads import public_beacon_heatmap_cell
+    from ..core.ionospheric import ionospheric_cache
+    from ..api.beacons import (
+        _build_kpis,
+        _build_recent_activity_summary,
+        _build_beacon_reading,
+        _build_beacon_nowcast,
+    )
+
+    heatmap_hours = 12.0
+    propagation_window_minutes = 180
+    forecast_window_minutes = 180
+
+    _, _, station_lat, station_lon = _resolve_qth()
+
+    heatmap_rows = state.db.get_beacon_heatmap(hours=heatmap_hours)
+    propagation_rows = state.db.get_beacon_observations(
+        limit=10000,
+        hours=max(0.1, propagation_window_minutes / 60.0),
+        detected_only=False,
+    )
+    propagation = build_beacon_propagation_summary(propagation_rows, propagation_window_minutes)
+    ionospheric = ionospheric_cache.get_summary(latitude=station_lat, longitude=station_lon)
+    reading = _build_beacon_reading(propagation, ionospheric)
+    forecast = _build_beacon_nowcast(propagation, ionospheric, forecast_window_minutes)
+
+    now_iso = _now_iso()
+    return {
+        "status": "ok",
+        "kind": "beacon_analytics",
+        "source_kind": "snapshot",
+        "generated_at_utc": now_iso,
+        "snapshot_captured_at_utc": now_iso,
+        "staleness_seconds": 0,
+        "windows": {
+            "heatmap_hours": heatmap_hours,
+            "propagation_window_minutes": propagation_window_minutes,
+            "forecast_window_minutes": forecast_window_minutes,
+        },
+        "freshness": {
+            "label": "snapshot",
+            "push_interval_seconds": None,
+            "warning": None,
+        },
+        "kpis": _build_kpis(heatmap_rows, propagation),
+        "recent_activity": _build_recent_activity_summary(heatmap_rows, heatmap_hours),
+        "propagation": propagation,
+        "ionospheric": ionospheric,
+        "reading": reading,
+        "forecast": forecast,
+    }
+
+
+def _snapshot_beacon_observations() -> Dict[str, Any]:
+    """Mirrors GET /api/beacons/observations with a 12-hour window, cap 200."""
+    from ..dependencies import state
+    from ..beacons.public_payloads import public_beacon_observation
+
+    rows = state.db.get_beacon_observations(limit=200, hours=12.0, detected_only=False)
+    public_rows = [
+        row for row in (public_beacon_observation(r) for r in rows) if row is not None
+    ]
+    return {"observations": public_rows, "count": len(public_rows), "offset": 0}
+
+
 def build_snapshot_bundle() -> Dict[str, Dict[str, Any]]:
     """Produce a dict ``{endpoint_key: {ts, payload}}`` for every endpoint.
 
@@ -334,6 +427,11 @@ def build_snapshot_bundle() -> Dict[str, Dict[str, Any]]:
         # directly so the dashboard period selector returns real-time
         # results. This keeps the per-push payload tiny (only kbytes of
         # version/scan/settings/ionospheric snapshots + delta events).
+        # Beacon data lives in a separate local table (beacon_observations)
+        # that is NOT mirrored row-by-row, so these three are snapshots.
+        (ENDPOINT_BEACON_STATUS, _snapshot_beacon_status),
+        (ENDPOINT_BEACON_ANALYTICS_OVERVIEW, _snapshot_beacon_analytics_overview),
+        (ENDPOINT_BEACON_OBSERVATIONS, _snapshot_beacon_observations),
     )
     captured_at = _now_iso()
     for key, fn in builders:
@@ -355,5 +453,8 @@ __all__ = [
     "ENDPOINT_ANALYTICS_ACADEMIC_24H",
     "ENDPOINT_ANALYTICS_ACADEMIC_7D",
     "ENDPOINT_ANALYTICS_ACADEMIC_30D",
+    "ENDPOINT_BEACON_STATUS",
+    "ENDPOINT_BEACON_ANALYTICS_OVERVIEW",
+    "ENDPOINT_BEACON_OBSERVATIONS",
     "build_snapshot_bundle",
 ]
