@@ -4700,7 +4700,7 @@ Last update: 2026-04-03 UTC
           payload ? sfiValue : Number.NaN,
           BEACON_SFI_GAUGE_MIN,
           sfiGaugeMax,
-          (v) => beaconFormatScore(v)
+          (v) => Math.round(v).toString()
         );
         setText("beaconKpiSfiDetail", payload ? `foF2 ${beaconFormatScore(iono.fof2_estimated_mhz)} MHz` : "--");
 
