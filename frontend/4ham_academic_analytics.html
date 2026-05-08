@@ -399,6 +399,10 @@ Last update: 2026-04-03 UTC
         margin-bottom: 16px;
       }
 
+      .beacon-view .cards.beacon-cards {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
       .card {
         border: 1px solid var(--line);
         border-radius: 14px;
@@ -2394,7 +2398,7 @@ Last update: 2026-04-03 UTC
           </div>
         </div>
 
-        <div class="cards">
+        <div class="cards beacon-cards">
           <div class="card card-snr-gauge is-empty" id="kpiEventsCard">
             <span class="label" data-i18n="kpi_total_events">Total events</span>
             <div class="snr-gauge" role="img" aria-label="Total events gauge">
