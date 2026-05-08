@@ -2095,6 +2095,7 @@ Last update: 2026-04-03 UTC
         align-items: end;
         gap: 4px;
         position: relative;
+        overflow: hidden;
         height: 132px;
         padding: 10px 8px 8px;
         border-radius: 14px;
@@ -3277,30 +3278,30 @@ Last update: 2026-04-03 UTC
 
           <div class="beacon-history-info-modal__charts">
             <section class="beacon-history-info-panel">
-              <div class="beacon-history-info-panel__heading">Copy mix</div>
-              <div class="beacon-history-info-panel__subtext">Rolling 12-hour split between detected and no-copy monitored slots.</div>
+              <div class="beacon-history-info-panel__heading" data-i18n="beacon_panel_copy_mix">Copy mix</div>
+              <div class="beacon-history-info-panel__subtext" data-i18n="beacon_panel_copy_mix_desc">Rolling 12-hour split between detected and no-copy monitored slots.</div>
               <div id="beaconHistoryInfoMixChart"></div>
             </section>
             <section class="beacon-history-info-panel">
-              <div class="beacon-history-info-panel__heading">Recent rhythm</div>
-              <div class="beacon-history-info-panel__subtext">Older to newer monitored passes, colour-coded by copy quality.</div>
+              <div class="beacon-history-info-panel__heading" data-i18n="beacon_panel_rhythm">Recent rhythm</div>
+              <div class="beacon-history-info-panel__subtext" data-i18n="beacon_panel_rhythm_desc">Older to newer monitored passes, colour-coded by copy quality.</div>
               <div id="beaconHistoryInfoDetectionChart"></div>
             </section>
             <section class="beacon-history-info-panel">
-              <div class="beacon-history-info-panel__heading">100 W SNR trend</div>
-              <div class="beacon-history-info-panel__subtext">Reference-dash strength across the latest monitored passes in this cell.</div>
+              <div class="beacon-history-info-panel__heading" data-i18n="beacon_panel_snr_trend">100 W SNR trend</div>
+              <div class="beacon-history-info-panel__subtext" data-i18n="beacon_panel_snr_trend_desc">Reference-dash strength across the latest monitored passes in this cell.</div>
               <div id="beaconHistoryInfoSnrChart"></div>
             </section>
             <section class="beacon-history-info-panel">
-              <div class="beacon-history-info-panel__heading">Dash sequence trend</div>
-              <div class="beacon-history-info-panel__subtext">Ordered dash copy from 0/4 to 4/4 across the same pass history.</div>
+              <div class="beacon-history-info-panel__heading" data-i18n="beacon_panel_dash_trend">Dash sequence trend</div>
+              <div class="beacon-history-info-panel__subtext" data-i18n="beacon_panel_dash_trend_desc">Ordered dash copy from 0/4 to 4/4 across the same pass history.</div>
               <div id="beaconHistoryInfoDashChart"></div>
             </section>
           </div>
 
           <div class="beacon-history-info-panel">
-            <div class="beacon-history-info-panel__heading">Latest monitored passes</div>
-            <div class="beacon-history-info-panel__subtext">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
+            <div class="beacon-history-info-panel__heading" data-i18n="beacon_panel_passes">Latest monitored passes</div>
+            <div class="beacon-history-info-panel__subtext" data-i18n="beacon_panel_passes_desc">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
             <div id="beaconHistoryInfoRecords">Loading details...</div>
           </div>
         </div>
@@ -4466,12 +4467,12 @@ Last update: 2026-04-03 UTC
         const bestSeq = `${Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))))}/4`;
         const latest = beaconFormatUtcTimestamp(cell.latest_detected_utc);
         const cards = [
-          { label: "Window", value: beaconFormatHistoryWindow(detail.hours), note: "Fixed rolling view" },
-          { label: "Coverage", value: `${total} slot(s)`, note: "Monitored in rolling view" },
-          { label: "Detected", value: `${detections} slot(s)`, note: `${detectionRate} of monitored coverage` },
-          { label: "No copy", value: `${noCopy} slot(s)`, note: `${noCopyRate} of monitored coverage` },
-          { label: "Best pass", value: `${bestSnr} · ${bestSeq}`, note: beaconFormatUtcTimestamp(cell.best_detected_utc) },
-          { label: "Latest detected", value: latest, note: `${observations.length} latest monitored rows loaded` },
+          { label: t("beacon_stat_window"), value: beaconFormatHistoryWindow(detail.hours), note: t("beacon_stat_window_note") },
+          { label: t("beacon_stat_coverage"), value: `${total} slot(s)`, note: t("beacon_stat_coverage_note") },
+          { label: t("beacon_chart_detected"), value: `${detections} slot(s)`, note: t("beacon_stat_pct_note", { pct: detectionRate }) },
+          { label: t("beacon_chart_no_copy"), value: `${noCopy} slot(s)`, note: t("beacon_stat_pct_note", { pct: noCopyRate }) },
+          { label: t("beacon_stat_best_pass"), value: `${bestSnr} · ${bestSeq}`, note: beaconFormatUtcTimestamp(cell.best_detected_utc) },
+          { label: t("beacon_stat_latest"), value: latest, note: t("beacon_stat_rows_loaded", { n: observations.length }) },
         ];
         return cards.map((card) => `
           <div class="beacon-history-info-stat">
@@ -4485,7 +4486,7 @@ Last update: 2026-04-03 UTC
       function beaconRenderHistoryMixChart(cell) {
         const total = Number(cell.total_slots || 0);
         if (total <= 0) {
-          return '<div class="beacon-history-chart__empty">No monitored slots in the rolling 12-hour window.</div>';
+          return '<div class="beacon-history-chart__empty">' + t("beacon_chart_mix_empty") + '</div>';
         }
         const detections = Math.max(0, Number(cell.detections || 0));
         const noCopy = Math.max(total - detections, 0);
@@ -4495,15 +4496,15 @@ Last update: 2026-04-03 UTC
             <span class="beacon-history-mix__seg beacon-history-mix__seg--nocopy" style="width:${beaconHistoryPct(noCopy, total)}%"></span>
           </div>
           <div class="beacon-history-mix__legend">
-            ${beaconRenderMixLegendItem("Detected", detections, total, "observed")}
-            ${beaconRenderMixLegendItem("No copy", noCopy, total, "nocopy")}
+            ${beaconRenderMixLegendItem(t("beacon_chart_detected"), detections, total, "observed")}
+            ${beaconRenderMixLegendItem(t("beacon_chart_no_copy"), noCopy, total, "nocopy")}
           </div>
         </div>`;
       }
 
       function beaconRenderHistoryRhythmChart(observations) {
         if (!observations.length) {
-          return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
+          return '<div class="beacon-history-chart__empty">' + t("beacon_chart_rhythm_empty") + '</div>';
         }
         const counts = { detected: 0, weak: 0, nocopy: 0 };
         observations.forEach((obs) => {
@@ -4513,7 +4514,7 @@ Last update: 2026-04-03 UTC
         const weakTrace = counts.weak;
         const noCopy = counts.nocopy;
         const detectionRate = observations.length > 0 ? `${Math.round((detected / observations.length) * 100)}%` : "0%";
-        const bars = observations.slice().reverse().map((obs) => {
+        const bars = observations.slice(0, 60).reverse().map((obs) => {
           const state = beaconGetHistoryObservationState(obs);
           const cls = state.key;
           const height = state.key === "detected" ? 82 : (state.key === "weak" ? 44 : 26);
@@ -4522,14 +4523,14 @@ Last update: 2026-04-03 UTC
         }).join("");
         return `<div class="beacon-history-rhythm">
           <div class="beacon-history-chart__stats">
-            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
-            ${beaconRenderHistoryChartStat("Detected", `${detected}`)}
-            ${beaconRenderHistoryChartStat("Weak trace", `${weakTrace}`)}
-            ${beaconRenderHistoryChartStat("No copy", `${noCopy}`)}
-            ${beaconRenderHistoryChartStat("Detection rate", detectionRate)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_rows"), `${observations.length}`)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_detected"), `${detected}`)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_weak_trace"), `${weakTrace}`)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_no_copy"), `${noCopy}`)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_detection_rate"), detectionRate)}
           </div>
           <div class="beacon-history-rhythm__bars">${bars}</div>
-          <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, gold = sub-threshold trace, amber = monitored with no copy.</div>
+          <div class="beacon-history-chart__caption">${t("beacon_chart_rhythm_caption")}</div>
         </div>`;
       }
 
@@ -4545,9 +4546,10 @@ Last update: 2026-04-03 UTC
 
       function beaconRenderHistoryMetricChart(observations, kind) {
         if (!observations.length) {
-          return '<div class="beacon-history-chart__empty">No monitored rows loaded yet for this chart.</div>';
+          return '<div class="beacon-history-chart__empty">' + t("beacon_chart_metric_empty") + '</div>';
         }
         const reversed = observations.slice().reverse();
+        const barsSlice = observations.slice(0, 60).reverse();
         const values = reversed.map((obs) => {
           if (kind === "snr") {
             return Number.isFinite(Number(obs.snr_db_100w)) ? Number(obs.snr_db_100w) : null;
@@ -4557,7 +4559,7 @@ Last update: 2026-04-03 UTC
         const maxValue = kind === "snr"
           ? Math.max(6, ...reversed.map((obs) => Math.max(0, Number(obs.snr_db_100w || 0))))
           : 4;
-        const bars = reversed.map((obs) => {
+        const bars = barsSlice.map((obs) => {
           const rawValue = kind === "snr"
             ? Math.max(0, Number(obs.snr_db_100w || 0))
             : Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
@@ -4568,18 +4570,16 @@ Last update: 2026-04-03 UTC
           const cls = obs.detected ? "live" : "muted";
           return `<span class="beacon-history-metric__bar beacon-history-metric__bar--${cls}" style="height:${pctHeight}%" title="${beaconEscapeHtml(title)}"></span>`;
         }).join("");
-        const caption = kind === "snr"
-          ? "100 W reference-dash intensity across the latest monitored passes."
-          : "Ordered dash-copy quality across the same pass history.";
+        const caption = kind === "snr" ? t("beacon_chart_snr_caption") : t("beacon_chart_dash_caption");
         const latestValue = values.length ? values[values.length - 1] : null;
         const bestValue = values.length ? Math.max(...values) : null;
         const avgValue = values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length) : null;
         return `<div class="beacon-history-metric">
           <div class="beacon-history-chart__stats">
-            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
-            ${beaconRenderHistoryChartStat("Latest", beaconFormatHistoryMetricValue(latestValue, kind))}
-            ${beaconRenderHistoryChartStat("Best", beaconFormatHistoryMetricValue(bestValue, kind))}
-            ${beaconRenderHistoryChartStat("Average", beaconFormatHistoryMetricValue(avgValue, kind))}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_rows"), `${observations.length}`)}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_latest"), beaconFormatHistoryMetricValue(latestValue, kind))}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_best"), beaconFormatHistoryMetricValue(bestValue, kind))}
+            ${beaconRenderHistoryChartStat(t("beacon_chart_average"), beaconFormatHistoryMetricValue(avgValue, kind))}
           </div>
           <div class="beacon-history-metric__bars">${bars}</div>
           <div class="beacon-history-chart__caption">${beaconEscapeHtml(caption)}</div>
