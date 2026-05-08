@@ -3030,7 +3030,7 @@ Last update: 2026-04-03 UTC
       const customRange = document.getElementById("customRange");
 
       // ── Flatpickr date pickers (locale pt, formato DD/MM/AAAA) ──────
-      const _fpOpts = { locale: "pt", dateFormat: "d/m/Y", allowInput: true, disableMobile: false };
+      const _fpOpts = { locale: "pt", dateFormat: "Y-m-d", allowInput: true, disableMobile: false };
       const _fpStart     = flatpickr(document.getElementById("startInputDate"), _fpOpts);
       const _fpEnd       = flatpickr(document.getElementById("endInputDate"),   _fpOpts);
       const _fpAprsStart = flatpickr(document.getElementById("aprsCustomStartDate"), _fpOpts);
