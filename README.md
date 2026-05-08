@@ -20,7 +20,8 @@ The platform combines:
 - **Public push-mirror to shared PHP+MySQL hosting** — read-only replica of the Academic Analytics dashboard published every 5 min via signed JSON snapshots, with no inbound port-forwarding, no WebSocket, and no admin surface on the public side (e.g. https://cs5arc.pt/external_academic_analytics/).
 - **Production-grade ops** — systemd packaging, graphical whiptail installer, WAL-mode SQLite with composite indices, structured logs, bcrypt admin auth, HMAC-SHA256-signed mirror replication.
 
-Licensed under GNU AGPL-3.0. Developed by **CT7BFV / Octávio Filipe Pereira Gonçalves**:
+Licensed under GNU AGPL-3.0. Developed by **CT7BFV / Octávio Filipe Pereira Gonçalves**.
+
 This software serves solely as a radio science guide for an operating amateur radio station or for the analysis of radioelectric data by the scientific community.
 
 ## Goal
