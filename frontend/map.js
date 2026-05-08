@@ -9,6 +9,7 @@
   // ── Band colour palette ────────────────────────────────────────────────────
   const BAND_COLORS = {
     "160m": "#ff0000", "80m": "#ff1493", "40m": "#ffa500",
+    "60m": "#facc15",
     "20m": "#00bfff",  "17m": "#00ff00", "15m": "#9400ff",
     "12m": "#00ffff",  "10m": "#ff4500", "6m":  "#ffff00",
     "2m":  "#7fff00",  "70cm": "#ff69b4",
@@ -144,7 +145,11 @@
   // Returns { controls: {zoomIn, zoomOut, reset} }
   function drawGlobe(container, W, H, data, world) {
     const station  = data.station  || {};
-    const contacts = data.contacts || [];
+    const allContacts = Array.isArray(data.contacts) ? data.contacts : [];
+    const selectedBand = getBandFilter();
+    const contacts = selectedBand === "all"
+      ? allContacts
+      : allContacts.filter((contact) => String(contact?.band || "").trim().toLowerCase() === selectedBand);
     const isBeaconMap = isBeaconMapData(data);
     const sLat = station.lat ?? 39.5;
     const sLon = station.lon ?? -8.0;
@@ -214,11 +219,17 @@
         .attr("fill", "#cbd5e1").attr("font-size", "15px").attr("font-family", "monospace").text(band);
     });
     const win = data.window_minutes || 60;
+    const totalCount = allContacts.length;
+    const shownCount = contacts.length;
+    const mapUnit = isBeaconMap ? "detections" : "contacts";
+    const countLabelText = selectedBand === "all"
+      ? `${shownCount} ${mapUnit} · ${formatWindowLabel(win)}`
+      : `${shownCount}/${totalCount} ${mapUnit} · ${selectedBand.toUpperCase()} · ${formatWindowLabel(win)}`;
     const countLabel = svg.append("text")
       .attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
       .attr("fill", "#64748b").attr("font-size", "14px").attr("font-family", "monospace")
       .attr("pointer-events", "none")
-      .text(`${contacts.length} ${isBeaconMap ? "detections" : "contacts"} · ${formatWindowLabel(win)}`);
+      .text(countLabelText);
 
     const tip = getTooltip();
 
@@ -446,6 +457,11 @@
     return sel ? parseInt(sel.value, 10) || 60 : 60;
   }
 
+  function getBandFilter() {
+    const sel = document.getElementById("mapBandFilter");
+    return sel ? String(sel.value || "all").trim().toLowerCase() : "all";
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
   const PropMap = {
     init(containerId, windowMinutes) {
@@ -501,10 +517,24 @@
         requestAnimationFrame(() => PropMap.init("propagationMap"));
       });
 
+      const refreshInlineAndModal = () => {
+        PropMap.refresh("propagationMap");
+        const fullscreenModalEl = document.getElementById("mapFullscreenModal");
+        if (fullscreenModalEl && fullscreenModalEl.classList.contains("show")) {
+          PropMap.renderModal();
+        }
+      };
+
       // Re-render immediately when user changes the time window
       const sel = document.getElementById("mapWindowSelect");
       if (sel) {
-        sel.addEventListener("change", () => PropMap.refresh("propagationMap"));
+        sel.addEventListener("change", refreshInlineAndModal);
+      }
+
+      // Re-render immediately when user changes the selected band filter
+      const bandSel = document.getElementById("mapBandFilter");
+      if (bandSel) {
+        bandSel.addEventListener("change", refreshInlineAndModal);
       }
     }
 
