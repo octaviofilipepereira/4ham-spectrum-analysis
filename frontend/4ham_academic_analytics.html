@@ -3224,20 +3224,6 @@ Last update: 2026-04-03 UTC
             </div>
             <div class="beacon-list" id="beaconIonosphericContext"></div>
           </article>
-
-          <article class="chart-panel span-12">
-            <div class="chart-header">
-              <h3 data-i18n="beacon_observations">Recent observations</h3>
-            </div>
-            <p data-i18n="beacon_observations_desc">Latest Beacon observations from the selected historical window.</p>
-            <div class="beacon-scroll">
-              <table class="beacon-observations-table" id="beaconObservationsTable"></table>
-            </div>
-            <div class="beacon-meta-inline">
-              <span id="beaconGeneratedAt">--</span>
-              <span id="beaconObservationCount">--</span>
-            </div>
-          </article>
         </div>
       </section>
       </div><!-- /beaconView -->
@@ -3529,9 +3515,7 @@ Last update: 2026-04-03 UTC
       let activeAcademicView = localStorage.getItem("academic_active_view") || "hf";
       let beaconDataLoaded = false;
       let beaconOverview = null;
-      let beaconObservations = [];
       const BEACON_WINDOW_HOURS = 12;
-      const BEACON_OBSERVATION_LIMIT = 20;
       const BEACON_HISTORY_MODAL_LIMIT = 24;
       const BEACON_LOCATION_BY_CALLSIGN = Object.freeze({
         "4U1UN": "New York, NY, USA",
@@ -4753,40 +4737,6 @@ Last update: 2026-04-03 UTC
         table.innerHTML = `${head}<tbody>${body}</tbody>`;
       }
 
-      function renderBeaconObservationsTable(rows) {
-        const table = document.getElementById("beaconObservationsTable");
-        if (!table) return;
-        if (!rows.length) {
-          table.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
-          return;
-        }
-        const head = `
-          <thead>
-            <tr>
-              <th>${beaconEscapeHtml(t("beacon_col_beacon"))}</th>
-              <th>${beaconEscapeHtml(t("beacon_col_band"))}</th>
-              <th>${beaconEscapeHtml(t("beacon_col_detected"))}</th>
-              <th>${beaconEscapeHtml(t("beacon_col_dashes"))}</th>
-              <th>${beaconEscapeHtml(t("beacon_col_snr"))}</th>
-              <th>${beaconEscapeHtml(t("beacon_col_recorded"))}</th>
-            </tr>
-          </thead>`;
-        const body = rows.map((row) => {
-          const detected = row.detected ? "yes" : "no";
-          const detectedClass = row.detected ? "good" : "no-data";
-          return `
-            <tr>
-              <td>${beaconEscapeHtml(row.beacon_callsign || "--")}</td>
-              <td>${beaconEscapeHtml(row.band_name || "--")}</td>
-              <td><span class="beacon-badge ${detectedClass}">${beaconEscapeHtml(detected)}</span></td>
-              <td>${beaconEscapeHtml(String(row.dash_levels_detected ?? 0))}</td>
-              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_100w))}</td>
-              <td>${beaconEscapeHtml(beaconFormatUtc(row.recorded_at || row.slot_start_utc))}</td>
-            </tr>`;
-        }).join("");
-        table.innerHTML = `${head}<tbody>${body}</tbody>`;
-      }
-
       function renderBeaconDashboard() {
         const payload = beaconOverview;
         const kpis = payload?.kpis || {};
@@ -4954,10 +4904,6 @@ Last update: 2026-04-03 UTC
           `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["17m"] || {}).status) || "--")}</div></div>`
         ] : [];
         renderBeaconRowList("beaconIonosphericContext", ionoRows, t("beacon_no_data"));
-
-        renderBeaconObservationsTable(Array.isArray(beaconObservations) ? beaconObservations : []);
-        setText("beaconGeneratedAt", payload ? `Generated: ${beaconFormatUtc(payload.generated_at_utc)}` : "--");
-        setText("beaconObservationCount", `${beaconObservations.length} rows`);
       }
 
       async function beaconLoadAndRender() {
@@ -4974,30 +4920,22 @@ Last update: 2026-04-03 UTC
             propagation_window_minutes: "180",
             forecast_window_minutes: "180",
           });
-          const obsParams = new URLSearchParams({
-            hours: String(BEACON_WINDOW_HOURS),
-            limit: String(BEACON_OBSERVATION_LIMIT),
-          });
-          const [overviewResp, obsResp] = await Promise.all([
+          const [overviewResp] = await Promise.all([
             fetch(`${_BASE}api/beacons/analytics/overview?${overviewParams.toString()}`),
-            fetch(`${_BASE}api/beacons/observations?${obsParams.toString()}`),
             fetchScanRuntimeStatus({ deferRender: true }),
             fetchBeaconRuntimeStatus({ deferRender: true }),
           ]);
           renderScanRuntimeInfo();
           startScanRuntimeTicker();
           updateApiLastFetchInfo(queryAt);
-          if (!overviewResp.ok || !obsResp.ok) {
+          if (!overviewResp.ok) {
             throw new Error("Beacon analytics request failed");
           }
           beaconOverview = await overviewResp.json();
-          const obsPayload = await obsResp.json();
-          beaconObservations = Array.isArray(obsPayload?.observations) ? obsPayload.observations : [];
           beaconDataLoaded = true;
           renderBeaconDashboard();
         } catch (_err) {
           beaconOverview = null;
-          beaconObservations = [];
           beaconDataLoaded = false;
           renderBeaconDashboard();
         } finally {
