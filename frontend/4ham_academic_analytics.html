@@ -741,10 +741,32 @@ Last update: 2026-04-03 UTC
         border: 1px solid transparent;
       }
 
-      #kpiBestBandScore {
-        font-size: 0.68rem;
-        white-space: nowrap;
-        line-height: 1.1;
+      .top-bands-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 10px;
+        width: 100%;
+      }
+      .top-band-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.84rem;
+      }
+      .top-band-row .rank {
+        font-size: 1.05rem;
+        width: 1.5em;
+        text-align: center;
+      }
+      .top-band-row .band-name {
+        font-weight: 700;
+        font-size: 0.92rem;
+        flex: 1;
+      }
+      .top-band-row .band-score {
+        color: var(--muted);
+        font-size: 0.78rem;
       }
 
       .prop-state .badge.excellent {
@@ -2350,9 +2372,10 @@ Last update: 2026-04-03 UTC
             </div>
           </div>
           <div class="card">
-            <span class="label" data-i18n="kpi_best_band">Best band</span>
-            <div class="value" id="kpiBestBand">--</div>
-            <div class="prop-state"><span id="kpiBestBandScore">--</span></div>
+            <span class="label" data-i18n="kpi_top_bands">Top 3 Bands</span>
+            <div id="kpiTopBands" class="top-bands-list">
+              <div class="top-band-row"><span class="rank">--</span></div>
+            </div>
           </div>
         </div>
 
@@ -2894,8 +2917,7 @@ Last update: 2026-04-03 UTC
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
       const kpiPropLabel = document.getElementById("kpiPropLabel");
-      const kpiBestBand = document.getElementById("kpiBestBand");
-      const kpiBestBandScore = document.getElementById("kpiBestBandScore");
+      const kpiTopBands = document.getElementById("kpiTopBands");
       const metaPeriod = document.getElementById("metaPeriod");
       const metaSnapshot = document.getElementById("metaSnapshot");
       const metaUpdateFrequency = document.getElementById("metaUpdateFrequency");
@@ -5226,10 +5248,14 @@ Last update: 2026-04-03 UTC
             const bestBand = bestBandData
               ? { band: bestBandData.band, score: Number(bestBandData.score), events: Number(bestBandData.events) }
               : null;
+            const topBands = propBands.slice(0, 3).map(r => ({
+              band: r.band, score: Number(r.score), events: Number(r.events)
+            }));
             serverPropagation = {
               overallScore,
               stability: Number(kpis.stability_pct || 0),
               bestBand,
+              topBands,
               byBand: byBandArray,
               trend,
             };
@@ -5453,12 +5479,14 @@ Last update: 2026-04-03 UTC
         kpiPropLabel.textContent = state.label;
         kpiPropState.className = `badge ${state.className}`;
 
-        if (propagation.bestBand) {
-          kpiBestBand.textContent = propagation.bestBand.band;
-          kpiBestBandScore.textContent = `${propagation.bestBand.score.toFixed(1)} / 100 | stability ${propagation.stability.toFixed(1)}%`;
+        const MEDALS = ["🥇", "🥈", "🥉"];
+        const topBands = propagation.topBands || (propagation.bestBand ? [propagation.bestBand] : []);
+        if (topBands.length > 0) {
+          kpiTopBands.innerHTML = topBands.slice(0, 3).map((b, i) =>
+            `<div class="top-band-row"><span class="rank">${MEDALS[i]}</span><span class="band-name">${b.band}</span><span class="band-score">${b.score.toFixed(1)}</span></div>`
+          ).join("");
         } else {
-          kpiBestBand.textContent = "--";
-          kpiBestBandScore.textContent = "--";
+          kpiTopBands.innerHTML = "<div class=\"top-band-row\"><span class=\"rank\">--</span></div>";
         }
       }
 
