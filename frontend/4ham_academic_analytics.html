@@ -3227,12 +3227,11 @@ Last update: 2026-04-03 UTC
 
           <article class="chart-panel span-12 beacon-propmap-card">
             <div class="chart-header">
-              <h3 data-i18n="chart_propmap">QTH-Centric Propagation Map</h3>
-              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom (CTRL+ Mouse Wheel) · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen." data-i18n-help-html="help_propmap" data-i18n-help-title="chart_propmap">i</button>
+              <h3>Beacon Detection Map — NCDXF/IARU</h3>
+              <button type="button" class="helper-icon" aria-label="Explain Beacon Detection Map" data-help-title="Beacon Detection Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured dots &amp; arcs&lt;/strong&gt; — NCDXF/IARU beacons with at least one confirmed detection in the analysis window, coloured by band (20 m / 17 m / 15 m / 12 m / 10 m).&lt;br&gt;&lt;strong&gt;Grey dots&lt;/strong&gt; — Beacons monitored but not detected in the window.&lt;br&gt;&lt;br&gt;Hover a dot to see callsign, location and detected bands.&lt;br&gt;Drag to rotate · CTRL+Scroll to zoom · Double-click to reset.">i</button>
             </div>
-            <p data-i18n="chart_propmap_desc">NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom (CTRL+ Mouse Wheel).</p>
+            <p>Arcos QTH → beacons detectados na janela de análise. Pontos cinzentos = monitorados sem cópia.</p>
             <div class="propmap-wrap" id="beaconPropMapWrap"></div>
-            <div class="propmap-mobile-legends" id="beaconPropMapMobileLegends"></div>
           </article>
         </div>
       </section>
@@ -3546,6 +3545,27 @@ Last update: 2026-04-03 UTC
         "LU4AA": "Buenos Aires, Argentina",
         "OA4B": "Lima, Peru",
         "YV5B": "Caracas, Venezuela",
+      });
+      // NCDXF/IARU beacon coordinates [lon, lat] (D3 GeoJSON convention)
+      const BEACON_COORDS_BY_CALLSIGN = Object.freeze({
+        "4U1UN":  [ -73.98,  40.75],
+        "VE8AT":  [ -85.96,  79.99],
+        "W6WX":   [-121.90,  37.16],
+        "KH6RS":  [-156.45,  20.77],
+        "ZL6B":   [ 175.66, -40.95],
+        "VK6RBP": [ 116.02, -32.11],
+        "JA2IGY": [ 136.94,  35.07],
+        "RR9O":   [  83.09,  54.85],
+        "VR2B":   [ 114.17,  22.32],
+        "4S7B":   [  79.86,   6.90],
+        "ZS6DN":  [  28.19, -25.74],
+        "5Z4B":   [  36.82,  -1.29],
+        "4X6TU":  [  34.78,  32.07],
+        "OH2B":   [  24.10,  60.26],
+        "CS3B":   [ -16.93,  32.65],
+        "LU4AA":  [ -58.38, -34.62],
+        "OA4B":   [ -77.06, -12.05],
+        "YV5B":   [ -67.87,  10.49],
       });
       const beaconHistoryNote = document.getElementById("beaconHistoryNote");
       const beaconEventsModal = document.getElementById("beaconEventsModal");
@@ -4914,6 +4934,257 @@ Last update: 2026-04-03 UTC
           `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["17m"] || {}).status) || "--")}</div></div>`
         ] : [];
         renderBeaconRowList("beaconIonosphericContext", ionoRows, t("beacon_no_data"));
+
+        // Beacon detection globe
+        const _bgWrap = document.getElementById("beaconPropMapWrap");
+        if (_bgWrap && window.d3 && window.topojson) {
+          _pmLoadWorld().then((world) => {
+            drawBeaconGlobe(_bgWrap, world, payload?.recent_activity || null);
+          });
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // Beacon Detection Globe (NCDXF/IARU — orthographic D3 globe)
+      // ═══════════════════════════════════════════════════════════════════════
+      function drawBeaconGlobe(wrap, world, recentActivity) {
+        if (!wrap || !window.d3 || !window.topojson) return;
+        wrap.innerHTML = "";
+
+        const NCDXF_BANDS = ["20m", "17m", "15m", "12m", "10m"];
+
+        // Build detection map: callsign → { detected: bool, bands: Set<string> }
+        const detectionMap = {};
+        if (recentActivity) {
+          const rBands   = Array.isArray(recentActivity.bands)   ? recentActivity.bands   : [];
+          const beacons  = Array.isArray(recentActivity.beacons) ? recentActivity.beacons : [];
+          const matrix   = Array.isArray(recentActivity.matrix)  ? recentActivity.matrix  : [];
+          beacons.forEach((cs, rIdx) => {
+            const row = Array.isArray(matrix[rIdx]) ? matrix[rIdx] : [];
+            const detected = new Set();
+            row.forEach((cell, cIdx) => {
+              if (cell && Number(cell.detections || 0) > 0) detected.add(rBands[cIdx]);
+            });
+            detectionMap[cs] = { detected: detected.size > 0, bands: detected };
+          });
+        }
+
+        const sLat = aprsQthLat || 39.5;
+        const sLon = aprsQthLon || -8.0;
+
+        const rect = wrap.getBoundingClientRect();
+        const W = rect.width || 800;
+        const H = rect.height || 520;
+        const baseScale = Math.min(W, H) * 0.44;
+        let kScale = 1;
+        let savedRot = null;
+        try {
+          const sv = JSON.parse(sessionStorage.getItem("beaconMapView"));
+          if (sv) { if (sv.k) kScale = sv.k; if (sv.rot) savedRot = sv.rot; }
+        } catch {}
+        function saveView() {
+          try { sessionStorage.setItem("beaconMapView", JSON.stringify({ k: kScale, rot: proj.rotate() })); } catch {}
+        }
+
+        const proj = d3.geoOrthographic()
+          .rotate(savedRot || [-sLon, -sLat])
+          .scale(baseScale * kScale)
+          .translate([W / 2, H / 2])
+          .clipAngle(90);
+        const path = d3.geoPath().projection(proj);
+        const graticule = d3.geoGraticule()();
+
+        const gradId = "beaconOcean";
+        const svg = d3.select(wrap).append("svg")
+          .attr("width", "100%").attr("height", "100%")
+          .attr("viewBox", `0 0 ${W} ${H}`)
+          .attr("preserveAspectRatio", "xMidYMid meet")
+          .style("background", "#0d1117").style("border-radius", "6px")
+          .style("cursor", "grab").style("display", "block");
+
+        const defs = svg.append("defs");
+        const grad = defs.append("radialGradient")
+          .attr("id", gradId).attr("gradientUnits", "userSpaceOnUse")
+          .attr("cx", W / 2).attr("cy", H / 2).attr("r", baseScale);
+        grad.append("stop").attr("offset", "0%").attr("stop-color", "#0e3266");
+        grad.append("stop").attr("offset", "70%").attr("stop-color", "#0a1e3d");
+        grad.append("stop").attr("offset", "100%").attr("stop-color", "#050d1a");
+
+        const spherePath = svg.append("path").datum({ type: "Sphere" })
+          .attr("fill", `url(#${gradId})`).attr("stroke", "#1e3a5f").attr("stroke-width", 0.6);
+        const gratPath = svg.append("path").datum(graticule)
+          .attr("fill", "none").attr("stroke", "#1a3a5c").attr("stroke-width", 0.3);
+        let countryPaths;
+        if (world) {
+          countryPaths = svg.append("g").selectAll("path")
+            .data(topojson.feature(world, world.objects.countries).features)
+            .join("path").attr("fill", "#1a3050").attr("stroke", "#2a4f78").attr("stroke-width", 0.4);
+        }
+
+        const arcG  = svg.append("g");
+        const dotG  = svg.append("g");
+        const homeG = svg.append("g");
+
+        let tip = document.getElementById("beaconMapTooltip");
+        if (!tip) {
+          tip = document.createElement("div");
+          tip.id = "beaconMapTooltip";
+          tip.style.cssText = "position:fixed;background:#1e293b;color:#e2e8f0;padding:5px 9px;"
+            + "border-radius:5px;font-size:11px;pointer-events:none;display:none;"
+            + "z-index:10001;white-space:nowrap;border:1px solid #334155;";
+          document.body.appendChild(tip);
+        }
+
+        function redraw() {
+          spherePath.attr("d", path);
+          gratPath.attr("d", path);
+          if (countryPaths) countryPaths.attr("d", path);
+          grad.attr("r", proj.scale());
+          const center = proj.invert([W / 2, H / 2]);
+
+          arcG.selectAll("*").remove();
+          dotG.selectAll("*").remove();
+          homeG.selectAll("*").remove();
+
+          for (const [cs, coords] of Object.entries(BEACON_COORDS_BY_CALLSIGN)) {
+            const [bLon, bLat] = coords;
+            const info = detectionMap[cs] || { detected: false, bands: new Set() };
+
+            if (info.detected) {
+              const primaryBand = NCDXF_BANDS.find((b) => info.bands.has(b)) || [...info.bands][0] || "20m";
+              const color = _pmColor(primaryBand);
+              arcG.append("path")
+                .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                .attr("d", path).attr("fill", "none")
+                .attr("stroke", color).attr("stroke-width", 1.8).attr("stroke-opacity", 0.85);
+            }
+
+            if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) continue;
+            const pp = proj([bLon, bLat]);
+            if (!pp) continue;
+
+            if (info.detected) {
+              const primaryBand = NCDXF_BANDS.find((b) => info.bands.has(b)) || [...info.bands][0] || "20m";
+              const color = _pmColor(primaryBand);
+              const bandList = NCDXF_BANDS.filter((b) => info.bands.has(b)).join(", ") || [...info.bands].join(", ");
+              const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
+              dotG.append("circle")
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5.5)
+                .attr("fill", color).attr("stroke", "#fff").attr("stroke-width", 1.2).attr("opacity", 0.93)
+                .style("cursor", "pointer")
+                .on("mousemove", (evt) => {
+                  tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Detectado em: ${bandList}`;
+                  tip.style.display = "block";
+                  tip.style.left = evt.clientX + 14 + "px";
+                  tip.style.top  = evt.clientY - 34 + "px";
+                })
+                .on("mouseleave", () => { tip.style.display = "none"; });
+              dotG.append("text")
+                .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+                .attr("fill", color).attr("font-size", "9px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(cs);
+            } else {
+              const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
+              dotG.append("circle")
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 3.5)
+                .attr("fill", "#334155").attr("stroke", "#64748b").attr("stroke-width", 0.8).attr("opacity", 0.7)
+                .style("cursor", "pointer")
+                .on("mousemove", (evt) => {
+                  tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br><span style="color:#94a3b8">Sem detecção na janela</span>`;
+                  tip.style.display = "block";
+                  tip.style.left = evt.clientX + 14 + "px";
+                  tip.style.top  = evt.clientY - 34 + "px";
+                })
+                .on("mouseleave", () => { tip.style.display = "none"; });
+              dotG.append("text")
+                .attr("x", pp[0] + 5).attr("y", pp[1] + 3)
+                .attr("fill", "#64748b").attr("font-size", "8px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(cs);
+            }
+          }
+
+          // Home marker
+          if (d3.geoDistance([sLon, sLat], center) < Math.PI / 2) {
+            const home = proj([sLon, sLat]);
+            if (home) {
+              homeG.append("circle").attr("cx", home[0]).attr("cy", home[1]).attr("r", 7)
+                .attr("fill", "#facc15").attr("stroke", "#fff").attr("stroke-width", 1.6);
+              homeG.append("text").attr("x", home[0] + 10).attr("y", home[1] + 5)
+                .attr("fill", "#facc15").attr("font-size", "11px")
+                .attr("font-family", "monospace").attr("pointer-events", "none")
+                .text(aprsStationCallsign || "QTH");
+            }
+          }
+        }
+
+        redraw();
+
+        svg.call(d3.drag()
+          .on("start", () => svg.style("cursor", "grabbing"))
+          .on("drag", (event) => {
+            const [rx, ry, rz] = proj.rotate();
+            proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
+            redraw();
+          })
+          .on("end", () => { svg.style("cursor", "grab"); saveView(); })
+        );
+
+        svg.node().addEventListener("wheel", (event) => {
+          if (!event.ctrlKey) return;
+          event.preventDefault();
+          const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+          kScale = Math.max(0.25, Math.min(12, kScale * factor));
+          proj.scale(baseScale * kScale);
+          redraw(); saveView();
+        }, { passive: false });
+
+        svg.on("dblclick", () => {
+          proj.rotate([-sLon, -sLat]).scale(baseScale);
+          kScale = 1; redraw(); saveView();
+        });
+
+        const ctrl = document.createElement("div");
+        ctrl.className = "propmap-ctrl";
+        const mkBtn = (html, title, fn) => {
+          const b = document.createElement("button");
+          b.title = title; b.innerHTML = html;
+          b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+          return b;
+        };
+        ctrl.appendChild(mkBtn("+", t("pm_zoom_in"), () => { kScale = Math.min(kScale * 1.6, 12); proj.scale(baseScale * kScale); redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("−", t("pm_zoom_out"), () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("↻", t("pm_reset"), () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); saveView(); }));
+        ctrl.appendChild(mkBtn("⤢", t("pm_fullscreen"), () => {
+          wrap.classList.toggle("fullscreen");
+          if (wrap.classList.contains("fullscreen")) {
+            wrap.requestFullscreen && wrap.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen && document.exitFullscreen().catch(() => {});
+          }
+          setTimeout(() => drawBeaconGlobe(wrap, world, recentActivity), 200);
+        }));
+        wrap.appendChild(ctrl);
+
+        // Band colour legend
+        const legend = document.createElement("div");
+        legend.className = "propmap-band-filter";
+        legend.style.pointerEvents = "none";
+        for (const band of NCDXF_BANDS) {
+          const color = _pmColor(band);
+          const span = document.createElement("span");
+          span.className = "propmap-band-btn";
+          span.style.cssText = `background:${color}33;color:${color};border-color:${color};cursor:default;`;
+          span.textContent = band;
+          legend.appendChild(span);
+        }
+        const noDetSpan = document.createElement("span");
+        noDetSpan.className = "propmap-band-btn off";
+        noDetSpan.style.cssText = "cursor:default;";
+        noDetSpan.textContent = "sem cópia";
+        legend.appendChild(noDetSpan);
+        wrap.appendChild(legend);
       }
 
       async function beaconLoadAndRender() {
@@ -5249,10 +5520,6 @@ Last update: 2026-04-03 UTC
           {
             wrap: document.getElementById("propMapWrap"),
             mobileLegendHost: document.getElementById("propMapMobileLegends"),
-          },
-          {
-            wrap: document.getElementById("beaconPropMapWrap"),
-            mobileLegendHost: document.getElementById("beaconPropMapMobileLegends"),
           },
         ].filter((host) => host.wrap);
       }
