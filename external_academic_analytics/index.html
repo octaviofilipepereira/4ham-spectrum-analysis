@@ -360,7 +360,7 @@ Last update: 2026-04-03 UTC
         min-width: 0;
       }
 
-      .dt-pair input[type="date"],
+      .dt-pair input[type="text"],
       .dt-pair input[type="time"] {
         min-width: 0;
         flex: 1;
@@ -371,6 +371,11 @@ Last update: 2026-04-03 UTC
         color: #e2e8f0;
         font-size: 0.82rem;
         color-scheme: dark;
+      }
+
+      .dt-pair input[type="text"] {
+        width: 7.5rem;
+        flex: none;
       }
 
       .cards {
@@ -1409,12 +1414,12 @@ Last update: 2026-04-03 UTC
             </div>
             <div class="custom-range" id="customRange" style="display:none;">
               <div class="dt-pair">
-                <input type="date" id="startInputDate" lang="pt-PT" />
-                <input type="time" id="startInputTime" lang="pt-PT" />
+                <input type="text" id="startInputDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" />
+                <input type="time" id="startInputTime" />
               </div>
               <div class="dt-pair">
-                <input type="date" id="endInputDate" lang="pt-PT" />
-                <input type="time" id="endInputTime" lang="pt-PT" />
+                <input type="text" id="endInputDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" />
+                <input type="time" id="endInputTime" />
               </div>
             </div>
           </div>
@@ -1614,13 +1619,13 @@ Last update: 2026-04-03 UTC
             <div id="aprsCustomRange" style="display:none;margin-top:8px;flex-direction:column;gap:6px;width:100%;">
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">From</label>
-                <input type="date" id="aprsCustomStartDate" lang="pt-PT" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
-                <input type="time" id="aprsCustomStartTime" lang="pt-PT" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="text" id="aprsCustomStartDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+                <input type="time" id="aprsCustomStartTime" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
               </div>
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">To</label>
-                <input type="date" id="aprsCustomEndDate" lang="pt-PT" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
-                <input type="time" id="aprsCustomEndTime" lang="pt-PT" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="text" id="aprsCustomEndDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
+                <input type="time" id="aprsCustomEndTime" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
               </div>
               <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="align-self:flex-start;margin-top:2px">Apply Filters</button>
             </div>
@@ -1865,15 +1870,39 @@ Last update: 2026-04-03 UTC
 
       const presetRow = document.getElementById("presetRow");
       const customRange = document.getElementById("customRange");
+      // Helpers: convert between ISO date (YYYY-MM-DD) and display (DD/MM/YYYY)
+      function _parseDMY(s) {
+        const m = s && s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+      }
+      function _fmtYMD(s) {
+        const m = s && s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+      }
+      // Auto-format DD/MM/AAAA as user types
+      function _bindDateFmt(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", function () {
+          const sel = this.selectionStart;
+          let v = this.value.replace(/\D/g, "");
+          if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+          if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5);
+          this.value = v.slice(0, 10);
+        });
+      }
       const startInput = (() => {
         const d = document.getElementById("startInputDate");
         const t = document.getElementById("startInputTime");
         return {
-          get value() { return d.value ? `${d.value}T${t.value || "00:00"}` : ""; },
+          get value() {
+            const iso = _parseDMY(d.value);
+            return iso ? `${iso}T${t.value || "00:00"}` : "";
+          },
           set value(v) {
             if (!v) { d.value = ""; t.value = ""; return; }
             const [date, time] = v.split("T");
-            d.value = date || "";
+            d.value = _fmtYMD(date || "");
             t.value = (time || "00:00").slice(0, 5);
           },
         };
@@ -1882,15 +1911,22 @@ Last update: 2026-04-03 UTC
         const d = document.getElementById("endInputDate");
         const t = document.getElementById("endInputTime");
         return {
-          get value() { return d.value ? `${d.value}T${t.value || "00:00"}` : ""; },
+          get value() {
+            const iso = _parseDMY(d.value);
+            return iso ? `${iso}T${t.value || "00:00"}` : "";
+          },
           set value(v) {
             if (!v) { d.value = ""; t.value = ""; return; }
             const [date, time] = v.split("T");
-            d.value = date || "";
+            d.value = _fmtYMD(date || "");
             t.value = (time || "00:00").slice(0, 5);
           },
         };
       })();
+      _bindDateFmt("startInputDate");
+      _bindDateFmt("endInputDate");
+      _bindDateFmt("aprsCustomStartDate");
+      _bindDateFmt("aprsCustomEndDate");
       const bandFilter = document.getElementById("bandFilter");
       const modeFilter = document.getElementById("modeFilter");
       const applyBtn = document.getElementById("applyBtn");
@@ -4593,8 +4629,10 @@ Last update: 2026-04-03 UTC
             const _ast = document.getElementById("aprsCustomStartTime")?.value;
             const _aed = document.getElementById("aprsCustomEndDate")?.value;
             const _aet = document.getElementById("aprsCustomEndTime")?.value;
-            const s = _asd ? `${_asd}T${_ast || "00:00"}` : "";
-            const e = _aed ? `${_aed}T${_aet || "00:00"}` : "";
+            const si = _parseDMY(_asd);
+            const ei = _parseDMY(_aed);
+            const s = si ? `${si}T${_ast || "00:00"}` : "";
+            const e = ei ? `${ei}T${_aet || "00:00"}` : "";
             return {
               start: s ? new Date(s) : new Date(now - 30 * 60e3),
               end:   e ? new Date(e) : now
