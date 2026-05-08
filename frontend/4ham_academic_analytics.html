@@ -4396,7 +4396,8 @@ Last update: 2026-04-03 UTC
         setText("beaconKpiDetectedSlots", payload ? String(kpis.detected_slots ?? "--") : "--");
         setText("beaconKpiDetectedBeacons", payload ? String(kpis.detected_beacons ?? "--") : "--");
         setText("beaconKpiNoaa", payload ? `Kp ${beaconFormatScore(iono.kp)} · SFI ${beaconFormatScore(iono.sfi)}` : "--");
-        setText("beaconKpiFreshness", payload ? `${freshness.label || "--"} · ${payload.staleness_seconds ?? 0}s` : "--");
+        const _stale = payload?.staleness_seconds ?? 0;
+        setText("beaconKpiFreshness", payload ? (_stale > 0 ? `${freshness.label || "--"} · ${_stale}s` : (freshness.label || "--")) : "--");
 
         renderBeaconRecentActivityTable(payload?.recent_activity || null);
 
