@@ -5224,13 +5224,27 @@ Last update: 2026-04-03 UTC
 
         const digRows = seriesRows.filter((d) => DIGITAL_KPI.has(d.mode));
         const anaRows = seriesRows.filter((d) => ANALOG_KPI.has(d.mode));
-        // Weight by snrCount (events that actually carry an SNR sample), not total
-        // count — otherwise buckets with many no-SNR events bias the average toward 0.
-        const _w = (d) => Number.isFinite(d.snrCount) ? d.snrCount : d.count;
-        const digSnrW = d3.sum(digRows, _w);
-        const anaSnrW = d3.sum(anaRows, _w);
-        const snrDigital = digSnrW > 0 ? d3.sum(digRows, (d) => _w(d) * d.snr) / digSnrW : null;
-        const snrAnalog = anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null;
+        // Use only buckets with a finite SNR and positive effective weight.
+        // This prevents artificial 0.0 dB values when some buckets have count>0
+        // but no real SNR sample.
+        const weightedSnrAvg = (rows) => {
+          let weightedSum = 0;
+          let weightSum = 0;
+          for (const row of rows) {
+            const snr = Number(row?.snr);
+            const rawWeight = Number.isFinite(Number(row?.snrCount))
+              ? Number(row.snrCount)
+              : Number(row?.count);
+            const weight = Number.isFinite(rawWeight) ? rawWeight : 0;
+            if (!Number.isFinite(snr) || weight <= 0) continue;
+            weightedSum += snr * weight;
+            weightSum += weight;
+          }
+          return weightSum > 0 ? (weightedSum / weightSum) : null;
+        };
+
+        const snrDigital = weightedSnrAvg(digRows);
+        const snrAnalog = weightedSnrAvg(anaRows);
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
