@@ -4113,7 +4113,7 @@ Last update: 2026-04-03 UTC
           return;
         }
         const beaconRunning = Boolean(getBeaconSchedulerSnapshot());
-        const showHistoryNote = activeAcademicView === "beacon" && !beaconRunning && hasActiveGenericScan();
+        const showHistoryNote = activeAcademicView === "beacon" && !beaconRunning;
         beaconHistoryNote.hidden = !showHistoryNote;
       }
 
