@@ -2291,8 +2291,8 @@ Last update: 2026-04-03 UTC
               <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
                 <defs>
                   <linearGradient id="kpiCallsignsGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stop-color="#6366f1" />
-                    <stop offset="100%" stop-color="#38bdf8" />
+                    <stop offset="0%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#fb923c" />
                   </linearGradient>
                 </defs>
                 <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
@@ -5457,7 +5457,9 @@ Last update: 2026-04-03 UTC
         const weightedTotal = d3.sum(byBandArray, (d) => d.score * d.events);
         const eventsTotal = d3.sum(byBandArray, (d) => d.events);
         const overallScore = eventsTotal > 0 ? weightedTotal / eventsTotal : 0;
-        const bestBand = byBandArray.slice().sort((a, b) => b.score - a.score)[0] || null;
+        const sortedBands = byBandArray.slice().sort((a, b) => b.score - a.score || b.events - a.events);
+        const topBands = sortedBands.filter(b => b.events > 0).slice(0, 3);
+        const bestBand = topBands[0] || null;
         const trendStd = d3.deviation(trend, (d) => d.score) || 0;
         const stability = clamp(100 - trendStd * 2.5, 0, 100);
 
@@ -5467,6 +5469,7 @@ Last update: 2026-04-03 UTC
           overallScore,
           stability,
           bestBand,
+          topBands,
           byBand: byBandArray,
           trend,
         };

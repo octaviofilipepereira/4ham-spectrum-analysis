@@ -3568,7 +3568,9 @@ Last update: 2026-04-03 UTC
         const weightedTotal = d3.sum(byBandArray, (d) => d.score * d.events);
         const eventsTotal = d3.sum(byBandArray, (d) => d.events);
         const overallScore = eventsTotal > 0 ? weightedTotal / eventsTotal : 0;
-        const bestBand = byBandArray.slice().sort((a, b) => b.score - a.score)[0] || null;
+        const sortedBands = byBandArray.slice().sort((a, b) => b.score - a.score || b.events - a.events);
+        const topBands = sortedBands.filter(b => b.events > 0).slice(0, 3);
+        const bestBand = topBands[0] || null;
         const trendStd = d3.deviation(trend, (d) => d.score) || 0;
         const stability = clamp(100 - trendStd * 2.5, 0, 100);
 
@@ -3578,6 +3580,7 @@ Last update: 2026-04-03 UTC
           overallScore,
           stability,
           bestBand,
+          topBands,
           byBand: byBandArray,
           trend,
         };
