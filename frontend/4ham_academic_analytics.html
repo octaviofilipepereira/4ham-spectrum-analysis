@@ -3024,6 +3024,8 @@ Last update: 2026-04-03 UTC
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
+      let serverSnrDigital = null; // kpis.snr_avg_digital from API
+      let serverSnrAnalog  = null; // kpis.snr_avg_analog  from API
       let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
       let lastBeaconRuntimeSnapshot = { kind: "unavailable", payload: null };
       let activeAcademicView = localStorage.getItem("academic_active_view") || "hf";
@@ -5342,6 +5344,11 @@ Last update: 2026-04-03 UTC
             serverPropagation = null;
           }
 
+          serverSnrDigital = (kpis.snr_avg_digital != null && Number.isFinite(Number(kpis.snr_avg_digital)))
+            ? Number(kpis.snr_avg_digital) : null;
+          serverSnrAnalog  = (kpis.snr_avg_analog  != null && Number.isFinite(Number(kpis.snr_avg_analog)))
+            ? Number(kpis.snr_avg_analog)  : null;
+
           dataSource = "api";
           if (metaSnapshot) {
             const snapshot = payload.snapshot_utc ? new Date(payload.snapshot_utc) : null;
@@ -5352,6 +5359,8 @@ Last update: 2026-04-03 UTC
           return true;
         } catch (_err) {
           updateApiLastFetchInfo(queryAt);
+          serverSnrDigital = null;
+          serverSnrAnalog  = null;
           return false;
         }
       }
@@ -5425,8 +5434,10 @@ Last update: 2026-04-03 UTC
           return weightSum > 0 ? (weightedSum / weightSum) : null;
         };
 
-        const snrDigital = weightedSnrAvg(digRows);
-        const snrAnalog = weightedSnrAvg(anaRows);
+        // Prefer server-computed values (accurate, confirmed-events-only);
+        // fall back to client-side weighted average from filtered series.
+        const snrDigital = serverSnrDigital !== null ? serverSnrDigital : weightedSnrAvg(digRows);
+        const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog  : weightedSnrAvg(anaRows);
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 

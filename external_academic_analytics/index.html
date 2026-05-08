@@ -1882,6 +1882,8 @@ Last update: 2026-04-03 UTC
       let nextRefreshDeadlineMs = null;
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
+      let serverSnrDigital = null; // kpis.snr_avg_digital from API
+      let serverSnrAnalog  = null; // kpis.snr_avg_analog  from API
       let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
 
       updateMetaUpdateFrequency();
@@ -3409,6 +3411,11 @@ Last update: 2026-04-03 UTC
             serverPropagation = null;
           }
 
+          serverSnrDigital = (kpis.snr_avg_digital != null && Number.isFinite(Number(kpis.snr_avg_digital)))
+            ? Number(kpis.snr_avg_digital) : null;
+          serverSnrAnalog  = (kpis.snr_avg_analog  != null && Number.isFinite(Number(kpis.snr_avg_analog)))
+            ? Number(kpis.snr_avg_analog)  : null;
+
           dataSource = "api";
           if (metaSnapshot) {
             const snapshot = payload.snapshot_utc ? new Date(payload.snapshot_utc) : null;
@@ -3419,6 +3426,8 @@ Last update: 2026-04-03 UTC
           return true;
         } catch (_err) {
           updateApiLastFetchInfo(queryAt);
+          serverSnrDigital = null;
+          serverSnrAnalog  = null;
           return false;
         }
       }
@@ -3474,8 +3483,10 @@ Last update: 2026-04-03 UTC
         const _w = (d) => Number.isFinite(d.snrCount) ? d.snrCount : d.count;
         const digSnrW = d3.sum(digRows, _w);
         const anaSnrW = d3.sum(anaRows, _w);
-        const snrDigital = digSnrW > 0 ? d3.sum(digRows, (d) => _w(d) * d.snr) / digSnrW : null;
-        const snrAnalog = anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null;
+        const snrDigital = serverSnrDigital !== null ? serverSnrDigital
+          : (digSnrW > 0 ? d3.sum(digRows, (d) => _w(d) * d.snr) / digSnrW : null);
+        const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog
+          : (anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null);
 
         const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
 
