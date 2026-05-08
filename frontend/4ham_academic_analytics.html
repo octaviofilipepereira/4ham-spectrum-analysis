@@ -1342,15 +1342,186 @@ Last update: 2026-04-03 UTC
         overflow-x: auto;
       }
 
-      .beacon-activity-table,
+      .beacon-matrix {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: calc(0.78rem + 2px);
+      }
+
+      .beacon-matrix th,
+      .beacon-matrix td {
+        padding: 4px 6px;
+        vertical-align: middle;
+        text-align: center;
+        border: 1px solid rgba(40, 68, 90, 0.75);
+      }
+
+      .beacon-matrix th {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .beacon-matrix td.beacon-callsign,
+      .beacon-matrix th.beacon-callsign-header {
+        text-align: left;
+      }
+
+      .beacon-matrix td:not(.beacon-callsign),
+      .beacon-matrix th:not(.beacon-callsign-header) {
+        width: calc((100% - 14rem) / 5);
+      }
+
+      .beacon-callsign {
+        width: 14rem;
+        max-width: 14rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.88rem;
+      }
+
+      .beacon-callsign .beacon-loc {
+        margin-left: 0.4rem;
+        color: var(--text-muted);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        font-size: 0.74rem;
+      }
+
+      .beacon-callsign-header {
+        width: 14rem;
+      }
+
+      .beacon-cell {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .beacon-cell__telemetry {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .beacon-history-cell {
+        display: inline-flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+        line-height: 1.05;
+      }
+
+      .beacon-history-cell__body {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .beacon-history-meta {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.62rem;
+        color: rgba(255, 255, 255, 0.82);
+        white-space: nowrap;
+      }
+
+      .beacon-meter-row {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+
+      .beacon-meter-value {
+        min-width: 2.3rem;
+        text-align: left;
+        font-variant-numeric: tabular-nums;
+        color: #f8fbff;
+      }
+
+      .beacon-meter {
+        display: inline-flex;
+        gap: 2px;
+        vertical-align: middle;
+        height: 10px;
+        margin-right: 4px;
+      }
+
+      .beacon-meter-row .beacon-meter {
+        margin-right: 0;
+      }
+
+      .beacon-history-cell .beacon-meter-value {
+        min-width: 2.1rem;
+        font-size: 0.72rem;
+      }
+
+      .beacon-cell--history-hit {
+        background: rgba(34, 197, 94, 0.10);
+      }
+
+      .beacon-cell--history-monitored {
+        background: rgba(217, 119, 6, 0.10);
+      }
+
+      .beacon-cell--history-unsampled {
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .beacon-meter__seg {
+        width: 7px;
+        height: 100%;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+
+      .beacon-meter__seg--on-1 {
+        background: #146e14;
+        border-color: #146e14;
+      }
+
+      .beacon-meter__seg--on-2 {
+        background: #29a829;
+        border-color: #29a829;
+      }
+
+      .beacon-meter__seg--on-3 {
+        background: #5edc5e;
+        border-color: #5edc5e;
+      }
+
+      .beacon-meter__seg--on-4 {
+        background: #b6f5b6;
+        border-color: #b6f5b6;
+      }
+
+      .beacon-meter__seg--nocopy,
+      .beacon-meter__seg--fail {
+        background: rgba(217, 119, 6, 0.96);
+        border-color: #fbbf24;
+        box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.18);
+      }
+
+      .beacon-history-footnote {
+        margin: 8px 4px 0;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        line-height: 1.4;
+      }
+
       .beacon-observations-table {
         width: 100%;
         border-collapse: collapse;
         min-width: 640px;
       }
 
-      .beacon-activity-table th,
-      .beacon-activity-table td,
       .beacon-observations-table th,
       .beacon-observations-table td {
         border-bottom: 1px solid rgba(40, 68, 90, 0.65);
@@ -1359,28 +1530,11 @@ Last update: 2026-04-03 UTC
         font-size: 0.82rem;
       }
 
-      .beacon-activity-table thead th,
       .beacon-observations-table thead th {
         color: var(--text-muted);
         font-size: 0.74rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-      }
-
-      .beacon-activity-table tbody th {
-        min-width: 86px;
-      }
-
-      .beacon-activity-table td {
-        text-align: center;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .beacon-cell-sub {
-        display: block;
-        margin-top: 2px;
-        color: var(--text-muted);
-        font-size: 0.72rem;
       }
 
       .beacon-empty {
@@ -1914,10 +2068,10 @@ Last update: 2026-04-03 UTC
             <div class="chart-header">
               <h3 data-i18n="beacon_recent_activity">Recent activity - last 12 h</h3>
             </div>
-            <p data-i18n="beacon_recent_activity_desc">Historical matrix by scheduled beacon slot and band.</p>
             <div class="beacon-scroll">
-              <table class="beacon-activity-table" id="beaconRecentActivityTable"></table>
+              <table class="beacon-matrix" id="beaconRecentActivityTable"></table>
             </div>
+            <p class="beacon-history-footnote" data-i18n="beacon_recent_activity_desc">Historical matrix by scheduled beacon slot and band.</p>
           </article>
 
           <article class="chart-panel span-4">
@@ -2128,6 +2282,26 @@ Last update: 2026-04-03 UTC
       let beaconObservations = [];
       const BEACON_WINDOW_HOURS = 12;
       const BEACON_OBSERVATION_LIMIT = 20;
+      const BEACON_LOCATION_BY_CALLSIGN = Object.freeze({
+        "4U1UN": "New York, NY, USA",
+        "VE8AT": "Eureka, NU, Canada",
+        "W6WX": "Mt. Umunhum, CA, USA",
+        "KH6RS": "Maui, HI, USA",
+        "ZL6B": "Masterton, New Zealand",
+        "VK6RBP": "Rolystone, WA, Australia",
+        "JA2IGY": "Aichi, Japan",
+        "RR9O": "Novosibirsk, Russia",
+        "VR2B": "Hong Kong",
+        "4S7B": "Colombo, Sri Lanka",
+        "ZS6DN": "Pretoria, South Africa",
+        "5Z4B": "Nairobi, Kenya",
+        "4X6TU": "Tel Aviv, Israel",
+        "OH2B": "Lohja, Finland",
+        "CS3B": "Madeira, Portugal",
+        "LU4AA": "Buenos Aires, Argentina",
+        "OA4B": "Lima, Peru",
+        "YV5B": "Caracas, Venezuela",
+      });
       const beaconHistoryNote = document.getElementById("beaconHistoryNote");
 
       updateMetaUpdateFrequency();
@@ -2795,6 +2969,51 @@ Last update: 2026-04-03 UTC
         return normalized || "unknown";
       }
 
+      function beaconReferenceMeterLevel(snrDb) {
+        const value = Number(snrDb);
+        if (!Number.isFinite(value) || value < 0.0) return 0;
+        if (value < 1.5) return 1;
+        if (value < 3.0) return 2;
+        if (value < 4.5) return 3;
+        return 4;
+      }
+
+      function renderBeaconMeter(dashes, variant = "success") {
+        const level = Math.max(0, Math.min(4, Math.round(Number(dashes || 0))));
+        if (variant === "nocopy" || variant === "fail") {
+          return `
+            <span class="beacon-meter beacon-meter--nocopy" aria-label="latest monitored pass had no copy">
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+              <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+            </span>`;
+        }
+        return `
+          <span class="beacon-meter" aria-label="signal level ${level}/4">
+            <span class="beacon-meter__seg${level >= 1 ? " beacon-meter__seg--on-1" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 2 ? " beacon-meter__seg--on-2" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 3 ? " beacon-meter__seg--on-3" : ""}"></span>
+            <span class="beacon-meter__seg${level >= 4 ? " beacon-meter__seg--on-4" : ""}"></span>
+          </span>`;
+      }
+
+      function renderBeaconHistoryTelemetry(bestSnrDb, bestDashes) {
+        const dashCount = Math.max(0, Math.min(4, Math.round(Number(bestDashes || 0))));
+        const snrLabel = Number.isFinite(Number(bestSnrDb)) ? `${Number(bestSnrDb).toFixed(1)} dB` : "n/a";
+        return `
+          <span class="beacon-cell__telemetry">
+            <span class="beacon-meter-row" title="100 W reference dash: ${beaconEscapeHtml(snrLabel)}">
+              ${renderBeaconMeter(beaconReferenceMeterLevel(bestSnrDb))}
+              <span class="beacon-meter-value">${beaconEscapeHtml(snrLabel)}</span>
+            </span>
+            <span class="beacon-meter-row" title="Ordered dash sequence heard: ${dashCount}/4">
+              ${renderBeaconMeter(dashCount)}
+              <span class="beacon-meter-value">${dashCount}/4</span>
+            </span>
+          </span>`;
+      }
+
       function renderBeaconRowList(targetId, rows, emptyText) {
         const target = document.getElementById(targetId);
         if (!target) return;
@@ -2811,25 +3030,47 @@ Last update: 2026-04-03 UTC
         const bands = Array.isArray(recentActivity?.bands) ? recentActivity.bands : [];
         const beacons = Array.isArray(recentActivity?.beacons) ? recentActivity.beacons : [];
         const matrix = Array.isArray(recentActivity?.matrix) ? recentActivity.matrix : [];
+        const noDataColspan = Math.max(2, bands.length + 1);
         if (!bands.length || !beacons.length || !matrix.length) {
-          table.innerHTML = `<tbody><tr><td class="beacon-empty">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          table.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="${noDataColspan}">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
           return;
         }
-        const head = `<thead><tr><th>${beaconEscapeHtml(t("beacon_col_beacon"))}</th>${bands.map((band) => `<th>${beaconEscapeHtml(band)}</th>`).join("")}</tr></thead>`;
+        const head = `<thead><tr><th class="beacon-callsign-header">${beaconEscapeHtml(t("beacon_col_beacon"))}</th>${bands.map((band) => `<th>${beaconEscapeHtml(band)}</th>`).join("")}</tr></thead>`;
         const body = beacons.map((callsign, rowIndex) => {
+          const location = BEACON_LOCATION_BY_CALLSIGN[callsign] || "";
           const row = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
           const cells = bands.map((band, colIndex) => {
             const cell = row[colIndex];
-            if (!cell) {
-              return `<td>-</td>`;
+            if (!cell || !Number(cell.total_slots || 0)) {
+              const noSampleTitle = `${callsign} ${band}: no monitored slots in window`;
+              return `<td class="beacon-cell beacon-cell--history-unsampled" title="${beaconEscapeHtml(noSampleTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span title="No monitored slots in window">·</span></span></small></td>`;
             }
             const totalSlots = Number(cell.total_slots || 0);
             const detections = Number(cell.detections || 0);
-            const ratio = totalSlots > 0 ? Math.max(0, Math.min(1, detections / totalSlots)) : 0;
-            const title = `${callsign} ${band}: ${detections}/${totalSlots}`;
-            return `<td title="${beaconEscapeHtml(title)}" style="background: rgba(52, 211, 153, ${0.10 + ratio * 0.45});">${detections}<span class="beacon-cell-sub">/${totalSlots}</span></td>`;
+            if (detections <= 0) {
+              const noCopyTitle = [
+                `${callsign} ${band}`,
+                `Monitored ${totalSlots} slot(s) in window`,
+                "0 detected passes",
+              ].join("\n");
+              return `<td class="beacon-cell beacon-cell--history-monitored" title="${beaconEscapeHtml(noCopyTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span class="beacon-meter-row">${renderBeaconMeter(0, "nocopy")}<span class="beacon-meter-value">0</span></span><span class="beacon-history-meta">0/${totalSlots} mon</span></span></small></td>`;
+            }
+            const bestDashes = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+            const bestSnrValue = Number(cell.best_snr_db);
+            const bestSnrLabel = Number.isFinite(bestSnrValue) ? `${bestSnrValue.toFixed(1)} dB` : "n/a";
+            const hitTitle = [
+              `${callsign} ${band}`,
+              `Detected ${detections}/${totalSlots} monitored slots in window`,
+              `Best detected pass: 100 W ${bestSnrLabel}, sequence ${bestDashes}/4`,
+              `Latest detected pass: ${cell.latest_detected_utc || "n/a"}`,
+            ].join("\n");
+            return `<td class="beacon-cell beacon-cell--history-hit" title="${beaconEscapeHtml(hitTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body">${renderBeaconHistoryTelemetry(bestSnrValue, bestDashes)}<span class="beacon-history-meta">${detections}/${totalSlots} mon</span></span></small></td>`;
           }).join("");
-          return `<tr><th>${beaconEscapeHtml(callsign)}</th>${cells}</tr>`;
+          const rowTitle = location ? `${callsign} — ${location}` : callsign;
+          const rowLabel = location
+            ? `${beaconEscapeHtml(callsign)}<span class="beacon-loc">— ${beaconEscapeHtml(location)}</span>`
+            : beaconEscapeHtml(callsign);
+          return `<tr><td class="beacon-callsign" title="${beaconEscapeHtml(rowTitle)}">${rowLabel}</td>${cells}</tr>`;
         }).join("");
         table.innerHTML = `${head}<tbody>${body}</tbody>`;
       }
