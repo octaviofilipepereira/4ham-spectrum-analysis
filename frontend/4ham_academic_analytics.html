@@ -3546,6 +3546,8 @@ Last update: 2026-04-03 UTC
         "OA4B": "Lima, Peru",
         "YV5B": "Caracas, Venezuela",
       });
+      // NCDXF/IARU bands (ordem de transmissão do ciclo)
+      const NCDXF_BANDS = Object.freeze(["20m", "17m", "15m", "12m", "10m"]);
       // NCDXF/IARU beacon coordinates [lon, lat] (D3 GeoJSON convention)
       const BEACON_COORDS_BY_CALLSIGN = Object.freeze({
         "4U1UN":  [ -73.98,  40.75],
@@ -4951,8 +4953,6 @@ Last update: 2026-04-03 UTC
         if (!wrap || !window.d3 || !window.topojson) return;
         wrap.innerHTML = "";
 
-        const NCDXF_BANDS = ["20m", "17m", "15m", "12m", "10m"];
-
         // Build detection map: callsign → { detected: bool, bands: Set<string> }
         const detectionMap = {};
         if (recentActivity) {
@@ -5858,6 +5858,115 @@ Last update: 2026-04-03 UTC
               })
               .on("mouseleave", () => { tip.style.display = "none"; });
           });
+
+          // ── NCDXF Beacon overlay (só quando beacon scan activo) ──────
+          if (getBeaconSchedulerSnapshot() && beaconOverview?.recent_activity) {
+            const bRA = beaconOverview.recent_activity;
+            const bMatrix = bRA.matrix || [];
+            const bBeacons = bRA.beacons || [];
+            const bBands   = bRA.bands   || [];
+
+            // Construir mapa callsign → { detected, bands }
+            const bDetMap = {};
+            bBeacons.forEach((cs, bi) => {
+              bDetMap[cs] = { detected: false, bands: new Set() };
+              bBands.forEach((band, bdi) => {
+                const row = bMatrix[bi];
+                if (row && row[bdi]) {
+                  bDetMap[cs].detected = true;
+                  bDetMap[cs].bands.add(band);
+                }
+              });
+            });
+
+            // Layer dedicados para os beacons no propmap (em cima dos contactos)
+            const bArcG = svg.select("g.beaconArcs");
+            const bDotG = svg.select("g.beaconDots");
+            // Se as camadas não existem ainda criar uma única vez (fora do redraw não é possível, por isso remover+recrear)
+            svg.selectAll("g.beaconArcs,g.beaconDots").remove();
+            const bArcGn = svg.append("g").attr("class", "beaconArcs");
+            const bDotGn = svg.append("g").attr("class", "beaconDots");
+
+            Object.entries(BEACON_COORDS_BY_CALLSIGN).forEach(([cs, [bLon, bLat]]) => {
+              const info = bDetMap[cs] || { detected: false, bands: new Set() };
+              const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
+
+              if (info.detected) {
+                const n = detectedBands.length;
+                const arcSpacing = 5;
+                const ps = proj([sLon, sLat]);
+                const pb = proj([bLon, bLat]);
+                let perpX = 0, perpY = 0;
+                if (ps && pb) {
+                  const dx = pb[0] - ps[0];
+                  const dy = pb[1] - ps[1];
+                  const len = Math.sqrt(dx * dx + dy * dy);
+                  if (len > 0) { perpX = -dy / len; perpY = dx / len; }
+                }
+                detectedBands.forEach((band, i) => {
+                  const offset = (i - (n - 1) / 2) * arcSpacing;
+                  bArcGn.append("path")
+                    .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                    .attr("d", path).attr("fill", "none")
+                    .attr("stroke", _pmColor(band))
+                    .attr("stroke-width", 2.0)
+                    .attr("stroke-opacity", 0.9)
+                    .attr("transform", `translate(${perpX * offset},${perpY * offset})`);
+                });
+              }
+
+              if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) return;
+              const pp = proj([bLon, bLat]);
+              if (!pp) return;
+
+              const loc = BEACON_LOCATION_BY_CALLSIGN?.[cs] || "";
+              if (info.detected) {
+                const bandList = detectedBands.join(", ");
+                const baseR = 6, step = 5;
+                [...detectedBands].reverse().forEach((band, ri) => {
+                  const r = baseR + (detectedBands.length - 1 - ri) * step;
+                  bDotGn.append("circle")
+                    .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
+                    .attr("fill", "none")
+                    .attr("stroke", _pmColor(band))
+                    .attr("stroke-width", 2.5)
+                    .attr("opacity", 0.95)
+                    .style("cursor", "pointer")
+                    .on("mousemove", (evt) => {
+                      tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Beacon detectado: <strong>${bandList}</strong>`;
+                      tip.style.display = "block";
+                      tip.style.left = evt.clientX + 14 + "px";
+                      tip.style.top  = evt.clientY - 34 + "px";
+                    })
+                    .on("mouseleave", () => { tip.style.display = "none"; });
+                });
+                const outerR = baseR + (detectedBands.length - 1) * step;
+                bDotGn.append("text")
+                  .attr("x", pp[0] + outerR + 5).attr("y", pp[1] + 5)
+                  .attr("fill", _pmColor(detectedBands[0])).attr("font-size", "12px")
+                  .attr("font-weight", "bold")
+                  .attr("font-family", "monospace").attr("pointer-events", "none")
+                  .text(cs);
+              } else {
+                bDotGn.append("circle")
+                  .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5)
+                  .attr("fill", "none").attr("stroke", "#6b7280").attr("stroke-width", 1.4).attr("opacity", 0.7)
+                  .style("cursor", "pointer")
+                  .on("mousemove", (evt) => {
+                    tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br><span style="color:#9ca3af">Monitorado — sem cópia</span>`;
+                    tip.style.display = "block";
+                    tip.style.left = evt.clientX + 14 + "px";
+                    tip.style.top  = evt.clientY - 34 + "px";
+                  })
+                  .on("mouseleave", () => { tip.style.display = "none"; });
+                bDotGn.append("text")
+                  .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+                  .attr("fill", "#6b7280").attr("font-size", "11px")
+                  .attr("font-family", "monospace").attr("pointer-events", "none")
+                  .text(cs);
+              }
+            });
+          }
 
           // ── Home marker ──────────────────────────────────────────────
           homeG.selectAll("*").remove();
