@@ -282,7 +282,7 @@ Indicativo: CT7BFV
 - [ ] Nova tabela `beacon_observations` (beacon, frequency_hz, slot_start_utc, snr_db, detected, decoded_text, qrb_km, azimuth_deg)
 - [ ] Modos: park numa única frequência, rotação multi-frequência (via scan rotation/preset scheduler existentes), modo passivo (apenas FFT quando outro modo está activo)
 - [ ] Frontend: painel de beacons em tempo real + heatmap por hora-do-dia × beacon × banda
-- [ ] Objectivo: substituto aberto, moderno, headless e multi-utilizador para Faros/BeaconSee — datasets acessíveis via REST/WebSocket e propagáveis para o mirror cs5arc
+- [ ] Objectivo: substituto aberto, moderno, headless e multi-utilizador para ferramentas legadas de monitorização de beacons — datasets acessíveis via REST/WebSocket e propagáveis para o mirror cs5arc
 - [ ] Reaproveita primitivas existentes: `scan_park`, `estimate_snr`, decoder CW, mapa de propagação, pipeline de push para mirror (~700 linhas de código novo, sem dependências novas)
 
 #### 8.7. Modo FT2 — Acompanhamento Experimental 🧪

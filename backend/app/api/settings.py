@@ -25,6 +25,11 @@ from app.core import features as _features
 
 
 router = APIRouter()
+_SYS_USB_ROOT = Path("/sys/bus/usb/devices")
+_RTL_USB_IDS = {
+    ("0bda", "2838"),  # RTL-SDR Blog V4 / RTL2838 DVB-T
+    ("0bda", "2832"),  # Older RTL2832U variants
+}
 
 # ---------------------------------------------------------------------------
 # APRS / Direwolf auto-configuration helpers
@@ -183,6 +188,98 @@ def _persist_env_vars(env_path: Path, env_vars: dict):
     env_path.write_text("\n".join(lines) + "\n")
 
 
+def _read_sysfs_value(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore").strip()
+    except OSError:
+        return ""
+
+
+def _format_usb_number(value: str) -> str:
+    try:
+        return f"{int(str(value).strip()):03d}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _looks_like_rtl_usb_device(
+    vendor_id: str,
+    product_id: str,
+    manufacturer: str,
+    product: str,
+) -> bool:
+    vendor_id = str(vendor_id or "").strip().lower()
+    product_id = str(product_id or "").strip().lower()
+    haystack = " ".join([manufacturer or "", product or "", vendor_id, product_id]).lower()
+    if (vendor_id, product_id) in _RTL_USB_IDS:
+        return True
+    return any(token in haystack for token in ("rtlsdr", "rtl283", "blog v4"))
+
+
+def _detect_rtl_usb_device() -> Dict[str, str]:
+    try:
+        device_dirs = sorted(
+            (path for path in _SYS_USB_ROOT.iterdir() if path.is_dir()),
+            key=lambda path: path.name,
+        )
+    except OSError:
+        return {}
+
+    for device_dir in device_dirs:
+        vendor_id = _read_sysfs_value(device_dir / "idVendor")
+        product_id = _read_sysfs_value(device_dir / "idProduct")
+        manufacturer = _read_sysfs_value(device_dir / "manufacturer")
+        product = _read_sysfs_value(device_dir / "product")
+        if not _looks_like_rtl_usb_device(vendor_id, product_id, manufacturer, product):
+            continue
+
+        busnum = _format_usb_number(_read_sysfs_value(device_dir / "busnum"))
+        devnum = _format_usb_number(_read_sysfs_value(device_dir / "devnum"))
+        if not busnum or not devnum:
+            continue
+
+        return {
+            "vendor_id": vendor_id.lower(),
+            "product_id": product_id.lower(),
+            "manufacturer": manufacturer,
+            "product": product,
+            "busnum": busnum,
+            "devnum": devnum,
+        }
+
+    return {}
+
+
+def _build_rtl_recovery_info() -> Dict:
+    usbreset_installed = command_exists("usbreset")
+    device = _detect_rtl_usb_device()
+    if not device:
+        return {
+            "detected": False,
+            "usbreset_installed": usbreset_installed,
+        }
+
+    bus_device = f"{device['busnum']}/{device['devnum']}"
+    return {
+        "detected": True,
+        "usbreset_installed": usbreset_installed,
+        "manufacturer": device["manufacturer"],
+        "product": device["product"],
+        "vendor_id": device["vendor_id"],
+        "product_id": device["product_id"],
+        "bus_device": bus_device,
+        "device_path": f"/dev/bus/usb/{device['busnum']}/{device['devnum']}",
+        "usbreset_command": f"sudo usbreset {bus_device}",
+        "usbreset_vid_pid_command": (
+            f"sudo usbreset {device['vendor_id']}:{device['product_id']}"
+            if device["vendor_id"] and device["product_id"]
+            else ""
+        ),
+        "stop_command": "bash scripts/server_control.sh stop",
+        "start_command": "bash scripts/server_control.sh start",
+    }
+
+
 @router.get("")
 def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
     """
@@ -246,6 +343,7 @@ def get_settings(_: None = Depends(verify_basic_auth)) -> Dict:
         "user": state.auth_user if state.auth_required else "",
         "password_configured": bool(state.auth_pass),
     }
+    settings["rtl_recovery"] = _build_rtl_recovery_info()
     return settings
 
 

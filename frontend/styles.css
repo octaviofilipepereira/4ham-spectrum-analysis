@@ -1141,13 +1141,13 @@ h1,
   line-height: 1.3;
   width: 100%;
   min-height: 28px;
-  height: 28px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.85);
-  overflow-x: auto;
-  white-space: pre;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   box-sizing: border-box;
 }
 
@@ -1357,13 +1357,228 @@ h1,
   color: var(--muted);
 }
 
+.beacon-time-sync-modal .modal-content {
+  border-color: rgba(255, 107, 107, 0.28);
+}
+
+.beacon-time-sync-modal__hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 107, 107, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(90, 22, 30, 0.34), rgba(40, 12, 20, 0.18));
+}
+
+.beacon-time-sync-modal__icon {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 160, 160, 0.98), rgba(255, 107, 107, 0.92) 45%, rgba(158, 31, 48, 0.96) 100%);
+  box-shadow: 0 10px 24px rgba(120, 22, 37, 0.35);
+  color: #fff7f7;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.beacon-time-sync-modal__copy {
+  min-width: 0;
+}
+
+.beacon-time-sync-modal__copy p {
+  color: var(--text);
+}
+
+.beacon-time-sync-modal__note {
+  color: rgba(245, 247, 255, 0.72);
+}
+
+@media (max-width: 575px) {
+  .beacon-time-sync-modal__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .beacon-time-sync-modal__icon {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+.app-modal .admin-config-helper-text {
+  color: rgba(245, 247, 255, 0.8);
+}
+
+.app-modal .rtl-recovery-card {
+  background: #ffffff;
+  color: #101726;
+  border: 1px solid rgba(16, 23, 38, 0.12);
+}
+
+.app-modal .rtl-recovery-card .rtl-recovery-helper-text {
+  color: #4c556d;
+}
+
+.app-modal .rtl-recovery-card .text-muted {
+  color: #5f677f !important;
+}
+
+.app-modal .rtl-recovery-toggle {
+  color: inherit;
+}
+
+.app-modal .rtl-recovery-toggle:hover,
+.app-modal .rtl-recovery-toggle:focus {
+  color: inherit;
+  text-decoration: none;
+  box-shadow: none;
+}
+
+.app-modal .rtl-recovery-chevron {
+  display: inline-flex;
+  transition: transform 0.18s ease;
+}
+
+.app-modal .rtl-recovery-toggle:not(.collapsed) .rtl-recovery-chevron {
+  transform: rotate(90deg);
+}
+
 .app-modal .btn-close {
-  filter: invert(1) brightness(1.2);
+  filter: invert(1) grayscale(1) brightness(180%);
   opacity: 0.85;
 }
 
-.app-modal .btn-close:hover {
+.app-modal .btn-close:hover,
+.app-modal .btn-close:focus {
   opacity: 1;
+}
+
+.app-modal .nav-tabs {
+  border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+.app-modal .nav-tabs .nav-link {
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+}
+
+.app-modal .nav-tabs .nav-link:hover,
+.app-modal .nav-tabs .nav-link:focus {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.18) transparent;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-modal .nav-tabs .nav-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* ── Satellite passes list ────────────────────────────────────────────── */
+
+.satellite-passes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.satellite-pass-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgba(255, 179, 71, 0.45);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.satellite-pass-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  border-left-color: rgba(255, 179, 71, 0.85);
+}
+
+.satellite-pass-card.is-active {
+  border-left-color: #dc3545;
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.satellite-pass-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.satellite-pass-card__name {
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.satellite-pass-card__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+.satellite-pass-card__time,
+.satellite-pass-card__metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.satellite-pass-card__metrics {
+  gap: 12px;
+}
+
+.satellite-pass-card__metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.satellite-pass-card__label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.satellite-pass-card__value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.satellite-pass-card__arrow {
+  color: var(--muted);
+  margin: 0 2px;
+}
+
+.satellite-pass-card__duration {
+  color: var(--muted);
+  margin-left: 4px;
 }
 
 .modal#loginModal .modal-content {
@@ -1778,4 +1993,466 @@ h1,
 .aprs-marker-lora .aprs-station-label { color: #ec4899; border-color: #ec4899; }
 .aprs-marker-lora .aprs-station-leader,
 .aprs-marker-lora .aprs-station-anchor { background: #ec4899; }
+
+/* ── Beacon Analysis matrix ──────────────────────────────────────────── */
+.beacon-matrix {
+  font-size: calc(0.78rem + 2px);
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.beacon-matrix th,
+.beacon-matrix td {
+  padding: 4px 6px;
+  vertical-align: middle;
+  text-align: center;
+  border: 1px solid #2a2a3a;
+}
+.beacon-matrix th small,
+.beacon-matrix td small {
+  font-size: calc(0.78rem + 2px);
+}
+
+.beacon-matrix td.beacon-callsign,
+.beacon-matrix th.beacon-callsign-header {
+  text-align: left;
+}
+
+.beacon-matrix td:not(.beacon-callsign),
+.beacon-matrix th:not(.beacon-callsign-header) {
+  width: calc((100% - 14rem) / 5);
+}
+
+.beacon-callsign {
+  font-family: var(--font-mono, monospace);
+  font-size: calc(0.80rem + 2px);
+  width: 14rem;
+  max-width: 14rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.beacon-callsign .beacon-loc {
+  font-family: var(--font-sans, sans-serif);
+  font-size: calc(0.72rem + 2px);
+  color: var(--muted, #9aa);
+  margin-left: 0.4rem;
+}
+
+.beacon-callsign-header {
+  width: 14rem;
+}
+
+/* Active slot row — amber glow */
+.beacon-row--active td {
+  background: rgba(255, 193, 7, 0.10);
+}
+
+/* Active cell — being listened to right now */
+.beacon-cell--active {
+  background: rgba(255, 193, 7, 0.25) !important;
+  outline: 2px solid #ffc107;
+  outline-offset: -2px;
+  animation: beacon-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes beacon-pulse {
+  from { background: rgba(255, 193, 7, 0.18); }
+  to   { background: rgba(255, 193, 7, 0.35); }
+}
+
+/* Observed beacon slot — blue */
+.beacon-cell--detected {
+  --bs-table-bg: rgba(56, 189, 248, 0.18);
+  background: rgba(56, 189, 248, 0.18);
+}
+
+/* Nothing heard */
+.beacon-cell--absent td,
+.beacon-cell--absent {
+  color: var(--muted, #777);
+}
+
+.beacon-dashes {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 2px;
+  color: #ffc107;
+}
+
+.beacon-cell__reading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.05;
+}
+
+.beacon-cell__telemetry {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.beacon-history-cell {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.05;
+}
+
+.beacon-history-cell__body {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.beacon-history-info-btn {
+  min-width: 0;
+  min-height: 24px;
+  margin-top: 1px;
+  flex: 0 0 auto;
+  padding: 0.14rem 0.45rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.beacon-history-info-modal .modal-dialog {
+  max-width: 1120px;
+}
+
+.beacon-history-info-modal__hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 38%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(12, 18, 32, 0.92));
+}
+
+.beacon-history-info-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.beacon-history-info-stat {
+  padding: 14px 14px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.92));
+}
+
+.beacon-history-info-stat__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(191, 219, 254, 0.74);
+}
+
+.beacon-history-info-stat__value {
+  margin-top: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.beacon-history-info-stat__note {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+.beacon-history-info-modal__charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.beacon-history-info-panel {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.92));
+}
+
+.beacon-history-info-panel__heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.beacon-history-info-panel__subtext {
+  margin-top: 4px;
+  margin-bottom: 14px;
+  font-size: 0.76rem;
+  color: rgba(226, 232, 240, 0.66);
+}
+
+.beacon-history-chart__empty,
+.beacon-history-chart__caption {
+  font-size: 0.76rem;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+.beacon-history-chart__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.beacon-history-chart__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.beacon-history-chart__stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(191, 219, 254, 0.72);
+}
+
+.beacon-history-chart__stat-value {
+  font-size: 0.84rem;
+  color: #f8fbff;
+}
+
+.beacon-history-mix__bar {
+  display: flex;
+  overflow: hidden;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.beacon-history-mix__seg--observed { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+.beacon-history-mix__seg--nocopy { background: linear-gradient(90deg, #b45309, #f59e0b); }
+
+.beacon-history-mix__legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.beacon-history-mix__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #f8fbff;
+}
+
+.beacon-history-mix__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.beacon-history-mix__legend-dot--observed { background: #60a5fa; }
+.beacon-history-mix__legend-dot--nocopy { background: #f59e0b; }
+
+.beacon-history-rhythm__bars,
+.beacon-history-metric__bars {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  position: relative;
+  height: 132px;
+  padding: 10px 8px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+    repeating-linear-gradient(
+      to top,
+      rgba(148, 163, 184, 0.12) 0,
+      rgba(148, 163, 184, 0.12) 1px,
+      transparent 1px,
+      transparent 32px
+    );
+}
+
+.beacon-history-rhythm__bar,
+.beacon-history-metric__bar {
+  display: block;
+  align-self: end;
+  flex: 1 1 0;
+  min-width: 6px;
+  border-radius: 999px 999px 2px 2px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.beacon-history-rhythm__bar--detected { background: linear-gradient(180deg, #60a5fa, #1d4ed8); }
+.beacon-history-rhythm__bar--weak { background: linear-gradient(180deg, #facc15, #ca8a04); }
+.beacon-history-rhythm__bar--nocopy { background: linear-gradient(180deg, #f59e0b, #92400e); }
+
+.beacon-history-metric__bar--live { background: linear-gradient(180deg, #38bdf8, #1d4ed8); }
+.beacon-history-metric__bar--muted { background: rgba(148, 163, 184, 0.24); }
+
+.beacon-history-info-table-wrap {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 14px;
+}
+
+.beacon-history-info-table thead th {
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(191, 219, 254, 0.78);
+}
+
+.beacon-history-state-chip,
+.beacon-history-drift-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.beacon-history-state-chip--detected { background: rgba(37, 99, 235, 0.18); color: #bfdbfe; }
+.beacon-history-state-chip--weak { background: rgba(202, 138, 4, 0.18); color: #fde047; }
+.beacon-history-state-chip--nocopy { background: rgba(180, 83, 9, 0.18); color: #fde68a; }
+
+.beacon-history-drift-chip { background: rgba(148, 163, 184, 0.14); color: rgba(226, 232, 240, 0.88); }
+
+.beacon-history-rowmetric {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.beacon-history-rowmetric__bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.beacon-history-rowmetric__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+  border-radius: inherit;
+}
+
+.beacon-history-rowmetric--sequence {
+  min-width: 145px;
+}
+
+.beacon-history-rowmetric__label {
+  font-size: 0.76rem;
+  color: #f8fbff;
+  white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+  .beacon-history-info-modal__charts {
+    grid-template-columns: 1fr;
+  }
+
+  .beacon-history-chart__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.beacon-history-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.82);
+  white-space: nowrap;
+}
+
+.beacon-meter-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.beacon-meter-value {
+  min-width: 2.3rem;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  color: #f8fbff;
+}
+
+/* Signal strength meter — 4 segments, light green → dark green */
+.beacon-meter {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+  height: 10px;
+  margin-right: 4px;
+}
+.beacon-meter-row .beacon-meter {
+  margin-right: 0;
+}
+
+.beacon-history-cell .beacon-meter-value {
+  min-width: 2.1rem;
+  font-size: 0.72rem;
+}
+
+.beacon-cell--history-hit {
+  --bs-table-bg: rgba(34, 197, 94, 0.10);
+  background: rgba(34, 197, 94, 0.10);
+}
+
+.beacon-cell--history-monitored {
+  --bs-table-bg: rgba(217, 119, 6, 0.10);
+  background: rgba(217, 119, 6, 0.10);
+}
+
+.beacon-cell--history-unsampled {
+  color: rgba(255, 255, 255, 0.42);
+}
+.beacon-meter__seg {
+  width: 7px;
+  height: 100%;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.beacon-meter__seg--on-1 { background: #146e14; border-color: #146e14; }
+.beacon-meter__seg--on-2 { background: #29a829; border-color: #29a829; }
+.beacon-meter__seg--on-3 { background: #5edc5e; border-color: #5edc5e; }
+.beacon-meter__seg--on-4 { background: #b6f5b6; border-color: #b6f5b6; }
+.beacon-meter__seg--nocopy,
+.beacon-meter__seg--fail {
+  background: rgba(217, 119, 6, 0.96);
+  border-color: #fbbf24;
+  box-shadow: inset 0 0 0 1px rgba(120, 53, 15, 0.18);
+}
+
+/* Beacon mode button active state (amber outline → solid amber) */
+.mode-quick-btn[data-quick-mode="BEACON"].is-active {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #000;
+}
 

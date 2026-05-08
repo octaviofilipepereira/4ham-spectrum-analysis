@@ -29,6 +29,8 @@ The installer presents an interactive graphical wizard (whiptail) that:
 5. Asks for an admin username and password (stored securely as bcrypt in the local SQLite database)
 6. Installs and starts the systemd background service (auto-start on boot)
 
+On supported Debian-family systems the installer also installs `usbutils`, which provides the `usbreset` utility used by the RTL recovery workflow in Admin Config.
+
 At the end, open the printed URL in your browser and log in. No further steps needed.
 
 Frontend routes after install:
@@ -43,7 +45,7 @@ Frontend routes after install:
 1. Install dependencies: SDR drivers, Python 3.10+, and build tools.
 2. Install SoapySDR and RTL-SDR tools plus Python bindings:
 	- `sudo apt update`
-	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr`
+	- `sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils`
 3. **RTL-SDR v4 only** — the standard `rtl-sdr` apt package does not support the RTL-SDR Blog v4. Build the updated driver from source:
 	```bash
 	sudo apt remove -y rtl-sdr librtlsdr0 librtlsdr-dev
@@ -63,6 +65,7 @@ Frontend routes after install:
 	sudo modprobe -r dvb_usb_rtl28xxu 2>/dev/null || true
 	```
 	Verify: `rtl_test -t`
+ 	The `usbutils` package also provides `usbreset`, used by the Admin Config RTL recovery workflow.
 4. Create a virtual environment and install Python dependencies:
 	- `python3 -m venv .venv`
 	- `source .venv/bin/activate`
@@ -77,8 +80,50 @@ Frontend routes after install:
 4. Run backend with uvicorn:
 	- `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`
 
-## Time Sync
+## Beacon Analysis - host time validation
 - Enable NTP for FT8/FT4 decoding.
+- Beacon Analysis also depends on reliable UTC timing. If 4ham cannot validate a healthy host time-sync state, startup is blocked to avoid false observations.
+- The system timezone does not need to be UTC. What matters is correct absolute time plus an active synchronization source.
+
+Validation states:
+- `healthy`: startup allowed.
+- `degraded`: startup blocked when timing quality is marginal, for example absolute offset above 500 ms or root distance above 1000 ms.
+- `offline`: startup blocked when the host is unsynchronized or clearly outside safe limits, for example absolute offset above 2000 ms or root distance above 5000 ms.
+
+How to verify on the host:
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+What to confirm:
+- `timedatectl status`: `System clock synchronized: yes` and active NTP.
+- `timedatectl timesync-status`: selected server plus reasonable offset and root distance values.
+- `chronyc tracking`: `Leap status: Normal` and low offset when chrony is in use.
+- `chronyc sources -v`: at least one active source, normally marked with `^*`.
+
+How to resolve with systemd-timesyncd:
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+How to resolve with chrony:
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Retry Beacon Analysis only after verification confirms a synchronized clock and a valid time source.
 
 ## Production service (Linux/systemd)
 Use the service installer script for end-user production runs:

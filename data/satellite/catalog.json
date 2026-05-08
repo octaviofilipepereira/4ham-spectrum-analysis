@@ -1,0 +1,9 @@
+{
+  "_meta": {
+    "source": "snapshot",
+    "generated_at": "2026-04-29T00:00:00Z",
+    "filter": "service in [amateur, educational] intersected with Celestrak amateur group",
+    "count": 0
+  },
+  "satellites": []
+}

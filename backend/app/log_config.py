@@ -95,6 +95,13 @@ def setup_logging():
         logger.setLevel(log_level)
         logger.propagate = False
     
+    # Silence noisy 3rd-party loggers that flood the file at INFO level and
+    # — worse — block the event loop while logging during the satellite
+    # propagator cycle. pyorbital prints "Parabolic interpolation did not
+    # converge" hundreds of times per cycle for satellites with marginal TLEs.
+    logging.getLogger("pyorbital.orbital").setLevel(logging.WARNING)
+    logging.getLogger("pyorbital").setLevel(logging.WARNING)
+
     # Log startup message
     root_logger.info(f"Logging configured: {log_file} (max {max_bytes // 1024 // 1024} MB, {backup_count} backups)")
     

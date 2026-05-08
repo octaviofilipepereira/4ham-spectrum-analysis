@@ -11,9 +11,10 @@ This manual provides a complete setup for Linux (Ubuntu 20.04+ / Debian 11+ / Li
 
 ## Contents
 - System Requirements
+- Prerequisites
+- Beacon Analysis - host time validation
 - Quick Start (graphical installer)
 - Service Management (`systemd` helper)
-- Prerequisites
 - Linux (Ubuntu/Debian)
 - Raspberry Pi
 - Decoder Integrations
@@ -41,6 +42,52 @@ This manual provides a complete setup for Linux (Ubuntu 20.04+ / Debian 11+ / Li
 - Python 3.10+
 - Basic build tools (Linux)
 - Accurate system time (NTP) for FT8/FT4
+- Beacon Analysis (NCDXF/IARU) additionally requires a healthy host UTC sync state; 4ham blocks scheduler start when that validation fails.
+
+## Beacon Analysis - host time validation
+Beacon Analysis validates the host time state before starting. The scheduler depends on exact 10-second UTC slots, so 4ham blocks startup whenever the host clock is not reliable enough.
+
+Important: the host timezone does not need to be configured as UTC. What matters is correct absolute time and an active synchronization source.
+
+Validation states:
+- `healthy`: startup allowed.
+- `degraded`: startup blocked. Typical causes include absolute offset above 500 ms, root distance above 1000 ms, no active server, or incomplete probe information.
+- `offline`: startup blocked. Typical causes include unsynchronized clock, inactive NTP, abnormal leap state, absolute offset above 2000 ms, root distance above 5000 ms, or no usable probe path.
+
+Verify on the host:
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+What to confirm:
+- `timedatectl status`: `System clock synchronized: yes` and active NTP.
+- `timedatectl timesync-status`: selected server plus reasonable offset and root distance values.
+- `chronyc tracking`: `Leap status: Normal` and low offset when chrony is in use.
+- `chronyc sources -v`: at least one active source, normally marked with `^*`.
+
+Resolve with systemd-timesyncd:
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+Resolve with chrony:
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Retry Beacon Analysis only after verification confirms a synchronized clock and a valid time source.
 
 ## Quick Start (graphical installer)
 
@@ -52,7 +99,7 @@ cd 4ham-spectrum-analysis
 chmod +x install.sh && ./install.sh
 ```
 
-The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), and optional systemd service activation. No manual steps are required after `git clone`.
+The installer covers: system packages, optional RTL-SDR Blog v4 driver build, Python virtual environment, admin account creation (bcrypt-hashed password stored in SQLite), optional systemd service activation, and the `usbreset` utility used by the RTL recovery workflow. No manual steps are required after `git clone`.
 
 To remove the installation:
 ```
@@ -113,8 +160,10 @@ For manual or customised setups, follow the sections below.
 ### 1) System dependencies
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils
 ```
+
+`usbutils` also provides `usbreset`, which is used by the Admin Config RTL recovery workflow.
 
 Optional utilities:
 ```
@@ -189,7 +238,7 @@ Open the backend-served UI in your browser:
 Use a 64-bit OS (Raspberry Pi OS 64-bit recommended), then install dependencies:
 ```
 sudo apt update
-sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr
+sudo apt install -y soapysdr-tools libsoapysdr-dev python3-soapysdr soapysdr-module-rtlsdr rtl-sdr usbutils
 ```
 
 **RTL-SDR v4 only** — follow section 2a from the Linux section above (build from `rtlsdrblog/rtl-sdr-blog` source and apply kernel blacklist). The process is identical on Raspberry Pi.

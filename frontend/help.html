@@ -61,6 +61,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <li><a href="#overview">Overview</a></li>
       <li><a href="#interface">Interface tour</a></li>
       <li><a href="#scan-modes">Scan modes</a></li>
+      <li><a href="#beacon-analysis">Beacon Analysis &mdash; NCDXF/IARU</a></li>
       <li><a href="#rotation">Scan Rotation</a></li>
       <li><a href="#presets-scheduler">Rotation Presets &amp; Scheduler</a></li>
       <li><a href="#waterfall">Waterfall &amp; spectrum display</a></li>
@@ -202,6 +203,195 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
     <div class="info-box">
       💡 <strong>FT8/FT4 dial frequency</strong> — the decoder locks onto the standard dial frequency for each band (e.g. 14.074 MHz for FT8 20m). A single waterfall marker represents the last decoded callsign for that band/mode combination.
     </div>
+  </section>
+
+  <!-- 3b. BEACON ANALYSIS -->
+  <section id="beacon-analysis">
+    <h2 class="section-title">3b · Beacon Analysis &mdash; NCDXF/IARU</h2>
+    <p>
+      <strong>Beacon Analysis</strong> is a dedicated module for the NCDXF International Beacon Network.
+      The network transmits on a strict 10-second UTC schedule across 5 bands (20/17/15/12/10 m) from 18 fixed stations.
+      Each beacon sends its callsign in CW at 22 WPM, followed by 1-second dashes at 100 W, 10 W, 1 W and 100 mW.
+    </p>
+
+    <h3 class="sub-title">What This Module Does</h3>
+    <ul>
+      <li>Uses a UTC-aligned scheduler instead of the normal scan sweep.</li>
+      <li>Shows a live 18×5 matrix with one row per beacon and one column per band.</li>
+      <li>Shows a separate <strong>Recent activity</strong> heatmap for a fixed rolling 12-hour window.</li>
+      <li>Keeps the propagation card visible in Beacon mode, but switches it to a Beacon-native globe with the latest confirmed detections.</li>
+      <li>Computes a Beacon propagation summary per band plus a global median score.</li>
+      <li>Blocks startup when host time cannot be validated safely enough for exact slot alignment.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Use It</h3>
+    <ol>
+      <li>Click <strong>📻 NCDXF — Beacon Monitor</strong> in the quick mode bar.</li>
+      <li>Click <strong>Start monitoring</strong> inside the Beacon panel.</li>
+      <li>The module first validates host UTC time. If validation fails, a blocking modal explains the reason and the recovery steps.</li>
+      <li>If validation succeeds, the scheduler takes over the scan engine and the normal band/mode scan controls remain locked while Beacon monitoring is active.</li>
+      <li>Click <strong>Stop</strong> to stop the scheduler and release the scan engine.</li>
+    </ol>
+
+    <p>If you hard-refresh the same browser tab while Beacon mode is open, 4ham returns directly to the Beacon panel instead of going back to the standard startup layout.</p>
+
+    <div class="warn-box">
+      <strong>Important:</strong> While Beacon Analysis is running, the scheduler owns the scan engine. Normal band buttons and other scan modes are intentionally disabled.
+    </div>
+
+    <h3 class="sub-title">How To Read The Panel</h3>
+    <ul>
+      <li><strong>Status badge</strong> — shows whether the Beacon scheduler is stopped, validating host time, starting, or running.</li>
+      <li><strong>Live matrix</strong> — each cell represents the latest monitored pass for one beacon on one band.</li>
+      <li><strong>Meter rows</strong> — top row is the 100 W reference dash strength; bottom row is the ordered dash sequence heard from 0 to 4.</li>
+      <li><strong>No copy</strong> — the orange no-copy bar means that slot was monitored but no reliable copy was obtained.</li>
+      <li><strong>Recent activity</strong> — the lower table is always a rolling 12-hour view and shows the best detected pass per cell, not the current live slot state.</li>
+      <li><strong>Events button</strong> — each history cell opens the detailed rows for that beacon/band, including <code>Detected</code>, <code>Weak trace</code>, and <code>No copy</code>.</li>
+      <li><strong>Beacon map</strong> — shows confirmed detections only, drawn in near real time from your QTH to the corresponding beacon; hover shows the latest available detection for that beacon.</li>
+      <li><strong>Beacon score</strong> — shows per-band scores computed from Beacon observations plus a global score based on the median of the monitored bands.</li>
+    </ul>
+
+    <h3 class="sub-title">Public Beacon Semantics</h3>
+    <p>
+      The public reading of Beacon Analysis is schedule-driven. 4ham already knows which beacon should be active in each UTC slot and on each band.
+      A slot shown publicly as <strong>Detected</strong> therefore means that the monitored slot contained enough evidence compatible with the scheduled beacon.
+      Internal engineering diagnostics remain in the system, but they do not enter the public Beacon interpretation or the future export model for this module.
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Term</th><th>Public meaning</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Window</strong></td><td>Rolling history window. In <strong>Recent activity</strong> it is always 12 hours.</td></tr>
+        <tr><td><strong>Coverage</strong></td><td>Number of slots actually monitored inside the window.</td></tr>
+        <tr><td><strong>Detected</strong></td><td>Number of monitored slots with a valid observation of the scheduled beacon.</td></tr>
+        <tr><td><strong>No copy</strong></td><td>Number of monitored slots without a usable observation. Publicly, this is <code>Coverage - Detected</code>.</td></tr>
+        <tr><td><strong>100 W SNR</strong></td><td>Strength of the 100 W reference dash in the observed slot.</td></tr>
+        <tr><td><strong>Best pass</strong></td><td>Best detected pass in the window, ranked first by ordered dash sequence and then by 100 W dash SNR.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Beacon Map and Propagation Score</h3>
+    <p>The Beacon panel now includes its own Beacon-native map and Beacon-native propagation score, without replacing the generic map used by the other modes.</p>
+
+    <p>Map behavior:</p>
+    <ul>
+      <li>Uses <strong>confirmed detections only</strong>; <code>Weak trace</code> does not draw an arc on the globe.</li>
+      <li>Keeps, for each beacon, the <strong>latest confirmed detection</strong> inside the selected map window.</li>
+      <li>Hover shows callsign, location, band, UTC time of the latest detection, 100 W SNR, heard dashes, and approximate distance to your QTH.</li>
+      <li>While you are hovering, dragging, or zooming, refreshes are deferred so the current view does not jump back to the default zoom/orientation.</li>
+    </ul>
+
+    <p>Score behavior:</p>
+    <ul>
+      <li>Each band uses a <strong>60-minute</strong> rolling window; if no useful data exists there, the UI falls back to <strong>24 hours</strong>.</li>
+      <li><code>Weak trace</code> means positive energy on the 100 W dash without crossing the <code>Detected</code> threshold; it contributes partially to the score, but not to the globe and not to the binary recent-activity aggregate.</li>
+      <li>The global Beacon score is the <strong>median</strong> of the band scores that actually contain monitored observations.</li>
+    </ul>
+
+    <table class="manual-table">
+      <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>W</code></td><td>Rolling window in minutes used for the band score</td></tr>
+        <tr><td><code>D_r</code></td><td>Detection rate = <code>Detected / Monitored</code></td></tr>
+        <tr><td><code>W_r</code></td><td><code>Weak trace</code> rate = <code>Weak / Monitored</code></td></tr>
+        <tr><td><code>T</code></td><td>Trace component = <code>min(1, D_r + 0.35 × W_r)</code></td></tr>
+        <tr><td><code>S</code></td><td>Normalised median <code>100 W SNR</code> = <code>clip((median_snr_100W - 3) / 18, 0, 1)</code></td></tr>
+        <tr><td><code>B</code></td><td>Median dash quality = <code>median_dashes / 4</code></td></tr>
+        <tr><td><code>Q</code></td><td>Recency component = <code>clip(1 - age_latest_meaningful / W, 0, 1)</code></td></tr>
+      </tbody>
+    </table>
+    <pre class="small border rounded px-2 py-2 mb-3">T = min(1, D_r + 0.35 × W_r)
+
+S = clip((median_snr_100W - 3) / 18, 0, 1)
+
+B = median_dashes / 4
+
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
+
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
+
+GlobalScore = median(BandScore_i across bands with monitored slots)</pre>
+    <ul>
+      <li><code>clip(x, 0, 1)</code> limits the value to the <code>[0, 1]</code> range.</li>
+      <li><code>median_snr_100W</code> uses <code>Detected</code> slots first; if none exist, it falls back to the band's <code>Weak trace</code> rows.</li>
+      <li><code>age_latest_meaningful</code> measures the age of the latest useful observation (<code>Detected</code> or <code>Weak trace</code>) inside the window.</li>
+      <li><strong>No copy</strong> remains visible publicly, but enters the score only indirectly by lowering <code>D_r</code> and <code>W_r</code>.</li>
+    </ul>
+
+    <h3 class="sub-title">NOAA Gauges &mdash; Kp &amp; SFI</h3>
+    <p>
+      The instrument panel at the top of the Beacon tab shows two NOAA-sourced gauges side by side.
+      Understanding what they measure helps correlate Beacon detection rates with solar and geomagnetic conditions.
+    </p>
+    <table class="manual-table">
+      <thead><tr><th>Gauge</th><th>What it measures</th><th>Scale</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Kp</strong></td>
+          <td>Planetary geomagnetic activity index. Reflects the disturbance in Earth's magnetic field caused by solar wind. Lower = quieter = better HF, especially on polar paths.</td>
+          <td>0–9<br>0–2: quiet (ideal); 3–4: unsettled; 5–6: active storm; ≥ 7: severe — HF blackout possible</td>
+        </tr>
+        <tr>
+          <td><strong>SFI</strong></td>
+          <td>Solar Flux Index at 10.7 cm — proxy for solar UV/X-ray ionising radiation. Higher SFI = denser F2 layer = more bands open for long-distance skip.</td>
+          <td>60–300+<br>&lt; 80: poor; 80–120: moderate; 120–200: good (15/10 m opening likely); &gt; 200: excellent</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Kp and SFI combined &mdash; band priority guide:</strong></p>
+    <table class="manual-table">
+      <thead><tr><th>Band</th><th>Kp sensitivity</th><th>SFI dependency</th><th>With Kp ≤ 3 + SFI ≥ 150 (daytime)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>80 m</strong></td><td>Low (regional, not auroral)</td><td>Very low — works at any SFI</td><td>Reliable at night for NVIS / short regional paths</td></tr>
+        <tr><td><strong>40 m</strong></td><td>Low–medium</td><td>Low — open day and night under most conditions</td><td>Reliable workhorse for short to medium DX</td></tr>
+        <tr><td><strong>20 m</strong></td><td>Medium (polar paths degrade first)</td><td>Medium–high — best with SFI &gt; 100</td><td>Prime DX band; multi-hop to any continent likely open</td></tr>
+        <tr><td><strong>15 m</strong></td><td>Medium</td><td>High — needs SFI &gt; 100 for daytime opening</td><td>Excellent daytime DX; intercontinental paths achievable</td></tr>
+        <tr><td><strong>10 m</strong></td><td>Low (ionospheric, not auroral)</td><td>Very high — needs SFI &gt; 120 for reliable opening</td><td>Good chance of daytime opening; sporadic-E also contributes</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>Daytime DX priority with Kp ≤ 3, SFI ≥ 150:</strong> 20 m &rarr; 15 m &rarr; 10 m &rarr; 40 m &rarr; 80 m.<br>
+      At night, 40 m and 80 m take priority for regional and medium-distance contacts.
+    </p>
+    <p>
+      When Kp rises above 5, polar and sub-polar paths (e.g. Europe to North America via the auroral zone) degrade first.
+      Mid-latitude and equatorial paths are less affected. Under Kp ≥ 7 a complete HF blackout on high-latitude bearings is possible.
+    </p>
+
+    <h3 class="sub-title">Time Validation Before Startup</h3>
+    <p>
+      Beacon Analysis depends on exact 10-second UTC slots. The application therefore validates host time before allowing the scheduler to start.
+      The operating system timezone does <em>not</em> need to be set to UTC. What matters is correct absolute time plus an active synchronization source.
+    </p>
+    <ul>
+      <li><strong>Healthy</strong> — startup allowed. Clock synchronized, NTP active, leap state normal, and timing quality within the Beacon thresholds.</li>
+      <li><strong>Degraded</strong> — startup blocked. Typical causes: absolute offset above 500 ms, root distance above 1000 ms, no active server, or only partial probe information.</li>
+      <li><strong>Offline</strong> — startup blocked. Typical causes: unsynchronized clock, inactive NTP, abnormal leap state, absolute offset above 2000 ms, root distance above 5000 ms, or no usable probe.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Verify On The Host</h3>
+    <pre class="small border rounded px-2 py-2 mb-3">timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v</pre>
+    <ul>
+      <li><code>timedatectl status</code> — <strong>System clock synchronized</strong> should be <code>yes</code> and NTP should be active.</li>
+      <li><code>timedatectl timesync-status</code> — a selected server should be present, with reasonable offset and root distance values.</li>
+      <li><code>chronyc tracking</code> — when chrony is in use, <strong>Leap status</strong> should be <code>Normal</code> and the offset should be low.</li>
+      <li><code>chronyc sources -v</code> — when chrony is in use, at least one active source should be present, normally marked <code>^*</code>.</li>
+    </ul>
+
+    <h3 class="sub-title">How To Resolve On The Host</h3>
+    <p><strong>systemd-timesyncd</strong></p>
+    <pre class="small border rounded px-2 py-2 mb-3">sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status</pre>
+    <p><strong>chrony</strong></p>
+    <pre class="small border rounded px-2 py-2 mb-3">sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v</pre>
+    <p>Retry Beacon Analysis only after the verification step confirms a synchronized clock and a valid time source.</p>
   </section>
 
   <!-- 4. SCAN ROTATION -->
@@ -533,6 +723,7 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td>Retention</td><td>Maximum event count before auto-export + purge; number of recent events to keep; export directory.</td></tr>
         <tr><td>Authentication</td><td>Change admin password.</td></tr>
         <tr><td>SSB Voice Transcription</td><td>Enable/disable Whisper ASR for automatic SSB voice-to-text. Requires <code>openai-whisper</code> package.</td></tr>
+        <tr><td>RTL recovery</td><td>Shows the current RTL USB node, the bus/device address, and the recommended <code>usbreset</code> commands to recover the dongle when preview/waterfall stays stuck without frames.</td></tr>
       </tbody>
     </table>
 
@@ -578,6 +769,22 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         </tr>
       </tbody>
     </table>
+
+    <h3 class="sub-title">RTL-SDR USB reset recovery</h3>
+    <p>
+      When the backend restarts correctly but preview mode remains stuck in <em>Awaiting Spectrum Stream</em> and the waterfall does not move,
+      the RTL can be wedged at USB/driver level. In that case, open <strong>Admin Config</strong> and use the <strong>RTL recovery</strong>
+      panel to identify the current USB node and the exact reset command for the dongle.
+    </p>
+    <ol>
+      <li>Stop the backend with <code>bash scripts/server_control.sh stop</code>.</li>
+      <li>Run the reset command shown in Admin Config, for example <code>sudo usbreset 001/008</code> or <code>sudo usbreset 0bda:2838</code>.</li>
+      <li>Start the backend again with <code>bash scripts/server_control.sh start</code>.</li>
+    </ol>
+    <p>
+      Use this workflow only when a normal restart does not restore the waterfall. The displayed bus/device address can change after unplugging,
+      rebooting, or reconnecting the RTL, so always read the current value from Admin Config before running <code>usbreset</code>.
+    </p>
 
     <h3 class="sub-title">Retention policy</h3>
     <p>
@@ -800,6 +1007,11 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
       <strong>Academic Analytics</strong> dashboard. It combines two data layers: band-by-band
       ionospheric zone predictions from NOAA SWPC, and your actual confirmed SDR contacts.
     </p>
+    <p>
+      When the active mode is <strong>Beacon / NCDXF</strong>, this same card switches to the Beacon globe:
+      it shows only the latest confirmed detection per beacon inside the selected time window and preserves
+      zoom/orientation while the operator is inspecting the map.
+    </p>
 
     <h3 class="sub-title">Map elements</h3>
     <table class="manual-table">
@@ -919,6 +1131,20 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
         <tr><td><strong>Marginal</strong></td><td style="color:#ff9800">■ Amber</td><td>Borderline conditions — NVIS or short skip only (typical for 40 m at mid-day, or higher bands under low SFI).</td></tr>
         <tr><td><strong>Closed</strong></td><td style="color:#e53935">■ Crimson</td><td>Band frequency is below foF2 — no skip propagation. Signals are absorbed by the ionosphere.</td></tr>
         <tr><td><strong>Absorbed</strong></td><td style="color:#9e9e9e">■ Grey</td><td>D-layer absorption is too high for useful propagation — typically 40 m and below during peak daylight under high solar activity.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Kp &times; SFI &mdash; band priority quick reference</h3>
+    <p>Use this table to pick the best band for a given set of space weather conditions:</p>
+    <table class="manual-table">
+      <thead><tr><th>Conditions</th><th>Best bands (priority order)</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Kp 0–2, SFI &gt; 150</td><td>20 m → 15 m → 10 m → 40 m</td><td>Excellent daytime DX; 10 m likely open</td></tr>
+        <tr><td>Kp 0–2, SFI 80–120</td><td>20 m → 40 m → 15 m → 80 m</td><td>Moderate conditions; 15 m marginal; 10 m closed</td></tr>
+        <tr><td>Kp 3–4, SFI &gt; 120</td><td>20 m → 15 m → 40 m → 10 m</td><td>Minor geomagnetic activity; polar paths slightly degraded</td></tr>
+        <tr><td>Kp 5–6, any SFI</td><td>40 m → 20 m → 80 m</td><td>Active storm — polar / auroral paths unreliable</td></tr>
+        <tr><td>Kp ≥ 7, any SFI</td><td>40 m → 80 m (if open)</td><td>Severe storm — HF blackout possible; lower bands most resilient</td></tr>
+        <tr><td>Night, any Kp / SFI</td><td>40 m → 80 m → 20 m</td><td>F2 weaker at night; 40/80 m NVIS for regional; 20 m still viable</td></tr>
       </tbody>
     </table>
 
@@ -1046,6 +1272,9 @@ sudo bash scripts/enable_aprs.sh</pre>
       <li>No other process (e.g. SDR#, GQRX) is using the device.</li>
       <li>The backend is running — check <strong>Server logs</strong>.</li>
     </ul>
+
+    <h3 class="sub-title">Beacon Analysis start is blocked</h3>
+    <p>See <a href="#beacon-analysis">3b · Beacon Analysis — NCDXF/IARU</a> for the full Beacon chapter, including validation states, verification commands, panel interpretation, and host recovery steps.</p>
 
     <h3 class="sub-title">FT8/FT4 markers appear and then disappear</h3>
     <p>

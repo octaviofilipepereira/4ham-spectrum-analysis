@@ -7,7 +7,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-data/
+data/*
+!data/satellite/
+data/satellite/wheels/*.whl
+**/data/*.c64
+**/data/exports/
 logs/
 
 # jt9 / wsprd runtime artifacts

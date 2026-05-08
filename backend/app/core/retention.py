@@ -104,4 +104,45 @@ async def run_retention() -> Optional[dict]:
     }
 
     _state.retention_notification = notification
+
+    # Satellite module retention (no-op if module not installed)
+    try:
+        await run_satellite_retention()
+    except Exception as exc:
+        _log.debug("Satellite retention error: %s", exc)
+
     return notification
+
+
+# ── Satellite retention ────────────────────────────────────────────────────────
+
+async def run_satellite_retention() -> None:
+    """Purge old satellite_passes (>30 days) and satellite_events (>90 days)."""
+    from app.dependencies import state as _state
+    from datetime import datetime, timezone, timedelta
+
+    # Only run if satellite tables exist
+    tables = {r[0] for r in _state.db.conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if "satellite_passes" not in tables:
+        return
+
+    now = datetime.now(timezone.utc)
+    cutoff_passes = (now - timedelta(days=30)).isoformat()
+    cutoff_events = (now - timedelta(days=90)).isoformat()
+
+    with _state.db._lock:
+        p_del = _state.db.conn.execute(
+            "DELETE FROM satellite_passes WHERE los < ?", (cutoff_passes,)
+        ).rowcount
+        e_del = _state.db.conn.execute(
+            "DELETE FROM satellite_events WHERE timestamp < ?", (cutoff_events,)
+        ).rowcount
+        _state.db.conn.commit()
+
+    if p_del or e_del:
+        _log.info(
+            "Satellite retention: %d passes (>30d) + %d events (>90d) purged.",
+            p_del, e_del,
+        )

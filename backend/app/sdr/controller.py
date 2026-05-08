@@ -434,10 +434,15 @@ class SDRController:
         device.setFrequency(SOAPY_SDR_RX, 0, int(center_hz))
 
     def close(self, device, stream):
-        if device is None or stream is None:
+        if device is None:
+            return
+        if stream is None:
             return
         try:
             device.deactivateStream(stream)
+        except Exception:
+            _log.debug("SoapySDR deactivateStream failed during close", exc_info=True)
+        try:
             device.closeStream(stream)
         except Exception:
-            return
+            _log.debug("SoapySDR closeStream failed during close", exc_info=True)

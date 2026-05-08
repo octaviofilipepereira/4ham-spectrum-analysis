@@ -34,8 +34,8 @@ setup_logging()
 from app.version import APP_VERSION
 
 # Import API and WebSocket routers
-from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api
-from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status
+from app.api import health, events, scan, settings, logs, exports, admin, decoders, map as map_api, auth as auth_api, analytics, features as features_api, external_mirrors as external_mirrors_api, satellite as satellite_api, beacons as beacons_api
+from app.websocket import logs as ws_logs, events as ws_events, spectrum as ws_spectrum, status as ws_status, satellite as ws_satellite, beacons as ws_beacons
 from app.core import features as _features
 
 
@@ -159,6 +159,61 @@ async def lifespan(app_instance: FastAPI):
     except Exception as exc:
         _log.warning("SDR preview startup skipped: %s", exc)
 
+    # Auto-start satellite scheduler if module is installed
+    try:
+        if _state.db.get_kv("satellite_module_installed") == "true":
+            from app.satellite.lifecycle import start_scheduler as _sat_start
+            await _sat_start()
+            _log.info("Satellite scheduler auto-started (module installed).")
+    except Exception as exc:
+        _log.warning("Satellite scheduler auto-start failed: %s", exc)
+
+    # Initialise beacon scheduler (always available; not auto-started)
+    try:
+        from app.beacons.scheduler import BeaconScheduler
+        from app.websocket.beacons import broadcast_slot_start, broadcast_observation
+        import asyncio as _asyncio
+
+        async def _persist_and_broadcast_observation(obs: dict) -> None:
+            try:
+                loop = _asyncio.get_running_loop()
+                await _asyncio.gather(
+                    loop.run_in_executor(None, _state.db.insert_beacon_observation, obs),
+                    broadcast_observation(obs),
+                )
+            except Exception:
+                _log.exception("beacon observation persistence error")
+
+        def _obs_cb(obs: dict) -> None:
+            _asyncio.create_task(_persist_and_broadcast_observation(dict(obs)))
+
+        def _slot_cb(callsign: str, freq_hz: int, slot_index: int, slot_start_utc: str) -> None:
+            _asyncio.create_task(broadcast_slot_start(callsign, freq_hz, slot_index, slot_start_utc))
+
+        # Create dedicated IQ queue for beacon scheduler (separate from FFT's _spectrum_queue).
+        # This queue will be registered via scan_engine.register_iq_listener() when the
+        # scheduler starts, ensuring the beacon monitor does NOT steal IQ chunks from the
+        # waterfall/spectrum display.
+        _engine = _state.scan_engine
+        _state.beacon_iq_queue = _asyncio.Queue(maxsize=128)
+
+        def _sample_rate_provider() -> int:
+            if _engine is None:
+                return 2048000
+            return int(getattr(_engine, "sample_rate", 2048000) or 2048000)
+
+        _state.beacon_scheduler = BeaconScheduler(
+            iq_queue=_state.beacon_iq_queue,
+            sample_rate_provider=_sample_rate_provider,
+            scan_park=getattr(_engine, "park", None) if _engine else None,
+            scan_unpark=getattr(_engine, "unpark", None) if _engine else None,
+            on_observation=_obs_cb,
+            on_slot_start=_slot_cb,
+        )
+        _log.info("Beacon scheduler initialised (not running — start via /api/beacons/start).")
+    except Exception as exc:
+        _log.warning("Beacon scheduler init failed: %s", exc)
+
     # Start retention background task
     asyncio.create_task(_retention_loop())
 
@@ -169,6 +224,14 @@ async def lifespan(app_instance: FastAPI):
     # Start ionospheric data refresh (Kp + SFI from NOAA SWPC, every 15 min)
     from app.core.ionospheric import ionospheric_refresh_loop
     asyncio.create_task(ionospheric_refresh_loop())
+
+    # Start internet connectivity probe (TCP/53 to public anycast resolvers,
+    # every 60 s).  Other modules (satellite TLE/catalog refresh, mirrors)
+    # can call connectivity.is_online() to skip network round-trips when
+    # offline instead of stalling on long timeouts.
+    from app.core import connectivity as _connectivity
+    _connectivity_task = asyncio.create_task(_connectivity.connectivity_loop())
+    app_instance.state.connectivity_task = _connectivity_task
 
     # Initialise external mirrors subsystem (push-mode replication).
     try:
@@ -262,6 +325,32 @@ async def lifespan(app_instance: FastAPI):
         except Exception:
             pass
 
+    # Stop satellite scheduler gracefully
+    try:
+        from app.satellite.lifecycle import stop_scheduler as _sat_stop
+        await _sat_stop()
+    except Exception:
+        pass
+
+    # Stop beacon scheduler gracefully
+    try:
+        if _state.beacon_scheduler and _state.beacon_scheduler._running:
+            await _state.beacon_scheduler.stop()
+    except Exception:
+        pass
+
+    # Stop connectivity probe gracefully
+    try:
+        _ct = getattr(app_instance.state, "connectivity_task", None)
+        if _ct and not _ct.done():
+            _ct.cancel()
+            try:
+                await _ct
+            except (asyncio.CancelledError, Exception):
+                pass
+    except Exception:
+        pass
+
 
 # ═══════════════════════════════════════════════════════════════════
 # FastAPI Application Setup
@@ -315,19 +404,21 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     
-    # Prevent stale frontend assets after a deploy. HTML is never cached
-    # (no-store). JS/CSS/JSON/SVG/PNG go through the browser cache but are
-    # always revalidated against the server's ETag/Last-Modified, so users
-    # get the new code immediately after `git pull` without manual hard
-    # reload, while still benefiting from 304 responses when unchanged.
+    # Prevent stale frontend assets after a deploy. We send no-store on
+    # ALL frontend resources (HTML, JS/MJS, CSS, JSON, MAPs, SVG) so the
+    # browser never serves cached copies — every request hits the server
+    # fresh. This is intentionally aggressive because deploys here are
+    # frequent and stale modules have caused repeated user-facing bugs.
+    # API responses and binary vendor assets keep their default behaviour.
     content_type = response.headers.get("content-type", "")
     path = request.url.path
-    if "text/html" in content_type:
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    is_api = path.startswith("/api/") or path.startswith("/ws/")
+    is_html = "text/html" in content_type
+    is_frontend_asset = path.endswith((".js", ".mjs", ".css", ".json", ".map", ".svg", ".html"))
+    if not is_api and (is_html or is_frontend_asset):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
-    elif path.endswith((".js", ".mjs", ".css", ".json", ".map", ".svg", ".html")):
-        response.headers["Cache-Control"] = "no-cache, must-revalidate"
     
     # Remove server header to avoid information disclosure
     if "server" in response.headers:
@@ -353,6 +444,8 @@ app.include_router(decoders.router, prefix="/api/decoders", tags=["Decoders"])
 app.include_router(map_api.router, prefix="/api", tags=["Map"])
 app.include_router(analytics.router, prefix="/api", tags=["Analytics"])
 app.include_router(features_api.router, prefix="/api/features", tags=["Features"])
+app.include_router(satellite_api.router, prefix="/api/satellite", tags=["Satellite"])
+app.include_router(beacons_api.router, prefix="/api/beacons", tags=["Beacons"])
 
 # ═══════════════════════════════════════════════════════════════════
 # WebSocket Routers
@@ -363,6 +456,8 @@ app.include_router(ws_logs.router, tags=["WebSocket - Logs"])
 app.include_router(ws_events.router, tags=["WebSocket - Events"])
 app.include_router(ws_spectrum.router, tags=["WebSocket - Spectrum"])
 app.include_router(ws_status.router, tags=["WebSocket - Status"])
+app.include_router(ws_satellite.router, tags=["WebSocket - Satellite"])
+app.include_router(ws_beacons.router, tags=["WebSocket - Beacons"])
 
 # ═══════════════════════════════════════════════════════════════════
 # Static File Serving (Frontend)

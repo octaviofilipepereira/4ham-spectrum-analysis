@@ -38,6 +38,28 @@ def _ssb_event(callsign, timestamp, confidence, payload):
     }
 
 
+def _beacon_obs(slot_start_utc, *, detected, id_confirmed=0, dashes=0, snr_db_100w=None):
+    return {
+        "slot_start_utc": slot_start_utc,
+        "slot_index": 14,
+        "beacon_callsign": "CS3B",
+        "beacon_index": 14,
+        "beacon_location": "Madeira, Portugal",
+        "beacon_status": "active",
+        "band_name": "20m",
+        "freq_hz": 14100000,
+        "detected": bool(detected),
+        "id_confirmed": bool(id_confirmed),
+        "id_confidence": 0.0,
+        "drift_ms": None,
+        "dash_levels_detected": dashes,
+        "snr_db_100w": snr_db_100w,
+        "snr_db_10w": None,
+        "snr_db_1w": None,
+        "snr_db_100mw": None,
+    }
+
+
 def test_decoder_baseline_stats_groups_by_source_and_mode(tmp_path):
     db = Database(str(tmp_path / "events.sqlite"))
 
@@ -110,3 +132,60 @@ def test_ssb_metrics_fallbacks_when_payload_is_missing(tmp_path):
     assert metrics["parse_methods"]["unknown"] == 2
     assert metrics["scores"]["count"] == 2
     assert metrics["scores"]["avg"] == 0.44
+
+
+def test_beacon_heatmap_keeps_best_pass_fields_from_same_detection(tmp_path):
+    db = Database(str(tmp_path / "events.sqlite"))
+
+    best_slot = _now_minus(50)
+    latest_slot = _now_minus(10)
+
+    db.insert_beacon_observation(_beacon_obs(_now_minus(70), detected=False, dashes=0, snr_db_100w=-1.2))
+    db.insert_beacon_observation(_beacon_obs(best_slot, detected=True, id_confirmed=1, dashes=3, snr_db_100w=1.4))
+    db.insert_beacon_observation(_beacon_obs(_now_minus(30), detected=True, id_confirmed=0, dashes=1, snr_db_100w=4.8))
+    db.insert_beacon_observation(_beacon_obs(latest_slot, detected=True, id_confirmed=0, dashes=0, snr_db_100w=6.2))
+
+    rows = db.get_beacon_heatmap(hours=2)
+    cell = next(r for r in rows if r["beacon_index"] == 14 and r["band_name"] == "20m")
+
+    assert cell["total_slots"] == 4
+    assert cell["detections"] == 3
+    assert cell["id_confirmed"] == 1
+    assert cell["best_dashes"] == 3
+    assert cell["best_snr_db"] == 1.4
+    assert cell["best_id_confirmed"] == 1
+    assert cell["best_detected_utc"] == best_slot
+    assert cell["latest_detected_utc"] == latest_slot
+
+
+def test_beacon_heatmap_returns_null_best_pass_fields_without_detections(tmp_path):
+    db = Database(str(tmp_path / "events.sqlite"))
+
+    db.insert_beacon_observation(_beacon_obs(_now_minus(20), detected=False, dashes=0, snr_db_100w=-0.7))
+
+    rows = db.get_beacon_heatmap(hours=2)
+    cell = next(r for r in rows if r["beacon_index"] == 14 and r["band_name"] == "20m")
+
+    assert cell["total_slots"] == 1
+    assert cell["detections"] == 0
+    assert cell["id_confirmed"] == 0
+    assert cell["best_dashes"] is None
+    assert cell["best_snr_db"] is None
+    assert cell["best_id_confirmed"] is None
+    assert cell["best_detected_utc"] is None
+    assert cell["latest_detected_utc"] is None
+
+
+def test_beacon_observations_can_filter_by_recent_window(tmp_path):
+    db = Database(str(tmp_path / "events.sqlite"))
+
+    db.insert_beacon_observation(_beacon_obs(_now_minus(190), detected=True, dashes=1, snr_db_100w=0.8))
+    db.insert_beacon_observation(_beacon_obs(_now_minus(50), detected=True, id_confirmed=1, dashes=3, snr_db_100w=2.6))
+    db.insert_beacon_observation(_beacon_obs(_now_minus(10), detected=False, dashes=0, snr_db_100w=-0.4))
+
+    rows = db.get_beacon_observations(callsign="CS3B", band="20m", hours=2, limit=10)
+
+    assert len(rows) == 2
+    assert rows[0]["slot_start_utc"] > rows[1]["slot_start_utc"]
+    assert all(row["beacon_callsign"] == "CS3B" for row in rows)
+    assert all(row["band_name"] == "20m" for row in rows)

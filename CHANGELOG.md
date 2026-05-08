@@ -7,6 +7,111 @@ Last update: 2026-04-18 UTC
 
 # Changelog
 
+## v0.15.0 - 2026-05-08
+
+Major release consolidating ~200 commits since `v0.14.3`. Highlights:
+nova tab Beacon nativa com painel completo NCDXF/IARU, overlay de
+beacons no globo principal, redesign dos KPI gauges, adopção de
+flatpickr para calendários PT, e paridade total entre o Academic
+Analytics local e o mirror externo (cs5arc.pt).
+
+### Added
+- **Native Beacon view** (`frontend/4ham_academic_analytics.html`,
+  `external_academic_analytics/index.html`) — substitui a cópia errada do
+  HF por uma vista NCDXF/IARU própria com KPIs, leitura Beacon+NOAA,
+  nowcast, propagação por banda, contexto ionosférico, matriz de
+  actividade recente (últimas 12 h) e modal de detalhes por slot.
+- **NCDXF beacon overlay no globo principal** quando o scan beacon está
+  activo — arcos por banda separados (offset perpendicular em
+  coordenadas de ecrã), padrões dashed por banda, anéis concêntricos
+  multi-banda na origem, paleta distinta (20m azul, 15m vermelho,
+  12m roxo, etc.), e dots cinzentos para beacons monitorados sem cópia.
+- **KPI gauges instrumentais** em todos os 6 cards do Academic Analytics
+  e cards Beacon — 5-column layout, escala dinâmica, badges centrados,
+  tooltips informativos. Top 3 Bands com medalhas (ouro/prata/bronze).
+- **Mapa de Propagação no painel Beacon** — fetch paralelo de
+  status+overview, alimenta o overlay independentemente do estado global.
+- **Flatpickr local** com locale `pt`, formato `DD/MM/AAAA`, calendário
+  visual unificado para todos os date pickers (HF, APRS).
+- **External mirror beacon parity** — `external_academic_analytics`
+  recebe os mesmos endpoints e snapshots beacon (`beacons/status`,
+  `beacons/analytics/overview`, `beacons/observations`) via PHP shims +
+  pusher, com 3 novos testes a validar a chave do bundle.
+- **Multi-band beacon API** — `bands[]` agregado por callsign no payload
+  do mapa, frontend consome o array em vez de duplicar registos.
+- **Always-refresh on tab click** — HF/Beacon/APRS recarregam dados ao
+  serem clicadas.
+- **Mouse-wheel scroll nos inputs de hora** incrementa/decrementa
+  horas ou minutos.
+- **Documentação Kp/SFI por banda** no `help.html` (secs. 3b e 14) e
+  `user_manual.md`.
+
+### Changed
+- **Redesign Beacon + NOAA reading card** com hero summary e band tiles;
+  card preenche toda a altura do painel.
+- **Top 3 Bands card** redesenhado para ocupar full-height da KPI row,
+  com paleta prateada para o segundo lugar.
+- **Recent activity control** convertido em `Events` button alinhado com
+  os mode buttons; coluna de eventos escondida em modo beacon.
+- **Beacon meter palette** invertida para dark→light (1=escuro, 4=claro)
+  e fonte da matriz beacon +2 px (cells, headers, small).
+- **i18n total parity** — modal Events totalmente traduzida (5 secções,
+  stats, captions, empty states), estados beacon (`Excellent`/`Closed`/
+  `aligned`/`Quiet`/etc.) traduzidos via tabela de lookup, +50 novas
+  chaves `beacon_*` e `beacon_state_*` em EN+PT.
+- **`refactor(beacons)`** — alinhamento de semântica pública e payloads
+  entre endpoints; remoção do painel "Recent observations" redundante.
+
+### Performance
+- WAL mode + composite indices no SQLite + redução drástica do polling
+  do frontend (`perf: WAL + composite indices + drastically reduce
+  frontend polling`).
+- Event loop desbloqueado durante propagação de passagens satélite
+  (`pyorbital`); silenciado spam de logs.
+- Retune SDR in-place na rotação de slot (sem `libusb close/open`).
+
+### Fixed
+- **APRS-IS frames já não são marcados `rf_gated`** (ver v0.14.2).
+- **Live APRS map** com classificação 3-rule espelhada do Academic
+  Analytics (RF > APRS-IS > RF-gated).
+- **Date inputs**: `type=text` + `flatpickr` para coerência cross-browser
+  PT-PT; `dateFormat: Y-m-d` para casar com ISO do proxy.
+- **Time inputs**: `type=text` + auto-formatter HH:MM (24 h) browser-
+  agnóstico.
+- **History note** do Beacon só aparece quando o scheduler beacon NÃO
+  está a correr (independentemente de scans HF/APRS).
+- **Recent rhythm chart** limitado às 60 passagens mais recentes
+  + `overflow:hidden` nos contenedores → elimina a barra horizontal
+  na popup Events.
+- **`beaconReferenceMeterLevel`** restaurado no external (declaração
+  apagada inadvertidamente durante a inserção do helper de tradução).
+- **Propagation Map**: zoom só com `Ctrl+wheel` (permite scroll de
+  página).
+- **Satélite**: tolera entradas SatNOGS sem `norad_id`; lê correctamente
+  peak elevation do `pyorbital`; nav button sempre visível; install card
+  escondido quando já instalado; modal alinhado com `app-modal` (tema
+  escuro consistente).
+- **Beacon Freshness KPI** removido (sempre `fresh` em dados live, sem
+  utilidade).
+- **Best Band gauge** mostra nome da banda (ex.: `20m`) como valor; score
+  movido para detail line.
+- **SFI gauge formatter** mostra inteiro (`162` em vez de `162.0`).
+- **Total events** — accuracy fix; `uniqueCallsigns` usa
+  `synthetic.callsigns` sem filtro temporal; gauge max dinâmico.
+- **RTL preview recovery cleanup** (libusb).
+- **Retention deletes** para batches grandes de eventos.
+
+### Tests
+- 3 novos testes em
+  `backend/tests/test_external_mirrors_snapshots.py` validam as chaves
+  beacon no bundle do snapshot.
+
+### Internal
+- Cache busting `v20260508` em assets de i18n e JS.
+- Reorganização de strings hardcoded EN para `i18n/academic_analytics.json`
+  com novas famílias `beacon_*`, `beacon_state_*`, `beacon_panel_*`,
+  `beacon_chart_*`, `beacon_stat_*`.
+
 ## v0.14.3 - 2026-04-25
 
 ### Added — RF-gated 3-rule classification on the live APRS map

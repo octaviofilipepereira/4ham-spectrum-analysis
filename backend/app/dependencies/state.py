@@ -109,6 +109,9 @@ scan_rotation: Any = None
 # Preset scheduler instance (set by schedule API on start/stop)
 preset_scheduler: Any = None
 
+# NCDXF/IARU Beacon scheduler instance (set at startup)
+beacon_scheduler: Any = None
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Default Configuration

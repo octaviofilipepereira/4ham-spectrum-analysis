@@ -48,7 +48,10 @@ def test_build_snapshot_bundle_keys_are_endpoint_paths():
     with patch.object(snapshots, "_snapshot_version", return_value={"version": "0.0.0", "app_version": "0.0.0"}), \
          patch.object(snapshots, "_snapshot_scan_status", return_value={"state": "stopped"}), \
          patch.object(snapshots, "_snapshot_settings", return_value={"station": {}}), \
-         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}):
+         patch.object(snapshots, "_snapshot_map_ionospheric", return_value={"kp": 0}), \
+         patch.object(snapshots, "_snapshot_beacon_status", return_value={"scheduler": {"running": False}}), \
+         patch.object(snapshots, "_snapshot_beacon_analytics_overview", return_value={"summary": {}}), \
+         patch.object(snapshots, "_snapshot_beacon_observations", return_value={"items": []}):
         bundle = snapshots.build_snapshot_bundle()
 
     assert set(bundle.keys()) == {
@@ -56,6 +59,9 @@ def test_build_snapshot_bundle_keys_are_endpoint_paths():
         "scan/status",
         "settings",
         "map/ionospheric",
+        "beacons/status",
+        "beacons/analytics/overview",
+        "beacons/observations",
     }
     for key, entry in bundle.items():
         assert "captured_at" in entry

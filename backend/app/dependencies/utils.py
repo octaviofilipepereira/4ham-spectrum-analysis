@@ -234,17 +234,20 @@ def device_requirements(choice: str) -> Dict:
     """Get system requirements for device type."""
     linux_packages = ["python3-soapysdr", "soapysdr-tools", "libsoapysdr-dev"]
     if choice == "rtl":
-        linux_packages.extend(["soapysdr-module-rtlsdr", "rtl-sdr"])
+        linux_packages.extend(["soapysdr-module-rtlsdr", "rtl-sdr", "usbutils"])
     elif choice == "hackrf":
         linux_packages.extend(["soapysdr-module-hackrf", "hackrf"])
     elif choice == "airspy":
         linux_packages.extend(["soapysdr-module-airspy", "airspy"])
     else:
         linux_packages.append("soapysdr-module-all")
+    required_commands = ["SoapySDRUtil", "rtl_test", "lsusb"]
+    if choice == "rtl":
+        required_commands.append("usbreset")
     return {
         "python_modules": ["SoapySDR"],
         "linux_apt_packages": linux_packages,
-        "required_commands": ["SoapySDRUtil", "rtl_test", "lsusb"],
+        "required_commands": required_commands,
     }
 
 

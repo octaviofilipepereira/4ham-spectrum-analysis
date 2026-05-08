@@ -282,7 +282,7 @@ Last update: 2026-04-21
 - [ ] New table `beacon_observations` (beacon, frequency_hz, slot_start_utc, snr_db, detected, decoded_text, qrb_km, azimuth_deg)
 - [ ] Modes: single-frequency park, multi-frequency rotation (via existing scan rotation/preset scheduler), passive (FFT-only when other modes active)
 - [ ] Frontend: real-time beacon panel + time-of-day heatmap by beacon×band
-- [ ] Goal: open, modern, headless, multi-user replacement for Faros/BeaconSee — datasets accessible via REST/WebSocket and pushable to cs5arc mirror
+- [ ] Goal: open, modern, headless, multi-user replacement for legacy beacon-monitoring tools — datasets accessible via REST/WebSocket and pushable to cs5arc mirror
 - [ ] Reuses existing primitives: `scan_park`, `estimate_snr`, CW decoder, propagation map, mirror push pipeline (~700 lines new code, no new dependencies)
 
 #### 8.7. FT2 Mode — Experimental Tracking 🧪

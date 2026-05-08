@@ -33,6 +33,8 @@ import {
 import { WaterfallController } from "./modules/waterfall.js";
 import { APRSMapController } from "./modules/aprs-map.js";
 import { initExternalMirrorsUI, loadMirrors } from "./modules/external-mirrors.js";
+import { initSatellite, bindSatelliteButtons, loadPassesPanel } from "./modules/satellite.js";
+import { BeaconController } from "./modules/beacons.js?v=20260503193000";
 
 const statusEl = document.getElementById("status");
 const vfoGotoGroup = document.querySelector(".vfo-goto-group");
@@ -153,6 +155,18 @@ const audioTxGainInput = document.getElementById("audioTxGain");
 const quickBandButtons = Array.from(document.querySelectorAll("[data-quick-band]"));
 const quickModeButtons = Array.from(document.querySelectorAll("[data-quick-mode]"));
 const adminSetupStatus = document.getElementById("adminSetupStatus");
+const rtlRecoverySection = document.getElementById("rtlRecoverySection");
+const rtlRecoveryBadge = document.getElementById("rtlRecoveryBadge");
+const rtlRecoveryDeviceName = document.getElementById("rtlRecoveryDeviceName");
+const rtlRecoveryDevicePath = document.getElementById("rtlRecoveryDevicePath");
+const rtlRecoveryBusDevice = document.getElementById("rtlRecoveryBusDevice");
+const rtlRecoveryCommand = document.getElementById("rtlRecoveryCommand");
+const rtlRecoveryVidPidCommand = document.getElementById("rtlRecoveryVidPidCommand");
+const rtlRecoveryAvailability = document.getElementById("rtlRecoveryAvailability");
+const rtlRecoverySequence = document.getElementById("rtlRecoverySequence");
+
+// NCDXF Beacon controller — initialised once DOM is ready
+let beaconController = null;
 
 // Immediately show/hide APRS-related buttons from cached state (avoids flash)
 {
@@ -218,6 +232,85 @@ function _backendMode(uiMode) {
 let selectedDecoderMode = null;
 let latestScanState = null;
 let bandUiReady = false;
+let beaconSummaryRefreshTimer = null;
+const BEACON_UI_SESSION_KEY = "4ham_beacon_ui_active";
+
+function isBeaconPropagationMode() {
+  return String(selectedDecoderMode || "").trim().toUpperCase() === "BEACON";
+}
+
+function rememberBeaconUiMode(active) {
+  try {
+    if (active) {
+      sessionStorage.setItem(BEACON_UI_SESSION_KEY, "1");
+    } else {
+      sessionStorage.removeItem(BEACON_UI_SESSION_KEY);
+    }
+  } catch (_) {}
+}
+
+function shouldRestoreBeaconUiMode() {
+  try {
+    return sessionStorage.getItem(BEACON_UI_SESSION_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+async function restoreBeaconUiModeFromSession() {
+  if (!shouldRestoreBeaconUiMode()) {
+    return;
+  }
+  if (String(selectedDecoderMode || "").trim()) {
+    return;
+  }
+  if (latestScanState?.state === "running") {
+    return;
+  }
+  if (!beaconController || beaconController.isBeaconModeActive()) {
+    return;
+  }
+
+  await beaconController.start();
+  setAprsMapVisible(false);
+  setBeaconAreaVisible(true);
+  selectedDecoderMode = "BEACON";
+  wfc.selectedDecoderMode = "BEACON";
+  refreshModeButtons();
+  if (eventsSearchModeInput && eventsSearchModeInput.value !== "BEACON") {
+    eventsSearchModeInput.value = "BEACON";
+    fetchEvents();
+    fetchTotal();
+  }
+}
+
+function formatPropagationUtcTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value || "-");
+  }
+  return date.toISOString().replace(".000Z", " UTC").replace("T", " ");
+}
+
+function schedulePropagationWidgetsRefresh() {
+  requestAnimationFrame(() => {
+    fetchPropagationSummary();
+    if (window.PropMap && typeof window.PropMap.refresh === "function") {
+      window.PropMap.refresh("propagationMap");
+    }
+    const modalEl = document.getElementById("mapFullscreenModal");
+    if (
+      modalEl &&
+      modalEl.classList.contains("show") &&
+      window.PropMap &&
+      typeof window.PropMap.renderModal === "function"
+    ) {
+      window.PropMap.renderModal();
+    }
+  });
+}
+
+window._getPropagationViewMode = () => (isBeaconPropagationMode() ? "BEACON" : "GENERIC");
 
 if (bandSelect) {
   const persistedBand = localStorage.getItem("4ham_active_band") || "";
@@ -331,6 +424,7 @@ const summaryMatrixTable = document.getElementById("summaryMatrixTable");
 const summaryMatrixCaption = document.getElementById("summaryMatrixCaption");
 const eventsCardTitle = document.getElementById("eventsCardTitle");
 const eventsCardTitleText = document.getElementById("eventsCardTitleText");
+const eventsCardColumn = eventsCardTitle?.closest(".col-events-custom") || null;
 const propagationScore = document.getElementById("propagationScore");
 const propagationBands = document.getElementById("propagationBands");
 const compactToggle = document.getElementById("compactToggle");
@@ -338,6 +432,7 @@ let modeStatsCache = {};
 let totalEventsInDB = 0;
 // internalFtStatusModal removed — Internal FT not used in this setup
 const externalFtStatusModalEl = document.getElementById("externalFtStatusModal");
+const beaconStatusModalEl = document.getElementById("beaconStatusModal");
 const cwStatusModalEl = document.getElementById("cwStatusModal");
 const ssbStatusModalEl = document.getElementById("ssbStatusModal");
 // pskStatusModal removed — PSK decoder not yet implemented
@@ -446,7 +541,10 @@ async function applyPreviewBandRange(selectedBand, { syncInputs = false } = {}) 
 
   const newCenterHz = Math.round((bandStartHz + bandEndHz) / 2);
   wfc.renderRuler(bandStartHz, bandEndHz);
-  wfc.updateVFODisplay(bandStartHz, bandEndHz);
+  // Don't clobber the beacon-pinned VFO display while BEACON mode is active.
+  if (!beaconController?.isBeaconModeActive()) {
+    wfc.updateVFODisplay(bandStartHz, bandEndHz);
+  }
   wfc.clearFrame();
 
   try {
@@ -522,7 +620,8 @@ function refreshQuickBandButtons() {
     const buttonBand = String(button.dataset.quickBand || "").trim();
     const isAvailable = availableBands.has(buttonBand);
     const isActive = isAvailable && buttonBand === activeBand;
-    button.disabled = !isAvailable || scanActionInFlight;
+    const beaconLock = !!beaconController?.isBeaconModeActive();
+    button.disabled = beaconLock || !isAvailable || scanActionInFlight;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
@@ -532,10 +631,17 @@ function refreshQuickBandButtons() {
 
 function refreshModeButtons() {
   if (quickModeButtons.length) {
+    const beaconLock = !!beaconController?.isBeaconModeActive();
+    const beaconScanRunning = !!beaconController?.isSchedulerRunning?.();
     quickModeButtons.forEach((button) => {
       const buttonMode = String(button.dataset.quickMode || "").trim();
       const isActive = selectedDecoderMode === buttonMode;
-      button.disabled = scanActionInFlight;
+      // While BEACON mode is active, lock all mode buttons EXCEPT the BEACON
+      // one (so the user can still click it to leave the mode). Exception:
+      // when Beacon Analysis is actively scanning, the BEACON button itself
+      // must stay locked until the user clicks Stop monitoring first.
+      const isBeaconBtn = buttonMode === "BEACON";
+      button.disabled = (beaconLock && (!isBeaconBtn || beaconScanRunning)) || scanActionInFlight;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
@@ -550,6 +656,8 @@ function refreshModeButtons() {
   }
   renderScanContextSummary(latestScanState);
 }
+
+window.refreshModeButtons = refreshModeButtons;
 
 function resolveActiveBandName(scanState) {
   const stateBand = String(scanState?.scan?.band || "").trim();
@@ -662,7 +770,13 @@ const aprsMapArea = document.getElementById("aprsMapArea");
 const waterfallArea = document.getElementById("waterfallArea");
 const aprsMapCountEl = document.getElementById("aprsMapCount");
 const propagationCard = document.getElementById("propagationCard");
+const propagationColumn = propagationCard?.closest(".col-propmap-custom") || null;
 const aprsMapFullscreenBtn = document.getElementById("aprsMapFullscreenBtn");
+
+// ── Beacon Monitor panel ────────────────────────────────────────────────
+const beaconArea = document.getElementById("beaconArea");
+const vfoBeaconLabel = document.getElementById("vfoBeaconLabel");
+
 const _aprsMapFsBtnLabel = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px;vertical-align:-1px;"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 1-1 0v-4A1.5 1.5 0 0 1 1.5 0h4a.5.5 0 0 1 0 1h-4zM10 .5a.5.5 0 0 1 .5-.5h4A1.5 1.5 0 0 1 16 1.5v4a.5.5 0 0 1-1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 1-.5-.5zM.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 0 14.5v-4a.5.5 0 0 1 .5-.5zm15 0a.5.5 0 0 1 .5.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 1 .5-.5z"/></svg>Fullscreen';
 
 function _setAprsMapFullscreen(fullscreen) {
@@ -748,6 +862,29 @@ async function _checkAprsConnectivity() {
       showToast("⚠️ No internet — APRS limited to RF reception only (144.800 MHz)");
     }
   } catch { /* best-effort */ }
+}
+
+/**
+ * Show or hide the Beacon Monitor panel (inline, replaces waterfall).
+ * @param {boolean} show - true → show beacon panel, false → show waterfall
+ */
+function setBeaconAreaVisible(show) {
+  if (beaconArea) beaconArea.hidden = !show;
+  if (waterfallArea) waterfallArea.hidden = show;
+  if (eventsCardColumn) eventsCardColumn.hidden = show;
+  if (propagationColumn) propagationColumn.classList.toggle("w-100", show);
+  // Keep propagation card visible in BEACON mode — it complements the
+  // beacon matrix with band activity and the QTH-centric globe.
+  // Hide Go-to-MHz / SNR / DSP status — irrelevant in BEACON mode
+  if (vfoGotoGroup) vfoGotoGroup.hidden = show;
+  if (show) {
+    // Sync VFO label to current beacon slot
+    _syncBeaconContext();
+  } else {
+    // Hide VFO beacon label when exiting mode
+    if (vfoBeaconLabel) vfoBeaconLabel.hidden = true;
+  }
+  schedulePropagationWidgetsRefresh();
 }
 
 /** Fetch recent APRS events from the API and populate the map. */
@@ -889,6 +1026,39 @@ function _syncAprsMapContext() {
 
   _updateAprsMapCount();
 }
+
+/**
+ * Sync the VFO beacon label to the current slot (freq + callsign).
+ * Called when entering beacon mode or when a new slot starts.
+ * Exposed globally so BeaconController can call it on slot_start.
+ */
+function _syncBeaconContext() {
+  if (!beaconArea || beaconArea.hidden) return;
+
+  // Query BeaconController for current slot freq and callsign
+  const freqHz = beaconController?.currentFreqHz;
+  const callsign = beaconController?.currentCallsign;
+
+  if (freqHz && callsign) {
+    // Pin the main VFO display to the exact beacon frequency the SDR is
+    // currently tuned to. Lock it so per-frame updates from the spectrum
+    // pipeline (which carry the band-wide range) don't overwrite it.
+    if (wfc && typeof wfc.lockVFOTo === "function") {
+      wfc.lockVFOTo(freqHz);
+    } else if (wfc && typeof wfc.updateVFODisplay === "function") {
+      wfc.updateVFODisplay(freqHz, freqHz);
+    }
+    if (vfoBeaconLabel) {
+      const freqMHz = (freqHz / 1e6).toFixed(3);
+      vfoBeaconLabel.textContent = ` → ${callsign} (${freqMHz} MHz)`;
+      vfoBeaconLabel.hidden = false;
+    }
+  } else {
+    if (wfc && typeof wfc.unlockVFO === "function") wfc.unlockVFO();
+    if (vfoBeaconLabel) vfoBeaconLabel.hidden = true;
+  }
+}
+window._syncBeaconContext = _syncBeaconContext;  // expose for BeaconController
 
 function updateFullscreenButtonState() {
   if (!waterfallFullscreenBtn) {
@@ -1880,21 +2050,28 @@ function renderPropagationSummary(data, options = {}) {
   if (!propagationScore || !propagationBands) {
     return;
   }
+  const isBeaconSummary = String(data?.kind || "").trim().toLowerCase() === "beacon";
   const overallScore = Number(data?.overall?.score ?? 0).toFixed(1);
   const overallState = String(data?.overall?.state || "Unknown");
   const eventCount = Number(data?.event_count || 0);
   const windowMinutes = Number(data?.window_minutes || 30);
   const sourceNote = options?.sourceNote ? ` | ${options.sourceNote}` : "";
-  propagationScore.textContent = `Score: ${overallScore}/100 (${overallState}) | events=${eventCount} | window=${windowMinutes} min${sourceNote}`;
+  const eventLabel = isBeaconSummary ? "slots" : "events";
+  const scoreLabel = isBeaconSummary ? "Median score" : "Score";
+  propagationScore.textContent = `${scoreLabel}: ${overallScore}/100 (${overallState}) | ${eventLabel}=${eventCount} | window=${windowMinutes} min${sourceNote}`;
   propagationScore.className = "";
-  const stateColorClass = { "Excellent": "text-success", "Good": "text-success", "Fair": "text-warning", "Poor": "text-danger" }[overallState] || "text-secondary";
+  const stateColorClass = { "Excellent": "text-success", "Good": "text-success", "Fair": "text-warning", "Poor": "text-danger", "No data": "text-secondary" }[overallState] || "text-secondary";
   propagationScore.classList.add("fw-semibold", stateColorClass);
 
-  const bands = Array.isArray(data?.bands) ? data.bands.slice(0, 5) : [];
+  const bands = Array.isArray(data?.bands)
+    ? (isBeaconSummary ? data.bands.slice(0, 5) : data.bands.slice(0, 5))
+    : [];
   propagationBands.innerHTML = "";
   if (!bands.length) {
     const li = document.createElement("li");
-    li.textContent = "No propagation data yet. Start/continue scan to build propagation statistics.";
+    li.textContent = isBeaconSummary
+      ? "No Beacon propagation data yet. Start/continue Beacon monitoring to build the band scores."
+      : "No propagation data yet. Start/continue scan to build propagation statistics.";
     propagationBands.appendChild(li);
     return;
   }
@@ -1907,6 +2084,18 @@ function renderPropagationSummary(data, options = {}) {
     const events = Number(item?.events || 0);
     const maxSNR = item?.max_snr_db;
     const snrLabel = maxSNR === null || maxSNR === undefined ? "-" : `${Number(maxSNR).toFixed(1)} dB`;
+    if (isBeaconSummary) {
+      const detectedBeacons = Number(item?.detected_beacons || 0);
+      const weakBeacons = Number(item?.weak_beacons || 0);
+      const detectionRate = Number(item?.detection_rate || 0);
+      const weakRate = Number(item?.weak_rate || 0);
+      const latestDetected = item?.latest_detected_utc
+        ? ` | last=${formatPropagationUtcTimestamp(item.latest_detected_utc)}`
+        : "";
+      li.textContent = `${bandName}: ${score}/100 (${state}) | slots=${events} | copy=${detectedBeacons} (${(detectionRate * 100).toFixed(0)}%) | weak=${weakBeacons} (${(weakRate * 100).toFixed(0)}%) | max SNR=${snrLabel}${latestDetected}`;
+      propagationBands.appendChild(li);
+      return;
+    }
     const callsigns = item?.unique_callsigns;
     const callsignLabel = callsigns !== null && callsigns !== undefined ? ` | callsigns=${callsigns}` : "";
     const decodeRate = item?.decode_rate;
@@ -1918,7 +2107,10 @@ function renderPropagationSummary(data, options = {}) {
 }
 
 async function requestPropagationSummary(windowMinutes, limit) {
-  const resp = await fetch(`/api/propagation/summary?window_minutes=${windowMinutes}&limit=${limit}`, {
+  const endpoint = isBeaconPropagationMode()
+    ? "/api/beacons/propagation_summary"
+    : "/api/propagation/summary";
+  const resp = await fetch(`${endpoint}?window_minutes=${windowMinutes}&limit=${limit}`, {
     headers: { ...getAuthHeader() }
   });
   if (!resp.ok) {
@@ -1953,6 +2145,16 @@ async function fetchPropagationSummary() {
     return;
   }
 }
+
+window.addEventListener("beacon-observation", () => {
+  if (!isBeaconPropagationMode()) {
+    return;
+  }
+  clearTimeout(beaconSummaryRefreshTimer);
+  beaconSummaryRefreshTimer = setTimeout(() => {
+    fetchPropagationSummary();
+  }, 250);
+});
 
 async function fetchLogs() {
   try {
@@ -1991,7 +2193,10 @@ function connectLogs() {
 
 async function fetchFileLog() {
   try {
-    const resp = await fetch("/api/logs/file?limit=2000", { headers: { ...getAuthHeader() } });
+    // 500 lines is enough for the live ops view; the Export button still pulls
+    // 2000 on demand. Previous default of 2000 produced ~235 KB per request
+    // every 8 s and was the single largest contributor to API latency.
+    const resp = await fetch("/api/logs/file?limit=500", { headers: { ...getAuthHeader() } });
     if (!resp.ok) {
       return;
     }
@@ -2077,7 +2282,14 @@ function updateScanButtonState() {
   startBtn.textContent = isScanRunning
     ? (rotationRunning ? "Stop Rotation Scanning" : "Stop Single Scanning")
     : "Start Single Scanning";
-  startBtn.disabled = false;
+  // While BEACON mode is active, the scheduler owns the engine — keep the
+  // single/rotation scan button disabled together with Config Scan Rotation.
+  const beaconLock = !!beaconController?.isBeaconModeActive();
+  startBtn.disabled = beaconLock;
+  const rotationToggleBtn = document.getElementById("rotationToggleBtn");
+  if (rotationToggleBtn) rotationToggleBtn.disabled = beaconLock;
+  const rotationPresetsMenuBtn = document.getElementById("rotationPresetsMenuBtn");
+  if (rotationPresetsMenuBtn) rotationPresetsMenuBtn.disabled = beaconLock;
   startBtn.classList.toggle("btn-primary", !isScanRunning);
   startBtn.classList.toggle("btn-danger", isScanRunning);
   refreshQuickBandButtons();
@@ -3183,6 +3395,21 @@ initExternalMirrorsUI({
   showToastError: typeof showToastError === "function" ? showToastError : undefined,
 });
 
+// Satellite module — init AFTER startApplication() (i.e. after auth) to avoid
+// opening /ws/satellite while the user is still on the login modal, which
+// produces 403 spam in backend logs and a broken pre-login UI.
+async function _initSatelliteModule() {
+  const lang = document.documentElement.lang?.toLowerCase()?.startsWith("pt") ? "pt" : "en";
+  await initSatellite(lang);
+  bindSatelliteButtons();
+  const satModalEl = document.getElementById("satelliteModal");
+  if (satModalEl) {
+    satModalEl.addEventListener("show.bs.modal", () => {
+      loadPassesPanel().catch(() => {});
+    });
+  }
+}
+
 function buildEventExportParams() {
   const params = new URLSearchParams({ limit: "1000" });
   if (exportBandFilter?.value) {
@@ -3435,6 +3662,26 @@ function decodeSpectrumFrame(frame) {
   };
 }
 
+function updateConnectivityBadge(conn) {
+  const el = document.getElementById("satelliteConnBadge");
+  if (!el) return;
+  const online = conn && conn.online;
+  if (online === true) {
+    el.className = "badge bg-success ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} Online";
+    el.title = "Internet reachable — TLE/catalog refresh enabled";
+  } else if (online === false) {
+    el.className = "badge bg-danger ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} Offline";
+    const fails = conn.consecutive_failures ?? 0;
+    el.title = `No internet (probe failed ${fails}\u00d7) — refresh skipped, using cached data`;
+  } else {
+    el.className = "badge bg-secondary ms-2 d-inline-flex align-items-center px-3 py-2";
+    el.textContent = "\u{1F4E1} —";
+    el.title = "Connectivity probe pending";
+  }
+}
+
 function connectStatus() {
   try {
     const ws = new WebSocket(wsUrl("/ws/status"));
@@ -3451,6 +3698,11 @@ function connectStatus() {
             ? status.agc_gain_db.toFixed(1)
             : "?";
           statusEl.textContent = `state=${status.state} cpu=${status.cpu_pct ?? "?"}% noise=${nf}dB thr=${threshold}dB agc=${agc}dB frameAge=${status.frame_age_ms ?? "?"}ms`;
+        }
+        // Connectivity badge — surfaced in the Satellite modal so the user
+        // knows TLE/catalog refresh is gated by the network probe.
+        if (data.status && data.status.connectivity) {
+          updateConnectivityBadge(data.status.connectivity);
         }
         if (data.retention_completed) {
           showRetentionToast(data.retention_completed);
@@ -3487,11 +3739,14 @@ function connectStatus() {
 
 async function fetchDecoderStatus() {
   try {
-    const resp = await fetch("/api/decoders/status", { headers: { ...getAuthHeader() } });
-    if (!resp.ok) {
+    const [resp, beaconResp] = await Promise.all([
+      fetch("/api/decoders/status", { headers: { ...getAuthHeader() } }),
+      fetch("/api/beacons/status", { headers: { ...getAuthHeader() } }),
+    ]);
+    if (!resp.ok || !beaconResp.ok) {
       throw new Error("decoder status failed");
     }
-    const data = await resp.json();
+    const [data, beaconData] = await Promise.all([resp.json(), beaconResp.json()]);
     const status = data.status || {};
     const intNative = status.internal_native || {};
     const extFt = status.external_ft || {};
@@ -3499,6 +3754,24 @@ async function fetchDecoderStatus() {
     const kiss = status.direwolf_kiss || {};
     const sources = status.sources || {};
     const lastEvent = Object.values(sources).sort().slice(-1)[0] || "-";
+    const beaconSt = beaconData?.scheduler || {};
+    const beaconRunning = Boolean(beaconSt.running);
+    const isBeaconUiMode = String(selectedDecoderMode || "").trim().toUpperCase() === "BEACON";
+
+    if (beaconRunning && beaconController && !beaconController.isBeaconModeActive()) {
+      await beaconController.start();
+      setAprsMapVisible(false);
+      setBeaconAreaVisible(true);
+      selectedDecoderMode = "BEACON";
+      wfc.selectedDecoderMode = "BEACON";
+      rememberBeaconUiMode(true);
+      refreshModeButtons();
+      if (eventsSearchModeInput && eventsSearchModeInput.value !== "BEACON") {
+        eventsSearchModeInput.value = "BEACON";
+        fetchEvents();
+        fetchTotal();
+      }
+    }
 
     // External FT
     if (externalFtStatusModalEl) {
@@ -3512,12 +3785,21 @@ async function fetchDecoderStatus() {
       }
     }
 
+    // Beacon monitor detector — separate from the generic CW scan decoder
+    if (beaconStatusModalEl) {
+      const runLabel = beaconRunning ? "Running" : "Stopped";
+      const bandLabel = beaconSt.current_band ? ` (${beaconSt.current_band})` : "";
+      beaconStatusModalEl.textContent = `${runLabel}${bandLabel}`;
+    }
+
     // CW — enabled either by CW_INTERNAL_ENABLE env var OR force-started by scan mode
     if (cwStatusModalEl) {
       const cwSt = (cwDec.status || {});
       if (cwDec.enabled || cwSt.running) {
         const runLabel = cwSt.running ? "Running" : "Stopped";
         cwStatusModalEl.textContent = `Configured / ${runLabel}`;
+      } else if (beaconRunning || isBeaconUiMode) {
+        cwStatusModalEl.textContent = "Disabled (BEACON uses separate detector)";
       } else {
         cwStatusModalEl.textContent = "Disabled";
       }
@@ -3556,6 +3838,7 @@ async function fetchDecoderStatus() {
     if (agcStatusModalEl) agcStatusModalEl.textContent = status.dsp && status.dsp.agc_enabled ? "On" : "Off";
   } catch (err) {
     if (externalFtStatusModalEl) externalFtStatusModalEl.textContent = "Unavailable";
+    if (beaconStatusModalEl) beaconStatusModalEl.textContent = "Unavailable";
     if (cwStatusModalEl) cwStatusModalEl.textContent = "Unavailable";
     if (ssbStatusModalEl) ssbStatusModalEl.textContent = "Unavailable";
 
@@ -3866,6 +4149,65 @@ async function loadBands() {
   renderScanContextSummary(latestScanState);
 }
 
+function renderRtlRecoveryInfo(info) {
+  if (!rtlRecoverySection) {
+    return;
+  }
+
+  rtlRecoverySection.classList.remove("d-none");
+  const detected = Boolean(info?.detected);
+  const usbresetInstalled = Boolean(info?.usbreset_installed);
+  const stopCommand = info?.stop_command || "bash scripts/server_control.sh stop";
+  const startCommand = info?.start_command || "bash scripts/server_control.sh start";
+  const resetCommand = info?.usbreset_command || info?.usbreset_vid_pid_command || "sudo usbreset <bus/device>";
+
+  if (!detected) {
+    if (rtlRecoveryBadge) {
+      rtlRecoveryBadge.textContent = usbresetInstalled ? "RTL not detected" : "usbreset missing";
+      rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-secondary" : "badge bg-warning text-dark";
+    }
+    if (rtlRecoveryDeviceName) rtlRecoveryDeviceName.textContent = "No RTL USB device currently detected";
+    if (rtlRecoveryDevicePath) rtlRecoveryDevicePath.textContent = "-";
+    if (rtlRecoveryBusDevice) rtlRecoveryBusDevice.textContent = "-";
+    if (rtlRecoveryCommand) rtlRecoveryCommand.textContent = usbresetInstalled ? "sudo usbreset <bus/device>" : "usbreset not installed";
+    if (rtlRecoveryVidPidCommand) rtlRecoveryVidPidCommand.textContent = "-";
+    if (rtlRecoveryAvailability) {
+      rtlRecoveryAvailability.textContent = usbresetInstalled
+        ? "Connect the RTL and reopen Admin Config or click Refresh devices to resolve the current USB node."
+        : "The usbreset utility is not installed on the server.";
+    }
+    if (rtlRecoverySequence) {
+      rtlRecoverySequence.textContent = [stopCommand, "sudo usbreset <bus/device>", startCommand].join("\n");
+    }
+    return;
+  }
+
+  const deviceName = [info?.manufacturer, info?.product]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+  if (rtlRecoveryBadge) {
+    rtlRecoveryBadge.textContent = usbresetInstalled ? "usbreset ready" : "usbreset missing";
+    rtlRecoveryBadge.className = usbresetInstalled ? "badge bg-white text-dark border" : "badge bg-warning text-dark";
+  }
+  if (rtlRecoveryDeviceName) {
+    rtlRecoveryDeviceName.textContent = deviceName || `${info?.vendor_id || ""}:${info?.product_id || ""}` || "RTL detected";
+  }
+  if (rtlRecoveryDevicePath) rtlRecoveryDevicePath.textContent = info?.device_path || "-";
+  if (rtlRecoveryBusDevice) rtlRecoveryBusDevice.textContent = info?.bus_device || "-";
+  if (rtlRecoveryCommand) rtlRecoveryCommand.textContent = info?.usbreset_command || "-";
+  if (rtlRecoveryVidPidCommand) rtlRecoveryVidPidCommand.textContent = info?.usbreset_vid_pid_command || "-";
+  if (rtlRecoveryAvailability) {
+    rtlRecoveryAvailability.textContent = usbresetInstalled
+      ? "Use this only when preview or scan stays stuck and the waterfall keeps waiting for frames."
+      : "The RTL USB node was detected, but the usbreset utility is not installed on the server.";
+  }
+  if (rtlRecoverySequence) {
+    rtlRecoverySequence.textContent = [stopCommand, resetCommand, startCommand].join("\n");
+  }
+}
+
 async function loadSettings() {
   try {
     const resp = await fetch("/api/settings", { headers: { ...getAuthHeader() } });
@@ -3915,6 +4257,7 @@ async function loadSettings() {
       await refreshAdminAuthFields();
     }
     applyDeviceConfigToForm(data.device_config || {});
+    renderRtlRecoveryInfo(data.rtl_recovery || {});
     if (data.asr) {
       if (ssbAsrEnabledCheck) ssbAsrEnabledCheck.checked = data.asr.enabled !== false;
       if (ssbAsrAvailableBadge) {
@@ -4512,8 +4855,9 @@ if (checkForUpdatesBtn) {
   });
 }
 
-refreshDevicesBtn.addEventListener("click", () => {
-  loadDevices();
+refreshDevicesBtn.addEventListener("click", async () => {
+  await loadDevices();
+  await loadSettings();
 });
 
 if (saveAsrSettingsBtn) {
@@ -4880,7 +5224,44 @@ if (quickModeButtons.length) {
         return;
       }
       const mode = String(button.dataset.quickMode || "").trim();
-      
+
+      // ── BEACON mode: special handling — takes over scan engine ────────────
+      if (mode === "BEACON") {
+        if (beaconController?.isBeaconModeActive() && beaconController?.isSchedulerRunning?.()) {
+          showToast("Stop Beacon Analysis first, then disable Beacon Monitor.");
+          return;
+        }
+        if (beaconController?.isBeaconModeActive()) {
+          // Toggle off
+          rememberBeaconUiMode(false);
+          await beaconController.stop();
+          setBeaconAreaVisible(false);
+          selectedDecoderMode = null;
+          refreshModeButtons();
+          logLine("Beacon Analysis mode desactivado.");
+        } else {
+          // Exit any running scan first
+          if (isScanRunning || latestScanState?.state === "running") {
+            await stopScan();
+          }
+          await beaconController?.start();
+          setBeaconAreaVisible(true);
+          selectedDecoderMode = "BEACON";
+          rememberBeaconUiMode(true);
+          refreshModeButtons();
+          logLine("Beacon Monitor mode aberto — clica 'Start monitoring' para iniciar scheduler.");
+        }
+        return;
+      }
+
+      // If beacon mode was active, exit it when switching to another mode
+      if (beaconController?.isBeaconModeActive()) {
+        rememberBeaconUiMode(false);
+        await beaconController.stop();
+        setBeaconAreaVisible(false);
+      }
+      // ── End BEACON special handling ───────────────────────────────────────
+
       // During active scan: allow mode change but prevent deselection.
       // Also check latestScanState as a fallback in case isScanRunning was
       // briefly set false by a syncScanState race between polls.
@@ -4982,7 +5363,9 @@ saveBandBtn.addEventListener("click", async () => {
     if (String(bandSelect?.value || "") === String(payload.band.name)) {
       if (isScanRunning) {
         wfc.renderRuler(Number(payload.band.start_hz), Number(payload.band.end_hz));
-        wfc.updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        if (!beaconController?.isBeaconModeActive()) {
+          wfc.updateVFODisplay(Number(payload.band.start_hz), Number(payload.band.end_hz));
+        }
         showToast("Band saved. New limits apply fully on next scan restart.");
       } else {
         await applyPreviewBandRange(payload.band.name, { syncInputs: true });
@@ -5005,6 +5388,9 @@ async function startApplication() {
     return;
   }
   appStarted = true;
+  // Initialise satellite module (opens /ws/satellite). Must run AFTER auth so
+  // the WebSocket carries the session cookie; otherwise backend returns 403.
+  _initSatelliteModule().catch((err) => console.warn("satellite init failed", err));
   connectSpectrum();
   ensureWaterfallFallback();
   connectStatus();
@@ -5021,6 +5407,14 @@ async function startApplication() {
       }
     }
   } catch (_) { /* best effort */ }
+
+  // Restore BEACON/NCDXF UI immediately after the first scan-state probe so a
+  // hard refresh does not visibly fall back to the standard startup layout.
+  if (!beaconController) {
+    beaconController = new BeaconController();
+  }
+  await restoreBeaconUiModeFromSession();
+
   await loadDevices();
   await loadBands();
   await loadSettings();
@@ -5028,21 +5422,29 @@ async function startApplication() {
   loadFilters();
   fetchEvents();
   fetchTotal();
-  setInterval(() => { fetchEvents(); fetchTotal(); }, 5000);
+  // Events: 200 rows × ~1 KB each = ~200 KB per fetch. 5 s polling overwhelmed
+  // the FastAPI threadpool (HAR analysis 2026-04-30: 8.7 MB transferred in
+  // 100 s for /api/events alone). 15 s gives interactive feel without flooding.
+  setInterval(() => { fetchEvents(); fetchTotal(); }, 15000);
   await syncScanState();
   refreshQuickBandButtons();
   setInterval(syncScanState, 5000);
   fetchModeStats();
-  setInterval(fetchModeStats, 10000);
+  // /api/events/stats runs COUNT(*) GROUP BY mode over ~800k rows; 30 s is plenty.
+  setInterval(fetchModeStats, 30000);
   fetchPropagationSummary();
-  setInterval(fetchPropagationSummary, 15000);
+  // Propagation summary updates derive from the same events; 60 s suffices.
+  setInterval(fetchPropagationSummary, 60000);
+
   fetchDecoderStatus();
-  setInterval(fetchDecoderStatus, 10000);
+  setInterval(fetchDecoderStatus, 20000);
   connectLogs();
   fetchLogs();
-  setInterval(fetchLogs, 4000);
+  // /ws/logs already pushes new entries in real time; the poll is a safety net.
+  setInterval(fetchLogs, 30000);
   fetchFileLog();
-  setInterval(fetchFileLog, 8000);
+  // Backend log file dump is ~235 KB per call; 30 s polling is enough for ops view.
+  setInterval(fetchFileLog, 30000);
   initMenuDropdownModalBehavior();
 
   try {

@@ -1,0 +1,4 @@
+# Amateur satellite TLE snapshot
+# Source: Celestrak (https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=TLE)
+# Generated: 2026-04-29T00:00:00Z
+# This file is a placeholder — run scripts/refresh_satellite_snapshots.sh to populate it.

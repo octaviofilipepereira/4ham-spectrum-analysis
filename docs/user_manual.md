@@ -11,19 +11,20 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 1. [Eventos SSB — Voice Signature](#eventos-ssb--voice-signature)
 2. [Compreender as Métricas](#compreender-as-métricas)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Dashboard Academic Analytics](#dashboard-academic-analytics)
-4. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
-5. [Presets de Rotação & Scheduler](#presets-de-rotação--scheduler)
-6. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
-7. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
-8. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
-9. [Configuração Inicial](#configuração-inicial)
-10. [Interface do Utilizador](#interface-do-utilizador)
-11. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
-12. [Exportação de Dados](#exportação-de-dados)
-13. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
-14. [Descodificação APRS — Pipeline VHF](#descodificação-aprs--pipeline-vhf)
-15. [Resolução de Problemas](#resolução-de-problemas)
+3. [Beacon Analysis — NCDXF/IARU](#beacon-analysis--ncdxfiaru)
+4. [Dashboard Academic Analytics](#dashboard-academic-analytics)
+5. [Scan Rotation (Rotação de Scan)](#scan-rotation-rotação-de-scan)
+6. [Presets de Rotação & Scheduler](#presets-de-rotação--scheduler)
+7. [Mapa de Propagação — Seletor de Janela Temporal](#mapa-de-propagação--seletor-de-janela-temporal)
+8. [Mapa de Propagação QTH-Cêntrico](#mapa-de-propagação-qth-cêntrico)
+9. [Painel de Clima Espacial Ionosférico](#painel-de-clima-espacial-ionosférico)
+10. [Configuração Inicial](#configuração-inicial)
+11. [Interface do Utilizador](#interface-do-utilizador)
+12. [Interpretação do Espectrograma](#interpretação-do-espectrograma)
+13. [Exportação de Dados](#exportação-de-dados)
+14. [Incorporar o Dashboard Académico num Website Externo](#incorporar-o-dashboard-académico-num-website-externo)
+15. [Descodificação APRS — Pipeline VHF](#descodificação-aprs--pipeline-vhf)
+16. [Resolução de Problemas](#resolução-de-problemas)
 
 ---
 
@@ -225,6 +226,195 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 
 ---
 
+## Beacon Analysis — NCDXF/IARU
+
+### O que faz este módulo?
+
+O **Beacon Analysis** é um módulo dedicado à rede internacional **NCDXF/IARU Beacon Network**. Os 18 radiofaróis fixos transmitem em **slots UTC exactos de 10 segundos** nas bandas de **20, 17, 15, 12 e 10 metros**.
+
+Cada slot transmite:
+- indicativo CW a 22 WPM
+- quatro dashes de 1 segundo em **100 W**, **10 W**, **1 W** e **100 mW**
+
+Este módulo existe para medir propagação real entre a tua estação e um conjunto estável de beacons distribuídos pelo mundo.
+
+Enquanto este modo está activo, o card de propagação continua visível mas passa para um globo Beacon específico, independente do mapa genérico usado pelos restantes modos.
+
+### Como usar no painel
+
+1. Clicar em **📻 NCDXF — Beacon Monitor** na barra de modos.
+2. Clicar em **Start monitoring** dentro do painel Beacon.
+3. O 4ham valida primeiro o estado temporal do host.
+4. Se a validação passar, o scheduler toma controlo do scan engine.
+5. Clicar em **Stop** para parar o módulo e libertar o scan engine.
+
+Se fizeres hard refresh na mesma tab enquanto o modo Beacon está aberto, o 4ham volta directamente a este painel em vez de regressar ao arranque standard.
+
+Importante:
+- enquanto o Beacon Analysis está activo, os controlos normais de scan ficam bloqueados
+- este módulo usa scheduler próprio e não o sweep normal do scanner
+
+### Como interpretar o painel
+
+- **Status badge**: mostra se o scheduler está parado, a validar tempo, a arrancar ou em execução.
+- **Matriz live 18×5**: cada linha é um beacon; cada coluna é uma banda.
+- **Top meter**: intensidade da dash de referência a 100 W, com o SNR à direita.
+- **Bottom meter**: sequência ordenada de dashes ouvidas, de 0 a 4.
+- **No copy**: significa que o slot foi monitorizado mas não houve cópia fiável.
+- **Recent activity**: usa sempre uma janela rolling de 12 horas e mostra o melhor passe detectado por célula; não representa o slot live actual.
+- **Botão Events**: em cada célula do histórico abre o detalhe desse beacon/banda, incluindo linhas recentes e o estado `Detected`, `Weak trace` ou `No copy`.
+- **Mapa Beacon**: mostra apenas detecções confirmadas, desenhadas em tempo quase real entre o teu QTH e o beacon correspondente; ao passar com o rato mostra a última detecção disponível para esse beacon.
+- **Score Beacon**: apresenta score por banda calculado a partir das observações Beacon e um score global obtido pela mediana das bandas monitorizadas.
+
+### Semântica pública do Beacon
+
+A leitura pública do módulo Beacon é baseada no calendário UTC conhecido da rede NCDXF/IARU. O 4ham já sabe qual beacon deveria estar activo em cada slot e em cada banda; por isso, um slot marcado publicamente como **Detected** significa que houve evidência suficiente compatível com o beacon agendado nesse slot monitorizado.
+
+Diagnósticos internos de engenharia continuam a existir no sistema, mas não entram na interpretação pública do Beacon nem no modelo futuro de exportação deste módulo.
+
+| Termo | Significado público |
+|---|---|
+| `Window` | Janela rolling usada pelo histórico. No painel **Recent activity** é sempre 12 horas. |
+| `Coverage` | Número de slots efectivamente monitorizados dentro da janela. |
+| `Detected` | Número de slots monitorizados com observação válida do beacon agendado. |
+| `No copy` | Número de slots monitorizados sem observação útil. Na leitura pública equivale a `Coverage - Detected`. |
+| `100 W SNR` | Intensidade da dash de referência a 100 W no slot observado. |
+| `Best pass` | Melhor passe detectado na janela, ordenado primeiro pela sequência de dashes ouvidas e depois pelo SNR da dash de 100 W. |
+
+### Mapa Beacon e Propagation Score
+
+O painel Beacon já inclui um mapa Beacon próprio e um Propagation Score Beacon próprio, sem substituir o mapa genérico dos outros modos.
+
+Comportamento do mapa:
+- usa apenas **detecções confirmadas** do Beacon; `Weak trace` não desenha linha no globo
+- mantém, por beacon, a **última detecção confirmada** dentro da janela temporal escolhida no seletor do mapa
+- no hover mostra indicativo, localização, banda, hora UTC da última detecção, SNR de 100 W, dashes ouvidas e distância aproximada ao teu QTH
+- enquanto estás em hover, a arrastar ou a fazer zoom, os refreshes ficam em espera e a vista actual não salta para o zoom/orientação inicial
+
+Comportamento do score:
+- cada banda usa uma janela rolling de **60 minutos**; se não houver dados úteis nessa janela, a UI faz fallback para **24 horas**
+- `Weak trace` significa energia positiva na dash de 100 W sem cumprir o limiar para `Detected`; conta parcialmente para o score, mas não entra no mapa nem altera o agregado binário do heatmap
+- o score global Beacon é a **mediana** dos scores das bandas com observações monitorizadas
+
+| Símbolo | Significado |
+|---|---|
+| `W` | janela rolling em minutos usada para o score da banda |
+| `D_r` | taxa de detecção = `Detected / Monitored` |
+| `W_r` | taxa de `Weak trace` = `Weak / Monitored` |
+| `T` | componente de traço = `min(1, D_r + 0.35 × W_r)` |
+| `S` | mediana normalizada do `100 W SNR` = `clip((median_snr_100W - 3) / 18, 0, 1)` |
+| `B` | qualidade mediana de dashes = `median_dashes / 4` |
+| `Q` | componente de recência = `clip(1 - age_latest_meaningful / W, 0, 1)` |
+
+```text
+T = min(1, D_r + 0.35 × W_r)
+
+S = clip((median_snr_100W - 3) / 18, 0, 1)
+
+B = median_dashes / 4
+
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
+
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
+
+GlobalScore = mediana(BandScore_i das bandas com slots monitorizados)
+```
+
+Notas:
+- `clip(x, 0, 1)` limita o valor ao intervalo `[0, 1]`.
+- `median_snr_100W` usa primeiro slots `Detected`; se não existirem, usa os `Weak trace` dessa banda.
+- `age_latest_meaningful` mede a idade da última observação útil (`Detected` ou `Weak trace`) dentro da janela.
+- `No copy` continua visível publicamente, mas entra no score apenas de forma indirecta ao baixar `D_r` e `W_r`.
+
+### Indicadores NOAA no painel de instrumentos
+
+O painel Beacon inclui dois velocímetros NOAA lado a lado: **Kp** e **SFI**. São actualizados a partir da mesma fonte ionosférica utilizada pelo mapa de propagação e pela barra lateral de clima espacial.
+
+#### O que é o Kp?
+
+O **Kp** (Índice Geomagnético Planetário) mede a perturbação no campo magnético terrestre causada pelo vento solar. Escala de 0 a 9.
+
+| Kp | Estado | Impacto na propagação HF |
+|---|---|---|
+| 0–2 | Calmo | Condições ideais — todas as bandas ao seu melhor |
+| 3–4 | Instável | Degradação ligeira nos percursos polares / auroral |
+| 5–6 | Tempestade activa | Degradação notável; percursos de alta latitude afectados |
+| ≥ 7 | Tempestade severa | Risco de apagão HF; percursos polares muito penalizados |
+
+> Um Kp mais baixo favorece especialmente os percursos DX que passam pela zona auroral (ex. Europa → América do Norte pela rota polar).
+
+#### O que é o SFI?
+
+O **SFI** (Solar Flux Index, 10,7 cm) é um indicador da radiação UV e raios-X do sol — a principal responsável por ionizar a camada F2. Um SFI mais alto significa uma ionosfera mais densa e mais bandas abertas para longa distância.
+
+| SFI | Estado | Efeito prático |
+|---|---|---|
+| < 80 | Baixo | Condições pobres — 15 m e 10 m provavelmente fechadas |
+| 80–120 | Moderado | 20 m fiável; 15 m marginal; 10 m fechada |
+| 120–200 | Bom | 20 m e 15 m abertas de dia; 10 m com aberturas possíveis |
+| > 200 | Excelente | 10 m, 12 m, 15 m com grande probabilidade de abertura |
+
+#### Kp × SFI → prioridade de banda
+
+| Banda | Sensibilidade ao Kp | Dependência do SFI | Com Kp ≤ 3 e SFI ≥ 150 (dia) |
+|---|---|---|---|
+| **80 m** | Baixa (regional) | Muito baixa | Fiável à noite para NVIS / percursos curtos |
+| **40 m** | Baixa–média | Baixa | Banda de referência, dia e noite |
+| **20 m** | Média | Média–alta | Principal banda DX; multi-hop para qualquer continente |
+| **15 m** | Média | Alta (SFI > 100) | Excelente DX diurno; transcontinental provável |
+| **10 m** | Baixa (ionosférica) | Muito alta (SFI > 120) | Abertura diurna provável; sporadic-E também contribui |
+
+**Ordem de prioridade diurna com Kp ≤ 3 e SFI ≥ 150:** 20 m → 15 m → 10 m → 40 m → 80 m.  
+**De noite:** 40 m → 80 m → 20 m.
+
+### Validação temporal antes do arranque
+
+O Beacon Analysis depende de slots UTC exactos de 10 segundos. Por isso, o 4ham valida o tempo do host antes de permitir o arranque do scheduler.
+
+Importante: o sistema operativo não precisa de estar com timezone UTC. O que interessa é a hora absoluta estar correcta e existir uma fonte de sincronização activa.
+
+Estados de validação:
+- `healthy`: arranque permitido. Relógio sincronizado, NTP activo, leap normal e métricas dentro dos limiares do Beacon.
+- `degraded`: arranque bloqueado. Causas típicas: offset absoluto acima de 500 ms, root distance acima de 1000 ms, sem servidor activo ou prova temporal incompleta.
+- `offline`: arranque bloqueado. Causas típicas: relógio não sincronizado, NTP inactivo, leap não normal, offset absoluto acima de 2000 ms, root distance acima de 5000 ms ou prova indisponível.
+
+### Como verificar no host
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+O que confirmar:
+- `timedatectl status`: `System clock synchronized: yes` e NTP activo.
+- `timedatectl timesync-status`: servidor seleccionado e valores razoáveis de offset e root distance.
+- `chronyc tracking`: `Leap status: Normal` e offset baixo, quando o host usa chrony.
+- `chronyc sources -v`: pelo menos uma fonte activa, normalmente marcada com `^*`.
+
+### Como resolver no host
+
+#### systemd-timesyncd
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+#### chrony
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Só voltar a tentar iniciar o Beacon Analysis depois de a verificação confirmar relógio sincronizado e uma fonte temporal válida.
+
 ---
 
 ## Configuração Inicial
@@ -234,6 +424,7 @@ O Propagation Score fornece uma **visão holística da qualidade da propagação
 - Sistema operativo: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - Sincronização de tempo NTP (obrigatório para FT8/FT4)
+- Beacon Analysis (NCDXF/IARU): requer estado UTC saudável no host; ver capítulo **Beacon Analysis — NCDXF/IARU**
 
 ### Instalação rápida (instalador gráfico)
 A partir da v0.7.1, o projeto inclui um instalador TUI interativo:
@@ -527,6 +718,8 @@ Eventos fora da janela selecionada não aparecem no mapa. Isto permite focar na 
 
 O mapa de propagação é um globo ortográfico 3D centrado no QTH do utilizador, renderizado com D3.js no dashboard Academic Analytics. Combina duas camadas de dados:
 
+Quando o modo activo é **Beacon / NCDXF**, este mesmo card muda para o globo Beacon: mostra apenas a última detecção confirmada por beacon dentro da janela temporal escolhida e mantém zoom/orientação enquanto o operador está a inspeccionar o mapa.
+
 1. **Previsão de zonas ionosféricas** — cobertura de propagação prevista por banda, calculada em tempo real a partir dos índices solares/geomagnéticos do NOAA SWPC através de um modelo ionosférico calibrado.
 2. **Contactos SDR confirmados** — descodificações com indicativo confirmado das sessões SDR, representadas como pontos e arcos de ortodrómia até à posição do locator da estação remota.
 
@@ -595,6 +788,19 @@ A barra lateral estreita à direita do globo (1/4 da largura da página) mostra 
 | **Closed** | 🔴 Carmesim | Frequência da banda abaixo do foF2 — sem propagação por salto |
 | **Absorbed** | ⚫ Cinzento | Absorção da camada D demasiado elevada — normalmente 40 m / 80 m em pleno dia sob alta atividade solar |
 
+### Kp × SFI — prioridade de banda prática
+
+Use esta tabela para escolher a melhor banda para uma combinação de condições de clima espacial:
+
+| Condições | Bandas (prioridade) | Notas |
+|---|---|---|
+| Kp 0–2, SFI > 150 | 20 m → 15 m → 10 m → 40 m | DX diurno excelente; 10 m provavelmente aberta |
+| Kp 0–2, SFI 80–120 | 20 m → 40 m → 15 m → 80 m | Condições moderadas; 15 m e 10 m marginais ou fechadas |
+| Kp 3–4, SFI > 120 | 20 m → 15 m → 40 m → 10 m | Actividade geomagnética ligeira; percursos polares ligeiramente degradados |
+| Kp 5–6, qualquer SFI | 40 m → 20 m → 80 m | Tempestade — percursos auroral/polar não fiáveis |
+| Kp ≥ 7, qualquer SFI | 40 m → 80 m (se aberta) | Tempestade severa — apagão HF possível; bandas baixas mais resilientes |
+| Noite, qualquer Kp/SFI | 40 m → 80 m → 20 m | F2 mais fraca à noite; NVIS em 40/80 m para regional |
+
 Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC.
 
 > O estado de banda é um guia baseado em modelo. Confirme sempre com as condições reais de operação e com o DX Cluster / WSPRnet para evidência em tempo real.
@@ -623,6 +829,7 @@ Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC
 | **Retention** | Limite máximo de eventos antes de auto-exportar+purge; número de eventos recentes a manter; diretório de exportação |
 | **Authentication** | Alterar password de administrador |
 | **SSB Voice Transcription** | Ativar/desativar Whisper ASR para SSB voice-to-text. Requer pacote `openai-whisper` |
+| **RTL recovery** | Mostra o nó USB actual do RTL, o endereço bus/device e os comandos `usbreset` recomendados para recuperar o dongle quando preview/cascata ficam presos sem frames |
 
 ### Painel Admin Config — Botões
 
@@ -637,6 +844,16 @@ Os dados atualizam automaticamente de **15 em 15 minutos** a partir do NOAA SWPC
 | **Purge invalid events** | Pede confirmação e elimina da base de dados todos os eventos de ocupação e callsign incompletos ou mal formados (sem timestamp, frequência inválida, callsign nulo/unknown, etc.). Atualiza os contadores no UI após a conclusão |
 | **Reset defaults** | Pede confirmação e repõe as definições padrão da aplicação (modos activos, opções de summary e outras configurações gerais). **Não afecta** eventos guardados, bandas customizadas, device configuration nem audio configuration |
 | **Reset total** | ⚠️ Destrutivo. Pede confirmação e elimina **todas** as definições e bandas customizadas da base de dados (`DELETE FROM settings`, `DELETE FROM bands`), limpa o localStorage do browser e recarrega a página. Equivale a estado de instalação limpa. Os eventos não são afectados |
+
+### Recuperação RTL-SDR com `usbreset`
+
+Se o backend arrancar mas o modo preview continuar preso em `Awaiting Spectrum Stream` e a cascata não mexer, o RTL pode ter ficado bloqueado a nível USB/driver. Nessa situação, abrir o **Admin Config** e consultar o bloco **RTL recovery** para confirmar o nó USB actual do dongle e o comando exacto a executar.
+
+1. Parar o backend com `bash scripts/server_control.sh stop`.
+2. Executar o comando indicado no Admin Config, por exemplo `sudo usbreset 001/008` ou `sudo usbreset 0bda:2838`.
+3. Voltar a arrancar o backend com `bash scripts/server_control.sh start`.
+
+Este procedimento só deve ser usado quando um restart normal não recupera a cascata. O endereço bus/device pode mudar depois de desligar, reiniciar ou voltar a ligar o RTL, por isso convém confirmar sempre o valor actual no **Admin Config** antes de correr `usbreset`.
 
 ### Controlos de scan
 - **Start scanning / Stop scanning** — inicia ou para o scan ativo

@@ -11,19 +11,20 @@ License: GNU AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html)
 1. [SSB Events — Voice Signature](#ssb-events--voice-signature)
 2. [Understanding the Metrics](#understanding-the-metrics)
    - [SNR vs Propagation Score](#snr-vs-propagation-score)
-3. [Academic Analytics Dashboard](#academic-analytics-dashboard)
-4. [Scan Rotation](#scan-rotation)
-5. [Rotation Presets & Scheduler](#rotation-presets--scheduler)
-6. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
-7. [QTH-Centric Propagation Map](#qth-centric-propagation-map)
-8. [Ionospheric Space Weather Panel](#ionospheric-space-weather-panel)
-9. [Initial Setup](#initial-setup)
-10. [User Interface](#user-interface)
-11. [Spectrogram Interpretation](#spectrogram-interpretation)
-12. [Data Export](#data-export)
-13. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
-14. [APRS Decoding — VHF Pipeline](#aprs-decoding--vhf-pipeline)
-15. [Troubleshooting](#troubleshooting)
+3. [Beacon Analysis — NCDXF/IARU](#beacon-analysis--ncdxfiaru)
+4. [Academic Analytics Dashboard](#academic-analytics-dashboard)
+5. [Scan Rotation](#scan-rotation)
+6. [Rotation Presets & Scheduler](#rotation-presets--scheduler)
+7. [Propagation Map — Time Window Selector](#propagation-map--time-window-selector)
+8. [QTH-Centric Propagation Map](#qth-centric-propagation-map)
+9. [Ionospheric Space Weather Panel](#ionospheric-space-weather-panel)
+10. [Initial Setup](#initial-setup)
+11. [User Interface](#user-interface)
+12. [Spectrogram Interpretation](#spectrogram-interpretation)
+13. [Data Export](#data-export)
+14. [Embedding the Academic Dashboard on an External Website](#embedding-the-academic-dashboard-on-an-external-website)
+15. [APRS Decoding — VHF Pipeline](#aprs-decoding--vhf-pipeline)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -225,6 +226,154 @@ The Propagation Score provides a **holistic view of propagation quality** on eac
 
 ---
 
+## Beacon Analysis — NCDXF/IARU
+
+### What does this module do?
+
+**Beacon Analysis** is a dedicated module for the **NCDXF/IARU International Beacon Network**. The 18 fixed beacons transmit in exact **10-second UTC slots** on the **20, 17, 15, 12 and 10 metre** bands.
+
+Each slot sends:
+- the CW callsign at 22 WPM
+- four 1-second dashes at **100 W**, **10 W**, **1 W** and **100 mW**
+
+This module exists to measure real propagation between your station and a stable set of beacons distributed around the world.
+
+While this mode is active, the propagation card remains visible but switches to a Beacon-specific globe, separate from the generic map used by the other modes.
+
+### How to use it in the panel
+
+1. Click **📻 NCDXF — Beacon Monitor** in the mode bar.
+2. Click **Start monitoring** inside the Beacon panel.
+3. 4ham first validates the host time state.
+4. If validation passes, the scheduler takes control of the scan engine.
+5. Click **Stop** to stop the module and release the scan engine.
+
+If you hard-refresh the same browser tab while Beacon mode is open, 4ham returns directly to this panel instead of falling back to the standard startup layout.
+
+Important:
+- while Beacon Analysis is active, the normal scan controls are intentionally locked
+- this module uses its own scheduler and does not use the normal sweep scanner
+
+### How to interpret the panel
+
+- **Status badge**: shows whether the scheduler is stopped, validating host time, starting, or running.
+- **Live 18×5 matrix**: each row is a beacon and each column is a band.
+- **Top meter**: 100 W reference dash strength, with SNR shown on the right.
+- **Bottom meter**: ordered dash sequence heard, from 0 to 4.
+- **No copy**: means the slot was monitored but no reliable copy was obtained.
+- **Recent activity**: always uses a rolling 12-hour window and shows the best detected pass per cell; it is not the current live slot state.
+- **Events button**: each history cell opens detailed rows for that beacon/band, including the `Detected`, `Weak trace`, and `No copy` states.
+- **Beacon map**: shows confirmed detections only, plotted in near real time between your QTH and the corresponding beacon; hover shows the latest available detection for that beacon.
+- **Beacon score**: shows per-band scores computed from Beacon observations plus a global score obtained from the median of the monitored bands.
+
+### Public Beacon semantics
+
+The public reading of the Beacon module is based on the known UTC schedule of the NCDXF/IARU network. 4ham already knows which beacon should be active in each slot and on each band; therefore, a slot shown publicly as **Detected** means there was enough evidence compatible with the scheduled beacon in that monitored slot.
+
+Internal engineering diagnostics still exist in the system, but they do not enter the public Beacon interpretation or the future export model for this module.
+
+| Term | Public meaning |
+|---|---|
+| `Window` | Rolling history window. In the **Recent activity** panel it is always 12 hours. |
+| `Coverage` | Number of slots actually monitored inside the window. |
+| `Detected` | Number of monitored slots with a valid observation of the scheduled beacon. |
+| `No copy` | Number of monitored slots without a usable observation. In the public interpretation it is `Coverage - Detected`. |
+| `100 W SNR` | Strength of the 100 W reference dash in the observed slot. |
+| `Best pass` | Best detected pass in the window, ranked first by ordered dash sequence and then by 100 W dash SNR. |
+
+### Beacon Map and Propagation Score
+
+The Beacon panel now includes its own Beacon-native map and Beacon-native propagation score, without replacing the generic map used by the other modes.
+
+Map behavior:
+- uses **confirmed detections only**; `Weak trace` does not draw an arc on the globe
+- keeps, for each beacon, the **latest confirmed detection** inside the selected map window
+- hover shows callsign, location, band, UTC time of the latest detection, 100 W SNR, heard dashes, and approximate distance to your QTH
+- while you are hovering, dragging, or zooming, refreshes are deferred so the current view does not jump back to the default zoom/orientation
+
+Score behavior:
+- each band uses a **60-minute** rolling window; if no useful data exists there, the UI falls back to **24 hours**
+- `Weak trace` means positive energy on the 100 W dash without crossing the `Detected` threshold; it contributes partially to the score, but not to the globe and not to the binary recent-activity aggregate
+- the global Beacon score is the **median** of the band scores that actually contain monitored observations
+
+| Symbol | Meaning |
+|---|---|
+| `W` | rolling window in minutes used for the band score |
+| `D_r` | detection rate = `Detected / Monitored` |
+| `W_r` | `Weak trace` rate = `Weak / Monitored` |
+| `T` | trace component = `min(1, D_r + 0.35 × W_r)` |
+| `S` | normalised median `100 W SNR` = `clip((median_snr_100W - 3) / 18, 0, 1)` |
+| `B` | median dash quality = `median_dashes / 4` |
+| `Q` | recency component = `clip(1 - age_latest_meaningful / W, 0, 1)` |
+
+```text
+T = min(1, D_r + 0.35 × W_r)
+
+S = clip((median_snr_100W - 3) / 18, 0, 1)
+
+B = median_dashes / 4
+
+Q = clip(1 - age_latest_meaningful / W, 0, 1)
+
+BandScore = 100 × (0.50 × T + 0.20 × S + 0.20 × B + 0.10 × Q)
+
+GlobalScore = median(BandScore_i across bands with monitored slots)
+```
+
+Notes:
+- `clip(x, 0, 1)` limits the value to the `[0, 1]` range.
+- `median_snr_100W` uses `Detected` slots first; if none exist, it falls back to the band's `Weak trace` rows.
+- `age_latest_meaningful` measures the age of the latest useful observation (`Detected` or `Weak trace`) inside the window.
+- `No copy` remains visible publicly, but enters the score only indirectly by lowering `D_r` and `W_r`.
+
+### Time validation before startup
+
+Beacon Analysis depends on exact 10-second UTC slots. 4ham therefore validates host time before allowing the scheduler to start.
+
+Important: the operating system timezone does not need to be set to UTC. What matters is correct absolute time and an active synchronization source.
+
+Validation states:
+- `healthy`: startup allowed. Clock synchronized, NTP active, leap state normal, and timing quality within the Beacon thresholds.
+- `degraded`: startup blocked. Typical causes: absolute offset above 500 ms, root distance above 1000 ms, no active server, or only partial probe information.
+- `offline`: startup blocked. Typical causes: unsynchronized clock, inactive NTP, abnormal leap state, absolute offset above 2000 ms, root distance above 5000 ms, or no usable probe.
+
+### How to verify on the host
+
+```bash
+timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v
+```
+
+What to confirm:
+- `timedatectl status`: `System clock synchronized: yes` and active NTP.
+- `timedatectl timesync-status`: selected server plus reasonable offset and root distance values.
+- `chronyc tracking`: `Leap status: Normal` and a low offset when the host uses chrony.
+- `chronyc sources -v`: at least one active source, normally marked with `^*`.
+
+### How to resolve on the host
+
+#### systemd-timesyncd
+
+```bash
+sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status
+```
+
+#### chrony
+
+```bash
+sudo systemctl enable --now chrony
+sudo chronyc makestep
+chronyc tracking
+chronyc sources -v
+```
+
+Retry Beacon Analysis only after verification confirms a synchronized clock and a valid time source.
+
 ---
 
 ## Initial Setup
@@ -234,6 +383,7 @@ The Propagation Score provides a **holistic view of propagation quality** on eac
 - Operating system: Linux Ubuntu 20.04+ / Debian 11+ / Linux Mint 20+ / Raspberry Pi OS 11+ (64-bit)
 - Python 3.10+
 - NTP time synchronisation (mandatory for FT8/FT4)
+- Beacon Analysis (NCDXF/IARU): requires a healthy host UTC state; see the **Beacon Analysis — NCDXF/IARU** chapter
 
 ### Quick installation (graphical installer)
 Starting with v0.7.1, the project includes an interactive TUI installer:
@@ -527,6 +677,8 @@ Events outside the selected window are not shown on the map. This allows focusin
 
 The propagation map is an orthographic 3D globe centred on your QTH, rendered with D3.js inside the Academic Analytics dashboard. It combines two data layers:
 
+When the active mode is **Beacon / NCDXF**, this same card switches to the Beacon globe: it shows only the latest confirmed detection per beacon inside the selected time window and preserves zoom/orientation while the operator is inspecting the map.
+
 1. **Ionospheric zone predictions** — band-by-band predicted propagation coverage, derived in real time from NOAA SWPC solar/geomagnetic indices via a calibrated ionospheric model.
 2. **Confirmed SDR contacts** — callsign-confirmed decodes from your SDR sessions, plotted as dots and great-circle arcs to the decoded station's grid locator position.
 
@@ -623,6 +775,7 @@ Data auto-refreshes every **15 minutes** from NOAA SWPC.
 | **Retention** | Maximum event limit before auto-export+purge; number of recent events to keep; export directory |
 | **Authentication** | Change administrator password |
 | **SSB Voice Transcription** | Enable/disable Whisper ASR for SSB voice-to-text. Requires `openai-whisper` package |
+| **RTL recovery** | Shows the current RTL USB node, the bus/device address, and the recommended `usbreset` commands to recover the dongle when preview/waterfall stays stuck without frames |
 
 ### Admin Config panel — Buttons
 
@@ -637,6 +790,16 @@ Data auto-refreshes every **15 minutes** from NOAA SWPC.
 | **Purge invalid events** | Prompts for confirmation and deletes all incomplete or malformed occupancy and callsign events from the database (missing timestamp, invalid frequency, null/unknown callsign, etc.). Updates counters in the UI after completion |
 | **Reset defaults** | Prompts for confirmation and restores the application's default settings (active modes, summary options and other general settings). **Does not affect** saved events, custom bands, device configuration or audio configuration |
 | **Reset total** | ⚠️ Destructive. Prompts for confirmation and deletes **all** settings and custom bands from the database (`DELETE FROM settings`, `DELETE FROM bands`), clears the browser's localStorage and reloads the page. Equivalent to a clean installation state. Events are not affected |
+
+### RTL-SDR recovery with `usbreset`
+
+If the backend starts correctly but preview mode remains stuck in `Awaiting Spectrum Stream` and the waterfall does not move, the RTL can be wedged at USB/driver level. In that case, open **Admin Config** and inspect the **RTL recovery** block to confirm the current USB node and the exact reset command for the dongle.
+
+1. Stop the backend with `bash scripts/server_control.sh stop`.
+2. Run the command shown in Admin Config, for example `sudo usbreset 001/008` or `sudo usbreset 0bda:2838`.
+3. Start the backend again with `bash scripts/server_control.sh start`.
+
+Use this workflow only when a normal restart does not restore the waterfall. The bus/device address can change after unplugging, rebooting, or reconnecting the RTL, so always confirm the current value in **Admin Config** before running `usbreset`.
 
 ### Scan controls
 - **Start scanning / Stop scanning** — starts or stops the active scan

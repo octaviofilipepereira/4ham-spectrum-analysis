@@ -17,7 +17,7 @@ Last update: 2026-02-22 16:27:19 UTC
     <title>4ham Spectrum Analysis</title>
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="styles.css?v=20260301000400" />
+    <link rel="stylesheet" href="styles.css?v=20260503193000" />
     <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
     <script>
       // Fire version fetch as early as possible (no auth required)
@@ -54,7 +54,7 @@ Last update: 2026-02-22 16:27:19 UTC
               </button>
               <ul class="dropdown-menu dropdown-menu-dark">
                 <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#bandsModal">Bands Config</button></li>
-                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#rotationPresetsModal">Scan Rotation Presets</button></li>
+                <li><button class="dropdown-item" type="button" id="rotationPresetsMenuBtn" data-bs-toggle="modal" data-bs-target="#rotationPresetsModal">Scan Rotation Presets</button></li>
               </ul>
             </div>
             <button class="btn btn-outline-info btn-sm d-none" type="button" data-bs-toggle="modal" data-bs-target="#presetsModal">Presets</button>
@@ -71,6 +71,7 @@ Last update: 2026-02-22 16:27:19 UTC
               </ul>
             </div>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#adminModal">Admin Config</button>
+            <button class="btn btn-outline-info btn-sm" id="satelliteNavBtn" type="button" data-bs-toggle="modal" data-bs-target="#satelliteModal">&#x1F6F0; Satellite</button>
             <a class="btn btn-outline-info btn-sm" href="/4ham_academic_analytics.html" target="_blank" rel="noopener noreferrer">Data Analysis</a>
             <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#helpModal">Help</button>
           </div>
@@ -101,6 +102,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <span class="vfo-display__label">VFO</span>
                   <span class="vfo-display__freq" id="vfoFreqEl">—</span>
                   <span class="vfo-display__unit">MHz</span>
+                  <span class="vfo-display__beacon-label" id="vfoBeaconLabel" hidden></span>
                 </div>
                 <div class="vfo-goto-group">
                   <span class="vfo-group-label">Go to (MHz)</span>
@@ -144,7 +146,7 @@ Last update: 2026-02-22 16:27:19 UTC
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="FT8">FT8</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="SSB">SSB</button>
                   <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="APRS">APRS</button>
-                  <button class="btn btn-outline-info btn-sm mode-quick-btn d-none" type="button" data-quick-mode="LORA" title="LoRa APRS via gr-lora_sdr (868.000 MHz EU SRD; 433.775 MHz also supported). Requires gr-lora_sdr and LoRa APRS enabled in Admin.">LoRa</button>
+                  <button class="btn btn-outline-info btn-sm mode-quick-btn" type="button" data-quick-mode="BEACON" title="NCDXF/IARU International Beacon Network monitor — takes over scan engine">&#x1F4FB; NCDXF — Beacon Monitor</button>
                 </div>
                 <div class="d-none d-flex align-items-center gap-2" id="cwScanParamsRow">
                   <label class="form-label mb-0" for="cwStepHz">CW Step (Hz)</label>
@@ -250,6 +252,99 @@ Last update: 2026-02-22 16:27:19 UTC
                   </div>
                 </div>
               </div>
+
+              <!-- Beacon Analysis — inline panel (replaces modal, shown when BEACON mode active) -->
+              <div class="beacon-area mt-4" id="beaconArea" hidden>
+                <div class="beacon-panel">
+                  <div class="beacon-header mb-2">
+                    <h2 class="h5 mb-0">&#x1F4FB; Beacon Analysis &mdash; NCDXF/IARU</h2>
+                  </div>
+
+                  <p class="small text-light mb-2">
+                    The NCDXF International Beacon Network transmits every 10 seconds on 5 bands (20/17/15/12/10 m).<br>
+                    Each beacon sends its callsign in CW at 22 WPM, followed by 1 s dashes at 100 W, 10 W, 1 W and 100 mW. Use this mode to assess propagation from 18 fixed stations around the world.
+                  </p>
+
+                  <p class="small text-light mb-3"><span class="text-warning me-1" aria-label="Warning">&#x26A0;&#xFE0F;</span>Scheduler takes over scan engine. Band buttons disabled while active.</p>
+
+                  <!-- Controls row -->
+                  <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                    <button class="btn btn-sm btn-secondary" id="beaconStatusBadge" type="button" disabled>&#x25CB; Stopped</button>
+                    <button class="btn btn-success btn-sm" id="beaconStartBtn">&#x25B6; Start monitoring</button>
+                    <button class="btn btn-danger btn-sm" id="beaconStopBtn" disabled>&#x25A0; Stop</button>
+                    <span id="beaconCountdown" class="small text-light ms-2"></span>
+                  </div>
+
+                  <!-- 18×5 matrix table -->
+                  <div class="table-responsive">
+                    <table class="table table-sm table-dark table-bordered beacon-matrix mb-0">
+                      <thead class="sticky-top">
+                        <tr>
+                          <th class="beacon-callsign-header">Beacon</th>
+                          <th class="text-center">20 m<br><small class="text-muted">14.100</small></th>
+                          <th class="text-center">17 m<br><small class="text-muted">18.110</small></th>
+                          <th class="text-center">15 m<br><small class="text-muted">21.150</small></th>
+                          <th class="text-center">12 m<br><small class="text-muted">24.930</small></th>
+                          <th class="text-center">10 m<br><small class="text-muted">28.200</small></th>
+                        </tr>
+                      </thead>
+                      <tbody id="beaconMatrixBody">
+                        <tr><td colspan="6" class="text-center text-muted small py-3">Waiting for data…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="mt-3">
+                    <small class="text-light">
+                      <strong class="text-info">&#x25CF; Detected</strong> = observed beacon slot &nbsp;|&nbsp;
+                      <span class="beacon-meter" aria-hidden="true">
+                        <span class="beacon-meter__seg beacon-meter__seg--on-1"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--on-2"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--on-3"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--on-4"></span>
+                      </span>
+                      = live cells show two stacked rows with this same meter: top row = 100 W reference dash strength (SNR at right), bottom row = ordered dash sequence heard (0–4) &nbsp;|&nbsp;
+                      <span class="beacon-meter beacon-meter--nocopy" aria-hidden="true">
+                        <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+                        <span class="beacon-meter__seg beacon-meter__seg--nocopy"></span>
+                      </span>
+                      = latest monitored pass had no copy &nbsp;|&nbsp;
+                      Cells stay visible until a newer pass overwrites them.
+                    </small>
+                  </div>
+
+                  <!-- Recent activity heatmap (separate from live matrix) -->
+                  <div class="beacon-history mt-4">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                      <h3 class="h6 mb-0 text-light">Recent activity &mdash; last 12 h
+                        <small class="text-white ms-2">(historical &mdash; not the current slot state)</small>
+                      </h3>
+                      <button class="btn btn-sm btn-outline-secondary" id="beaconHistoryRefresh" type="button" title="Refresh history">&#x21BB;</button>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-dark table-bordered beacon-matrix mb-0">
+                        <thead>
+                          <tr>
+                            <th class="beacon-callsign-header">Beacon</th>
+                            <th class="text-center">20 m</th>
+                            <th class="text-center">17 m</th>
+                            <th class="text-center">15 m</th>
+                            <th class="text-center">12 m</th>
+                            <th class="text-center">10 m</th>
+                          </tr>
+                        </thead>
+                        <tbody id="beaconHistoryBody">
+                          <tr><td colspan="6" class="text-center text-muted small py-3">Loading history…</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <small class="text-muted">Recent activity is always a rolling 12-hour window. Each cell shows one coherent best detected pass in that window. Use the info icon inside a cell for the detailed 12-hour view with richer history and pass-level visuals.</small>
+                  </div>
+                </div><!-- /.beacon-panel -->
+              </div><!-- /#beaconArea -->
+
             </div>
           </div>
         </div>
@@ -326,6 +421,26 @@ Last update: 2026-02-22 16:27:19 UTC
                   <option value="720">12 h</option>
                   <option value="1440">24 h</option>
                 </select>
+                <select id="mapBandFilter" class="form-select form-select-sm" style="width:auto;" title="Filter map by band">
+                  <option value="all" selected>All bands</option>
+                  <option value="160m">160m</option>
+                  <option value="80m">80m</option>
+                  <option value="60m">60m</option>
+                  <option value="40m">40m</option>
+                  <option value="30m">30m</option>
+                  <option value="20m">20m</option>
+                  <option value="17m">17m</option>
+                  <option value="15m">15m</option>
+                  <option value="12m">12m</option>
+                  <option value="10m">10m</option>
+                  <option value="6m">6m</option>
+                  <option value="2m">2m</option>
+                  <option value="70cm">70cm</option>
+                </select>
+                <div class="form-check form-switch mb-0 ms-1" title="Show arcs between QTH and contacts">
+                  <input class="form-check-input" type="checkbox" id="mapArcsToggle" checked>
+                  <label class="form-check-label small" for="mapArcsToggle">Arcs</label>
+                </div>
               </div>
               <p style="font-size:0.75rem;color:#9ca3af;margin:0 0 6px;">Score based on confirmed decodes (callsign verified). Events without a callsign = band occupancy.</p>
               <p id="propagationScore" class="mb-1" style="font-size:1.125rem;">Score: --</p>
@@ -375,6 +490,99 @@ Last update: 2026-02-22 16:27:19 UTC
             <button type="submit" class="btn btn-primary w-100" id="loginModalSave">Sign in</button>
           </div>
           </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal beacon-time-sync-modal" id="beaconTimeSyncModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconTimeSyncModalLabel">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="beaconTimeSyncModalLabel">Beacon Analysis blocked</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="beacon-time-sync-modal__hero mb-3">
+              <div class="beacon-time-sync-modal__icon" aria-hidden="true">!</div>
+              <div class="beacon-time-sync-modal__copy">
+                <p id="beaconTimeSyncModalMessage" class="mb-2">Beacon Analysis start was blocked because 4ham could not validate the host UTC time with enough confidence.</p>
+                <p class="small mb-0 beacon-time-sync-modal__note">This module depends on exact 10-second UTC slots. 4ham blocks startup here to avoid false observations.</p>
+              </div>
+            </div>
+            <div class="small mb-1"><strong>Reason:</strong> <span id="beaconTimeSyncModalReason">-</span></div>
+            <div class="small mb-1"><strong>Detected source:</strong> <span id="beaconTimeSyncModalSource">-</span></div>
+            <div class="small mb-1"><strong>Selected server:</strong> <span id="beaconTimeSyncModalServer">-</span></div>
+            <div class="small mb-3"><strong>Metrics:</strong> <span id="beaconTimeSyncModalMetrics">-</span></div>
+            <div class="small fw-semibold mb-1">1. Verify on the host</div>
+            <p class="small beacon-time-sync-modal__note mb-2">Run these checks first and confirm the host reports a synchronized clock and an active time source.</p>
+            <pre id="beaconTimeSyncModalChecks" class="small border rounded px-2 py-2 mb-0">timedatectl status
+timedatectl timesync-status
+chronyc tracking
+chronyc sources -v</pre>
+            <div class="small fw-semibold mb-1 mt-3">2. Resolve on the host</div>
+            <p id="beaconTimeSyncModalResolveNote" class="small beacon-time-sync-modal__note mb-2">Re-enable or restart the host time-sync service, then verify again.</p>
+            <pre id="beaconTimeSyncModalResolveCommands" class="small border rounded px-2 py-2 mb-0">sudo timedatectl set-ntp true
+sudo systemctl restart systemd-timesyncd
+timedatectl status
+timedatectl timesync-status</pre>
+            <p id="beaconTimeSyncModalRetryNote" class="small beacon-time-sync-modal__note mt-3 mb-0">Retry Beacon Analysis only after the verification step reports a synchronized clock and a valid time source.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade app-modal beacon-history-info-modal" id="beaconHistoryInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="beaconHistoryInfoModalLabel">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="beaconHistoryInfoModalLabel">Beacon recent activity details</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="beacon-history-info-modal__hero mb-4">
+              <div>
+                <div id="beaconHistoryInfoWindow" class="small text-info fw-semibold mb-1">-</div>
+                <p id="beaconHistoryInfoSummary" class="small text-white mb-0">-</p>
+              </div>
+            </div>
+
+            <div id="beaconHistoryInfoStats" class="beacon-history-info-modal__stats mb-4"></div>
+
+            <div class="beacon-history-info-modal__charts mb-4">
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Copy mix</div>
+                <div class="beacon-history-info-panel__subtext">Rolling 12-hour split between detected and no-copy monitored slots.</div>
+                <div id="beaconHistoryInfoMixChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Recent rhythm</div>
+                <div class="beacon-history-info-panel__subtext">Older to newer monitored passes, colour-coded by copy quality.</div>
+                <div id="beaconHistoryInfoDetectionChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">100 W SNR trend</div>
+                <div class="beacon-history-info-panel__subtext">Reference-dash strength across the latest monitored passes in this cell.</div>
+                <div id="beaconHistoryInfoSnrChart"></div>
+              </section>
+              <section class="beacon-history-info-panel">
+                <div class="beacon-history-info-panel__heading">Dash sequence trend</div>
+                <div class="beacon-history-info-panel__subtext">Ordered dash copy from `0/4` to `4/4` across the same pass history.</div>
+                <div id="beaconHistoryInfoDashChart"></div>
+              </section>
+            </div>
+
+            <div class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Latest monitored passes</div>
+              <div class="beacon-history-info-panel__subtext">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
+              <div id="beaconHistoryInfoRecords" class="small mt-3">Loading details…</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
         </div>
       </div>
     </div>
@@ -606,8 +814,12 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-6">
                 <label class="form-label">Device</label>
                 <select id="deviceSelect" class="form-select form-select-sm"></select>
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
+                  <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
+                </div>
               </div>
-              <div class="col-6">
+              <div class="col-6 align-self-start">
                 <label class="form-label">Band</label>
                 <select id="bandSelect" class="form-select form-select-sm">
                   <option value="160m">160 m</option>
@@ -669,10 +881,38 @@ Last update: 2026-02-22 16:27:19 UTC
                 <div id="adminSetupStatus" class="alert alert-success py-2 mb-0 d-none" role="status"></div>
                 <small class="text-muted">Este estado mostra o áudio guardado e é atualizado após "Auto-detect Device" ou "Auto-detect áudio".</small>
               </div>
-              <div class="col-12">
-                <div class="form-check mt-1">
-                  <input class="form-check-input" type="checkbox" id="showNonSdrDevices" />
-                  <label class="form-check-label" for="showNonSdrDevices">Show non-SDR devices (diagnostic)</label>
+              <div class="col-12 d-none" id="rtlRecoverySection">
+                <h3 class="h6 mb-1">RTL recovery</h3>
+                <div class="alert rtl-recovery-card py-2 mb-0" role="status">
+                  <div class="d-flex justify-content-between align-items-start gap-2 flex-nowrap">
+                    <button
+                      class="btn btn-link p-0 text-start text-decoration-none flex-grow-1 rtl-recovery-toggle collapsed"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#rtlRecoveryDetails"
+                      aria-expanded="false"
+                      aria-controls="rtlRecoveryDetails"
+                    >
+                      <span class="d-flex align-items-center gap-2 small fw-semibold">
+                        <span class="rtl-recovery-chevron" aria-hidden="true">▸</span>
+                        <span>Show recovery details</span>
+                      </span>
+                      <small class="d-block mt-2 rtl-recovery-helper-text">If preview or waterfall stays stuck, run the reset command shown below for the current RTL USB device, then restart the backend.</small>
+                    </button>
+                    <span id="rtlRecoveryBadge" class="badge bg-secondary mt-1">checking…</span>
+                  </div>
+                  <div class="collapse mt-2" id="rtlRecoveryDetails">
+                    <div class="small"><strong>Detected RTL:</strong> <span id="rtlRecoveryDeviceName">-</span></div>
+                    <div class="small"><strong>USB device:</strong> <code id="rtlRecoveryDevicePath">-</code></div>
+                    <div class="small"><strong>Bus/device:</strong> <code id="rtlRecoveryBusDevice">-</code></div>
+                    <div class="small"><strong>Reset command:</strong> <code id="rtlRecoveryCommand">-</code></div>
+                    <div class="small"><strong>VID:PID fallback:</strong> <code id="rtlRecoveryVidPidCommand">-</code></div>
+                    <small id="rtlRecoveryAvailability" class="text-muted d-block mt-2"></small>
+                    <div class="small fw-semibold mt-2">Recovery sequence</div>
+                    <pre id="rtlRecoverySequence" class="small border rounded px-2 py-2 mb-0">bash scripts/server_control.sh stop
+sudo usbreset &lt;bus/device&gt;
+bash scripts/server_control.sh start</pre>
+                  </div>
                 </div>
               </div>
               <div class="col-12"><hr class="my-2" /></div>
@@ -891,7 +1131,7 @@ Last update: 2026-02-22 16:27:19 UTC
               <div class="col-12"><hr class="my-2" /></div>
               <div class="col-12">
                 <h3 class="h6 mb-1">External Mirrors (push to remote PHP/MySQL)</h3>
-                <small class="d-block text-muted mb-2">
+                <small class="d-block admin-config-helper-text mb-2">
                   Push selected dashboard data (callsign &amp; occupancy events) to one or more remote PHP/MySQL hosts.
                   Tokens are bcrypt-hashed at rest and only shown once at creation/rotation. After 5 consecutive failures
                   a mirror is auto-disabled. Re-enabling clears the failure counter.
@@ -1259,6 +1499,7 @@ Last update: 2026-02-22 16:27:19 UTC
                 <h2 class="h5">Decoder Status</h2>
                 <ul class="summary">
                   <li>External FT (jt9/wsprd): <span id="externalFtStatusModal">Unknown</span></li>
+                  <li>Beacon monitor detector: <span id="beaconStatusModal">Unknown</span></li>
                   <li>CW decoder: <span id="cwStatusModal">Unknown</span></li>
                   <li>SSB / Voice ASR: <span id="ssbStatusModal">Unknown</span></li>
                   <li>PSK decoder: <span>Not available</span></li>
@@ -1424,10 +1665,176 @@ Last update: 2026-02-22 16:27:19 UTC
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="lib/d3.min.js"></script>
     <script src="lib/topojson.min.js"></script>
-    <script src="map.js?v=20260408120000"></script>
+    <script src="map.js?v=20260508201000"></script>
     <script src="vendor/flatpickr/flatpickr.min.js"></script>
     <script src="vendor/flatpickr/pt.js"></script>
     <script src="lib/html2canvas.min.js"></script>
-    <script type="module" src="app.js?v=20260402000003"></script>
+    <script type="module" src="app.js?v=20260503200500"></script>
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+       ║  SATELLITE MODAL — Satellite Predict Lightbox                       ║
+       ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <div class="modal fade app-modal" id="satelliteModal" tabindex="-1" aria-labelledby="satelliteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+
+        <!-- Header -->
+        <div class="modal-header">
+          <h2 class="modal-title h5 me-3" id="satelliteModalLabel">&#x1F6F0; Satellite Predict</h2>
+          <span id="satelliteInstallStatus" class="badge bg-secondary ms-3 d-inline-flex align-items-center px-3 py-2">—</span>
+          <span id="satelliteConnBadge" class="badge bg-secondary ms-2 d-inline-flex align-items-center px-3 py-2" title="Internet connectivity (probe to public DNS)">&#x1F4E1; —</span>
+          <button type="button" class="btn btn-outline-danger btn-sm ms-2 d-none" id="satelliteUninstallBtn">Uninstall</button>
+          <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+
+          <!-- Install card (only shown when module is NOT installed) -->
+          <div id="satelliteInstallCard" class="card mb-3">
+            <div class="card-body">
+              <p class="mb-2" id="satelliteInstallPrompt">Install the Satellite module to start predicting LEO/GEO passes.</p>
+              <button class="btn btn-primary btn-sm" id="satelliteInstallBtn">Install Satellite Module</button>
+              <pre id="satelliteInstallLog" class="mt-2 small text-muted" style="max-height:120px;overflow:auto;white-space:pre-wrap;"></pre>
+            </div>
+          </div>
+
+          <!-- Tabs (shown after install) -->
+          <ul class="nav nav-tabs mb-3" id="satelliteTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#satTabStation" type="button" role="tab">Station</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabCatalog" type="button" role="tab">Catalog</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabTles" type="button" role="tab">TLEs</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#satTabPrefs" type="button" role="tab">Preferences</button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+
+            <!-- Station tab -->
+            <div class="tab-pane fade show active" id="satTabStation" role="tabpanel">
+              <form class="row g-2 mb-3" id="satelliteStationForm">
+                <div class="col-4">
+                  <label class="form-label small">Latitude</label>
+                  <input type="number" step="any" class="form-control form-control-sm" id="satLat" placeholder="38.7169" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Longitude</label>
+                  <input type="number" step="any" class="form-control form-control-sm" id="satLon" placeholder="-9.1399" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Altitude (m)</label>
+                  <input type="number" step="1" class="form-control form-control-sm" id="satAlt" placeholder="0" />
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">Min. elevation (°)</label>
+                  <input type="number" step="1" min="0" max="90" class="form-control form-control-sm" id="satMinEl" value="5" />
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-primary btn-sm" id="satelliteSaveStationBtn">Save</button>
+                </div>
+              </form>
+
+              <h6 class="small fw-semibold">Upcoming passes (24 h)</h6>
+              <div id="satellitePassesList" class="satellite-passes">
+                <div class="text-muted small">Loading…</div>
+              </div>
+            </div>
+
+            <!-- Catalog tab -->
+            <div class="tab-pane fade" id="satTabCatalog" role="tabpanel">
+              <div class="card panel">
+                <div class="card-body">
+                  <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h5 mb-0">Catalog</h2>
+                    <span class="badge bg-secondary" id="satelliteCatalogCount" title="Total satellites in catalog">—</span>
+                  </div>
+
+                  <div class="filters row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="satelliteCatalogFilter">Filter</label>
+                      <input type="search" id="satelliteCatalogFilter" class="form-control form-control-sm" placeholder="Name, SATCAT, mode…" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <label class="form-label" for="satelliteCatalogShow">Show</label>
+                      <select id="satelliteCatalogShow" class="form-select form-select-sm">
+                        <option value="active" selected>Receivable (amateur + weather sats)</option>
+                        <option value="downlink">Any downlink</option>
+                        <option value="enabled">Enabled only</option>
+                        <option value="disabled">Disabled only</option>
+                        <option value="all">All</option>
+                      </select>
+                    </div>
+                    <div class="col-6 col-md-3 d-flex flex-wrap gap-2">
+                      <button class="btn btn-outline-info btn-sm" type="button" id="satelliteRefreshCatBtn">Refresh (SatNOGS)</button>
+                      <label class="btn btn-outline-info btn-sm mb-0">
+                        Import JSON
+                        <input type="file" accept=".json" class="d-none" id="satelliteImportCatInput" />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
+                    <table class="table table-sm table-dark table-hover align-middle mb-0">
+                      <thead class="sticky-top">
+                        <tr>
+                          <th title="Satellite Catalog Number (NORAD ID)">SATCAT</th>
+                          <th>Name</th>
+                          <th>Downlink</th>
+                          <th>Mode</th>
+                          <th class="text-center">Enabled</th>
+                        </tr>
+                      </thead>
+                      <tbody id="satelliteCatalogList">
+                        <tr><td colspan="5" class="text-muted">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TLEs tab -->
+            <div class="tab-pane fade" id="satTabTles" role="tabpanel">
+              <div class="d-flex align-items-center gap-3 mb-3">
+                <span id="satelliteTleBadge" class="badge bg-secondary">—</span>
+                <span class="small text-muted">Last refresh: <span id="satelliteTleLastRefresh">—</span></span>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="satelliteRefreshTleBtn">Refresh (Celestrak)</button>
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  Import TLE file
+                  <input type="file" accept=".txt,.tle" class="d-none" id="satelliteImportTleInput" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Preferences tab -->
+            <div class="tab-pane fade" id="satTabPrefs" role="tabpanel">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="satAutoTune" disabled />
+                <label class="form-check-label small" for="satAutoTune">Auto-tune SDR to satellite downlink (requires Fase 2)</label>
+              </div>
+            </div>
+
+          </div><!-- /.tab-content -->
+        </div><!-- /.modal-body -->
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#satelliteModal -->
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+       ║  BEACON MODAL — NCDXF/IARU Beacon Analysis                           ║
+       ╚══════════════════════════════════════════════════════════════════════╝ -->
   </body>
 </html>

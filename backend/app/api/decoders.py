@@ -1175,24 +1175,16 @@ def _ft_external_band_provider() -> str:
 
 def _ft_external_scan_park(dial_hz: int):
     """Hold scanner on specific frequency during decode."""
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"_ft_external_scan_park dial_hz={dial_hz} running={state.scan_engine.running} device={state.scan_engine.device is not None}")
     if state.scan_engine.running and state.scan_engine.device:
         state.scan_engine.park(int(dial_hz))
-    else:
-        logger.warning(f"_ft_external_scan_park_skipped dial_hz={dial_hz} running={state.scan_engine.running} device={state.scan_engine.device is not None}")
+    # Skipped path is silent: park() is called every decode window (~15 s for FT8);
+    # if the engine is not running there is nothing actionable to log.
 
 
 def _ft_external_scan_unpark():
     """Resume normal scanning after decode."""
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"_ft_external_scan_unpark running={state.scan_engine.running}")
     if state.scan_engine.running:
         state.scan_engine.unpark()
-    else:
-        logger.warning(f"_ft_external_scan_unpark_skipped running={state.scan_engine.running}")
 
 
 async def _start_ft_external_decoder(force: bool = False) -> Dict:

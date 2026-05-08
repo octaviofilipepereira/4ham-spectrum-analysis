@@ -6,15 +6,35 @@
 (function () {
   "use strict";
 
+  // ── NCDXF/IARU beacon coordinates [lon, lat] (D3 GeoJSON convention) ────────
+  const NCDXF_BANDS = Object.freeze(["20m", "17m", "15m", "12m", "10m"]);
+  const BEACON_COORDS = Object.freeze({
+    "4U1UN":  [ -73.98,  40.75], "VE8AT":  [ -85.96,  79.99],
+    "W6WX":   [-121.90,  37.16], "KH6RS":  [-156.45,  20.77],
+    "ZL6B":   [ 175.66, -40.95], "VK6RBP": [ 116.02, -32.11],
+    "JA2IGY": [ 136.94,  35.07], "RR9O":   [  83.09,  54.85],
+    "VR2B":   [ 114.17,  22.32], "4S7B":   [  79.86,   6.90],
+    "ZS6DN":  [  28.19, -25.74], "5Z4B":   [  36.82,  -1.29],
+    "4X6TU":  [  34.78,  32.07], "OH2B":   [  24.10,  60.26],
+    "CS3B":   [ -16.93,  32.65], "LU4AA":  [ -58.38, -34.62],
+    "OA4B":   [ -77.06, -12.05], "YV5B":   [ -67.87,  10.49],
+  });
+
   // ── Band colour palette ────────────────────────────────────────────────────
   const BAND_COLORS = {
     "160m": "#ff0000", "80m": "#ff1493", "40m": "#ffa500",
+    "60m": "#facc15",
     "20m": "#00bfff",  "17m": "#00ff00", "15m": "#9400ff",
     "12m": "#00ffff",  "10m": "#ff4500", "6m":  "#ffff00",
     "2m":  "#7fff00",  "70cm": "#ff69b4",
   };
   const DEFAULT_COLOR = "#9ca3af";
   const bandColor = (b) => BAND_COLORS[(b || "").toLowerCase()] || DEFAULT_COLOR;
+  const MAP_BAND_FILTER_STORAGE_KEY = "4ham_map_band_filter";
+  const MAP_ARCS_TOGGLE_STORAGE_KEY = "4ham_map_arcs_toggle";
+  const MAP_ALLOWED_BAND_FILTERS = new Set([
+    "all", "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm",
+  ]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   const authHeader = () => {
@@ -23,10 +43,115 @@
     return u && p ? { Authorization: "Basic " + btoa(u + ":" + p) } : {};
   };
 
+  const getPropagationViewMode = () => {
+    if (typeof window._getPropagationViewMode === "function") {
+      return String(window._getPropagationViewMode() || "GENERIC").trim().toUpperCase();
+    }
+    return "GENERIC";
+  };
+
+  const isBeaconMapData = (data) => String(data?.kind || "").trim().toLowerCase() === "beacon";
+
+  function formatWindowLabel(windowMinutes) {
+    return windowMinutes >= 1440 ? `${Math.round(windowMinutes / 1440)}d` : `${windowMinutes}min`;
+  }
+
+  function formatUtcTimestamp(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value || "-");
+    }
+    return date.toISOString().replace(".000Z", " UTC").replace("T", " ");
+  }
+
+  function renderTooltipHtml(contact, isBeaconMap) {
+    const snrValue = Number(contact?.snr_db);
+    const snrLabel = Number.isFinite(snrValue) ? `${snrValue.toFixed(1)} dB` : "-";
+    const distanceValue = Number(contact?.distance_km);
+    const distanceLabel = Number.isFinite(distanceValue) ? `${distanceValue.toLocaleString()} km` : "-";
+
+    if (isBeaconMap) {
+      const dashValue = Number(contact?.dash_levels_detected);
+      const dashLabel = Number.isFinite(dashValue) ? `${dashValue}/4` : "-";
+      const whenLabel = formatUtcTimestamp(contact?.last_detection_utc || contact?.timestamp);
+      return `<strong>${contact.callsign}</strong> · ${contact.location}<br>`
+        + `${contact.band} · ${contact.state} · 100 W ${snrLabel} · dashes ${dashLabel}<br>`
+        + `Last detection ${whenLabel} · ${distanceLabel}`;
+    }
+
+    return `<strong>${contact.callsign}</strong> · ${contact.country}<br>`
+      + `${contact.band} · ${contact.mode} · SNR ${snrLabel} · ${distanceLabel}`;
+  }
+
   // ── State ────────────────────────────────────────────────────────────────
   let _worldData    = null;
   let _refreshTimer = null;
   let _lastData     = null;
+  let _inlineContainerId = "propagationMap";
+  const _modalContainerId = "propagationMapModal";
+  let _beaconRefreshTimer = null;
+  const _viewStateByContainer = new Map();
+
+  function getViewState(containerId) {
+    if (!_viewStateByContainer.has(containerId)) {
+      _viewStateByContainer.set(containerId, {
+        rotation: null,
+        zoomScale: 1,
+        pointerInside: false,
+        interactionActive: false,
+        interactionTimer: null,
+        pendingPayload: null,
+      });
+    }
+    return _viewStateByContainer.get(containerId);
+  }
+
+  function isInteractionBlocked(viewState) {
+    return Boolean(viewState?.pointerInside || viewState?.interactionActive);
+  }
+
+  function syncCameraState(sourceContainerId, targetContainerId) {
+    const source = _viewStateByContainer.get(sourceContainerId);
+    if (!source) {
+      return;
+    }
+    const target = getViewState(targetContainerId);
+    if (Array.isArray(source.rotation) && source.rotation.length === 3) {
+      target.rotation = source.rotation.slice();
+    }
+    if (Number.isFinite(Number(source.zoomScale)) && Number(source.zoomScale) > 0) {
+      target.zoomScale = Number(source.zoomScale);
+    }
+  }
+
+  function queuePendingPayload(containerId, payload) {
+    const viewState = getViewState(containerId);
+    viewState.pendingPayload = payload;
+  }
+
+  function scheduleInteractionRelease(containerId) {
+    const viewState = getViewState(containerId);
+    clearTimeout(viewState.interactionTimer);
+    viewState.interactionActive = true;
+    viewState.interactionTimer = setTimeout(() => {
+      viewState.interactionActive = false;
+      flushPendingRender(containerId);
+    }, 350);
+  }
+
+  async function flushPendingRender(containerId) {
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState) || !viewState.pendingPayload) {
+      return;
+    }
+    const payload = viewState.pendingPayload;
+    viewState.pendingPayload = null;
+    if (!payload.data) {
+      await render(payload.containerId, payload.windowMinutes, payload.isModal);
+      return;
+    }
+    await drawResolvedData(payload.containerId, payload.windowMinutes, payload.isModal, payload.data);
+  }
 
   // ── World atlas ──────────────────────────────────────────────────────────
   async function loadWorld() {
@@ -54,20 +179,30 @@
   // Returns { controls: {zoomIn, zoomOut, reset} }
   function drawGlobe(container, W, H, data, world) {
     const station  = data.station  || {};
-    const contacts = data.contacts || [];
+    const allContacts = Array.isArray(data.contacts) ? data.contacts : [];
+    const selectedBand = getBandFilter();
+    const showArcs = getArcsEnabled();
+    const contacts = selectedBand === "all"
+      ? allContacts
+      : allContacts.filter((contact) => String(contact?.band || "").trim().toLowerCase() === selectedBand);
+    const isBeaconMap = isBeaconMapData(data);
     const sLat = station.lat ?? 39.5;
     const sLon = station.lon ?? -8.0;
+    const viewState = getViewState(container.id);
 
     container.innerHTML = "";
 
     // Per-container gradient id so inline + modal can coexist
     const gradId = "oceanGrad_" + container.id;
     const baseScale = Math.min(W, H) * 0.44;
-    let kScale = 1;                          // current zoom multiplier
+    let kScale = Math.max(0.25, Math.min(12, Number(viewState.zoomScale) || 1));
+    const initialRotation = Array.isArray(viewState.rotation) && viewState.rotation.length === 3
+      ? viewState.rotation
+      : [-sLon, -sLat, 0];
 
     const proj = d3.geoOrthographic()
-      .rotate([-sLon, -sLat])
-      .scale(baseScale)
+      .rotate(initialRotation)
+      .scale(baseScale * kScale)
       .translate([W / 2, H / 2])
       .clipAngle(90);                        // only visible hemisphere
 
@@ -119,13 +254,24 @@
         .attr("fill", "#cbd5e1").attr("font-size", "15px").attr("font-family", "monospace").text(band);
     });
     const win = data.window_minutes || 60;
+    const totalCount = allContacts.length;
+    const shownCount = contacts.length;
+    const mapUnit = isBeaconMap ? "detections" : "contacts";
+    const countLabelText = selectedBand === "all"
+      ? `${shownCount} ${mapUnit} · ${formatWindowLabel(win)}`
+      : `${shownCount}/${totalCount} ${mapUnit} · ${selectedBand.toUpperCase()} · ${formatWindowLabel(win)}`;
     const countLabel = svg.append("text")
       .attr("x", W - 6).attr("y", H - 6).attr("text-anchor", "end")
       .attr("fill", "#64748b").attr("font-size", "14px").attr("font-family", "monospace")
       .attr("pointer-events", "none")
-      .text(`${contacts.length} contacts · ${win >= 1440 ? Math.round(win / 1440) + "d" : win + "min"}`);
+      .text(countLabelText);
 
     const tip = getTooltip();
+
+    function persistViewState() {
+      viewState.rotation = proj.rotate().slice();
+      viewState.zoomScale = Math.max(0.25, Math.min(12, proj.scale() / baseScale));
+    }
 
     // ── redraw: called on every rotate/zoom interaction ───────────────────
     function redraw() {
@@ -135,40 +281,122 @@
 
       // Great-circle arcs as GeoJSON LineString — D3+orthographic clips automatically
       arcG.selectAll("path").remove();
-      contacts.forEach((c) => {
-        if (c.lat == null || c.lon == null) return;
-        arcG.append("path")
-          .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
-          .attr("d", path)
-          .attr("fill", "none")
-          .attr("stroke", bandColor(c.band))
-          .attr("stroke-width", 1.8)
-          .attr("stroke-opacity", 0.85);
-      });
-
-      // Dots — only on visible hemisphere (geoDistance < 90°)
       dotG.selectAll("*").remove();
       const center = proj.invert([W / 2, H / 2]);
-      contacts.forEach((c) => {
-        if (c.lat == null || c.lon == null) return;
-        if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
-        const pp = proj([c.lon, c.lat]);
-        if (!pp) return;
-        const snrStr  = c.snr_db      != null ? `${c.snr_db > 0 ? "+" : ""}${c.snr_db} dB` : "—";
-        const distStr = c.distance_km != null ? `${c.distance_km.toLocaleString()} km` : "—";
-        dotG.append("circle")
-          .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
-          .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
-          .attr("opacity", 0.92).style("cursor", "pointer")
-          .on("mousemove", (evt) => {
-            tip.innerHTML = `<strong>${c.callsign}</strong> · ${c.country}<br>`
-              + `${c.band} · ${c.mode} · SNR ${snrStr} · ${distStr}`;
-            tip.style.display = "block";
-            tip.style.left = evt.clientX + 14 + "px";
-            tip.style.top  = evt.clientY - 34 + "px";
-          })
-          .on("mouseleave", () => { tip.style.display = "none"; });
-      });
+
+      if (isBeaconMap) {
+        // ── NCDXF beacon overlay: arcos separados por banda + anéis concêntricos ──
+        // Agrupar detecções por callsign → bandas (usa campo `bands` se disponível, fallback para `band`)
+        const detMap = {};
+        contacts.forEach((c) => {
+          if (!c.callsign) return;
+          if (!detMap[c.callsign]) detMap[c.callsign] = { detected: false, bands: new Set(), contact: c };
+          const bandList = Array.isArray(c.bands) && c.bands.length ? c.bands : (c.band ? [c.band] : []);
+          bandList.forEach((b) => { detMap[c.callsign].detected = true; detMap[c.callsign].bands.add(b); });
+        });
+
+        Object.entries(BEACON_COORDS).forEach(([cs, [bLon, bLat]]) => {
+          const info = detMap[cs] || { detected: false, bands: new Set(), contact: null };
+          const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
+
+          // Arcos — um por banda, deslocados perpendicularmente
+          if (info.detected && showArcs) {
+            const n = detectedBands.length;
+            const ps = proj([sLon, sLat]);
+            const pb = proj([bLon, bLat]);
+            let perpX = 0, perpY = 0;
+            if (ps && pb) {
+              const dx = pb[0] - ps[0], dy = pb[1] - ps[1];
+              const len = Math.sqrt(dx * dx + dy * dy);
+              if (len > 0) { perpX = -dy / len; perpY = dx / len; }
+            }
+            detectedBands.forEach((band, i) => {
+              const offset = (i - (n - 1) / 2) * 5;
+              arcG.append("path")
+                .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                .attr("d", path).attr("fill", "none")
+                .attr("stroke", bandColor(band)).attr("stroke-width", 2.0).attr("stroke-opacity", 0.9)
+                .attr("transform", `translate(${perpX * offset},${perpY * offset})`);
+            });
+          }
+
+          // Pontos — só no hemisfério visível
+          if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) return;
+          const pp = proj([bLon, bLat]);
+          if (!pp) return;
+
+          if (info.detected) {
+            const bandList = detectedBands.join(", ");
+            const baseR = 6, step = 5;
+            [...detectedBands].reverse().forEach((band, ri) => {
+              const r = baseR + (detectedBands.length - 1 - ri) * step;
+              dotG.append("circle")
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
+                .attr("fill", "none").attr("stroke", bandColor(band))
+                .attr("stroke-width", 2.5).attr("opacity", 0.95)
+                .style("cursor", "pointer")
+                .on("mousemove", (evt) => {
+                  tip.innerHTML = `<strong>${cs}</strong><br>Detectado em: <strong>${bandList}</strong>`;
+                  tip.style.display = "block";
+                  tip.style.left = evt.clientX + 14 + "px";
+                  tip.style.top  = evt.clientY - 34 + "px";
+                })
+                .on("mouseleave", () => { tip.style.display = "none"; });
+            });
+            const outerR = baseR + (detectedBands.length - 1) * step;
+            dotG.append("text")
+              .attr("x", pp[0] + outerR + 5).attr("y", pp[1] + 5)
+              .attr("fill", bandColor(detectedBands[0])).attr("font-size", "12px")
+              .attr("font-weight", "bold").attr("font-family", "monospace")
+              .attr("pointer-events", "none").text(cs);
+          } else {
+            dotG.append("circle")
+              .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5)
+              .attr("fill", "none").attr("stroke", "#6b7280")
+              .attr("stroke-width", 1.4).attr("opacity", 0.75)
+              .style("cursor", "pointer")
+              .on("mousemove", (evt) => {
+                tip.innerHTML = `<strong>${cs}</strong><br><span style="color:#9ca3af">Monitorado — sem cópia</span>`;
+                tip.style.display = "block";
+                tip.style.left = evt.clientX + 14 + "px";
+                tip.style.top  = evt.clientY - 34 + "px";
+              })
+              .on("mouseleave", () => { tip.style.display = "none"; });
+            dotG.append("text")
+              .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+              .attr("fill", "#6b7280").attr("font-size", "11px")
+              .attr("font-family", "monospace").attr("pointer-events", "none").text(cs);
+          }
+        });
+      } else {
+        // ── Modo normal: arcos + dots por contacto ───────────────────────────
+        if (showArcs) {
+          contacts.forEach((c) => {
+            if (c.lat == null || c.lon == null) return;
+            arcG.append("path")
+              .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
+              .attr("d", path).attr("fill", "none")
+              .attr("stroke", bandColor(c.band)).attr("stroke-width", 1.8).attr("stroke-opacity", 0.85);
+          });
+        }
+        contacts.forEach((c) => {
+          if (c.lat == null || c.lon == null) return;
+          if (d3.geoDistance([c.lon, c.lat], center) >= Math.PI / 2) return;
+          const pp = proj([c.lon, c.lat]);
+          if (!pp) return;
+          dotG.append("circle")
+            .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
+            .attr("fill", bandColor(c.band)).attr("stroke", "#fff").attr("stroke-width", 0.7)
+            .attr("opacity", 0.92).style("cursor", "pointer")
+            .on("mousemove", (evt) => {
+              tip.innerHTML = renderTooltipHtml(c, false);
+              tip.style.display = "block";
+              tip.style.left = evt.clientX + 14 + "px";
+              tip.style.top  = evt.clientY - 34 + "px";
+            })
+            .on("mouseleave", () => { tip.style.display = "none"; });
+        });
+      }
 
       // Home marker
       homeG.selectAll("*").remove();
@@ -186,29 +414,49 @@
 
       // Update gradient radius to match current scale
       grad.attr("r", proj.scale());
+      persistViewState();
     }
 
     redraw();
 
+    svg
+      .on("mouseenter", () => {
+        viewState.pointerInside = true;
+      })
+      .on("mouseleave", async () => {
+        viewState.pointerInside = false;
+        tip.style.display = "none";
+        await flushPendingRender(container.id);
+      });
+
     // ── Drag = rotate globe ───────────────────────────────────────────────
     svg.call(
       d3.drag()
-        .on("start", () => svg.style("cursor", "grabbing"))
+        .on("start", () => {
+          viewState.interactionActive = true;
+          svg.style("cursor", "grabbing");
+        })
         .on("drag", (event) => {
           const [rx, ry, rz] = proj.rotate();
           proj.rotate([rx + event.dx * 0.25, ry - event.dy * 0.25, rz]);
           redraw();
         })
-        .on("end", () => svg.style("cursor", "grab"))
+        .on("end", async () => {
+          viewState.interactionActive = false;
+          svg.style("cursor", "grab");
+          await flushPendingRender(container.id);
+        })
     );
 
-    // ── Scroll wheel = zoom (scale only) ─────────────────────────────────
+    // ── Ctrl/⌘ + scroll wheel = zoom; plain wheel = page scroll ──────────
     svg.node().addEventListener("wheel", (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return;  // let page scroll
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
       kScale = Math.max(0.25, Math.min(12, kScale * factor));
       proj.scale(baseScale * kScale);
       redraw();
+      scheduleInteractionRelease(container.id);
     }, { passive: false });
 
     // ── Double-click = reset view ─────────────────────────────────────────
@@ -216,13 +464,14 @@
       proj.rotate([-sLon, -sLat]).scale(baseScale);
       kScale = 1;
       redraw();
+      scheduleInteractionRelease(container.id);
     });
 
     // ── Programmatic controls ─────────────────────────────────────────────
     const controls = {
-      zoomIn:  () => { kScale = Math.min(kScale * 1.6, 12);   proj.scale(baseScale * kScale); redraw(); },
-      zoomOut: () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); },
-      reset:   () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); },
+      zoomIn:  () => { kScale = Math.min(kScale * 1.6, 12);   proj.scale(baseScale * kScale); redraw(); scheduleInteractionRelease(container.id); },
+      zoomOut: () => { kScale = Math.max(kScale / 1.6, 0.25); proj.scale(baseScale * kScale); redraw(); scheduleInteractionRelease(container.id); },
+      reset:   () => { proj.rotate([-sLon, -sLat]).scale(baseScale); kScale = 1; redraw(); scheduleInteractionRelease(container.id); },
     };
 
     return { controls };
@@ -263,8 +512,11 @@
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   async function fetchData(windowMinutes) {
+    const endpoint = getPropagationViewMode() === "BEACON"
+      ? "/api/beacons/map/contacts"
+      : "/api/map/contacts";
     const r = await fetch(
-      `/api/map/contacts?window_minutes=${windowMinutes}&limit=2000`,
+      `${endpoint}?window_minutes=${windowMinutes}&limit=2000`,
       { headers: authHeader() }
     );
     if (!r.ok) throw new Error(r.status);
@@ -272,16 +524,40 @@
   }
 
   // ── Render into a container ───────────────────────────────────────────────
-  async function render(containerId, windowMinutes, isModal) {
+  async function drawResolvedData(containerId, windowMinutes, isModal, data) {
     if (!window.d3 || !window.topojson) return;
+    if (!data) return;
     const container = document.getElementById(containerId);
     if (!container) return;
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data });
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const W = rect.width  || (isModal ? window.innerWidth  - 48 : 420);
     const H = isModal
       ? Math.max(window.innerHeight - 150, 300)
       : (rect.height > 80 ? rect.height : Math.min(W * 1.1, 680));
+
+    const world = await loadWorld();
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data });
+      return;
+    }
+
+    const { controls } = drawGlobe(container, W, H, data, world);
+    addControls(container, controls, !isModal);
+  }
+
+  async function render(containerId, windowMinutes, isModal) {
+    if (!window.d3 || !window.topojson) return;
+    const viewState = getViewState(containerId);
+    if (isInteractionBlocked(viewState)) {
+      queuePendingPayload(containerId, { containerId, windowMinutes, isModal, data: null });
+      return;
+    }
 
     let data;
     try {
@@ -292,9 +568,7 @@
       return;
     }
 
-    const world = await loadWorld();
-    const { controls } = drawGlobe(container, W, H, data, world);
-    addControls(container, controls, !isModal);
+    await drawResolvedData(containerId, windowMinutes, isModal, data);
   }
 
   // ── Read selected window from UI dropdown ─────────────────────────────────
@@ -303,10 +577,54 @@
     return sel ? parseInt(sel.value, 10) || 60 : 60;
   }
 
+  function getBandFilter() {
+    const sel = document.getElementById("mapBandFilter");
+    const raw = sel ? String(sel.value || "all").trim().toLowerCase() : "all";
+    return MAP_ALLOWED_BAND_FILTERS.has(raw) ? raw : "all";
+  }
+
+  function getArcsEnabled() {
+    const toggle = document.getElementById("mapArcsToggle");
+    return toggle ? Boolean(toggle.checked) : true;
+  }
+
+  function restoreMapUiPreferences() {
+    const bandSel = document.getElementById("mapBandFilter");
+    if (bandSel) {
+      let savedBand = "all";
+      try {
+        savedBand = String(localStorage.getItem(MAP_BAND_FILTER_STORAGE_KEY) || "all").trim().toLowerCase();
+      } catch (_) {}
+      bandSel.value = MAP_ALLOWED_BAND_FILTERS.has(savedBand) ? savedBand : "all";
+    }
+
+    const arcsToggle = document.getElementById("mapArcsToggle");
+    if (arcsToggle) {
+      let savedArcs = "1";
+      try {
+        savedArcs = String(localStorage.getItem(MAP_ARCS_TOGGLE_STORAGE_KEY) || "1").trim();
+      } catch (_) {}
+      arcsToggle.checked = savedArcs !== "0";
+    }
+  }
+
+  function persistMapBandFilterPreference() {
+    try {
+      localStorage.setItem(MAP_BAND_FILTER_STORAGE_KEY, getBandFilter());
+    } catch (_) {}
+  }
+
+  function persistMapArcsPreference() {
+    try {
+      localStorage.setItem(MAP_ARCS_TOGGLE_STORAGE_KEY, getArcsEnabled() ? "1" : "0");
+    } catch (_) {}
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
   const PropMap = {
     init(containerId, windowMinutes) {
       windowMinutes = windowMinutes || getWindowMinutes();
+      _inlineContainerId = containerId || _inlineContainerId;
       render(containerId, windowMinutes, false);
       if (_refreshTimer) clearInterval(_refreshTimer);
       _refreshTimer = setInterval(() => render(containerId, getWindowMinutes(), false), 60000);
@@ -317,22 +635,20 @@
     },
 
     async renderModal() {
-      const c = document.getElementById("propagationMapModal");
+      const c = document.getElementById(_modalContainerId);
       if (!c) return;
-      const W = c.clientWidth  || window.innerWidth  - 48;
-      const H = Math.max(window.innerHeight - 150, 300);
-      const world = await loadWorld();
       const win = getWindowMinutes();
 
+      // Keep fullscreen view aligned with the latest inline camera state.
+      syncCameraState(_inlineContainerId, _modalContainerId);
+
       if (_lastData) {
-        const { controls } = drawGlobe(c, W, H, _lastData, world);
-        addControls(c, controls, false);
+        await drawResolvedData(c.id, win, true, _lastData);
       }
       try {
         const fresh = await fetchData(win);
         _lastData = fresh;
-        const { controls } = drawGlobe(c, W, H, fresh, world);
-        addControls(c, controls, false);
+        await drawResolvedData(c.id, win, true, fresh);
       } catch {
         // Silently ignore fetch errors in modal
       }
@@ -341,17 +657,59 @@
 
   window.PropMap = PropMap;
 
+  window.addEventListener("beacon-observation", () => {
+    if (getPropagationViewMode() !== "BEACON") {
+      return;
+    }
+    clearTimeout(_beaconRefreshTimer);
+    _beaconRefreshTimer = setTimeout(() => {
+      PropMap.refresh(_inlineContainerId, getWindowMinutes());
+      const modalEl = document.getElementById("mapFullscreenModal");
+      if (modalEl && modalEl.classList.contains("show")) {
+        PropMap.renderModal();
+      }
+    }, 250);
+  });
+
   document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("propagationMap")) {
+      restoreMapUiPreferences();
+
       // Double rAF ensures flex layout AND paint have completed before measuring
       requestAnimationFrame(() => {
         requestAnimationFrame(() => PropMap.init("propagationMap"));
       });
 
+      const refreshInlineAndModal = () => {
+        PropMap.refresh("propagationMap");
+        const fullscreenModalEl = document.getElementById("mapFullscreenModal");
+        if (fullscreenModalEl && fullscreenModalEl.classList.contains("show")) {
+          PropMap.renderModal();
+        }
+      };
+
       // Re-render immediately when user changes the time window
       const sel = document.getElementById("mapWindowSelect");
       if (sel) {
-        sel.addEventListener("change", () => PropMap.refresh("propagationMap"));
+        sel.addEventListener("change", refreshInlineAndModal);
+      }
+
+      // Re-render immediately when user changes the selected band filter
+      const bandSel = document.getElementById("mapBandFilter");
+      if (bandSel) {
+        bandSel.addEventListener("change", () => {
+          persistMapBandFilterPreference();
+          refreshInlineAndModal();
+        });
+      }
+
+      // Re-render immediately when user toggles map arcs
+      const arcsToggle = document.getElementById("mapArcsToggle");
+      if (arcsToggle) {
+        arcsToggle.addEventListener("change", () => {
+          persistMapArcsPreference();
+          refreshInlineAndModal();
+        });
       }
     }
 
@@ -361,6 +719,14 @@
       modalEl.addEventListener("hide.bs.modal", () => {
         const tip = document.getElementById("mapTooltip");
         if (tip) tip.style.display = "none";
+      });
+      modalEl.addEventListener("hidden.bs.modal", async () => {
+        syncCameraState(_modalContainerId, _inlineContainerId);
+        if (_lastData) {
+          await drawResolvedData(_inlineContainerId, getWindowMinutes(), false, _lastData);
+        } else {
+          PropMap.refresh(_inlineContainerId, getWindowMinutes());
+        }
       });
     }
   });
