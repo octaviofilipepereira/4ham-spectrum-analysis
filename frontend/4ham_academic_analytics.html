@@ -1605,54 +1605,250 @@ Last update: 2026-04-03 UTC
         color: #f8fbff;
       }
 
-      .beacon-events-modal__window {
+      .beacon-events-modal__body {
+        overflow: auto;
+        padding: 14px 16px 16px;
+      }
+
+      .beacon-history-info-modal__hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 38%),
+          linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(12, 18, 32, 0.92));
+      }
+
+      .beacon-history-info-modal__window {
         margin: 0;
-        padding: 10px 16px;
-        color: var(--text-muted);
-        font-size: 0.8rem;
-        border-bottom: 1px solid rgba(56, 189, 248, 0.14);
-      }
-
-      .beacon-events-modal__stats {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-        padding: 12px 16px;
-      }
-
-      .beacon-events-stat {
-        border: 1px solid rgba(40, 68, 90, 0.65);
-        border-radius: 10px;
-        padding: 8px 10px;
-        background: rgba(9, 17, 24, 0.52);
-      }
-
-      .beacon-events-stat .k {
-        display: block;
-        color: var(--text-muted);
-        font-size: 0.72rem;
-      }
-
-      .beacon-events-stat .v {
-        display: block;
-        margin-top: 3px;
-        font-size: 0.9rem;
+        color: #7dd3fc;
+        font-size: 0.82rem;
         font-weight: 700;
       }
 
-      .beacon-events-modal__table-wrap {
-        padding: 0 16px 16px;
+      .beacon-history-info-modal__summary {
+        margin: 6px 0 0;
+        color: #f8fbff;
+        font-size: 0.82rem;
+      }
+
+      .beacon-history-info-modal__stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .beacon-history-info-stat {
+        padding: 14px 14px 12px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.92));
+      }
+
+      .beacon-history-info-stat__label {
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: rgba(191, 219, 254, 0.74);
+      }
+
+      .beacon-history-info-stat__value {
+        margin-top: 6px;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #f8fbff;
+      }
+
+      .beacon-history-info-stat__note {
+        margin-top: 4px;
+        font-size: 0.75rem;
+        color: rgba(226, 232, 240, 0.68);
+      }
+
+      .beacon-history-info-modal__charts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .beacon-history-info-panel {
+        padding: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.92));
+      }
+
+      .beacon-history-info-panel__heading {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #f8fbff;
+      }
+
+      .beacon-history-info-panel__subtext {
+        margin-top: 4px;
+        margin-bottom: 14px;
+        font-size: 0.76rem;
+        color: rgba(226, 232, 240, 0.66);
+      }
+
+      .beacon-history-chart__empty,
+      .beacon-history-chart__caption {
+        font-size: 0.76rem;
+        color: rgba(226, 232, 240, 0.68);
+      }
+
+      .beacon-history-chart__stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .beacon-history-chart__stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 10px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.42);
+      }
+
+      .beacon-history-chart__stat-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: rgba(191, 219, 254, 0.72);
+      }
+
+      .beacon-history-chart__stat-value {
+        font-size: 0.84rem;
+        color: #f8fbff;
+      }
+
+      .beacon-history-mix__bar {
+        display: flex;
+        overflow: hidden;
+        height: 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .beacon-history-mix__seg--observed {
+        background: linear-gradient(90deg, #2563eb, #60a5fa);
+      }
+
+      .beacon-history-mix__seg--nocopy {
+        background: linear-gradient(90deg, #b45309, #f59e0b);
+      }
+
+      .beacon-history-mix__legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .beacon-history-mix__legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #f8fbff;
+      }
+
+      .beacon-history-mix__legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .beacon-history-mix__legend-dot--observed {
+        background: #60a5fa;
+      }
+
+      .beacon-history-mix__legend-dot--nocopy {
+        background: #f59e0b;
+      }
+
+      .beacon-history-rhythm__bars,
+      .beacon-history-metric__bars {
+        display: flex;
+        align-items: end;
+        gap: 4px;
+        position: relative;
+        height: 132px;
+        padding: 10px 8px 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+          repeating-linear-gradient(
+            to top,
+            rgba(148, 163, 184, 0.12) 0,
+            rgba(148, 163, 184, 0.12) 1px,
+            transparent 1px,
+            transparent 32px
+          );
+      }
+
+      .beacon-history-rhythm__bar,
+      .beacon-history-metric__bar {
+        display: block;
+        align-self: end;
+        flex: 1 1 0;
+        min-width: 6px;
+        border-radius: 999px 999px 2px 2px;
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      }
+
+      .beacon-history-rhythm__bar--detected {
+        background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+      }
+
+      .beacon-history-rhythm__bar--weak {
+        background: linear-gradient(180deg, #facc15, #ca8a04);
+      }
+
+      .beacon-history-rhythm__bar--nocopy {
+        background: linear-gradient(180deg, #f59e0b, #92400e);
+      }
+
+      .beacon-history-metric__bar--live {
+        background: linear-gradient(180deg, #38bdf8, #1d4ed8);
+      }
+
+      .beacon-history-metric__bar--muted {
+        background: rgba(148, 163, 184, 0.24);
+      }
+
+      .beacon-history-info-table-wrap {
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 14px;
         overflow: auto;
       }
 
-      .beacon-events-modal__table {
+      .beacon-history-info-table {
         width: 100%;
         min-width: 720px;
         border-collapse: collapse;
       }
 
-      .beacon-events-modal__table th,
-      .beacon-events-modal__table td {
+      .beacon-history-info-table thead th {
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(191, 219, 254, 0.78);
+      }
+
+      .beacon-history-info-table th,
+      .beacon-history-info-table td {
         border-bottom: 1px solid rgba(40, 68, 90, 0.65);
         padding: 8px 10px;
         text-align: left;
@@ -1660,21 +1856,88 @@ Last update: 2026-04-03 UTC
         font-variant-numeric: tabular-nums;
       }
 
-      .beacon-events-modal__table thead th {
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
+      .beacon-history-state-chip,
+      .beacon-history-drift-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 8px;
+        border-radius: 999px;
         font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .beacon-history-state-chip--detected {
+        background: rgba(37, 99, 235, 0.18);
+        color: #bfdbfe;
+      }
+
+      .beacon-history-state-chip--weak {
+        background: rgba(202, 138, 4, 0.18);
+        color: #fde047;
+      }
+
+      .beacon-history-state-chip--nocopy {
+        background: rgba(180, 83, 9, 0.18);
+        color: #fde68a;
+      }
+
+      .beacon-history-rowmetric {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 160px;
+      }
+
+      .beacon-history-rowmetric__bar {
+        position: relative;
+        flex: 1 1 auto;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.18);
+        overflow: hidden;
+      }
+
+      .beacon-history-rowmetric__fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: linear-gradient(90deg, #38bdf8, #2563eb);
+        border-radius: inherit;
+      }
+
+      .beacon-history-rowmetric--sequence {
+        min-width: 145px;
+      }
+
+      .beacon-history-rowmetric__label {
+        font-size: 0.76rem;
+        color: #f8fbff;
+        white-space: nowrap;
+      }
+
+      #beaconHistoryInfoRecords {
+        margin-top: 12px;
+      }
+
+      @media (max-width: 991.98px) {
+        .beacon-history-info-modal__charts {
+          grid-template-columns: 1fr;
+        }
+
+        .beacon-history-chart__stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .beacon-history-info-modal__stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
 
       body.beacon-events-modal-open {
         overflow: hidden;
-      }
-
-      @media (max-width: 900px) {
-        .beacon-events-modal__stats {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
       }
 
       @media (max-width: 640px) {
@@ -1684,8 +1947,12 @@ Last update: 2026-04-03 UTC
           margin: 4px auto;
         }
 
-        .beacon-events-modal__stats {
+        .beacon-history-info-modal__stats {
           grid-template-columns: 1fr;
+        }
+
+        .beacon-events-modal__body {
+          padding: 10px;
         }
       }
 
@@ -2307,16 +2574,50 @@ Last update: 2026-04-03 UTC
     </div>
 
     <div class="beacon-events-modal" id="beaconEventsModal" aria-hidden="true">
-      <div class="beacon-events-modal__backdrop" data-beacon-events-close="true"></div>
+      <div class="beacon-events-modal__backdrop" data-beacon-history-close="true"></div>
       <section class="beacon-events-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="beaconEventsModalTitle">
         <div class="beacon-events-modal__header">
           <h3 class="beacon-events-modal__title" id="beaconEventsModalTitle">Beacon recent activity details</h3>
-          <button type="button" class="beacon-events-modal__close" data-beacon-events-close="true">Close</button>
+          <button type="button" class="beacon-events-modal__close" data-beacon-history-close="true">Close</button>
         </div>
-        <p class="beacon-events-modal__window" id="beaconEventsModalWindow">--</p>
-        <div class="beacon-events-modal__stats" id="beaconEventsModalStats"></div>
-        <div class="beacon-events-modal__table-wrap">
-          <table class="beacon-events-modal__table" id="beaconEventsModalTable"></table>
+        <div class="beacon-events-modal__body">
+          <div class="beacon-history-info-modal__hero">
+            <div>
+              <div id="beaconHistoryInfoWindow" class="beacon-history-info-modal__window">-</div>
+              <p id="beaconHistoryInfoSummary" class="beacon-history-info-modal__summary">-</p>
+            </div>
+          </div>
+
+          <div id="beaconHistoryInfoStats" class="beacon-history-info-modal__stats"></div>
+
+          <div class="beacon-history-info-modal__charts">
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Copy mix</div>
+              <div class="beacon-history-info-panel__subtext">Rolling 12-hour split between detected and no-copy monitored slots.</div>
+              <div id="beaconHistoryInfoMixChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Recent rhythm</div>
+              <div class="beacon-history-info-panel__subtext">Older to newer monitored passes, colour-coded by copy quality.</div>
+              <div id="beaconHistoryInfoDetectionChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">100 W SNR trend</div>
+              <div class="beacon-history-info-panel__subtext">Reference-dash strength across the latest monitored passes in this cell.</div>
+              <div id="beaconHistoryInfoSnrChart"></div>
+            </section>
+            <section class="beacon-history-info-panel">
+              <div class="beacon-history-info-panel__heading">Dash sequence trend</div>
+              <div class="beacon-history-info-panel__subtext">Ordered dash copy from 0/4 to 4/4 across the same pass history.</div>
+              <div id="beaconHistoryInfoDashChart"></div>
+            </section>
+          </div>
+
+          <div class="beacon-history-info-panel">
+            <div class="beacon-history-info-panel__heading">Latest monitored passes</div>
+            <div class="beacon-history-info-panel__subtext">Per-row visual bars show signal strength and dash-copy quality without forcing the user to parse raw numbers only.</div>
+            <div id="beaconHistoryInfoRecords">Loading details...</div>
+          </div>
         </div>
       </section>
     </div>
@@ -2470,6 +2771,7 @@ Last update: 2026-04-03 UTC
       let beaconObservations = [];
       const BEACON_WINDOW_HOURS = 12;
       const BEACON_OBSERVATION_LIMIT = 20;
+      const BEACON_HISTORY_MODAL_LIMIT = 24;
       const BEACON_LOCATION_BY_CALLSIGN = Object.freeze({
         "4U1UN": "New York, NY, USA",
         "VE8AT": "Eureka, NU, Canada",
@@ -2493,9 +2795,14 @@ Last update: 2026-04-03 UTC
       const beaconHistoryNote = document.getElementById("beaconHistoryNote");
       const beaconEventsModal = document.getElementById("beaconEventsModal");
       const beaconEventsModalTitle = document.getElementById("beaconEventsModalTitle");
-      const beaconEventsModalWindow = document.getElementById("beaconEventsModalWindow");
-      const beaconEventsModalStats = document.getElementById("beaconEventsModalStats");
-      const beaconEventsModalTable = document.getElementById("beaconEventsModalTable");
+      const beaconHistoryInfoWindow = document.getElementById("beaconHistoryInfoWindow");
+      const beaconHistoryInfoSummary = document.getElementById("beaconHistoryInfoSummary");
+      const beaconHistoryInfoStats = document.getElementById("beaconHistoryInfoStats");
+      const beaconHistoryInfoMixChart = document.getElementById("beaconHistoryInfoMixChart");
+      const beaconHistoryInfoDetectionChart = document.getElementById("beaconHistoryInfoDetectionChart");
+      const beaconHistoryInfoSnrChart = document.getElementById("beaconHistoryInfoSnrChart");
+      const beaconHistoryInfoDashChart = document.getElementById("beaconHistoryInfoDashChart");
+      const beaconHistoryInfoRecords = document.getElementById("beaconHistoryInfoRecords");
       const beaconHistoryCellDetails = new Map();
       let beaconEventsRequestSeq = 0;
 
@@ -2568,13 +2875,13 @@ Last update: 2026-04-03 UTC
       });
 
       document.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-beacon-history-events]");
+        const button = event.target.closest("[data-beacon-history-info]");
         if (!button) {
           return;
         }
         event.preventDefault();
         event.stopPropagation();
-        const detailKey = button.getAttribute("data-beacon-history-events") || "";
+        const detailKey = button.getAttribute("data-beacon-history-info") || "";
         if (!detailKey) {
           return;
         }
@@ -2582,7 +2889,7 @@ Last update: 2026-04-03 UTC
       });
 
       beaconEventsModal?.addEventListener("click", (event) => {
-        if (event.target.closest("[data-beacon-events-close]")) {
+        if (event.target.closest("[data-beacon-history-close]")) {
           closeBeaconEventsModal();
         }
       });
@@ -3238,8 +3545,8 @@ Last update: 2026-04-03 UTC
           </span>`;
       }
 
-      function renderBeaconHistoryEventsButton(detailKey, label) {
-        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-events="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(label)}">Events</button>`;
+      function renderBeaconHistoryEventsButton(detailKey, detail) {
+        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(detail.callsign)} on ${beaconEscapeHtml(detail.band)}">Events</button>`;
       }
 
       function closeBeaconEventsModal() {
@@ -3251,54 +3558,272 @@ Last update: 2026-04-03 UTC
         document.body.classList.remove("beacon-events-modal-open");
       }
 
-      function renderBeaconEventsModalStats(detail) {
-        if (!beaconEventsModalStats) {
-          return;
+      function beaconHistoryPct(value, total) {
+        if (!Number.isFinite(Number(total)) || Number(total) <= 0) {
+          return 0;
         }
-        const stats = [
-          { k: "Window", v: `${detail.hours} h` },
-          { k: "Detected/Monitored", v: `${detail.detections}/${detail.totalSlots}` },
-          { k: "Best pass", v: `${beaconFormatScore(detail.bestSnrDb)} dB · ${detail.bestDashes}/4` },
-          { k: "Latest detected", v: beaconFormatUtc(detail.latestDetectedUtc) },
-        ];
-        beaconEventsModalStats.innerHTML = stats.map((item) =>
-          `<div class="beacon-events-stat"><span class="k">${beaconEscapeHtml(item.k)}</span><span class="v">${beaconEscapeHtml(item.v)}</span></div>`
-        ).join("");
+        return Math.round((Number(value) / Number(total)) * 100);
       }
 
-      function renderBeaconEventsModalTable(rows) {
-        if (!beaconEventsModalTable) {
-          return;
+      function beaconFormatHistoryWindow(hours) {
+        const value = Number(hours);
+        if (!Number.isFinite(value) || value <= 0) {
+          return "rolling window";
         }
-        if (!Array.isArray(rows) || !rows.length) {
-          beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
-          return;
+        if (value < 1) {
+          return `${Math.round(value * 60)} min`;
         }
-        const head = `
-          <thead>
-            <tr>
-              <th>Slot UTC</th>
-              <th>Detected</th>
-              <th>Dashes</th>
-              <th>100W SNR</th>
-              <th>10W SNR</th>
-              <th>1W SNR</th>
-            </tr>
-          </thead>`;
-        const body = rows.map((row) => {
-          const detected = row.detected ? "yes" : "no";
-          const detectedClass = row.detected ? "good" : "no-data";
-          return `
-            <tr>
-              <td>${beaconEscapeHtml(beaconFormatUtc(row.slot_start_utc || row.recorded_at))}</td>
-              <td><span class="beacon-badge ${detectedClass}">${beaconEscapeHtml(detected)}</span></td>
-              <td>${beaconEscapeHtml(String(row.dash_levels_detected ?? 0))}/4</td>
-              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_100w))}</td>
-              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_10w))}</td>
-              <td>${beaconEscapeHtml(beaconFormatScore(row.snr_db_1w))}</td>
-            </tr>`;
+        const wholeHours = Number.isInteger(value) ? String(value) : value.toFixed(1);
+        return `${wholeHours} h`;
+      }
+
+      function beaconFormatUtcTimestamp(value) {
+        if (!value) {
+          return "n/a";
+        }
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+          return String(value);
+        }
+        return parsed.toISOString().replace("T", " ").replace("Z", " UTC");
+      }
+
+      function beaconGetHistoryObservationState(obs) {
+        if (obs?.detected) {
+          return { key: "detected", label: "Detected" };
+        }
+        const leadSnr = Number(obs?.snr_db_100w);
+        if (Number.isFinite(leadSnr) && leadSnr > 0) {
+          return { key: "weak", label: "Weak trace" };
+        }
+        return { key: "nocopy", label: "No copy" };
+      }
+
+      function beaconRenderHistoryChartStat(label, value) {
+        return `<div class="beacon-history-chart__stat"><span class="beacon-history-chart__stat-label">${beaconEscapeHtml(label)}</span><strong class="beacon-history-chart__stat-value">${beaconEscapeHtml(value)}</strong></div>`;
+      }
+
+      function beaconRenderMixLegendItem(label, value, total, variant) {
+        return `<div class="beacon-history-mix__legend-item"><span class="beacon-history-mix__legend-dot beacon-history-mix__legend-dot--${variant}"></span><span>${beaconEscapeHtml(label)}</span><strong>${beaconEscapeHtml(`${value}`)}</strong><span>${beaconEscapeHtml(`${beaconHistoryPct(value, total)}%`)}</span></div>`;
+      }
+
+      function beaconRenderHistoryInfoStats(detail, observations) {
+        const cell = detail.cell || {};
+        const total = Number(cell.total_slots || 0);
+        const detections = Number(cell.detections || 0);
+        const noCopy = Math.max(total - detections, 0);
+        const detectionRate = total > 0 ? `${Math.round((detections / total) * 100)}%` : "0%";
+        const noCopyRate = total > 0 ? `${Math.round((noCopy / total) * 100)}%` : "0%";
+        const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+        const bestSeq = `${Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))))}/4`;
+        const latest = beaconFormatUtcTimestamp(cell.latest_detected_utc);
+        const cards = [
+          { label: "Window", value: beaconFormatHistoryWindow(detail.hours), note: "Fixed rolling view" },
+          { label: "Coverage", value: `${total} slot(s)`, note: "Monitored in rolling view" },
+          { label: "Detected", value: `${detections} slot(s)`, note: `${detectionRate} of monitored coverage` },
+          { label: "No copy", value: `${noCopy} slot(s)`, note: `${noCopyRate} of monitored coverage` },
+          { label: "Best pass", value: `${bestSnr} · ${bestSeq}`, note: beaconFormatUtcTimestamp(cell.best_detected_utc) },
+          { label: "Latest detected", value: latest, note: `${observations.length} latest monitored rows loaded` },
+        ];
+        return cards.map((card) => `
+          <div class="beacon-history-info-stat">
+            <div class="beacon-history-info-stat__label">${beaconEscapeHtml(card.label)}</div>
+            <div class="beacon-history-info-stat__value">${beaconEscapeHtml(card.value)}</div>
+            <div class="beacon-history-info-stat__note">${beaconEscapeHtml(card.note)}</div>
+          </div>
+        `).join("");
+      }
+
+      function beaconRenderHistoryMixChart(cell) {
+        const total = Number(cell.total_slots || 0);
+        if (total <= 0) {
+          return '<div class="beacon-history-chart__empty">No monitored slots in the rolling 12-hour window.</div>';
+        }
+        const detections = Math.max(0, Number(cell.detections || 0));
+        const noCopy = Math.max(total - detections, 0);
+        return `<div class="beacon-history-mix">
+          <div class="beacon-history-mix__bar" role="img" aria-label="Copy mix across the rolling 12-hour window">
+            <span class="beacon-history-mix__seg beacon-history-mix__seg--observed" style="width:${beaconHistoryPct(detections, total)}%"></span>
+            <span class="beacon-history-mix__seg beacon-history-mix__seg--nocopy" style="width:${beaconHistoryPct(noCopy, total)}%"></span>
+          </div>
+          <div class="beacon-history-mix__legend">
+            ${beaconRenderMixLegendItem("Detected", detections, total, "observed")}
+            ${beaconRenderMixLegendItem("No copy", noCopy, total, "nocopy")}
+          </div>
+        </div>`;
+      }
+
+      function beaconRenderHistoryRhythmChart(observations) {
+        if (!observations.length) {
+          return '<div class="beacon-history-chart__empty">Load a monitored cell to see the latest copy rhythm.</div>';
+        }
+        const counts = { detected: 0, weak: 0, nocopy: 0 };
+        observations.forEach((obs) => {
+          counts[beaconGetHistoryObservationState(obs).key] += 1;
+        });
+        const detected = counts.detected;
+        const weakTrace = counts.weak;
+        const noCopy = counts.nocopy;
+        const detectionRate = observations.length > 0 ? `${Math.round((detected / observations.length) * 100)}%` : "0%";
+        const bars = observations.slice().reverse().map((obs) => {
+          const state = beaconGetHistoryObservationState(obs);
+          const cls = state.key;
+          const height = state.key === "detected" ? 82 : (state.key === "weak" ? 44 : 26);
+          const title = `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | ${state.label}`;
+          return `<span class="beacon-history-rhythm__bar beacon-history-rhythm__bar--${cls}" style="height:${height}%" title="${beaconEscapeHtml(title)}"></span>`;
         }).join("");
-        beaconEventsModalTable.innerHTML = `${head}<tbody>${body}</tbody>`;
+        return `<div class="beacon-history-rhythm">
+          <div class="beacon-history-chart__stats">
+            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
+            ${beaconRenderHistoryChartStat("Detected", `${detected}`)}
+            ${beaconRenderHistoryChartStat("Weak trace", `${weakTrace}`)}
+            ${beaconRenderHistoryChartStat("No copy", `${noCopy}`)}
+            ${beaconRenderHistoryChartStat("Detection rate", detectionRate)}
+          </div>
+          <div class="beacon-history-rhythm__bars">${bars}</div>
+          <div class="beacon-history-chart__caption">Older on the left, newer on the right. Blue = detected slot, gold = sub-threshold trace, amber = monitored with no copy.</div>
+        </div>`;
+      }
+
+      function beaconFormatHistoryMetricValue(value, kind) {
+        if (!Number.isFinite(Number(value))) {
+          return "n/a";
+        }
+        if (kind === "snr") {
+          return `${Number(value).toFixed(1)} dB`;
+        }
+        return `${Math.max(0, Math.min(4, Math.round(Number(value))))}/4`;
+      }
+
+      function beaconRenderHistoryMetricChart(observations, kind) {
+        if (!observations.length) {
+          return '<div class="beacon-history-chart__empty">No monitored rows loaded yet for this chart.</div>';
+        }
+        const reversed = observations.slice().reverse();
+        const values = reversed.map((obs) => {
+          if (kind === "snr") {
+            return Number.isFinite(Number(obs.snr_db_100w)) ? Number(obs.snr_db_100w) : null;
+          }
+          return Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+        }).filter((value) => value !== null);
+        const maxValue = kind === "snr"
+          ? Math.max(6, ...reversed.map((obs) => Math.max(0, Number(obs.snr_db_100w || 0))))
+          : 4;
+        const bars = reversed.map((obs) => {
+          const rawValue = kind === "snr"
+            ? Math.max(0, Number(obs.snr_db_100w || 0))
+            : Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+          const pctHeight = maxValue > 0 ? Math.max(8, Math.round((rawValue / maxValue) * 100)) : 8;
+          const title = kind === "snr"
+            ? `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | 100 W reference ${Number.isFinite(Number(obs.snr_db_100w)) ? `${Number(obs.snr_db_100w).toFixed(1)} dB` : "n/a"}`
+            : `${beaconFormatUtcTimestamp(obs.slot_start_utc)} | Dash copy ${rawValue}/4`;
+          const cls = obs.detected ? "live" : "muted";
+          return `<span class="beacon-history-metric__bar beacon-history-metric__bar--${cls}" style="height:${pctHeight}%" title="${beaconEscapeHtml(title)}"></span>`;
+        }).join("");
+        const caption = kind === "snr"
+          ? "100 W reference-dash intensity across the latest monitored passes."
+          : "Ordered dash-copy quality across the same pass history.";
+        const latestValue = values.length ? values[values.length - 1] : null;
+        const bestValue = values.length ? Math.max(...values) : null;
+        const avgValue = values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+        return `<div class="beacon-history-metric">
+          <div class="beacon-history-chart__stats">
+            ${beaconRenderHistoryChartStat("Rows", `${observations.length}`)}
+            ${beaconRenderHistoryChartStat("Latest", beaconFormatHistoryMetricValue(latestValue, kind))}
+            ${beaconRenderHistoryChartStat("Best", beaconFormatHistoryMetricValue(bestValue, kind))}
+            ${beaconRenderHistoryChartStat("Average", beaconFormatHistoryMetricValue(avgValue, kind))}
+          </div>
+          <div class="beacon-history-metric__bars">${bars}</div>
+          <div class="beacon-history-chart__caption">${beaconEscapeHtml(caption)}</div>
+        </div>`;
+      }
+
+      function beaconRenderHistoryStateBadge(obs) {
+        const state = beaconGetHistoryObservationState(obs);
+        return `<span class="beacon-history-state-chip beacon-history-state-chip--${state.key}">${beaconEscapeHtml(state.label)}</span>`;
+      }
+
+      function beaconRenderHistoryRowMetric(obs, kind) {
+        if (kind === "snr") {
+          const value = Number(obs.snr_db_100w);
+          const width = Number.isFinite(value) ? Math.max(6, Math.min(100, Math.round((Math.max(0, value) / 6) * 100))) : 6;
+          const label = Number.isFinite(value) ? `${value.toFixed(1)} dB` : "n/a";
+          return `<div class="beacon-history-rowmetric">
+            <span class="beacon-history-rowmetric__bar"><span class="beacon-history-rowmetric__fill" style="width:${width}%"></span></span>
+            <span class="beacon-history-rowmetric__label">${beaconEscapeHtml(label)}</span>
+          </div>`;
+        }
+        const dashes = Math.max(0, Math.min(4, Math.round(Number(obs.dash_levels_detected || 0))));
+        return `<div class="beacon-history-rowmetric beacon-history-rowmetric--sequence">
+          ${renderBeaconMeter(dashes, dashes > 0 ? "success" : "nocopy")}
+          <span class="beacon-history-rowmetric__label">${beaconEscapeHtml(`${dashes}/4`)}</span>
+        </div>`;
+      }
+
+      function renderBeaconHistoryInfoRows(observations) {
+        if (!beaconHistoryInfoRecords) {
+          return;
+        }
+        if (!observations.length) {
+          beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">No observation rows matched this cell in the rolling 12-hour window.</div>';
+          return;
+        }
+        const rows = observations.map((obs) => `
+          <tr>
+            <td>${beaconEscapeHtml(beaconFormatUtcTimestamp(obs.slot_start_utc))}</td>
+            <td>${beaconRenderHistoryStateBadge(obs)}</td>
+            <td>${beaconRenderHistoryRowMetric(obs, "snr")}</td>
+            <td>${beaconRenderHistoryRowMetric(obs, "dash")}</td>
+          </tr>
+        `).join("");
+        beaconHistoryInfoRecords.innerHTML = `<div class="beacon-history-info-table-wrap"><table class="beacon-history-info-table"><thead><tr><th>UTC slot</th><th>Observation</th><th>100 W profile</th><th>Sequence profile</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+
+      function renderBeaconHistoryInfoVisuals(detail, observations) {
+        const cell = detail.cell || {};
+        if (beaconHistoryInfoStats) {
+          beaconHistoryInfoStats.innerHTML = beaconRenderHistoryInfoStats(detail, observations);
+        }
+        if (beaconHistoryInfoMixChart) {
+          beaconHistoryInfoMixChart.innerHTML = beaconRenderHistoryMixChart(cell);
+        }
+        if (beaconHistoryInfoDetectionChart) {
+          beaconHistoryInfoDetectionChart.innerHTML = beaconRenderHistoryRhythmChart(observations);
+        }
+        if (beaconHistoryInfoSnrChart) {
+          beaconHistoryInfoSnrChart.innerHTML = beaconRenderHistoryMetricChart(observations, "snr");
+        }
+        if (beaconHistoryInfoDashChart) {
+          beaconHistoryInfoDashChart.innerHTML = beaconRenderHistoryMetricChart(observations, "dash");
+        }
+      }
+
+      function renderBeaconHistoryInfoModal(detail) {
+        if (beaconHistoryInfoWindow) {
+          beaconHistoryInfoWindow.textContent = `${detail.callsign} - ${detail.location || "Unknown location"} · ${detail.band} · rolling ${beaconFormatHistoryWindow(detail.hours)}`;
+        }
+        if (!beaconHistoryInfoSummary) {
+          return;
+        }
+        const cell = detail.cell;
+        if (!cell || !cell.total_slots) {
+          beaconHistoryInfoSummary.textContent = "No monitored slots were recorded for this beacon/band cell in the rolling history window.";
+          renderBeaconHistoryInfoVisuals(detail, []);
+          return;
+        }
+        const total = Number(cell.total_slots || 0);
+        const detections = Number(cell.detections || 0);
+        const noCopy = Math.max(total - detections, 0);
+        const bestSnr = Number.isFinite(Number(cell.best_snr_db)) ? `${Number(cell.best_snr_db).toFixed(1)} dB` : "n/a";
+        const bestSeq = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
+        const latest = beaconFormatUtcTimestamp(cell.latest_detected_utc);
+        if (detections <= 0) {
+          beaconHistoryInfoSummary.textContent = `Monitored ${total} slot(s) in the rolling 12-hour window. No detected passes were recorded for this cell.`;
+          renderBeaconHistoryInfoVisuals(detail, []);
+          return;
+        }
+        beaconHistoryInfoSummary.textContent = `Detected ${detections}/${total} monitored slot(s). No copy: ${noCopy}. Best detected pass: ${bestSnr}, sequence ${bestSeq}/4. Latest detected pass: ${latest}.`;
+        renderBeaconHistoryInfoVisuals(detail, []);
       }
 
       async function openBeaconEventsModal(detailKey) {
@@ -3308,45 +3833,50 @@ Last update: 2026-04-03 UTC
         }
 
         if (beaconEventsModalTitle) {
-          beaconEventsModalTitle.textContent = `${detail.callsign} · ${detail.band} events`;
+          beaconEventsModalTitle.textContent = `${detail.callsign} · ${detail.band} details`;
         }
-        if (beaconEventsModalWindow) {
-          beaconEventsModalWindow.textContent = `${detail.callsign} - ${detail.location || "Unknown location"} - Rolling ${detail.hours} h window`;
-        }
-        renderBeaconEventsModalStats(detail);
-        if (beaconEventsModalTable) {
-          beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">Loading...</td></tr></tbody>`;
+
+        renderBeaconHistoryInfoModal(detail);
+        if (beaconHistoryInfoRecords) {
+          beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">Loading details...</div>';
         }
 
         beaconEventsModal.classList.add("visible");
         beaconEventsModal.setAttribute("aria-hidden", "false");
         document.body.classList.add("beacon-events-modal-open");
 
+        if (!detail.cell?.total_slots) {
+          if (beaconHistoryInfoRecords) {
+            beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">No observation rows exist for this cell in the rolling history window.</div>';
+          }
+          return;
+        }
+
         const reqSeq = ++beaconEventsRequestSeq;
         try {
           const params = new URLSearchParams({
-            hours: String(detail.hours),
-            limit: "24",
             callsign: detail.callsign,
             band: detail.band,
-            detected_only: "true",
+            hours: String(detail.hours),
+            limit: String(BEACON_HISTORY_MODAL_LIMIT),
           });
-          const resp = await fetch(`${_BASE}api/beacons/observations?${params.toString()}`);
+          const resp = await fetch(`${_BASE}api/beacons/observations?${params.toString()}`, { cache: "no-store" });
           if (!resp.ok) {
-            throw new Error("beacon cell events request failed");
+            throw new Error("history_detail_fetch_failed");
           }
           const payload = await resp.json();
           if (reqSeq !== beaconEventsRequestSeq) {
             return;
           }
-          const rows = Array.isArray(payload?.observations) ? payload.observations : [];
-          renderBeaconEventsModalTable(rows);
+          const observations = Array.isArray(payload?.observations) ? payload.observations : [];
+          renderBeaconHistoryInfoVisuals(detail, observations);
+          renderBeaconHistoryInfoRows(observations);
         } catch (_err) {
           if (reqSeq !== beaconEventsRequestSeq) {
             return;
           }
-          if (beaconEventsModalTable) {
-            beaconEventsModalTable.innerHTML = `<tbody><tr><td class="beacon-empty" colspan="6">${beaconEscapeHtml(t("beacon_no_data"))}</td></tr></tbody>`;
+          if (beaconHistoryInfoRecords) {
+            beaconHistoryInfoRecords.innerHTML = '<div class="beacon-empty">Unable to load observation details for this cell.</div>';
           }
         }
       }
@@ -3379,9 +3909,20 @@ Last update: 2026-04-03 UTC
           const row = Array.isArray(matrix[rowIndex]) ? matrix[rowIndex] : [];
           const cells = bands.map((band, colIndex) => {
             const cell = row[colIndex];
+            const detail = {
+              callsign,
+              location,
+              band,
+              hours: BEACON_WINDOW_HOURS,
+              cell: cell || null,
+            };
+            const detailKey = `${rowIndex}:${colIndex}:${BEACON_WINDOW_HOURS}`;
+            beaconHistoryCellDetails.set(detailKey, detail);
+            const eventsButton = renderBeaconHistoryEventsButton(detailKey, detail);
+
             if (!cell || !Number(cell.total_slots || 0)) {
               const noSampleTitle = `${callsign} ${band}: no monitored slots in window`;
-              return `<td class="beacon-cell beacon-cell--history-unsampled" title="${beaconEscapeHtml(noSampleTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span title="No monitored slots in window">·</span></span></small></td>`;
+              return `<td class="beacon-cell beacon-cell--history-unsampled" title="${beaconEscapeHtml(noSampleTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span title="No monitored slots in window">·</span></span>${eventsButton}</small></td>`;
             }
             const totalSlots = Number(cell.total_slots || 0);
             const detections = Number(cell.detections || 0);
@@ -3391,31 +3932,17 @@ Last update: 2026-04-03 UTC
                 `Monitored ${totalSlots} slot(s) in window`,
                 "0 detected passes",
               ].join("\n");
-              return `<td class="beacon-cell beacon-cell--history-monitored" title="${beaconEscapeHtml(noCopyTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span class="beacon-meter-row">${renderBeaconMeter(0, "nocopy")}<span class="beacon-meter-value">0</span></span><span class="beacon-history-meta">0/${totalSlots} mon</span></span></small></td>`;
+              return `<td class="beacon-cell beacon-cell--history-monitored" title="${beaconEscapeHtml(noCopyTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body"><span class="beacon-meter-row">${renderBeaconMeter(0, "nocopy")}<span class="beacon-meter-value">0</span></span><span class="beacon-history-meta">0/${totalSlots} mon</span></span>${eventsButton}</small></td>`;
             }
             const bestDashes = Math.max(0, Math.min(4, Math.round(Number(cell.best_dashes || 0))));
             const bestSnrValue = Number(cell.best_snr_db);
             const bestSnrLabel = Number.isFinite(bestSnrValue) ? `${bestSnrValue.toFixed(1)} dB` : "n/a";
-            const detailKey = `${callsign}|${band}|${rowIndex}|${colIndex}`;
-            beaconHistoryCellDetails.set(detailKey, {
-              callsign,
-              location,
-              band,
-              hours: BEACON_WINDOW_HOURS,
-              totalSlots,
-              detections,
-              bestDashes,
-              bestSnrDb: bestSnrValue,
-              bestDetectedUtc: cell.best_detected_utc || null,
-              latestDetectedUtc: cell.latest_detected_utc || null,
-            });
             const hitTitle = [
               `${callsign} ${band}`,
               `Detected ${detections}/${totalSlots} monitored slots in window`,
               `Best detected pass: 100 W ${bestSnrLabel}, sequence ${bestDashes}/4`,
               `Latest detected pass: ${cell.latest_detected_utc || "n/a"}`,
             ].join("\n");
-            const eventsButton = renderBeaconHistoryEventsButton(detailKey, `${callsign} ${band}`);
             return `<td class="beacon-cell beacon-cell--history-hit" title="${beaconEscapeHtml(hitTitle)}"><small class="beacon-history-cell"><span class="beacon-history-cell__body">${renderBeaconHistoryTelemetry(bestSnrValue, bestDashes)}<span class="beacon-history-meta">${detections}/${totalSlots} mon</span></span>${eventsButton}</small></td>`;
           }).join("");
           const rowTitle = location ? `${callsign} — ${location}` : callsign;
