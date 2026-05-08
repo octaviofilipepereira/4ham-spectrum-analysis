@@ -748,25 +748,80 @@ Last update: 2026-04-03 UTC
         margin-top: 10px;
         width: 100%;
       }
-      .top-band-row {
+
+      .card-top-bands {
         display: flex;
+        flex-direction: column;
+      }
+
+      .card-top-bands .top-bands-list {
+        margin-top: 8px;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .top-band-row {
+        display: grid;
+        grid-template-columns: 2.1rem 1fr auto;
         align-items: center;
-        gap: 6px;
-        font-size: 0.84rem;
+        gap: 10px;
+        min-height: 0;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        background: linear-gradient(120deg, rgba(30, 58, 138, 0.22), rgba(30, 41, 59, 0.22));
       }
+
+      .top-band-row:nth-child(1) {
+        border-color: rgba(245, 158, 11, 0.45);
+        background: linear-gradient(120deg, rgba(245, 158, 11, 0.30), rgba(146, 64, 14, 0.15));
+      }
+
+      .top-band-row:nth-child(2) {
+        border-color: rgba(125, 211, 252, 0.38);
+        background: linear-gradient(120deg, rgba(56, 189, 248, 0.24), rgba(30, 58, 138, 0.14));
+      }
+
+      .top-band-row:nth-child(3) {
+        border-color: rgba(196, 181, 253, 0.35);
+        background: linear-gradient(120deg, rgba(167, 139, 250, 0.22), rgba(59, 130, 246, 0.14));
+      }
+
+      .top-band-row.is-empty {
+        opacity: 0.64;
+        border-style: dashed;
+      }
+
       .top-band-row .rank {
-        font-size: 1.05rem;
-        width: 1.5em;
-        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 999px;
+        font-size: 1.08rem;
+        background: rgba(2, 6, 23, 0.38);
       }
+
       .top-band-row .band-name {
-        font-weight: 700;
-        font-size: 0.92rem;
+        font-weight: 800;
+        font-size: 1rem;
         flex: 1;
+        letter-spacing: 0.02em;
       }
+
       .top-band-row .band-score {
-        color: var(--muted);
-        font-size: 0.78rem;
+        color: #e2e8f0;
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(2, 6, 23, 0.36);
       }
 
       .prop-state .badge.excellent {
@@ -1061,6 +1116,27 @@ Last update: 2026-04-03 UTC
         .aprs-source-legend,
         .aprs-filter-row {
           flex-wrap: wrap;
+        }
+
+        .top-band-row {
+          grid-template-columns: 1.9rem 1fr auto;
+          padding: 8px 10px;
+          gap: 8px;
+        }
+
+        .top-band-row .rank {
+          width: 1.8rem;
+          height: 1.8rem;
+          font-size: 0.98rem;
+        }
+
+        .top-band-row .band-name {
+          font-size: 0.92rem;
+        }
+
+        .top-band-row .band-score {
+          font-size: 0.82rem;
+          padding: 3px 8px;
         }
 
         .view-selector-row {
@@ -2371,10 +2447,12 @@ Last update: 2026-04-03 UTC
               <span id="kpiPropState" class="badge"><span id="kpiPropLabel">--</span><button type="button" class="helper-icon" style="font-size:10px;width:14px;height:14px;line-height:12px;padding:0;margin-left:5px;vertical-align:middle;" aria-label="Explain propagation score" data-help-title="Global Propagation Score" data-help-text="Confirmed decodes only (verified callsign).&#10;No callsign = band occupancy.">i</button></span>
             </div>
           </div>
-          <div class="card">
+          <div class="card card-top-bands" id="kpiTopBandsCard">
             <span class="label" data-i18n="kpi_top_bands">Top 3 Bands</span>
             <div id="kpiTopBands" class="top-bands-list">
-              <div class="top-band-row"><span class="rank">--</span></div>
+              <div class="top-band-row is-empty"><span class="rank">🥇</span><span class="band-name">--</span><span class="band-score">--</span></div>
+              <div class="top-band-row is-empty"><span class="rank">🥈</span><span class="band-name">--</span><span class="band-score">--</span></div>
+              <div class="top-band-row is-empty"><span class="rank">🥉</span><span class="band-name">--</span><span class="band-score">--</span></div>
             </div>
           </div>
         </div>
@@ -5485,13 +5563,13 @@ Last update: 2026-04-03 UTC
 
         const MEDALS = ["🥇", "🥈", "🥉"];
         const topBands = propagation.topBands || (propagation.bestBand ? [propagation.bestBand] : []);
-        if (topBands.length > 0) {
-          kpiTopBands.innerHTML = topBands.slice(0, 3).map((b, i) =>
-            `<div class="top-band-row"><span class="rank">${MEDALS[i]}</span><span class="band-name">${b.band}</span><span class="band-score">${b.score.toFixed(1)}</span></div>`
-          ).join("");
-        } else {
-          kpiTopBands.innerHTML = "<div class=\"top-band-row\"><span class=\"rank\">--</span></div>";
-        }
+        const slots = Array.from({ length: 3 }, (_, i) => topBands[i] || null);
+        kpiTopBands.innerHTML = slots.map((entry, i) => {
+          const hasData = !!(entry && entry.band);
+          const bandName = hasData ? entry.band : "--";
+          const score = hasData && Number.isFinite(Number(entry.score)) ? Number(entry.score).toFixed(1) : "--";
+          return `<div class="top-band-row${hasData ? "" : " is-empty"}"><span class="rank">${MEDALS[i]}</span><span class="band-name">${bandName}</span><span class="band-score">${score}</span></div>`;
+        }).join("");
       }
 
       function propagationState(score) {
