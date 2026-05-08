@@ -5054,16 +5054,24 @@ Last update: 2026-04-03 UTC
             const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
 
             if (info.detected) {
-              // Um arco por banda, espessura decresce da mais baixa para a mais alta
-              // (20m mais espesso e desenhado primeiro; 10m mais fino por cima)
-              const strokeWidths = [2.4, 2.0, 1.6, 1.2, 0.9];
+              // Um arco por banda — separados visualmente por padrão de linha e espessura
+              // 20m: sólido grosso | 17m: traço longo | 15m: traço curto | 12m: ponto-traço | 10m: ponteado
+              const arcStyles = [
+                { w: 3.0, dash: null },
+                { w: 2.4, dash: "10,4" },
+                { w: 2.0, dash: "5,4" },
+                { w: 1.6, dash: "8,3,2,3" },
+                { w: 1.4, dash: "2,4" },
+              ];
               detectedBands.forEach((band, i) => {
-                arcG.append("path")
+                const s = arcStyles[i] ?? { w: 1.4, dash: "2,4" };
+                const arc = arcG.append("path")
                   .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
                   .attr("d", path).attr("fill", "none")
                   .attr("stroke", _pmColor(band))
-                  .attr("stroke-width", strokeWidths[i] ?? 0.9)
-                  .attr("stroke-opacity", 0.85);
+                  .attr("stroke-width", s.w)
+                  .attr("stroke-opacity", 0.9);
+                if (s.dash) arc.attr("stroke-dasharray", s.dash);
               });
             }
 
@@ -5075,8 +5083,8 @@ Last update: 2026-04-03 UTC
               const bandList = detectedBands.join(", ");
               const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
               // Anéis concêntricos — um por banda (mais externo=20m, mais interno=10m)
-              const baseR = 4.5;
-              const step  = 3.0;
+              const baseR = 6;
+              const step  = 5;
               // Desenhar do maior para o menor (maior fica atrás)
               [...detectedBands].reverse().forEach((band, ri) => {
                 const r = baseR + (detectedBands.length - 1 - ri) * step;
@@ -5084,8 +5092,8 @@ Last update: 2026-04-03 UTC
                   .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
                   .attr("fill", "none")
                   .attr("stroke", _pmColor(band))
-                  .attr("stroke-width", 2.0)
-                  .attr("opacity", 0.92)
+                  .attr("stroke-width", 2.5)
+                  .attr("opacity", 0.95)
                   .style("cursor", "pointer")
                   .on("mousemove", (evt) => {
                     tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Detectado em: <strong>${bandList}</strong>`;
@@ -5097,17 +5105,19 @@ Last update: 2026-04-03 UTC
               });
               // Label com a cor da banda mais baixa (mais visível)
               const labelColor = _pmColor(detectedBands[0]);
+              const outerR = baseR + (detectedBands.length - 1) * step;
               dotG.append("text")
-                .attr("x", pp[0] + baseR + (detectedBands.length - 1) * step + 4)
-                .attr("y", pp[1] + 4)
-                .attr("fill", labelColor).attr("font-size", "9px")
+                .attr("x", pp[0] + outerR + 5)
+                .attr("y", pp[1] + 5)
+                .attr("fill", labelColor).attr("font-size", "12px")
+                .attr("font-weight", "bold")
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(cs);
             } else {
               const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
               // Círculo cinzento oco — monitorado sem cópia
               dotG.append("circle")
-                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 4.5)
+                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5)
                 .attr("fill", "none").attr("stroke", "#6b7280").attr("stroke-width", 1.4).attr("opacity", 0.85)
                 .style("cursor", "pointer")
                 .on("mousemove", (evt) => {
@@ -5118,8 +5128,8 @@ Last update: 2026-04-03 UTC
                 })
                 .on("mouseleave", () => { tip.style.display = "none"; });
               dotG.append("text")
-                .attr("x", pp[0] + 6).attr("y", pp[1] + 3)
-                .attr("fill", "#6b7280").attr("font-size", "8px")
+                .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
+                .attr("fill", "#6b7280").attr("font-size", "11px")
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(cs);
             }
