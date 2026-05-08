@@ -5563,21 +5563,22 @@ Last update: 2026-04-03 UTC
         if (!hosts.length || !window.d3 || !window.topojson) return;
 
         try {
-          // Se beacon scan activo, buscar overview em paralelo para overlay no mapa
-          const beaconFetch = getBeaconSchedulerSnapshot()
-            ? fetch(`${_BASE}api/beacons/analytics/overview?window_minutes=180&propagation_window_minutes=180&forecast_window_minutes=180`)
-                .then(r => r.ok ? r.json() : null).catch(() => null)
-            : Promise.resolve(null);
-
-          const [ionoResp, contactResp, world, beaconJson] = await Promise.all([
+          // Beacon status e overview sempre em paralelo — overlay aparece se scan estiver activo
+          const [ionoResp, contactResp, world, beaconStatusJson, beaconJson] = await Promise.all([
             fetch(`${_BASE}api/map/ionospheric`),
             fetch(`${_BASE}api/map/contacts?window_minutes=${_pmWindowMinutes()}&limit=2000`),
             _pmLoadWorld(),
-            beaconFetch,
+            fetch(`${_BASE}api/beacons/status`).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${_BASE}api/beacons/analytics/overview?window_minutes=180&propagation_window_minutes=180&forecast_window_minutes=180`)
+              .then(r => r.ok ? r.json() : null).catch(() => null),
           ]);
           if (!ionoResp.ok || !contactResp.ok) return;
           _pmIonoData = await ionoResp.json();
           _pmContactData = await contactResp.json();
+          // Actualizar snapshot de runtime beacon para o redraw poder verificar
+          if (beaconStatusJson) {
+            lastBeaconRuntimeSnapshot = { kind: "payload", payload: beaconStatusJson, receivedAt: Date.now() };
+          }
           if (beaconJson) beaconOverview = beaconJson;
 
           // Initialize band visibility — restore from session or default none
