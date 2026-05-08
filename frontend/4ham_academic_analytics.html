@@ -370,6 +370,71 @@ Last update: 2026-04-03 UTC
         font-weight: 700;
       }
 
+      .card-snr-gauge {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .snr-gauge {
+        margin-top: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .snr-gauge-svg {
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+      }
+
+      .snr-gauge-arc {
+        fill: none;
+        stroke-width: 10;
+        stroke-linecap: round;
+      }
+
+      .snr-gauge-arc--track {
+        stroke: rgba(159, 180, 200, 0.22);
+      }
+
+      .snr-gauge-arc--range {
+        stroke-width: 9;
+      }
+
+      .snr-gauge-needle {
+        stroke: #e2e8f0;
+        stroke-width: 3;
+        stroke-linecap: round;
+        transform-origin: 80px 80px;
+        transform: rotate(-90deg);
+        transition: transform 0.38s ease-out, opacity 0.2s ease;
+      }
+
+      .card-snr-gauge.is-empty .snr-gauge-needle {
+        opacity: 0.35;
+      }
+
+      .snr-gauge-hub {
+        fill: #e2e8f0;
+      }
+
+      .snr-gauge-value {
+        margin-top: -2px;
+        font-size: clamp(1.05rem, 1rem + 0.65vw, 1.5rem);
+      }
+
+      .snr-gauge-scale {
+        width: 100%;
+        max-width: 220px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--text-muted);
+        font-size: 0.66rem;
+        letter-spacing: 0.02em;
+      }
+
       .grid {
         display: grid;
         grid-template-columns: repeat(12, 1fr);
@@ -2186,9 +2251,29 @@ Last update: 2026-04-03 UTC
             <span class="label" data-i18n="kpi_unique_callsigns">Unique callsigns</span>
             <div class="value" id="kpiCallsigns">--</div>
           </div>
-          <div class="card">
+          <div class="card card-snr-gauge is-empty" id="kpiSnrDigitalCard">
             <span class="label" data-i18n="kpi_avg_snr_digital">Avg SNR FT4/FT8/WSPR</span>
-            <div class="value" id="kpiSnrDigital">--</div>
+            <div class="snr-gauge" role="img" aria-label="Average SNR gauge for FT4 FT8 and WSPR">
+              <svg class="snr-gauge-svg" viewBox="0 0 160 102" aria-hidden="true" focusable="false">
+                <defs>
+                  <linearGradient id="kpiSnrDigitalGradient" x1="20" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="52%" stop-color="#f59e0b" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path class="snr-gauge-arc snr-gauge-arc--track" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <path class="snr-gauge-arc snr-gauge-arc--range" stroke="url(#kpiSnrDigitalGradient)" d="M 20 80 A 60 60 0 0 1 140 80"></path>
+                <line id="kpiSnrDigitalNeedle" class="snr-gauge-needle" x1="80" y1="80" x2="80" y2="24"></line>
+                <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
+              </svg>
+              <div class="value snr-gauge-value" id="kpiSnrDigital">--</div>
+              <div class="snr-gauge-scale" aria-hidden="true">
+                <span>-30</span>
+                <span>-7.5</span>
+                <span>+15 dB</span>
+              </div>
+            </div>
           </div>
           <div class="card">
             <span class="label" data-i18n="kpi_avg_snr_analog">Avg SNR CW/SSB</span>
@@ -2731,6 +2816,8 @@ Last update: 2026-04-03 UTC
       const kpiEvents = document.getElementById("kpiEvents");
       const kpiCallsigns = document.getElementById("kpiCallsigns");
       const kpiSnrDigital = document.getElementById("kpiSnrDigital");
+      const kpiSnrDigitalNeedle = document.getElementById("kpiSnrDigitalNeedle");
+      const kpiSnrDigitalCard = document.getElementById("kpiSnrDigitalCard");
       const kpiSnrAnalog = document.getElementById("kpiSnrAnalog");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
@@ -2805,6 +2892,8 @@ Last update: 2026-04-03 UTC
       const beaconHistoryInfoRecords = document.getElementById("beaconHistoryInfoRecords");
       const beaconHistoryCellDetails = new Map();
       let beaconEventsRequestSeq = 0;
+      const DIGITAL_SNR_GAUGE_MIN_DB = -30;
+      const DIGITAL_SNR_GAUGE_MAX_DB = 15;
 
       updateMetaUpdateFrequency();
 
@@ -5147,10 +5236,29 @@ Last update: 2026-04-03 UTC
 
         kpiEvents.textContent = formatInt(totalEvents);
         kpiCallsigns.textContent = formatInt(uniqueCallsigns);
-        kpiSnrDigital.textContent = snrDigital != null ? `${snrDigital.toFixed(1)} dB` : "--";
+        updateDigitalSnrGauge(snrDigital);
         kpiSnrAnalog.textContent = snrAnalog != null ? `${snrAnalog.toFixed(1)} dB` : "--";
 
         metaPeriod.textContent = `${fmtDateUtc(start)} - ${fmtDateUtc(end)}`;
+      }
+
+      function updateDigitalSnrGauge(valueDb) {
+        const hasValue = Number.isFinite(valueDb);
+        const span = DIGITAL_SNR_GAUGE_MAX_DB - DIGITAL_SNR_GAUGE_MIN_DB;
+        const normalized = hasValue && span > 0
+          ? clamp((valueDb - DIGITAL_SNR_GAUGE_MIN_DB) / span, 0, 1)
+          : 0;
+        const angleDeg = -90 + (normalized * 180);
+
+        if (kpiSnrDigitalNeedle) {
+          kpiSnrDigitalNeedle.style.transform = `rotate(${angleDeg.toFixed(2)}deg)`;
+        }
+        if (kpiSnrDigitalCard) {
+          kpiSnrDigitalCard.classList.toggle("is-empty", !hasValue);
+        }
+        if (kpiSnrDigital) {
+          kpiSnrDigital.textContent = hasValue ? `${valueDb.toFixed(1)} dB` : "--";
+        }
       }
 
       function computePropagationAnalytics(seriesRows, callsignRows, start, end) {
