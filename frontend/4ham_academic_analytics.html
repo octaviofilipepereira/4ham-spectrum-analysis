@@ -7305,32 +7305,19 @@ Last update: 2026-04-03 UTC
             hfView.style.display = "none";
             if (beaconView) beaconView.style.display = "none";
             aprsView.style.display = "block";
-            if (!aprsDataLoaded) {
-              aprsLoadAndRender();
-            } else {
-              if (aprsMap) setTimeout(() => aprsMap.invalidateSize(), 200);
-              // Only (re)start the auto-refresh if not already armed — avoids
-              // resetting the 5-min countdown each time the user toggles tabs.
-              if (!aprsRefreshTimer) aprsStartAutoRefresh();
-              requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
-            }
+            aprsLoadAndRender();
           } else if (view === "beacon") {
             hfView.style.display = "none";
             aprsView.style.display = "none";
             aprsStopAutoRefresh();
             if (beaconView) beaconView.style.display = "block";
-            if (!beaconDataLoaded) {
-              beaconLoadAndRender();
-            } else {
-              renderBeaconDashboard();
-              requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
-            }
+            beaconLoadAndRender();
           } else {
             hfView.style.display = "block";
             aprsView.style.display = "none";
             if (beaconView) beaconView.style.display = "none";
             aprsStopAutoRefresh();
-            requestAnimationFrame(() => requestAnimationFrame(() => overlay?.classList.remove("active")));
+            loadAndRender();
           }
           localStorage.setItem("academic_active_view", view);
         });
