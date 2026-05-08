@@ -2802,10 +2802,6 @@ Last update: 2026-04-03 UTC
             <span class="label" data-i18n="beacon_kpi_noaa">NOAA Kp / SFI</span>
             <div class="value" id="beaconKpiNoaa">--</div>
           </div>
-          <div class="card">
-            <span class="label" data-i18n="beacon_kpi_freshness">Freshness</span>
-            <div class="value" id="beaconKpiFreshness">--</div>
-          </div>
         </div>
 
         <div class="grid">
@@ -4396,8 +4392,6 @@ Last update: 2026-04-03 UTC
         setText("beaconKpiDetectedSlots", payload ? String(kpis.detected_slots ?? "--") : "--");
         setText("beaconKpiDetectedBeacons", payload ? String(kpis.detected_beacons ?? "--") : "--");
         setText("beaconKpiNoaa", payload ? `Kp ${beaconFormatScore(iono.kp)} · SFI ${beaconFormatScore(iono.sfi)}` : "--");
-        const _stale = payload?.staleness_seconds ?? 0;
-        setText("beaconKpiFreshness", payload ? (_stale > 0 ? `${freshness.label || "--"} · ${_stale}s` : (freshness.label || "--")) : "--");
 
         renderBeaconRecentActivityTable(payload?.recent_activity || null);
 
