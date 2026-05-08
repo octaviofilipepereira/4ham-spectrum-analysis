@@ -1767,10 +1767,11 @@ Last update: 2026-04-03 UTC
       // ── i18n engine ────────────────────────────────────────────────
       let _i18nStrings = {};
       let _i18nLang = localStorage.getItem("4ham_lang") || "en";
+      const I18N_ASSET_VERSION = "20260508180500";
 
       async function loadI18n() {
         try {
-          const resp = await fetch(`${_BASE}i18n/academic_analytics.json`);
+          const resp = await fetch(`${_BASE}i18n/academic_analytics.json?v=${I18N_ASSET_VERSION}`, { cache: "no-store" });
           if (resp.ok) _i18nStrings = await resp.json();
         } catch (_) { /* fallback: hardcoded EN strings stay in HTML */ }
       }

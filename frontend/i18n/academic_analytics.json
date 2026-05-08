@@ -20,6 +20,7 @@
     "kpi_time_coverage": "Time coverage",
     "kpi_overall_prop": "Global Propagation",
     "kpi_best_band": "Best band",
+    "kpi_top_bands": "Top 3 Bands",
     "kpi_prop_note": "Confirmed decodes only (verified callsign).<br>No callsign = band occupancy.",
 
     "chart_propmap": "QTH-Centric Propagation Map",
@@ -194,6 +195,7 @@
     "kpi_time_coverage": "Cobertura temporal",
     "kpi_overall_prop": "Propagação Global",
     "kpi_best_band": "Melhor banda",
+    "kpi_top_bands": "Top 3 bandas",
     "kpi_prop_note": "Apenas descodificações confirmadas (indicativo verificado).<br>Sem indicativo = ocupação de banda.",
 
     "chart_propmap": "Mapa de Propagação Centrado no QTH",
