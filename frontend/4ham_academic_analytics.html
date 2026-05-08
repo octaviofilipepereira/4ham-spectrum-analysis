@@ -2361,6 +2361,164 @@ Last update: 2026-04-03 UTC
         line-height: 1.5;
       }
 
+      .beacon-reading-panel {
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.13), transparent 40%),
+          linear-gradient(180deg, rgba(8, 16, 24, 0.82), rgba(9, 17, 24, 0.58));
+      }
+
+      .beacon-reading-panel > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .beacon-reading-hero {
+        margin: 0 4px 12px;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(85, 150, 196, 0.28);
+        background:
+          linear-gradient(140deg, rgba(8, 28, 44, 0.88), rgba(13, 42, 58, 0.62)),
+          radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 48%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .beacon-reading-kicker {
+        margin-bottom: 6px;
+        color: #7dd3fc;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-summary {
+        margin: 0;
+        color: #f8fbff;
+        font-size: 0.93rem;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+
+      .beacon-reading-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .beacon-reading-band {
+        padding: 12px;
+        border: 1px solid rgba(40, 68, 90, 0.72);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(12, 21, 30, 0.84), rgba(9, 16, 24, 0.54));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band--aligned,
+      .beacon-reading-band--good,
+      .beacon-reading-band--excellent {
+        border-color: rgba(52, 211, 153, 0.3);
+        box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band--mixed,
+      .beacon-reading-band--fair,
+      .beacon-reading-band--marginal {
+        border-color: rgba(251, 191, 36, 0.28);
+        box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band--divergent,
+      .beacon-reading-band--poor,
+      .beacon-reading-band--closed,
+      .beacon-reading-band--absorbed {
+        border-color: rgba(239, 68, 68, 0.3);
+        box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .beacon-reading-band-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .beacon-reading-band-id {
+        display: grid;
+        gap: 4px;
+      }
+
+      .beacon-reading-band-label {
+        color: #7f9bb5;
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-band-name {
+        color: #ffffff;
+        font-size: 1.02rem;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .beacon-reading-band-flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .beacon-reading-chip {
+        min-height: 64px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(67, 100, 126, 0.34);
+        background: rgba(255, 255, 255, 0.04);
+        display: grid;
+        align-content: center;
+        gap: 4px;
+      }
+
+      .beacon-reading-chip--ghost {
+        background: rgba(125, 211, 252, 0.06);
+      }
+
+      .beacon-reading-chip-label {
+        color: #9ab4c9;
+        font-size: 0.64rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .beacon-reading-chip-value {
+        color: #f8fbff;
+        font-size: 0.86rem;
+        font-weight: 700;
+        text-transform: capitalize;
+        line-height: 1.2;
+      }
+
+      .beacon-reading-flow-arrow {
+        color: #7dd3fc;
+        font-size: 1rem;
+        font-weight: 800;
+        opacity: 0.9;
+      }
+
+      .beacon-reading-empty {
+        padding: 16px 12px;
+        border: 1px dashed rgba(86, 118, 145, 0.38);
+        border-radius: 14px;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+
       .beacon-meta-inline {
         display: flex;
         flex-wrap: wrap;
@@ -3019,12 +3177,15 @@ Last update: 2026-04-03 UTC
             <p class="beacon-history-footnote" data-i18n="beacon_recent_activity_desc">Historical matrix by scheduled beacon slot and band.</p>
           </article>
 
-          <article class="chart-panel span-4">
+          <article class="chart-panel span-4 beacon-reading-panel">
             <div class="chart-header">
               <h3 data-i18n="beacon_reading">Beacon + NOAA reading</h3>
             </div>
-            <p class="beacon-summary" id="beaconReadingSummary">--</p>
-            <div class="beacon-list" id="beaconReadingBands"></div>
+            <div class="beacon-reading-hero">
+              <div class="beacon-reading-kicker">Quick read</div>
+              <p class="beacon-reading-summary" id="beaconReadingSummary">--</p>
+            </div>
+            <div class="beacon-reading-grid" id="beaconReadingBands"></div>
           </article>
 
           <article class="chart-panel span-4">
@@ -4708,19 +4869,36 @@ Last update: 2026-04-03 UTC
 
         const reading = payload?.reading || {};
         setText("beaconReadingSummary", reading.summary || t("beacon_no_data"));
-        renderBeaconRowList(
-          "beaconReadingBands",
-          Array.isArray(reading.bands) ? reading.bands.map((row) => `
-            <div class="beacon-list-row">
-              <div>
-                <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
-                <div class="beacon-list-detail">${beaconEscapeHtml(`${row.observed_state || "--"} vs ${row.expected_state || "--"}`)}</div>
-              </div>
-              <span class="beacon-badge ${beaconBadgeClass(row.agreement)}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
-            </div>`)
-          : [],
-          t("beacon_no_data")
-        );
+        const readingBandsEl = document.getElementById("beaconReadingBands");
+        if (readingBandsEl) {
+          const readingRows = Array.isArray(reading.bands) ? reading.bands : [];
+          readingBandsEl.innerHTML = readingRows.length
+            ? readingRows.map((row) => {
+              const toneClass = beaconBadgeClass(row.agreement);
+              return `
+                <article class="beacon-reading-band beacon-reading-band--${toneClass}">
+                  <div class="beacon-reading-band-top">
+                    <div class="beacon-reading-band-id">
+                      <span class="beacon-reading-band-label">Band</span>
+                      <div class="beacon-reading-band-name">${beaconEscapeHtml(row.band || "--")}</div>
+                    </div>
+                    <span class="beacon-badge ${toneClass}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
+                  </div>
+                  <div class="beacon-reading-band-flow">
+                    <div class="beacon-reading-chip">
+                      <span class="beacon-reading-chip-label">Observed</span>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.observed_state || "--")}</div>
+                    </div>
+                    <div class="beacon-reading-flow-arrow" aria-hidden="true">&rarr;</div>
+                    <div class="beacon-reading-chip beacon-reading-chip--ghost">
+                      <span class="beacon-reading-chip-label">NOAA</span>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.expected_state || "--")}</div>
+                    </div>
+                  </div>
+                </article>`;
+            }).join("")
+            : `<div class="beacon-reading-empty">${beaconEscapeHtml(t("beacon_no_data"))}</div>`;
+        }
 
         const forecast = payload?.forecast || {};
         setText("beaconNowcastSummary", forecast.summary || t("beacon_no_data"));
