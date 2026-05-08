@@ -3583,7 +3583,11 @@ Last update: 2026-04-03 UTC
         const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog
           : (anaSnrW > 0 ? d3.sum(anaRows, (d) => _w(d) * d.snr) / anaSnrW : null);
 
-        const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
+        const uniqueCallsigns = new Set(
+          synthetic.callsigns
+            .filter(d => (_fb === "ALL" || d.band === _fb) && (_fm === "ALL" || d.mode === _fm))
+            .map((d) => d.callsign)
+        ).size;
 
         kpiEvents.textContent = formatInt(totalEvents);
         kpiCallsigns.textContent = formatInt(uniqueCallsigns);

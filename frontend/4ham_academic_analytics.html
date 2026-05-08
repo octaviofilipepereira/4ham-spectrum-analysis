@@ -2407,7 +2407,7 @@ Last update: 2026-04-03 UTC
                 <circle class="snr-gauge-hub" cx="80" cy="80" r="4"></circle>
               </svg>
               <div class="value snr-gauge-value" id="kpiCallsigns">--</div>
-              <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>500</span><span>1k+</span></div>
+              <div class="snr-gauge-scale" id="kpiCallsignsScale" aria-hidden="true"><span>0</span><span>500</span><span>1k+</span></div>
             </div>
           </div>
           <div class="card card-snr-gauge is-empty" id="kpiSnrDigitalCard">
@@ -5537,9 +5537,27 @@ Last update: 2026-04-03 UTC
         const snrDigital = serverSnrDigital !== null ? serverSnrDigital : weightedSnrAvg(digRows);
         const snrAnalog  = serverSnrAnalog  !== null ? serverSnrAnalog  : weightedSnrAvg(anaRows);
 
-        const uniqueCallsigns = new Set(callsignRows.map((d) => d.callsign)).size;
+        // Unique callsigns: use synthetic.callsigns filtered only by band/mode (no time filter).
+        // Bucket timestamps in callsigns can precede the period start (same issue as totalEvents);
+        // synthetic is already scoped to the requested period by the server.
+        const uniqueCallsigns = new Set(
+          synthetic.callsigns
+            .filter(d => (_fb === "ALL" || d.band === _fb) && (_fm === "ALL" || d.mode === _fm))
+            .map((d) => d.callsign)
+        ).size;
 
-        updateKpiGauge(kpiCallsignsNeedle, kpiCallsignsCard, kpiCallsigns, uniqueCallsigns, 0, CALLSIGNS_GAUGE_MAX, (v) => formatInt(v));
+        // Callsigns gauge: auto-scale so needle is never pegged.
+        const callsignsGaugeMax = uniqueCallsigns > CALLSIGNS_GAUGE_MAX
+          ? Math.ceil(uniqueCallsigns / 1000) * 1000
+          : CALLSIGNS_GAUGE_MAX;
+        const kpiCallsignsScaleEl = document.getElementById("kpiCallsignsScale");
+        if (kpiCallsignsScaleEl) {
+          const mid = callsignsGaugeMax / 2;
+          const midLabel = mid >= 1000 ? `${Math.round(mid / 1000)}k` : String(mid);
+          const maxLabel = callsignsGaugeMax >= 1000 ? `${Math.round(callsignsGaugeMax / 1000)}k+` : String(callsignsGaugeMax);
+          kpiCallsignsScaleEl.innerHTML = `<span>0</span><span>${midLabel}</span><span>${maxLabel}</span>`;
+        }
+        updateKpiGauge(kpiCallsignsNeedle, kpiCallsignsCard, kpiCallsigns, uniqueCallsigns, 0, callsignsGaugeMax, (v) => formatInt(v));
         updateDigitalSnrGauge(snrDigital);
         updateKpiGauge(kpiSnrAnalogNeedle, kpiSnrAnalogCard, kpiSnrAnalog, snrAnalog,
           ANALOG_SNR_GAUGE_MIN_DB, ANALOG_SNR_GAUGE_MAX_DB, (v) => `${v.toFixed(1)} dB`);
