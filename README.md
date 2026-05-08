@@ -6,7 +6,21 @@ Last update: 2026-05-03 UTC
 -->
 
 # 4ham-spectrum-analysis
-Web platform for amateur radio spectrum analysis, with real-time DSP, decoder integration (FT8/FT4/WSPR/CW/SSB), propagation scoring, academic analytics, and automated multi-band scan rotation.
+
+**4ham-spectrum-analysis** is an end-to-end, self-hosted observatory for amateur radio HF/VHF activity, designed to turn an inexpensive RTL-SDR (or compatible SDR) plus a Linux PC or Raspberry Pi into a continuously-running, scientifically-honest propagation and occupancy laboratory.
+
+The platform combines:
+
+- **Real-time DSP and waterfall** — adaptive power/threshold occupancy detection, in-browser spectrum and waterfall, per-event SNR/Doppler/crest extraction.
+- **Multi-decoder pipeline** — FT8/FT4/WSPR via WSJT-X, CW via custom matched-filter detector, SSB via voice activity detection + optional Whisper ASR transcription, APRS via Direwolf KISS (RF) and APRS-IS (TCP), with a unified `rf_gated` 3-rule classification on map and analytics.
+- **NCDXF/IARU Beacon Analysis** — UTC-aligned 10 s slot scheduler monitoring 18 fixed beacons across 20/17/15/12/10 m, native dashboard tab with KPIs, ionospheric context, per-band propagation scoring, recent-activity matrix, and a multi-band beacon overlay rendered directly on the main propagation globe.
+- **Confirmed-decode propagation scoring** — only verified callsign+SNR events feed the propagation score; events without a callsign are recorded as band occupancy but excluded from scoring, keeping the metric defensible for academic use.
+- **Automated multi-band scan rotation** — configurable dwell, presets, scheduler, live countdown, mode-aware UI.
+- **Academic Analytics dashboard** — propagation scoring, band heatmaps, instrumental KPI gauges, historical aggregations (1 h → 30 d), exhaustive XLSX/CSV exports with DXCC/grid/source enrichment.
+- **Public push-mirror to shared PHP+MySQL hosting** — read-only replica of the Academic Analytics dashboard published every 5 min via signed JSON snapshots, with no inbound port-forwarding, no WebSocket, and no admin surface on the public side (e.g. https://cs5arc.pt/external_academic_analytics/).
+- **Production-grade ops** — systemd packaging, graphical whiptail installer, WAL-mode SQLite with composite indices, structured logs, bcrypt admin auth, HMAC-SHA256-signed mirror replication.
+
+Licensed under GNU AGPL-3.0. Developed by **CT7BFV / Octávio Filipe Gonçalves** as the radio-science companion to a working amateur station.
 
 ## Goal
 Web-based project to scan amateur radio bands, detect frequency occupancy, and identify signals, including digital modes and CW.
@@ -107,6 +121,18 @@ Default frontend routes:
 ```
 
 ## Changelog (cumulative)
+
+### v0.15.0
+- **Native Beacon view** in Academic Analytics (local + cs5arc mirror) — replaces the previous HF copy with a dedicated NCDXF/IARU panel: KPIs, Beacon+NOAA reading, nowcast, per-band propagation, ionospheric context, 12 h recent-activity matrix and an `Events` modal with 4 charts (rhythm, mix, SNR trend, dash trend).
+- **NCDXF beacon overlay on the main propagation globe** when the beacon scheduler is active — separate per-band arcs (perpendicular screen-space offset), dashed patterns, multi-band concentric rings at the home QTH, distinct palette (20 m blue, 15 m red, 12 m purple, etc.), and grey dots for monitored beacons without copy.
+- **Instrumental KPI gauges** redesign across all 6 Academic Analytics cards and Beacon cards — 5-column layout, dynamic scale, centred badges, informative tooltips. Top 3 Bands with gold/silver/bronze medals.
+- **Flatpickr date picker** with `pt` locale and `DD/MM/AAAA` format unifies all date inputs (HF, APRS, Beacon).
+- **Multi-band beacon API** — `bands[]` aggregated per callsign on the map payload; the frontend consumes the array instead of duplicating records.
+- **External mirror beacon parity** — `external_academic_analytics` receives the same beacon endpoints and snapshots (`beacons/status`, `beacons/analytics/overview`, `beacons/observations`) via PHP shims + pusher; covered by 3 new tests.
+- **i18n total parity** — Events modal fully translated (5 sections, stats, captions, empty states); beacon states (`Excellent`/`Closed`/`aligned`/`Quiet`/...) translated via lookup table; +50 new `beacon_*` and `beacon_state_*` keys (EN+PT).
+- **Performance** — SQLite WAL + composite indices + drastically reduced frontend polling; satellite propagation no longer blocks the event loop (`pyorbital`); SDR retune in-place during slot rotation (no `libusb close/open`).
+- **Many UX & satellite fixes** — `Recent rhythm` chart limited to the 60 most recent passes (eliminates horizontal scrollbar in the Events popup), Propagation Map zoom only with `Ctrl+wheel`, satellite tolerates SatNOGS entries without `norad_id`, etc.
+- **Version bump** to v0.15.0 across backend (`APP_VERSION`), help badge, and Academic Analytics dashboard title (local + external mirror).
 
 ### v0.14.0
 - **External Mirrors (push replication) + Public Dashboard mirror**: new `external_mirrors` backend module + Admin Config UI + companion PHP/MySQL receiver in `external_academic_analytics/`. Lets the production station push selected dashboard data (callsign and occupancy events) **and a snapshot bundle of the read-only API surface** (`version`, `scan/status`, `settings`, `map/ionospheric`, `map/contacts`, `analytics/academic`) to one or more remote PHP hosts over HTTPS without inbound port-forwarding. The receiver also serves a fully public, read-only replica of the Academic Analytics dashboard (max 5 min staleness, no WebSocket, no admin surface) e.g. https://cs5arc.pt/external_academic_analytics/. Per-mirror bcrypt-hashed tokens, HMAC-SHA256 request signing, replay protection, automatic disable after 5 consecutive failures. See `docs/external_mirrors.md`.
