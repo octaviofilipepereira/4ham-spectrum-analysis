@@ -3262,8 +3262,8 @@ Last update: 2026-04-03 UTC
       <div class="beacon-events-modal__backdrop" data-beacon-history-close="true"></div>
       <section class="beacon-events-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="beaconEventsModalTitle">
         <div class="beacon-events-modal__header">
-          <h3 class="beacon-events-modal__title" id="beaconEventsModalTitle">Beacon recent activity details</h3>
-          <button type="button" class="beacon-events-modal__close" data-beacon-history-close="true">Close</button>
+          <h3 class="beacon-events-modal__title" id="beaconEventsModalTitle" data-i18n="beacon_modal_title">Beacon recent activity details</h3>
+          <button type="button" class="beacon-events-modal__close" data-beacon-history-close="true" data-i18n="beacon_close_btn">Close</button>
         </div>
         <div class="beacon-events-modal__body">
           <div class="beacon-history-info-modal__hero">
@@ -4324,7 +4324,30 @@ Last update: 2026-04-03 UTC
         return normalized || "unknown";
       }
 
-      function beaconReferenceMeterLevel(snrDb) {
+      const _BEACON_STATE_KEYS = {
+        "Excellent": "beacon_state_excellent",
+        "Good": "beacon_state_good",
+        "Fair": "beacon_state_fair",
+        "Poor": "beacon_state_poor",
+        "No data": "beacon_state_no_data",
+        "Open": "beacon_state_open",
+        "Marginal": "beacon_state_marginal",
+        "Closed": "beacon_state_closed",
+        "Absorbed": "beacon_state_absorbed",
+        "aligned": "beacon_state_aligned",
+        "mixed": "beacon_state_mixed",
+        "divergent": "beacon_state_divergent",
+        "unknown": "beacon_state_unknown",
+        "Unknown": "beacon_state_unknown",
+        "Quiet": "beacon_state_quiet",
+        "Unsettled": "beacon_state_unsettled",
+        "Active": "beacon_state_active",
+      };
+      function beaconTranslateState(value) {
+        const key = _BEACON_STATE_KEYS[value];
+        return key ? t(key) : (value || "--");
+      }
+
         const value = Number(snrDb);
         if (!Number.isFinite(value) || value < 0.0) return 0;
         if (value < 1.5) return 1;
@@ -4370,7 +4393,7 @@ Last update: 2026-04-03 UTC
       }
 
       function renderBeaconHistoryEventsButton(detailKey, detail) {
-        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(detail.callsign)} on ${beaconEscapeHtml(detail.band)}">Events</button>`;
+        return `<button type="button" class="beacon-history-info-btn" data-beacon-history-info="${beaconEscapeHtml(detailKey)}" aria-label="Events for ${beaconEscapeHtml(detail.callsign)} on ${beaconEscapeHtml(detail.band)}">${t("beacon_events_btn")}</button>`;
       }
 
       function closeBeaconEventsModal() {
@@ -4888,17 +4911,17 @@ Last update: 2026-04-03 UTC
                       <span class="beacon-reading-band-label">${t("beacon_band_label")}</span>
                       <div class="beacon-reading-band-name">${beaconEscapeHtml(row.band || "--")}</div>
                     </div>
-                    <span class="beacon-badge ${toneClass}">${beaconEscapeHtml(row.agreement || "unknown")}</span>
+                    <span class="beacon-badge ${toneClass}">${beaconEscapeHtml(beaconTranslateState(row.agreement || "unknown"))}</span>
                   </div>
                   <div class="beacon-reading-band-flow">
                     <div class="beacon-reading-chip">
                       <span class="beacon-reading-chip-label">${t("beacon_observed_label")}</span>
-                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.observed_state || "--")}</div>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(beaconTranslateState(row.observed_state || "--"))}</div>
                     </div>
                     <div class="beacon-reading-flow-arrow" aria-hidden="true">&rarr;</div>
                     <div class="beacon-reading-chip beacon-reading-chip--ghost">
                       <span class="beacon-reading-chip-label">NOAA</span>
-                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(row.expected_state || "--")}</div>
+                      <div class="beacon-reading-chip-value">${beaconEscapeHtml(beaconTranslateState(row.expected_state || "--"))}</div>
                     </div>
                   </div>
                 </article>`;
@@ -4916,7 +4939,7 @@ Last update: 2026-04-03 UTC
                 <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
                 <div class="beacon-list-detail">${beaconEscapeHtml(row.confidence || "low")}</div>
               </div>
-              <span class="beacon-badge ${beaconBadgeClass(row.forecast_state)}">${beaconEscapeHtml(row.forecast_state || "No data")}</span>
+              <span class="beacon-badge ${beaconBadgeClass(row.forecast_state)}">${beaconEscapeHtml(beaconTranslateState(row.forecast_state || "No data"))}</span>
             </div>`)
           : [],
           t("beacon_no_data")
@@ -4931,18 +4954,18 @@ Last update: 2026-04-03 UTC
                 <div class="beacon-list-label">${beaconEscapeHtml(row.band || "--")}</div>
                 <div class="beacon-list-detail">${beaconEscapeHtml(`${row.events ?? 0} ${t("beacon_events_unit")}`)}</div>
               </div>
-              <span class="beacon-badge ${beaconBadgeClass(row.state)}">${beaconEscapeHtml(`${beaconFormatScore(row.score)} · ${row.state || "No data"}`)}</span>
+              <span class="beacon-badge ${beaconBadgeClass(row.state)}">${beaconEscapeHtml(`${beaconFormatScore(row.score)} · ${beaconTranslateState(row.state || "No data")}`)}</span>
             </div>`)
           : [],
           t("beacon_no_data")
         );
 
         const ionoRows = payload ? [
-          `<div class="beacon-list-row"><div class="beacon-list-label">Kp</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.kp)} · ${iono.kp_condition || "--"}`)}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">Kp</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.kp)} · ${beaconTranslateState(iono.kp_condition || "--")}`)}</div></div>`,
           `<div class="beacon-list-row"><div class="beacon-list-label">SFI</div><div class="beacon-list-detail">${beaconEscapeHtml(beaconFormatScore(iono.sfi))}</div></div>`,
           `<div class="beacon-list-row"><div class="beacon-list-label">foF2</div><div class="beacon-list-detail">${beaconEscapeHtml(`${beaconFormatScore(iono.fof2_estimated_mhz)} MHz`)}</div></div>`,
-          `<div class="beacon-list-row"><div class="beacon-list-label">20m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["20m"] || {}).status) || "--")}</div></div>`,
-          `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml((((iono.bands || {})["17m"] || {}).status) || "--")}</div></div>`
+          `<div class="beacon-list-row"><div class="beacon-list-label">20m</div><div class="beacon-list-detail">${beaconEscapeHtml(beaconTranslateState((((iono.bands || {})["20m"] || {}).status) || "--"))}</div></div>`,
+          `<div class="beacon-list-row"><div class="beacon-list-label">17m</div><div class="beacon-list-detail">${beaconEscapeHtml(beaconTranslateState((((iono.bands || {})["17m"] || {}).status) || "--"))}</div></div>`
         ] : [];
         renderBeaconRowList("beaconIonosphericContext", ionoRows, t("beacon_no_data"));
 
