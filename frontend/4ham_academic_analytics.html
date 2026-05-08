@@ -2345,8 +2345,7 @@ Last update: 2026-04-03 UTC
               <div class="snr-gauge-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span></div>
             </div>
             <div class="prop-state">
-              <span id="kpiPropState" class="badge">--</span>
-              <button type="button" class="helper-icon" style="font-size:10px;width:16px;height:16px;line-height:14px;padding:0;margin-left:5px;vertical-align:middle;" aria-label="Explain propagation score" data-help-title="Global Propagation Score" data-help-text="Confirmed decodes only (verified callsign).&#10;No callsign = band occupancy.">i</button>
+              <span id="kpiPropState" class="badge"><span id="kpiPropLabel">--</span><button type="button" class="helper-icon" style="font-size:10px;width:14px;height:14px;line-height:12px;padding:0;margin-left:5px;vertical-align:middle;" aria-label="Explain propagation score" data-help-title="Global Propagation Score" data-help-text="Confirmed decodes only (verified callsign).&#10;No callsign = band occupancy.">i</button></span>
             </div>
           </div>
           <div class="card">
@@ -2893,6 +2892,7 @@ Last update: 2026-04-03 UTC
       const kpiPropScoreCard = document.getElementById("kpiPropScoreCard");
       const kpiPropScore = document.getElementById("kpiPropScore");
       const kpiPropState = document.getElementById("kpiPropState");
+      const kpiPropLabel = document.getElementById("kpiPropLabel");
       const kpiBestBand = document.getElementById("kpiBestBand");
       const kpiBestBandScore = document.getElementById("kpiBestBandScore");
       const metaPeriod = document.getElementById("metaPeriod");
@@ -5449,7 +5449,7 @@ Last update: 2026-04-03 UTC
         const state = propagationState(score);
 
         updateKpiGauge(kpiPropScoreNeedle, kpiPropScoreCard, kpiPropScore, score, 0, 100, (v) => `${v.toFixed(1)}`);
-        kpiPropState.textContent = state.label;
+        kpiPropLabel.textContent = state.label;
         kpiPropState.className = `badge ${state.className}`;
 
         if (propagation.bestBand) {
