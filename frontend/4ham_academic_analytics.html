@@ -1870,7 +1870,7 @@ Last update: 2026-04-03 UTC
 
       <div id="beaconView" class="beacon-view">
       <section class="panel">
-        <p class="beacon-note" data-i18n="beacon_history_note">Historical analysis only — not the current slot state.</p>
+        <p id="beaconHistoryNote" class="beacon-note" data-i18n="beacon_history_note">Historical analysis only — not the current slot state.</p>
 
         <div class="cards">
           <div class="card">
@@ -2111,12 +2111,14 @@ Last update: 2026-04-03 UTC
       let isLoading = false;
       let serverPropagation = null; // propagation data from API (overrides client-side compute)
       let lastScanRuntimeSnapshot = { kind: "unavailable", payload: null };
+      let lastBeaconRuntimeSnapshot = { kind: "unavailable", payload: null };
       let activeAcademicView = localStorage.getItem("academic_active_view") || "hf";
       let beaconDataLoaded = false;
       let beaconOverview = null;
       let beaconObservations = [];
       const BEACON_WINDOW_HOURS = 12;
       const BEACON_OBSERVATION_LIMIT = 20;
+      const beaconHistoryNote = document.getElementById("beaconHistoryNote");
 
       updateMetaUpdateFrequency();
 
@@ -2551,6 +2553,40 @@ Last update: 2026-04-03 UTC
         return compact.replace(/^(\d+(?:\.\d+)?)(cm|m)$/i, "$1\u00A0$2");
       }
 
+      function formatScanFrequencyLabel(freqHz) {
+        const value = Number(freqHz);
+        if (!Number.isFinite(value) || value <= 0) {
+          return "";
+        }
+        return `${(value / 1e6).toFixed(3)}\u00A0MHz`;
+      }
+
+      function getBeaconSchedulerSnapshot() {
+        if (!lastBeaconRuntimeSnapshot || lastBeaconRuntimeSnapshot.kind !== "payload") {
+          return null;
+        }
+        const scheduler = lastBeaconRuntimeSnapshot.payload?.scheduler;
+        return scheduler && scheduler.running ? scheduler : null;
+      }
+
+      function hasActiveGenericScan() {
+        if (!lastScanRuntimeSnapshot || lastScanRuntimeSnapshot.kind !== "payload") {
+          return false;
+        }
+        const payload = lastScanRuntimeSnapshot.payload || {};
+        const state = String(payload.state || "").trim().toLowerCase();
+        return state === "preview" || state === "running" || Boolean(payload.rotation?.running);
+      }
+
+      function renderBeaconHistoryNote() {
+        if (!beaconHistoryNote) {
+          return;
+        }
+        const beaconRunning = Boolean(getBeaconSchedulerSnapshot());
+        const showHistoryNote = activeAcademicView === "beacon" && !beaconRunning && hasActiveGenericScan();
+        beaconHistoryNote.hidden = !showHistoryNote;
+      }
+
       function setScanRuntimeInfo(stateName, text) {
         if (!scanRuntimeInfo) {
           return;
@@ -2562,6 +2598,22 @@ Last update: 2026-04-03 UTC
 
       function renderScanRuntimeInfo() {
         if (!scanRuntimeInfo) {
+          return;
+        }
+
+        renderBeaconHistoryNote();
+
+        const beaconScheduler = activeAcademicView === "beacon" ? getBeaconSchedulerSnapshot() : null;
+        if (beaconScheduler) {
+          const details = [
+            formatScanBandLabel(beaconScheduler.current_band),
+            formatScanFrequencyLabel(beaconScheduler.current_freq_hz),
+          ].filter(Boolean).join(" · ");
+          let text = t("scan_status_beacon_label");
+          if (details) {
+            text = `${text}: ${details}`;
+          }
+          setScanRuntimeInfo("running", text);
           return;
         }
 
@@ -2628,7 +2680,7 @@ Last update: 2026-04-03 UTC
         setScanRuntimeInfo("stopped", t("scan_status_stopped"));
       }
 
-      async function fetchScanRuntimeStatus() {
+      async function fetchScanRuntimeStatus({ deferRender = false } = {}) {
         try {
           const resp = await fetch(`${_BASE}api/scan/status`);
           if (!resp.ok) {
@@ -2642,8 +2694,30 @@ Last update: 2026-04-03 UTC
         } catch (_) {
           lastScanRuntimeSnapshot = { kind: "unavailable", payload: null, receivedAt: Date.now() };
         }
-        renderScanRuntimeInfo();
-        startScanRuntimeTicker();
+        if (!deferRender) {
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
+        }
+      }
+
+      async function fetchBeaconRuntimeStatus({ deferRender = false } = {}) {
+        try {
+          const resp = await fetch(`${_BASE}api/beacons/status`);
+          if (!resp.ok) {
+            throw new Error("beacon status request failed");
+          }
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {
+            throw new Error("beacon status payload invalid");
+          }
+          lastBeaconRuntimeSnapshot = { kind: "payload", payload, receivedAt: Date.now() };
+        } catch (_) {
+          lastBeaconRuntimeSnapshot = { kind: "unavailable", payload: null, receivedAt: Date.now() };
+        }
+        if (!deferRender) {
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
+        }
       }
 
       let scanRuntimeTicker = null;
@@ -2887,8 +2961,11 @@ Last update: 2026-04-03 UTC
           const [overviewResp, obsResp] = await Promise.all([
             fetch(`${_BASE}api/beacons/analytics/overview?${overviewParams.toString()}`),
             fetch(`${_BASE}api/beacons/observations?${obsParams.toString()}`),
-            fetchScanRuntimeStatus(),
+            fetchScanRuntimeStatus({ deferRender: true }),
+            fetchBeaconRuntimeStatus({ deferRender: true }),
           ]);
+          renderScanRuntimeInfo();
+          startScanRuntimeTicker();
           updateApiLastFetchInfo(queryAt);
           if (!overviewResp.ok || !obsResp.ok) {
             throw new Error("Beacon analytics request failed");
