@@ -5050,13 +5050,21 @@ Last update: 2026-04-03 UTC
             const [bLon, bLat] = coords;
             const info = detectionMap[cs] || { detected: false, bands: new Set() };
 
+            // Bandas detectadas por ordem NCDXF (20→10m)
+            const detectedBands = NCDXF_BANDS.filter((b) => info.bands.has(b));
+
             if (info.detected) {
-              const primaryBand = NCDXF_BANDS.find((b) => info.bands.has(b)) || [...info.bands][0] || "20m";
-              const color = _pmColor(primaryBand);
-              arcG.append("path")
-                .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
-                .attr("d", path).attr("fill", "none")
-                .attr("stroke", color).attr("stroke-width", 1.8).attr("stroke-opacity", 0.85);
+              // Um arco por banda, espessura decresce da mais baixa para a mais alta
+              // (20m mais espesso e desenhado primeiro; 10m mais fino por cima)
+              const strokeWidths = [2.4, 2.0, 1.6, 1.2, 0.9];
+              detectedBands.forEach((band, i) => {
+                arcG.append("path")
+                  .datum({ type: "LineString", coordinates: [[sLon, sLat], [bLon, bLat]] })
+                  .attr("d", path).attr("fill", "none")
+                  .attr("stroke", _pmColor(band))
+                  .attr("stroke-width", strokeWidths[i] ?? 0.9)
+                  .attr("stroke-opacity", 0.85);
+              });
             }
 
             if (d3.geoDistance([bLon, bLat], center) >= Math.PI / 2) continue;
@@ -5064,24 +5072,35 @@ Last update: 2026-04-03 UTC
             if (!pp) continue;
 
             if (info.detected) {
-              const primaryBand = NCDXF_BANDS.find((b) => info.bands.has(b)) || [...info.bands][0] || "20m";
-              const color = _pmColor(primaryBand);
-              const bandList = NCDXF_BANDS.filter((b) => info.bands.has(b)).join(", ") || [...info.bands].join(", ");
+              const bandList = detectedBands.join(", ");
               const loc = BEACON_LOCATION_BY_CALLSIGN[cs] || "";
-              dotG.append("circle")
-                .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", 5.5)
-                .attr("fill", color).attr("stroke", "#fff").attr("stroke-width", 1.2).attr("opacity", 0.93)
-                .style("cursor", "pointer")
-                .on("mousemove", (evt) => {
-                  tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Detectado em: ${bandList}`;
-                  tip.style.display = "block";
-                  tip.style.left = evt.clientX + 14 + "px";
-                  tip.style.top  = evt.clientY - 34 + "px";
-                })
-                .on("mouseleave", () => { tip.style.display = "none"; });
+              // Anéis concêntricos — um por banda (mais externo=20m, mais interno=10m)
+              const baseR = 4.5;
+              const step  = 3.0;
+              // Desenhar do maior para o menor (maior fica atrás)
+              [...detectedBands].reverse().forEach((band, ri) => {
+                const r = baseR + (detectedBands.length - 1 - ri) * step;
+                dotG.append("circle")
+                  .attr("cx", pp[0]).attr("cy", pp[1]).attr("r", r)
+                  .attr("fill", "none")
+                  .attr("stroke", _pmColor(band))
+                  .attr("stroke-width", 2.0)
+                  .attr("opacity", 0.92)
+                  .style("cursor", "pointer")
+                  .on("mousemove", (evt) => {
+                    tip.innerHTML = `<strong>${cs}</strong> · ${loc}<br>Detectado em: <strong>${bandList}</strong>`;
+                    tip.style.display = "block";
+                    tip.style.left = evt.clientX + 14 + "px";
+                    tip.style.top  = evt.clientY - 34 + "px";
+                  })
+                  .on("mouseleave", () => { tip.style.display = "none"; });
+              });
+              // Label com a cor da banda mais baixa (mais visível)
+              const labelColor = _pmColor(detectedBands[0]);
               dotG.append("text")
-                .attr("x", pp[0] + 7).attr("y", pp[1] + 4)
-                .attr("fill", color).attr("font-size", "9px")
+                .attr("x", pp[0] + baseR + (detectedBands.length - 1) * step + 4)
+                .attr("y", pp[1] + 4)
+                .attr("fill", labelColor).attr("font-size", "9px")
                 .attr("font-family", "monospace").attr("pointer-events", "none")
                 .text(cs);
             } else {
