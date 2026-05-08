@@ -147,6 +147,7 @@
     const station  = data.station  || {};
     const allContacts = Array.isArray(data.contacts) ? data.contacts : [];
     const selectedBand = getBandFilter();
+    const showArcs = getArcsEnabled();
     const contacts = selectedBand === "all"
       ? allContacts
       : allContacts.filter((contact) => String(contact?.band || "").trim().toLowerCase() === selectedBand);
@@ -246,16 +247,18 @@
 
       // Great-circle arcs as GeoJSON LineString — D3+orthographic clips automatically
       arcG.selectAll("path").remove();
-      contacts.forEach((c) => {
-        if (c.lat == null || c.lon == null) return;
-        arcG.append("path")
-          .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
-          .attr("d", path)
-          .attr("fill", "none")
-          .attr("stroke", bandColor(c.band))
-          .attr("stroke-width", isBeaconMap ? 2.2 : 1.8)
-          .attr("stroke-opacity", isBeaconMap ? 0.92 : 0.85);
-      });
+      if (showArcs) {
+        contacts.forEach((c) => {
+          if (c.lat == null || c.lon == null) return;
+          arcG.append("path")
+            .datum({ type: "LineString", coordinates: [[sLon, sLat], [c.lon, c.lat]] })
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", bandColor(c.band))
+            .attr("stroke-width", isBeaconMap ? 2.2 : 1.8)
+            .attr("stroke-opacity", isBeaconMap ? 0.92 : 0.85);
+        });
+      }
 
       // Dots — only on visible hemisphere (geoDistance < 90°)
       dotG.selectAll("*").remove();
@@ -462,6 +465,11 @@
     return sel ? String(sel.value || "all").trim().toLowerCase() : "all";
   }
 
+  function getArcsEnabled() {
+    const toggle = document.getElementById("mapArcsToggle");
+    return toggle ? Boolean(toggle.checked) : true;
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
   const PropMap = {
     init(containerId, windowMinutes) {
@@ -535,6 +543,12 @@
       const bandSel = document.getElementById("mapBandFilter");
       if (bandSel) {
         bandSel.addEventListener("change", refreshInlineAndModal);
+      }
+
+      // Re-render immediately when user toggles map arcs
+      const arcsToggle = document.getElementById("mapArcsToggle");
+      if (arcsToggle) {
+        arcsToggle.addEventListener("change", refreshInlineAndModal);
       }
     }
 
