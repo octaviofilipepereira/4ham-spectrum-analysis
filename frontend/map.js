@@ -21,7 +21,6 @@
   const MAP_ALLOWED_BAND_FILTERS = new Set([
     "all", "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm",
   ]);
-  const MAP_BAND_DISPLAY_ORDER = ["160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m", "2m", "70cm"];
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   const authHeader = () => {
@@ -70,25 +69,6 @@
       + `${contact.band} · ${contact.mode} · SNR ${snrLabel} · ${distanceLabel}`;
   }
 
-  function normalizeBandValue(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function collectBandCounts(contacts) {
-    const counts = new Map();
-    for (const band of MAP_BAND_DISPLAY_ORDER) {
-      counts.set(band, 0);
-    }
-    (contacts || []).forEach((contact) => {
-      const band = normalizeBandValue(contact?.band);
-      if (!MAP_ALLOWED_BAND_FILTERS.has(band) || band === "all") {
-        return;
-      }
-      counts.set(band, Number(counts.get(band) || 0) + 1);
-    });
-    return counts;
-  }
-
   // ── State ────────────────────────────────────────────────────────────────
   let _worldData    = null;
   let _refreshTimer = null;
@@ -133,85 +113,6 @@
   function queuePendingPayload(containerId, payload) {
     const viewState = getViewState(containerId);
     viewState.pendingPayload = payload;
-  }
-
-  function setBandFilter(value) {
-    const bandSel = document.getElementById("mapBandFilter");
-    if (!bandSel) {
-      return false;
-    }
-    const normalized = normalizeBandValue(value || "all");
-    const safeBand = MAP_ALLOWED_BAND_FILTERS.has(normalized) ? normalized : "all";
-    bandSel.value = safeBand;
-    return true;
-  }
-
-  function renderBandMiniCounters(allContacts, selectedBand) {
-    const host = document.getElementById("mapBandMiniCounters");
-    if (!host) {
-      return;
-    }
-
-    const counts = collectBandCounts(allContacts);
-    const total = Array.from(counts.values()).reduce((acc, value) => acc + Number(value || 0), 0);
-    const activeBand = MAP_ALLOWED_BAND_FILTERS.has(selectedBand) ? selectedBand : "all";
-    const visibleEntries = MAP_BAND_DISPLAY_ORDER
-      .map((band) => ({ band, count: Number(counts.get(band) || 0) }))
-      .filter((entry) => entry.count > 0);
-
-    if (activeBand !== "all" && !visibleEntries.some((entry) => entry.band === activeBand)) {
-      visibleEntries.unshift({ band: activeBand, count: 0 });
-    }
-
-    host.innerHTML = "";
-
-    const prefix = document.createElement("span");
-    prefix.className = "text-muted small";
-    prefix.textContent = "Bands:";
-    host.appendChild(prefix);
-
-    const allBtn = document.createElement("button");
-    allBtn.type = "button";
-    allBtn.className = `btn btn-sm ${activeBand === "all" ? "btn-info text-dark" : "btn-outline-secondary"}`;
-    allBtn.style.padding = "0.05rem 0.38rem";
-    allBtn.style.fontSize = "0.72rem";
-    allBtn.textContent = `All ${total}`;
-    allBtn.addEventListener("click", () => {
-      if (setBandFilter("all")) {
-        persistMapBandFilterPreference();
-        refreshMapViews();
-      }
-    });
-    host.appendChild(allBtn);
-
-    visibleEntries.forEach((entry) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `btn btn-sm ${activeBand === entry.band ? "btn-info text-dark" : "btn-outline-secondary"}`;
-      button.style.padding = "0.05rem 0.38rem";
-      button.style.fontSize = "0.72rem";
-      button.title = `Filter map to ${entry.band}`;
-
-      const dot = document.createElement("span");
-      dot.style.display = "inline-block";
-      dot.style.width = "8px";
-      dot.style.height = "8px";
-      dot.style.borderRadius = "50%";
-      dot.style.marginRight = "6px";
-      dot.style.background = bandColor(entry.band);
-      button.appendChild(dot);
-
-      const label = document.createTextNode(`${entry.band} ${entry.count}`);
-      button.appendChild(label);
-
-      button.addEventListener("click", () => {
-        if (setBandFilter(entry.band)) {
-          persistMapBandFilterPreference();
-          refreshMapViews();
-        }
-      });
-      host.appendChild(button);
-    });
   }
 
   function scheduleInteractionRelease(containerId) {
@@ -274,8 +175,6 @@
     const sLat = station.lat ?? 39.5;
     const sLon = station.lon ?? -8.0;
     const viewState = getViewState(container.id);
-
-    renderBandMiniCounters(allContacts, selectedBand);
 
     container.innerHTML = "";
 
@@ -583,7 +482,7 @@
 
   function getBandFilter() {
     const sel = document.getElementById("mapBandFilter");
-    const raw = sel ? normalizeBandValue(sel.value || "all") : "all";
+    const raw = sel ? String(sel.value || "all").trim().toLowerCase() : "all";
     return MAP_ALLOWED_BAND_FILTERS.has(raw) ? raw : "all";
   }
 
@@ -622,17 +521,6 @@
     try {
       localStorage.setItem(MAP_ARCS_TOGGLE_STORAGE_KEY, getArcsEnabled() ? "1" : "0");
     } catch (_) {}
-  }
-
-  function refreshMapViews() {
-    if (!window.PropMap) {
-      return;
-    }
-    window.PropMap.refresh(_inlineContainerId, getWindowMinutes());
-    const fullscreenModalEl = document.getElementById("mapFullscreenModal");
-    if (fullscreenModalEl && fullscreenModalEl.classList.contains("show")) {
-      window.PropMap.renderModal();
-    }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -695,10 +583,18 @@
         requestAnimationFrame(() => PropMap.init("propagationMap"));
       });
 
+      const refreshInlineAndModal = () => {
+        PropMap.refresh("propagationMap");
+        const fullscreenModalEl = document.getElementById("mapFullscreenModal");
+        if (fullscreenModalEl && fullscreenModalEl.classList.contains("show")) {
+          PropMap.renderModal();
+        }
+      };
+
       // Re-render immediately when user changes the time window
       const sel = document.getElementById("mapWindowSelect");
       if (sel) {
-        sel.addEventListener("change", refreshMapViews);
+        sel.addEventListener("change", refreshInlineAndModal);
       }
 
       // Re-render immediately when user changes the selected band filter
@@ -706,7 +602,7 @@
       if (bandSel) {
         bandSel.addEventListener("change", () => {
           persistMapBandFilterPreference();
-          refreshMapViews();
+          refreshInlineAndModal();
         });
       }
 
@@ -715,7 +611,7 @@
       if (arcsToggle) {
         arcsToggle.addEventListener("change", () => {
           persistMapArcsPreference();
-          refreshMapViews();
+          refreshInlineAndModal();
         });
       }
     }
