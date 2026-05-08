@@ -5176,13 +5176,13 @@ Last update: 2026-04-03 UTC
           const span = document.createElement("span");
           span.className = "propmap-band-btn";
           span.style.cssText = `background:${color}33;color:${color};border-color:${color};cursor:default;`;
-          span.textContent = band;
+          span.innerHTML = `<span style="font-size:1.1em;vertical-align:middle;margin-right:3px;">●</span>${band} detectado`;
           legend.appendChild(span);
         }
         const noDetSpan = document.createElement("span");
         noDetSpan.className = "propmap-band-btn off";
-        noDetSpan.style.cssText = "cursor:default;";
-        noDetSpan.textContent = "sem cópia";
+        noDetSpan.style.cssText = "cursor:default;color:#64748b;border-color:#334155;";
+        noDetSpan.innerHTML = `<span style="font-size:1.1em;vertical-align:middle;margin-right:3px;color:#334155;">●</span>monitorado, sem cópia`;
         legend.appendChild(noDetSpan);
         wrap.appendChild(legend);
       }
