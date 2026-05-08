@@ -3224,6 +3224,16 @@ Last update: 2026-04-03 UTC
             </div>
             <div class="beacon-list" id="beaconIonosphericContext"></div>
           </article>
+
+          <article class="chart-panel span-12 beacon-propmap-card">
+            <div class="chart-header">
+              <h3 data-i18n="chart_propmap">QTH-Centric Propagation Map</h3>
+              <button type="button" class="helper-icon" aria-label="Explain QTH Propagation Map" data-help-title="QTH-Centric Propagation Map" data-help-html="Orthographic globe centred on your QTH.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Coloured zones&lt;/strong&gt; — NOAA-predicted propagation per band, shaped by solar position (3 intensity layers: strong / moderate / fringe).&lt;br&gt;&lt;strong&gt;Day/night terminator&lt;/strong&gt; — dashed yellow line separating sunlit and dark hemispheres.&lt;br&gt;&lt;strong&gt;Dots &amp; arcs&lt;/strong&gt; — Confirmed SDR contacts in the selected period.&lt;br&gt;&lt;br&gt;&lt;strong&gt;Correlation:&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#4ade80'&gt;●&lt;/span&gt; Contact inside predicted zone = &lt;strong&gt;Confirmed&lt;/strong&gt;&lt;br&gt;&lt;span style='color:#f87171'&gt;●&lt;/span&gt; Contact outside zone = &lt;strong&gt;Anomaly&lt;/strong&gt; (better than predicted)&lt;br&gt;&lt;br&gt;Drag to rotate · Scroll to zoom (CTRL+ Mouse Wheel) · Double-click to reset.&lt;br&gt;Select bands on the left to display propagation zones. Click ⤢ for fullscreen." data-i18n-help-html="help_propmap" data-i18n-help-title="chart_propmap">i</button>
+            </div>
+            <p data-i18n="chart_propmap_desc">NOAA propagation zones vs real SDR contacts — select bands, drag to rotate, scroll to zoom (CTRL+ Mouse Wheel).</p>
+            <div class="propmap-wrap" id="beaconPropMapWrap"></div>
+            <div class="propmap-mobile-legends" id="beaconPropMapMobileLegends"></div>
+          </article>
         </div>
       </section>
       </div><!-- /beaconView -->
@@ -5234,9 +5244,22 @@ Last update: 2026-04-03 UTC
         return 60;
       }
 
+      function getPropMapHosts() {
+        return [
+          {
+            wrap: document.getElementById("propMapWrap"),
+            mobileLegendHost: document.getElementById("propMapMobileLegends"),
+          },
+          {
+            wrap: document.getElementById("beaconPropMapWrap"),
+            mobileLegendHost: document.getElementById("beaconPropMapMobileLegends"),
+          },
+        ].filter((host) => host.wrap);
+      }
+
       async function refreshPropMap() {
-        const wrap = document.getElementById("propMapWrap");
-        if (!wrap || !window.d3 || !window.topojson) return;
+        const hosts = getPropMapHosts();
+        if (!hosts.length || !window.d3 || !window.topojson) return;
 
         try {
           const [ionoResp, contactResp, world] = await Promise.all([
@@ -5257,18 +5280,20 @@ Last update: 2026-04-03 UTC
             }
           }
 
-          drawPropMap(wrap, world);
+          hosts.forEach(({ wrap, mobileLegendHost }) => {
+            drawPropMap(wrap, world, { mobileLegendHost });
+          });
         } catch (e) {
           console.warn("[propmap] fetch failed", e);
         }
       }
 
-      function drawPropMap(wrap, world) {
+      function drawPropMap(wrap, world, options = {}) {
         const iono = _pmIonoData;
         const cdata = _pmContactData;
         if (!iono || !cdata) return;
 
-        const mobileLegendHost = document.getElementById("propMapMobileLegends");
+        const mobileLegendHost = options.mobileLegendHost || null;
         if (mobileLegendHost) {
           mobileLegendHost.innerHTML = "";
         }
@@ -5640,7 +5665,7 @@ Last update: 2026-04-03 UTC
             document.exitFullscreen && document.exitFullscreen().catch(() => {});
           }
           setTimeout(() => {
-            drawPropMap(wrap, world);
+            drawPropMap(wrap, world, options);
           }, 200);
         }));
         wrap.appendChild(ctrl);
@@ -5650,7 +5675,7 @@ Last update: 2026-04-03 UTC
           if (!document.fullscreenElement && _pmIsFullscreen) {
             _pmIsFullscreen = false;
             wrap.classList.remove("fullscreen");
-            setTimeout(() => drawPropMap(wrap, world), 100);
+            setTimeout(() => drawPropMap(wrap, world, options), 100);
           }
         });
 
