@@ -190,6 +190,9 @@ CREATE INDEX IF NOT EXISTS idx_beacon_obs_band
 """
 
 
+_SQLITE_DELETE_BATCH_SIZE = 500
+
+
 class Database:
     def __init__(self, path):
         self.path = path
@@ -1440,17 +1443,29 @@ class Database:
         """
         with self._lock:
             deleted = 0
-            if occ_ids:
-                ph = ",".join("?" * len(occ_ids))
-                cursor = self.conn.execute(
-                    f"DELETE FROM occupancy_events WHERE id IN ({ph})", occ_ids
-                )
-                deleted += cursor.rowcount
-            if call_ids:
-                ph = ",".join("?" * len(call_ids))
-                cursor = self.conn.execute(
-                    f"DELETE FROM callsign_events WHERE id IN ({ph})", call_ids
-                )
-                deleted += cursor.rowcount
+            deleted += self._delete_ids_in_batches(
+                "DELETE FROM occupancy_events WHERE id IN ({placeholders})",
+                occ_ids,
+            )
+            deleted += self._delete_ids_in_batches(
+                "DELETE FROM callsign_events WHERE id IN ({placeholders})",
+                call_ids,
+            )
             self.conn.commit()
             return deleted
+
+    def _delete_ids_in_batches(self, sql_template: str, ids: list) -> int:
+        if not ids:
+            return 0
+
+        batch_size = max(1, int(_SQLITE_DELETE_BATCH_SIZE))
+        deleted = 0
+        for start in range(0, len(ids), batch_size):
+            batch = ids[start:start + batch_size]
+            placeholders = ",".join("?" for _ in batch)
+            cursor = self.conn.execute(
+                sql_template.format(placeholders=placeholders),
+                batch,
+            )
+            deleted += cursor.rowcount
+        return deleted
