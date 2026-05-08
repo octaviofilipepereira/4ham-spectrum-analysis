@@ -4348,6 +4348,7 @@ Last update: 2026-04-03 UTC
         return key ? t(key) : (value || "--");
       }
 
+      function beaconReferenceMeterLevel(snrDb) {
         const value = Number(snrDb);
         if (!Number.isFinite(value) || value < 0.0) return 0;
         if (value < 1.5) return 1;
