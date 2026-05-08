@@ -361,8 +361,7 @@ Last update: 2026-04-03 UTC
         min-width: 0;
       }
 
-      .dt-pair input[type="text"],
-      .dt-pair input[type="time"] {
+      .dt-pair input[type="text"] {
         min-width: 0;
         flex: 1;
         padding: 4px 6px;
@@ -374,7 +373,7 @@ Last update: 2026-04-03 UTC
         color-scheme: dark;
       }
 
-      .dt-pair input[type="time"] {
+      .dt-pair .time-input {
         width: 6.5rem;
         flex: none;
       }
@@ -1439,11 +1438,11 @@ Last update: 2026-04-03 UTC
             <div class="custom-range" id="customRange" style="display:none;">
               <div class="dt-pair">
                 <input type="text" id="startInputDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" />
-                <input type="time" id="startInputTime" />
+                <input type="text" class="time-input" id="startInputTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off" />
               </div>
               <div class="dt-pair">
                 <input type="text" id="endInputDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" />
-                <input type="time" id="endInputTime" />
+                <input type="text" class="time-input" id="endInputTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off" />
               </div>
             </div>
           </div>
@@ -1644,12 +1643,12 @@ Last update: 2026-04-03 UTC
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">From</label>
                 <input type="text" id="aprsCustomStartDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
-                <input type="time" id="aprsCustomStartTime" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="text" class="time-input" id="aprsCustomStartTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
               </div>
               <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:0.75rem;color:var(--text-muted);white-space:nowrap;width:2.2rem">To</label>
                 <input type="text" id="aprsCustomEndDate" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="flex:1;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
-                <input type="time" id="aprsCustomEndTime" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;color-scheme:dark;">
+                <input type="text" class="time-input" id="aprsCustomEndTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off" style="width:5.5rem;min-width:0;padding:3px 6px;border-radius:6px;border:1px solid #334155;background:#1a2035;color:#e2e8f0;font-size:0.78rem;">
               </div>
               <button class="apply-btn" id="aprsApplyBtn" data-i18n="apply_filters" style="align-self:flex-start;margin-top:2px">Apply Filters</button>
             </div>
@@ -1934,6 +1933,20 @@ Last update: 2026-04-03 UTC
           },
         };
       })();
+      // Auto-formatar HH:MM nos inputs de hora
+      function _bindTimeFmt(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", function () {
+          let v = this.value.replace(/\D/g, "").slice(0, 4);
+          if (v.length > 2) v = v.slice(0, 2) + ":" + v.slice(2);
+          this.value = v;
+        });
+      }
+      _bindTimeFmt("startInputTime");
+      _bindTimeFmt("endInputTime");
+      _bindTimeFmt("aprsCustomStartTime");
+      _bindTimeFmt("aprsCustomEndTime");
       const bandFilter = document.getElementById("bandFilter");
       const modeFilter = document.getElementById("modeFilter");
       const applyBtn = document.getElementById("applyBtn");
